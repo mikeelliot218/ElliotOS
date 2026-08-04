@@ -38,20 +38,80 @@ Tudo é compilado e instalado via um único script (`luascript.sh`), que constr�
 
 ## Instalação
 
-> **Requisitos:** Android com [Termux](https://f-droid.org/packages/com.termux/) instalado via F-Droid. Sem root.
+> **Requisito:** Android com [Termux via F-Droid](https://f-droid.org/packages/com.termux/) — não use a versão da Play Store, está desatualizada.
+
+Escolha o modo abaixo e cole o bloco completo no Termux:
+
+---
+
+### Mínimo — só o ElliotOS
+
+Sistema, REPL `ms`, ferramentas de rede e pentest. Sem editor, sem GUI.
 
 ```bash
-# 1. Instale o Termux pelo F-Droid (não use a versão da Play Store — está desatualizada)
-# 2. No Termux:
-
-pkg update -y && pkg install -y git wget curl
-
+pkg update -y && pkg install -y git wget curl clang
 git clone https://github.com/mikeelliot218/ElliotOS.git
 cd ElliotOS
 bash luascript.sh
 ```
 
-A instalação compila tudo do zero e leva cerca de **15 a 20 minutos** dependendo do dispositivo. Nenhuma etapa exige root.
+---
+
+### Com editor — ElliotOS + ElliotOS Editor
+
+Tudo do modo mínimo + editor de texto nativo (`ms -e`).
+
+```bash
+pkg update -y && pkg install -y git wget curl clang
+git clone https://github.com/mikeelliot218/ElliotOS.git
+cd ElliotOS
+bash luascript.sh -e
+```
+
+---
+
+### Com GUI — ElliotOS + XFCE4 (Termux:X11)
+
+Tudo do modo mínimo + ambiente gráfico XFCE4. Sem editor.
+
+```bash
+pkg update -y && pkg install -y git wget curl clang
+git clone https://github.com/mikeelliot218/ElliotOS.git
+cd ElliotOS
+bash luascript.sh --gui
+```
+
+---
+
+### Full — ElliotOS + Editor + GUI
+
+Instalação completa: sistema + editor + XFCE4.
+
+```bash
+pkg update -y && pkg install -y git wget curl clang
+git clone https://github.com/mikeelliot218/ElliotOS.git
+cd ElliotOS
+bash luascript.sh -e --gui
+```
+
+---
+
+### Atualizar — já tem o ElliotOS instalado?
+
+Clona o repositório novamente para pegar o `luascript.sh` mais recente e atualiza o sistema.
+
+```bash
+pkg update -y && pkg install -y git wget curl clang
+git clone https://github.com/mikeelliot218/ElliotOS.git
+cd ElliotOS
+bash luascript.sh --update
+```
+
+---
+
+> A instalação compila tudo do zero e leva cerca de **15 a 20 minutos** dependendo do dispositivo. Nenhuma etapa exige root.
+>
+> Para ver todas as opções do instalador: `bash luascript.sh -h`
 
 ---
 
