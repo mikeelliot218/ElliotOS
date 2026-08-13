@@ -101055,7 +101055,7 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
 
     _NH_DIR="\$HOME/.xpm/nethunter"
     _NH_INSTALLER="\$_NH_DIR/install-nethunter.sh"
-    _NH_ROOTFS="\$HOME/kali-nethunter"
+    _NH_ROOTFS="\$HOME/.xpm/kali/rootfs"
     _PREFIX="\${PREFIX:-/data/data/com.termux/files/usr}"
     _TMPDIR="\${TMPDIR:-\$_PREFIX/tmp}"
 
@@ -101189,13 +101189,13 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     {
       printf '#!/data/data/com.termux/files/usr/bin/bash\n'
       printf '# ElliotOS NetHunter launcher\n'
-      printf 'NH_ROOTFS="${HOME}/kali-nethunter"\n'
-      printf '[ ! -d "$NH_ROOTFS" ] && { echo "NetHunter nao instalado. Execute: ms -nh"; exit 1; }\n'
+      printf 'NH_ROOTFS="\${HOME}/.xpm/kali/rootfs"\n'
+      printf '[ ! -d "\$NH_ROOTFS" ] && { echo "NetHunter nao instalado. Execute: ms -nh"; exit 1; }\n'
       printf 'unset LD_PRELOAD\n'
       printf '_BINDS="-b /dev -b /proc -b /sys"\n'
-      printf '[ -d /sdcard ] && _BINDS="$_BINDS -b /sdcard"\n'
-      printf '[ -d /data   ] && _BINDS="$_BINDS -b /data"\n'
-      printf 'exec proot --link2symlink -0 -r "$NH_ROOTFS" $_BINDS -b "${HOME}:/root" -w /root /usr/bin/env -i HOME=/root TERM="${TERM:-xterm-256color}" LANG=C.UTF-8 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --login "$@"\n'
+      printf '[ -d /sdcard ] && _BINDS="\$_BINDS -b /sdcard"\n'
+      printf '[ -d /data   ] && _BINDS="\$_BINDS -b /data"\n'
+      printf 'exec proot --link2symlink -0 -r "\$NH_ROOTFS" \$_BINDS -b "\${HOME}:/root" -w /root /usr/bin/env -i HOME=/root TERM="\${TERM:-xterm-256color}" LANG=C.UTF-8 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --login "\$@"\n'
     } > "\$_PREFIX/bin/nethunter"
     chmod +x "\$_PREFIX/bin/nethunter"
     ln -sf "\$_PREFIX/bin/nethunter" "\$_PREFIX/bin/nh" 2>/dev/null || \
@@ -104419,7 +104419,7 @@ _head() { printf "\n${W}  ══ %s ══${N}\n\n" "$1"; }
 
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
 TERMUX_BIN="$PREFIX/bin"
-NH_ROOTFS="${HOME}/kali-nethunter"
+NH_ROOTFS="${HOME}/.xpm/kali/rootfs"
 
 # ── Detecção de arquitetura ───────────────────────────────────────────────
 _detect_arch() {
@@ -104578,7 +104578,7 @@ cat > "$TERMUX_BIN/nethunter" << 'LAUNCHEOF'
 #!/data/data/com.termux/files/usr/bin/bash
 # ElliotOS NetHunter launcher — multi-arch
 PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
-NH_ROOTFS="${HOME}/kali-nethunter"
+NH_ROOTFS="${HOME}/.xpm/kali/rootfs"
 
 [ ! -d "$NH_ROOTFS" ] && {
   echo "NetHunter não instalado. Execute: ms -nh"
