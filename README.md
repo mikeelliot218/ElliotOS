@@ -322,8 +322,16 @@ ms --exploit-lfi url          # exploit.lfi REPL
 ```bash
 ms --apk app.apk [app2.apk ...]  # testa compatibilidade e instalabilidade
 ms --apk-sign app.apk            # alinha e assina um APK já compilado
-web2apk build <dir> [opções]     # converte HTML/CSS/JS em APK sem root
+appforge build <dir> [opções]     # converte HTML/CSS/JS em APK sem root
 ```
+
+**Distros Linux (proot)**
+```bash
+ms -ba                            # instala Arch Linux ARM + repositório BlackArch (CLI apenas)
+```
+
+> **BlackArch:** funciona apenas em modo CLI. Interface gráfica (GUI) não é suportada em proot.
+> **NetHunter:** funciona em CLI e GUI.
 
 **Crypto**
 ```bash
@@ -362,10 +370,18 @@ ms --script portscan.lua -- 192.168.1.1 80 443
 ms --script xerxes.c -- 192.168.1.1 80
 ```
 
-**Aprender**
+**Aprender / Documentação**
 ```bash
-ms --learn                    # tutorial interativo em português
-ms --examples                 # lista scripts de exemplo prontos
+ms --learn                    # tutorial completo: 30 lições em 4 trilhas (Lua, ElliotOS API, C, projetos)
+ms --examples                 # lista todos os scripts de exemplo instalados com descrição e categoria
+ms --doc                      # documentação completa do ElliotOS
+ms --doc modulos              # referência de todos os módulos da API
+ms --doc net                  # módulo net.* (HTTP, TCP, UDP, DNS, sockets)
+ms --doc mod                  # módulo mod.* (23 scanners de pentest)
+ms --doc crypto               # módulo crypto.* (hash, AES, JWT, encoding)
+ms --doc sys                  # módulo sys.* (threads, processos, env)
+ms --doc fs                   # módulo fs.* (arquivos e diretórios)
+ms --doc ai                   # módulo ai.* (CYN — chat, code, search)
 ```
 
 **Diagnóstico**
@@ -701,12 +717,12 @@ xtun -l porta
 
 ---
 
-## web2apk — HTML/CSS/JS para APK
+## appforge — HTML/CSS/JS para APK
 
-O `web2apk` converte qualquer projeto web local em um APK Android funcional, **sem root, sem Android Studio, sem PC**. Não vem instalado por padrão — é uma ferramenta do XPM:
+O `appforge` converte qualquer projeto web local em um APK Android funcional, **sem root, sem Android Studio, sem PC**. Não vem instalado por padrão — é uma ferramenta do XPM:
 
 ```bash
-xpm install web2apk
+xpm install appforge
 ```
 
 ```bash
@@ -717,30 +733,30 @@ xpm install web2apk
 └── script.js
 
 # Analisar o projeto antes de compilar
-web2apk check ./meuapp/
+appforge check ./meuapp/
 
 # Gerar APK básico
-web2apk build ./meuapp/
+appforge build ./meuapp/
 
 # Com nome, ícone e permissões
-web2apk build ./meuapp/ --name "Meu App" --pkgname com.meuapp --perm camera,mic --fullscreen
+appforge build ./meuapp/ --name "Meu App" --pkgname com.meuapp --perm camera,mic --fullscreen
 
 # Converter um site remoto em APK
-web2apk build --url https://exemplo.com --name "Meu Site"
+appforge build --url https://exemplo.com --name "Meu Site"
 
 # Gerar template de projeto pronto para editar
-web2apk template basic    # HTML + CSS + JS básico
-web2apk template game     # Jogo Snake funcional
-web2apk template pwa      # PWA com suporte offline
+appforge template basic    # HTML + CSS + JS básico
+appforge template game     # Jogo Snake funcional
+appforge template pwa      # PWA com suporte offline
 
 # Manual: o que cada arquivo deve conter para o APK funcionar
-web2apk --man
+appforge --man
 
 # Verificar ferramentas de build instaladas (sem argumento)
-web2apk check
+appforge check
 ```
 
-### `web2apk check <dir>` — Análise do projeto
+### `appforge check <dir>` — Análise do projeto
 
 Analisa todos os arquivos do projeto e retorna um relatório com três níveis de severidade:
 
@@ -777,7 +793,7 @@ Sugestões (🔵 dim) — melhorias opcionais:
 - Imagens pesadas (> 2 MB total)
 
 ```bash
-web2apk check ./meuapp/
+appforge check ./meuapp/
 # saída exemplo:
 #   8 arquivo(s): 1 HTML  1 CSS  1 JS  5 outros
 #   [OK]    index.html presente
@@ -791,7 +807,7 @@ web2apk check ./meuapp/
 #   4 verificação(ões) OK
 ```
 
-### Opções principais do `build`
+### Opções principais do `appforge build`
 
 | Opção | Descrição |
 |-------|-----------|
@@ -803,6 +819,47 @@ web2apk check ./meuapp/
 | `--fullscreen` | Esconde a status bar |
 | `--theme dark\|light\|transparent` | Tema da WebView |
 | `--url https://...` | Carrega URL remota em vez de arquivos locais |
+
+---
+
+## ms -ba — Arch Linux ARM + BlackArch
+
+O `ms -ba` instala o **Arch Linux ARM** dentro do Termux via proot e configura o repositório **BlackArch** — dando acesso a mais de 2.800 ferramentas de segurança, sem root.
+
+```bash
+ms -ba
+```
+
+O instalador:
+- Baixa e verifica o rootfs do Arch Linux ARM (aarch64)
+- Configura o pacman com `DisableSandbox` para funcionar em proot
+- Inicializa o keyring (`pacman-key --init/--populate`)
+- Adiciona o repositório BlackArch via `strap.sh` oficial
+
+### Suporte
+
+| Modo | NetHunter | BlackArch |
+|------|-----------|-----------|
+| CLI  | ✓         | ✓         |
+| GUI (XFCE4/VNC) | ✓ | ✗ (não suportado em proot) |
+
+> Interface gráfica não funciona no BlackArch em proot devido a limitações de sandboxing (`bwrap`/`glycin`) incompatíveis com o ambiente Android.
+
+### Acessar o container
+
+```bash
+archlinux          # entra no Arch Linux ARM como root
+```
+
+### Instalar ferramentas BlackArch
+
+```bash
+# Dentro do container (archlinux):
+pacman -S nmap sqlmap burpsuite
+pacman -Sg blackarch            # lista todos os grupos
+pacman -Sg blackarch-scanner    # ferramentas de scan
+pacman -Sg blackarch-exploitation
+```
 
 ---
 
@@ -843,7 +900,7 @@ xpm doctor                 # diagnóstico e correções do ambiente
 | CTF / Binários | pwntools | pip |
 | Wordlists | seclists | github |
 | AD / Rede | impacket, nuclei | pip / go |
-| Criação de APK | web2apk | nativo ElliotOS |
+| Criação de APK | appforge | nativo ElliotOS |
 
 > **Nenhuma ferramenta exige root para ser instalada ou usada no Termux.**
 
@@ -934,7 +991,7 @@ O ElliotOS instala scripts prontos em `$PREFIX/share/lua-scripts/`. Liste com `m
 
 | Script | Descrição |
 |--------|-----------|
-| `learn.lua` | Tutorial interativo completo do ElliotOS em português — ensina Lua + todos os módulos com exemplos |
+| `learn.lua` | Tutorial interativo completo — 30 lições em 4 trilhas: Lua do zero ao avançado, ElliotOS API, C e projetos reais de pentest. Menu com navegação por trilha ou lição específica |
 | `recon.lua` | Recon completo de um alvo: ping, DNS, port scan com threads, banner grab, headers HTTP e OS fingerprint |
 | `portscan.lua` | Port scanner rápido com threads e banner grab, identifica FTP/SSH/HTTP/MySQL/Redis... |
 | `webcheck.lua` | Auditoria de headers HTTP: HSTS, CSP, X-Frame-Options, Referrer-Policy — gera score de segurança em % |
@@ -942,7 +999,19 @@ O ElliotOS instala scripts prontos em `$PREFIX/share/lua-scripts/`. Liste com `m
 | `nexus.lua` | Framework de rede avançado: flood (UDP/TCP/HTTP/ICMP/PSYN), slowloris, recon, DNS, ping, hosts |
 
 ```bash
-# Tutorial interativo
+# Tutorial interativo — 30 lições, menu por trilha
+ms --learn
+
+# Documentação por módulo
+ms --doc
+ms --doc net
+ms --doc mod
+ms --doc crypto
+
+# Listar scripts com descrição e categoria
+ms --examples
+
+# Tutorial interativo (alternativa via --script)
 ms --script learn
 
 # Recon completo de um alvo
@@ -964,6 +1033,52 @@ ms --script nexus -- --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512
 ms --script nexus -- --slow 192.168.1.1 -p 80 -s 200 -st 10
 ms --script nexus -- --dns google.com youtube.com github.com
 ms --script nexus -- --hosts
+```
+
+---
+
+## Documentação e aprendizado
+
+O ElliotOS tem três formas de aprender e consultar a API, todas em português, sem precisar sair do terminal.
+
+### `ms --learn` — Tutorial completo (30 lições)
+
+O tutorial é interativo e dividido em 4 trilhas. Ao iniciar, um menu permite escolher de onde começar:
+
+| Trilha | Conteúdo | Lições |
+|--------|----------|--------|
+| **1 — Lua do zero ao avançado** | Variáveis, tipos, operadores, if/else, loops, funções, tables, strings, módulos, OOP com metatables, erros/pcall, corrotinas | 1–12 |
+| **2 — Lua + ElliotOS API** | net.*, mod.*, crypto.*, sys.*, fs.*, ai.*, db.*, scripts profissionais, lpm/xpm | 13–21 |
+| **3 — C no ElliotOS** | Base de C vs Lua, tipos, ponteiros, memória, sockets raw, criar módulo `.so` para o ms | 22–27 |
+| **4 — Projetos reais** | Scanner de vulnerabilidades completo, port scanner multi-thread, próximos passos | 28–30 |
+
+Navegação: **ENTER** avança, **s** pula a lição, **q** sai. É possível ir direto para qualquer lição pelo número.
+
+```bash
+ms --learn
+```
+
+### `ms --doc` — Referência da API
+
+Documentação técnica de cada módulo, consultável por nome:
+
+```bash
+ms --doc               # visão geral do sistema
+ms --doc modulos       # todos os módulos listados
+ms --doc net           # net.* — HTTP, TCP, UDP, DNS, sockets, port scan
+ms --doc mod           # mod.* — 23 scanners (XSS, SQLi, LFI, RCE, SSRF...)
+ms --doc crypto        # crypto.* — MD5, SHA, AES, Base64, JWT, HMAC
+ms --doc sys           # sys.* — threads, processos, env, sleep, tempo
+ms --doc fs            # fs.* — read, write, list, stat, glob, mkdir
+ms --doc ai            # ai.* — CYN: chat, code, search, providers
+```
+
+### `ms --examples` — Scripts instalados
+
+Lista todos os scripts em `$PREFIX/share/lua-scripts/` e `$PREFIX/share/c-scripts/` com nome, categoria e descrição extraídos do cabeçalho de cada arquivo.
+
+```bash
+ms --examples
 ```
 
 ---
@@ -1028,7 +1143,7 @@ ElliotOS/
 │   ├── Lua 5.4.8 source  # Interpretador customizado (baixado de lua.org)
 │   ├── lua-net binary    # Embutido como heredoc compilado na instalação
 │   ├── xpm               # Gerenciador de pentest (Bash)
-│   │   └── web2apk       # Conversor HTML/CSS/JS → APK (instalável via xpm)
+│   │   └── appforge       # Conversor HTML/CSS/JS → APK (instalável via xpm)
 │   ├── lpm               # Gerenciador de pacotes Lua (Bash)
 │   ├── cxx               # Compilador wrapper (Bash)
 │   ├── ee                # Editor nativo (C, embutido)

