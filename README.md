@@ -1193,14 +1193,35 @@ xpm search nmap            # buscar ferramenta específica
 xpm install sqlmap         # instalar
 xpm install sqlmap nikto dirsearch nmap  # instalar várias
 xpm list                   # ver o que está instalado
-xpm update sqlmap          # atualizar ferramenta
-xpm upgrade                # atualizar tudo
+xpm update sqlmap          # atualizar ferramenta específica
+xpm upgrade                # atualizar tudo (respeita pins)
 xpm remove sqlmap          # remover
-xpm info <ferramenta>      # detalhes
+xpm info <ferramenta>      # detalhes + versão instalada
 xpm categories             # categorias disponíveis
-xpm stats                  # estatísticas do catálogo
+xpm stats                  # estatísticas completas com versões
+xpm cache                  # conteúdo e tamanho do cache
+xpm clean                  # limpar cache
 xpm doctor                 # diagnóstico e correções do ambiente
 ```
+
+### Pins — travar versão de uma ferramenta
+
+```bash
+xpm pin sqlmap             # trava sqlmap na versão atual
+xpm pin sqlmap nikto       # trava várias de uma vez
+xpm unpin sqlmap           # libera para atualização
+xpm upgrade                # ferramentas pinadas são ignoradas com aviso
+```
+
+Útil quando uma atualização quebra compatibilidade com um script ou exploit em uso. O `xpm stats` e `xpm info` mostram quais ferramentas estão pinadas e em qual versão.
+
+### Rastreamento de versão
+
+A partir da v1.5.0, o `xpm` rastreia automaticamente a versão de cada ferramenta instalada. O `xpm info` mostra a versão detectada na instalação e `xpm stats` lista todas as ferramentas com suas versões e datas. Ferramentas com versão detectável exibem o diff antes/depois no `xpm update` (`1.2.3 → 1.3.0`).
+
+### Pré-requisitos de sistema automáticos
+
+Ferramentas como `impacket`, `pwntools`, `ropper`, `binwalk`, `wfuzz` e `dnsrecon` instalam automaticamente as dependências de sistema necessárias antes de rodar o pip, sem intervenção manual.
 
 ### Ferramentas disponíveis no XPM
 
@@ -1376,7 +1397,7 @@ rungui -l love jogo/
 
 ```
 ElliotOS/
-├── luascript.sh              # Script único de instalação (v17.0)
+├── luascript.sh              # Script único de instalação (v17.0) — xpm v1.5.0
 │   ├── libnet.c              # Biblioteca C com todos os módulos
 │   ├── Lua 5.4.8 source      # Interpretador customizado (baixado de lua.org)
 │   ├── xpm                   # Gerenciador de pentest (Bash)
@@ -1399,6 +1420,8 @@ ElliotOS/
 | `$HOME/.lua-modules` | Módulos do usuário (lmod) |
 | `$HOME/.elliotai` | Configuração e cache da CYN |
 | `$HOME/.elliot` | Dados do usuário, scripts baixados via lpm |
+| `$HOME/.xpm/pins` | Versões pinadas pelo `xpm pin` |
+| `$HOME/.xpm/installed` | Metadados das ferramentas instaladas (versão, data, origin) |
 | `$HOME/.elliot_logs` | Log de vulnerabilidades encontradas |
 | `$HOME/.elliot_ivar.cfg` | Estado persistente do ivar (ativado/desativado) |
 | `$PREFIX/share/lua-scripts` | Scripts de exemplo do ElliotOS |

@@ -27942,33 +27942,30 @@ install_elliotos() {
     printf "  \033[0;90m[luar] bin dir: %s\033[0m\n" "$BIN_DIR"
 
     # ── Barra de progresso do luar ───────────────────────────────────────────
-    # _bar_calc_width: calcula largura da barra baseado no terminal atual
-    _bar_cols_prev=0
-    _bar_calc_width() {
-        local label_len=${#1}
-        local cols
-        cols=$(tput cols 2>/dev/null || echo 80)
-        # Se o terminal redimensionou, limpa linhas residuais do wrap
-        if [ "$cols" != "$_bar_cols_prev" ] && [ "$_bar_cols_prev" != "0" ]; then
-            printf "\033[2K\r\033[1A\033[2K\r"
-        fi
-        _bar_cols_prev=$cols
-        # overhead: 2(indent) + 2([]) + 1(sp) + 4(%3d%) + 2(sp) + label
-        local overhead=$(( label_len + 11 ))
-        local w=$(( cols - overhead ))
-        [ "$w" -lt 8  ] && w=8
-        [ "$w" -gt 60 ] && w=60
-        echo "$w"
-    }
+    _luar_bar_visible=0
     _luar_bar_draw() {
         local pct=$1 label=$2
-        local _w; _w=$(_bar_calc_width "$label")
-        local filled=$(( pct * _w / 100 ))
-        local empty=$(( _w - filled ))
-        local bar=""
+        local cols label_len _w filled empty bar rows
+        cols=$(tput cols 2>/dev/null || echo 80)
+        label_len=${#label}
+        _w=$(( cols - label_len - 11 ))
+        [ "$_w" -lt 8  ] && _w=8
+        [ "$_w" -gt 60 ] && _w=60
+        filled=$(( pct * _w / 100 ))
+        empty=$(( _w - filled ))
+        bar=""
         for ((i=0;i<filled;i++)); do bar+="█"; done
         for ((i=0;i<empty;i++));  do bar+="░"; done
-        printf "\033[2K\r  \033[1;34m[%s]\033[0m \033[1;36m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        if [ "$_luar_bar_visible" -gt 0 ]; then
+            rows=$(( (_luar_bar_visible + cols - 1) / cols ))
+            if [ "$rows" -gt 1 ]; then
+                printf "\r\033[%dA\033[J" "$(( rows - 1 ))"
+            else
+                printf "\r\033[J"
+            fi
+        fi
+        printf "  \033[1;34m[%s]\033[0m \033[1;36m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        _luar_bar_visible=$(( _w + label_len + 11 ))
     }
 
     printf "\n"
@@ -27987,8 +27984,8 @@ install_elliotos() {
         ) 2>&1 | tee "$HOME/.elliot_vanilla.log"
         _LUAR_OK=${PIPESTATUS[0]}
     else
-        _luar_bar_draw 0 "Aguardando compilador...         "
         printf "\033[?25l"
+        _luar_bar_draw 0 "Aguardando compilador...         "
         (
             cd "$_SRC_DIR"
             # Compilar cada .c em paralelo (-j) para velocidade maxima
@@ -94072,18 +94069,33 @@ TRANSLATE_EOF
     _ok "Arquitetura: $_ARCH ${_ARCH_FLAGS:-(genérico)}  ·  CPUs: $_ncpu"
 
     # ── Barra de progresso de compilação ─────────────────────────────────────
+    _bar_visible=0
     if [ "$INSTALL_SQ" = "1" ]; then
         _bar_draw() { :; }  # modo -sq: sem barra, output bruto do compilador
     else
         _bar_draw() {
             local pct=$1 label=$2
-            local _w; _w=$(_bar_calc_width "$label")
-            local filled=$(( pct * _w / 100 ))
-            local empty=$(( _w - filled ))
-            local bar=""
+            local cols label_len _w filled empty bar rows
+            cols=$(tput cols 2>/dev/null || echo 80)
+            label_len=${#label}
+            _w=$(( cols - label_len - 11 ))
+            [ "$_w" -lt 8  ] && _w=8
+            [ "$_w" -gt 60 ] && _w=60
+            filled=$(( pct * _w / 100 ))
+            empty=$(( _w - filled ))
+            bar=""
             for ((i=0;i<filled;i++)); do bar+="█"; done
             for ((i=0;i<empty;i++));  do bar+="░"; done
-            printf "\033[2K\r  \033[1;35m[%s]\033[0m \033[1;32m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+            if [ "$_bar_visible" -gt 0 ]; then
+                rows=$(( (_bar_visible + cols - 1) / cols ))
+                if [ "$rows" -gt 1 ]; then
+                    printf "\r\033[%dA\033[J" "$(( rows - 1 ))"
+                else
+                    printf "\r\033[J"
+                fi
+            fi
+            printf "  \033[1;35m[%s]\033[0m \033[1;32m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+            _bar_visible=$(( _w + label_len + 11 ))
         }
     fi
 
@@ -94091,6 +94103,7 @@ TRANSLATE_EOF
     printf "\033[1;35m║   Compilando ElliotOS v17  —  Lua ${LUA_VERSION} + Módulos          ║\033[0m\n"
     printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n"
 
+    printf "\033[?25l"
     _bar_draw 0  "Limpando objetos antigos...      "
     make clean >/dev/null 2>&1 || true
 
@@ -94196,7 +94209,7 @@ TRANSLATE_EOF
     fi
 
     _bar_draw 100 "Concluído!                       "
-    printf "\n\n"
+    printf "\033[?25h\n\n"
 
     rm -f "$BIN"
     cp -f lua "$BIN" && chmod 755 "$BIN"
@@ -94207,17 +94220,33 @@ TRANSLATE_EOF
     # ── Compila liblua-net.so — barra de progresso dedicada ──────────────────
     printf "  \033[1;35m📦 Compilando liblua-net.so...\033[0m\n\n"
 
+    _so_bar_visible=0
     _so_bar_draw() {
         local pct=$1 label=$2
-        local _w; _w=$(_bar_calc_width "$label")
-        local filled=$(( pct * _w / 100 ))
-        local empty=$(( _w - filled ))
-        local bar=""
+        local cols label_len _w filled empty bar rows
+        cols=$(tput cols 2>/dev/null || echo 80)
+        label_len=${#label}
+        _w=$(( cols - label_len - 11 ))
+        [ "$_w" -lt 8  ] && _w=8
+        [ "$_w" -gt 60 ] && _w=60
+        filled=$(( pct * _w / 100 ))
+        empty=$(( _w - filled ))
+        bar=""
         for ((i=0;i<filled;i++)); do bar+="█"; done
         for ((i=0;i<empty;i++));  do bar+="░"; done
-        printf "\033[2K\r  \033[1;35m[%s]\033[0m \033[1;33m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        if [ "$_so_bar_visible" -gt 0 ]; then
+            rows=$(( (_so_bar_visible + cols - 1) / cols ))
+            if [ "$rows" -gt 1 ]; then
+                printf "\r\033[%dA\033[J" "$(( rows - 1 ))"
+            else
+                printf "\r\033[J"
+            fi
+        fi
+        printf "  \033[1;35m[%s]\033[0m \033[1;33m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        _so_bar_visible=$(( _w + label_len + 11 ))
     }
 
+    printf "\033[?25l"
     _so_bar_draw 0 "Aguardando compilador...         "
 
     (
@@ -94263,11 +94292,11 @@ TRANSLATE_EOF
 
     if [ "$_so_exit" -eq 0 ] && [ -f "${_TPFX}/lib/liblua-net.so" ]; then
         _so_bar_draw 100 "Concluído!                       "
-        printf "\n\n"
+        printf "\033[?25h\n\n"
         _ok "liblua-net.so instalada"
     else
         _so_bar_draw 0 "Falhou                           "
-        printf "\n\n"
+        printf "\033[?25h\n\n"
         _warn "liblua-net.so nao compilada — lpm pode não funcionar"
         [ -s "$HOME/.elliot_so.log" ] && tail -3 "$HOME/.elliot_so.log" | sed 's/^/     /'
     fi
