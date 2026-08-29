@@ -27922,7 +27922,14 @@ install_elliotos() {
     # usa flags detectados no preflight, com fallback
     _ARCH_FLAGS="${_PF_ARCH_FLAGS:--O2}"
     _CC="${_PF_CC:-clang}"
-    _VANILLA_FLAGS="${_ARCH_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -I${_TPFX_V}/include"
+    if command -v ccache >/dev/null 2>&1; then
+        _CC="ccache ${_CC}"
+        _ok "ccache detectado -- recompilacoes serao muito mais rapidas"
+    fi
+    # luar: -O1 compila todos os 32 .c em paralelo muito mais rapido
+    _ARCH_FLAGS_LUAR="${_ARCH_FLAGS//-O2/-O1}"
+    _ARCH_FLAGS_LUAR="${_ARCH_FLAGS_LUAR:--O1}"
+    _VANILLA_FLAGS="${_ARCH_FLAGS_LUAR} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -I${_TPFX_V}/include"
     _VANILLA_LIBS="-lm -ldl -lreadline -L${_TPFX_V}/lib"
     # tenta ncurses, fallback tinfo (varia por versão do Termux)
     _NCURSES_LIB=""
@@ -27935,15 +27942,33 @@ install_elliotos() {
     printf "  \033[0;90m[luar] bin dir: %s\033[0m\n" "$BIN_DIR"
 
     # ── Barra de progresso do luar ───────────────────────────────────────────
-    _luar_bar_width=40
+    # _bar_calc_width: calcula largura da barra baseado no terminal atual
+    _bar_cols_prev=0
+    _bar_calc_width() {
+        local label_len=${#1}
+        local cols
+        cols=$(tput cols 2>/dev/null || echo 80)
+        # Se o terminal redimensionou, limpa linhas residuais do wrap
+        if [ "$cols" != "$_bar_cols_prev" ] && [ "$_bar_cols_prev" != "0" ]; then
+            printf "\033[2K\r\033[1A\033[2K\r"
+        fi
+        _bar_cols_prev=$cols
+        # overhead: 2(indent) + 2([]) + 1(sp) + 4(%3d%) + 2(sp) + label
+        local overhead=$(( label_len + 11 ))
+        local w=$(( cols - overhead ))
+        [ "$w" -lt 8  ] && w=8
+        [ "$w" -gt 60 ] && w=60
+        echo "$w"
+    }
     _luar_bar_draw() {
         local pct=$1 label=$2
-        local filled=$(( pct * _luar_bar_width / 100 ))
-        local empty=$(( _luar_bar_width - filled ))
+        local _w; _w=$(_bar_calc_width "$label")
+        local filled=$(( pct * _w / 100 ))
+        local empty=$(( _w - filled ))
         local bar=""
         for ((i=0;i<filled;i++)); do bar+="█"; done
         for ((i=0;i<empty;i++));  do bar+="░"; done
-        printf "\r  \033[1;34m[%s]\033[0m \033[1;36m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        printf "\033[2K\r  \033[1;34m[%s]\033[0m \033[1;36m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
     }
 
     printf "\n"
@@ -27963,18 +27988,26 @@ install_elliotos() {
         _LUAR_OK=${PIPESTATUS[0]}
     else
         _luar_bar_draw 0 "Aguardando compilador...         "
+        printf "\033[?25l"
         (
             cd "$_SRC_DIR"
-            ${_CC} ${_VANILLA_FLAGS} \
-                lua.c \
-                lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c \
-                lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c \
-                ltm.c lundump.c lvm.c lzio.c \
-                lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c \
-                loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c \
-                ${_VANILLA_LIBS} -o "$_SRC_DIR/luar_bin"
-        ) > "$HOME/.elliot_vanilla.log" 2>&1
-        _LUAR_OK=$?
+            # Compilar cada .c em paralelo (-j) para velocidade maxima
+            _luar_srcs="lua.c lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c"
+            _luar_objs=""
+            _luar_cpids=""
+            for _f in $_luar_srcs; do
+                _o="${_f%.c}.luar.o"
+                ${_CC} ${_VANILLA_FLAGS} -c "$_f" -o "$_o" >> "$HOME/.elliot_vanilla.log" 2>&1 &
+                _luar_cpids="$_luar_cpids $!"
+                _luar_objs="$_luar_objs $_o"
+            done
+            # aguarda todos os objetos
+            for _pid in $_luar_cpids; do wait "$_pid" || exit 1; done
+            # linka
+            ${_CC} $_luar_objs ${_VANILLA_LIBS} -o "$_SRC_DIR/luar_bin" >> "$HOME/.elliot_vanilla.log" 2>&1
+            rm -f $_luar_objs
+        ) > /dev/null 2>&1 &
+        _luar_pid=$!
         _luar_pct=0
         _luar_spinchars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
         _luar_spin=0
@@ -27985,7 +28018,10 @@ install_elliotos() {
             _luar_spin=$(( _luar_spin + 1 ))
             sleep 0.25
         done
+        wait "$_luar_pid"
+        _LUAR_OK=$?
         _luar_bar_draw 100 "Concluído!                       "
+        printf "\033[?25h"
         printf "\n\n"
     fi
 
@@ -28000,6 +28036,7 @@ install_elliotos() {
         fi
     else
         _luar_bar_draw 0 "Falhou (exit $_LUAR_OK)          "
+        printf "\033[?25h"
         printf "\n\n"
         printf "  \033[0;90m[luar] clang exit: %d\033[0m\n" "$_LUAR_OK"
         _warn "luar falhou — últimas linhas do log:"
@@ -28339,7 +28376,10 @@ static int elliot_rl_ready = 0;
  * AMBOS elliot_rl_ready e elliot_rl_interactive são 1.
  * Setado para 1 dentro do pushline() do lua.c patchado, que é o
  * primeiro momento em que o REPL realmente começa a ler input. */
-extern int elliot_rl_interactive;
+/* definicao fraca: a .so exporta o simbolo com valor 0;
+ * o executavel lua-net sobrescreve com a definicao forte (=1 no REPL).
+ * Isso permite que modulos como socket/core.so carreguem sem erro de dlopen. */
+int elliot_rl_interactive __attribute__((weak)) = 0;
 
 static int elliot_system(const char *cmd) {
     /* FORTIFY fix: garante streams válidos caso readline ainda não tenha
@@ -94032,18 +94072,18 @@ TRANSLATE_EOF
     _ok "Arquitetura: $_ARCH ${_ARCH_FLAGS:-(genérico)}  ·  CPUs: $_ncpu"
 
     # ── Barra de progresso de compilação ─────────────────────────────────────
-    _bar_width=40
     if [ "$INSTALL_SQ" = "1" ]; then
         _bar_draw() { :; }  # modo -sq: sem barra, output bruto do compilador
     else
         _bar_draw() {
             local pct=$1 label=$2
-            local filled=$(( pct * _bar_width / 100 ))
-            local empty=$(( _bar_width - filled ))
+            local _w; _w=$(_bar_calc_width "$label")
+            local filled=$(( pct * _w / 100 ))
+            local empty=$(( _w - filled ))
             local bar=""
             for ((i=0;i<filled;i++)); do bar+="█"; done
             for ((i=0;i<empty;i++));  do bar+="░"; done
-            printf "\r  \033[1;35m[%s]\033[0m \033[1;32m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+            printf "\033[2K\r  \033[1;35m[%s]\033[0m \033[1;32m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
         }
     fi
 
@@ -94065,7 +94105,11 @@ TRANSLATE_EOF
     # -flto=thin no libnet.c: vale o custo porque é um arquivo enorme (~19k linhas)
     # NÃO passa -flto no make/link: o linker LTO no Termux/ARM demora 2-5 min extra
     # -O2 no make é suficiente — Lua core não precisa de -O3 agressivo
-    _LIBNET_FLAGS="${_PF_ARCH_FLAGS:--O2} -pipe -fomit-frame-pointer"
+    # libnet.c e enorme: -O1 compila ~40% mais rapido que -O2,
+    # sem impacto perceptivel (gargalo do ElliotOS e sempre I/O)
+    _LIBNET_FLAGS="${_PF_ARCH_FLAGS//-O2/-O1} -pipe -fomit-frame-pointer -fno-strict-aliasing"
+    _LIBNET_FLAGS="${_LIBNET_FLAGS:--O1 -pipe -fomit-frame-pointer}"
+    # lua core: -O2 esta correto (arquivos pequenos, compila rapido)
     _MAKE_FLAGS="${_PF_ARCH_FLAGS:--O2} -pipe -fomit-frame-pointer"
     _CC="${_PF_CC:-clang}"
 
@@ -94163,32 +94207,38 @@ TRANSLATE_EOF
     # ── Compila liblua-net.so — barra de progresso dedicada ──────────────────
     printf "  \033[1;35m📦 Compilando liblua-net.so...\033[0m\n\n"
 
-    _so_bar_width=40
     _so_bar_draw() {
         local pct=$1 label=$2
-        local filled=$(( pct * _so_bar_width / 100 ))
-        local empty=$(( _so_bar_width - filled ))
+        local _w; _w=$(_bar_calc_width "$label")
+        local filled=$(( pct * _w / 100 ))
+        local empty=$(( _w - filled ))
         local bar=""
         for ((i=0;i<filled;i++)); do bar+="█"; done
         for ((i=0;i<empty;i++));  do bar+="░"; done
-        printf "\r  \033[1;35m[%s]\033[0m \033[1;33m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
+        printf "\033[2K\r  \033[1;35m[%s]\033[0m \033[1;33m%3d%%\033[0m  %s" "$bar" "$pct" "$label"
     }
 
     _so_bar_draw 0 "Aguardando compilador...         "
 
     (
-        ${_CC} ${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE \
-            ${PROFILE_DEFINES} ${_INC} -shared \
-            lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c \
-            lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c \
-            ltm.c lundump.c lvm.c lzio.c \
-            lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c \
-            loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c \
-            libnet.o \
+        _so_srcs="lapi.c lcode.c lctype.c ldebug.c ldo.c ldump.c lfunc.c lgc.c llex.c lmem.c lobject.c lopcodes.c lparser.c lstate.c lstring.c ltable.c ltm.c lundump.c lvm.c lzio.c lauxlib.c lbaselib.c lcorolib.c ldblib.c liolib.c lmathlib.c loadlib.c loslib.c lstrlib.c ltablib.c lutf8lib.c linit.c"
+        _so_objs=""
+        _so_cpids=""
+        _so_cflags="${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE ${PROFILE_DEFINES} ${_INC}"
+        for _f in $_so_srcs; do
+            _o="${_f%.c}.so.o"
+            ${_CC} ${_so_cflags} -c "$_f" -o "$_o" 2>/dev/null &
+            _so_cpids="$_so_cpids $!"
+            _so_objs="$_so_objs $_o"
+        done
+        for _pid in $_so_cpids; do wait "$_pid" || exit 1; done
+        ${_CC} ${_MAKE_FLAGS} -shared \
+            $_so_objs libnet.o \
             -o liblua-net.so \
             ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 \
             2>/dev/null && \
             cp liblua-net.so "${_TPFX}/lib/liblua-net.so" || true
+        rm -f $_so_objs
     ) > "$HOME/.elliot_so.log" 2>&1 &
     _so_pid=$!
     [ "$INSTALL_SQ" = "1" ] && {
@@ -95113,7 +95163,8 @@ XPM_CACHE="$XPM_HOME/cache"
 XPM_META="$XPM_HOME/meta"
 XPM_INSTALLED="$XPM_HOME/installed"
 XPM_TMP="${TMPDIR:-$PREFIX/tmp}/xpm_$$"
-XPM_VERSION="1.4.1"
+XPM_PINS="$XPM_HOME/pins"
+XPM_VERSION="1.5.0"
 
 R=$'\033[0m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; B=$'\033[1;36m'
 E=$'\033[1;31m'; M=$'\033[1;35m'; W=$'\033[1;37m'; DIM=$'\033[0;90m'
@@ -95132,7 +95183,7 @@ _arch() { uname -m 2>/dev/null || echo "unknown"; }
 
 # ── Bootstrap do diretório de dados ──────────────────────────────────────────
 _xpm_init() {
-    mkdir -p "$XPM_DB" "$XPM_CACHE" "$XPM_META" "$XPM_INSTALLED" "$XPM_TMP"
+    mkdir -p "$XPM_DB" "$XPM_CACHE" "$XPM_META" "$XPM_INSTALLED" "$XPM_TMP" "$XPM_PINS"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -95546,6 +95597,24 @@ _backend_pip() {
         _warn "Rota sem pandas falhou — tentando pip padrão como fallback"
     fi
 
+    # Pré-instala dependências de sistema para pacotes que precisam compilar extensões C
+    case "$name" in
+        impacket|pwntools|ropper)
+            _info "Pré-instalando deps de sistema para $name..."
+            pkg install -y libffi openssl python-cryptography 2>/dev/null || true
+            ;;
+        binwalk)
+            _info "Pré-instalando deps de sistema para binwalk..."
+            pkg install -y binutils libffi python-lzma 2>/dev/null || true
+            ;;
+        wfuzz)
+            pkg install -y libffi 2>/dev/null || true
+            ;;
+        dnsrecon)
+            pkg install -y python-dnspython 2>/dev/null || true
+            ;;
+    esac
+
     _info "Instalando via pip: $pkgname"
     if command -v pip3 &>/dev/null; then
         pip3 install "$pkgname" 2>/dev/null || \
@@ -95623,72 +95692,129 @@ _backend_gem() {
 _backend_github() {
     local repo="$1" name="$2"
     local dest="$HOME/.xpm/tools/${name}"
+    local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
     _info "Clonando de github.com/$repo"
-    command -v git &>/dev/null || pkg install -y git || _die "git não encontrado"
+    command -v git &>/dev/null || pkg install -y git || _die "git nao encontrado"
     rm -rf "$dest" 2>/dev/null
     git clone --depth=1 "https://github.com/${repo}.git" "$dest" || _die "Falha ao clonar $repo"
 
-    # Alguns pacotes Python (pandas, numpy, lxml...) tem build C pesado e quebram
-    # se o pip tentar compilar do source no Termux. Pre-instala via pkg (binario pronto)
-    # quando aparecem no requirements.txt, assim o pip so reaproveita o que ja existe.
+    # ── Mapa de entry points conhecidos ──────────────────────────────────────
+    # Ferramentas onde o nome do arquivo nao bate com o nome do pacote
+    _known_entry=""
+    case "$name" in
+        zphisher)   _known_entry="$dest/zphisher.sh" ;;
+        xsstrike)   _known_entry="$dest/xsstrike.py" ;;
+        commix)     _known_entry="$dest/commix.py" ;;
+        sublist3r)  _known_entry="$dest/sublist3r.py" ;;
+        sqlmap)     _known_entry="$dest/sqlmap.py" ;;
+        dirsearch)  _known_entry="$dest/dirsearch.py" ;;
+        theharvester) _known_entry="$dest/theHarvester.py" ;;
+        maigret)    _known_entry="$dest/maigret/__main__.py" ;;
+        holehe)     _known_entry="$dest/holehe/core.py" ;;
+        wfuzz)      _known_entry="$dest/wfuzz/__main__.py" ;;
+        nikto)      _known_entry="$dest/program/nikto.pl" ;;
+    esac
+
+    # ── Pre-instala deps pesadas via pkg (binarios prontos, evita build C) ───
     for req in "$dest/requirements.txt" "$dest/pyproject.toml"; do
         [ -f "$req" ] || continue
-        grep -qi '^pandas\|"pandas\|pandas[<>=]' "$req" 2>/dev/null && pkg install -y python-pandas 2>/dev/null
-        grep -qi '^numpy\|"numpy\|numpy[<>=]' "$req" 2>/dev/null && pkg install -y python-numpy 2>/dev/null
-        grep -qi '^lxml\|"lxml\|lxml[<>=]' "$req" 2>/dev/null && pkg install -y python-lxml 2>/dev/null
-        grep -qi '^pillow\|"pillow\|pillow[<>=]' "$req" 2>/dev/null && pkg install -y python-pillow 2>/dev/null
-        grep -qi '^cryptography\|"cryptography\|cryptography[<>=]' "$req" 2>/dev/null && pkg install -y python-cryptography 2>/dev/null
+        grep -qi 'pandas'       "$req" 2>/dev/null && pkg install -y python-pandas      2>/dev/null || true
+        grep -qi 'numpy'        "$req" 2>/dev/null && pkg install -y python-numpy       2>/dev/null || true
+        grep -qi 'lxml'         "$req" 2>/dev/null && pkg install -y python-lxml        2>/dev/null || true
+        grep -qi 'pillow\|PIL'  "$req" 2>/dev/null && pkg install -y python-pillow      2>/dev/null || true
+        grep -qi 'cryptography' "$req" 2>/dev/null && pkg install -y python-cryptography 2>/dev/null || true
+        grep -qi 'pycurl'       "$req" 2>/dev/null && pkg install -y python-pycurl      2>/dev/null || true
+        grep -qi 'psutil'       "$req" 2>/dev/null && pkg install -y python-psutil      2>/dev/null || true
     done
 
+    # ── Tenta instalar como pacote Python se tiver setup.py/pyproject.toml ───
     local pip_ok=0
     if [ -f "$dest/setup.py" ] || [ -f "$dest/pyproject.toml" ]; then
-        _info "Instalando pacote Python (pip)"
-        if pip3 install "$dest"; then
-            pip_ok=1
-        else
-            _warn "pip install falhou — tentando requirements.txt + wrapper manual"
-        fi
+        _info "Instalando pacote Python via pip"
+        pip3 install --break-system-packages "$dest" 2>/dev/null \
+            || pip3 install "$dest" 2>/dev/null \
+            && pip_ok=1
     fi
 
-    # Se o pip já criou o comando no PATH (via console_scripts), nao precisa de wrapper
+    # Se pip criou o comando no PATH, pronto
     if [ "$pip_ok" = "1" ] && command -v "$name" &>/dev/null; then
         _ok "$name instalado via pip e disponivel no PATH"
         return 0
     fi
 
-    # Fallback: instala dependencias soltas e cria wrapper manual
+    # ── Instala requirements.txt ─────────────────────────────────────────────
     if [ -f "$dest/requirements.txt" ]; then
-        _info "Instalando dependências Python (requirements.txt)"
-        pip3 install -r "$dest/requirements.txt" || _warn "Algumas dependências podem ter falhado"
+        _info "Instalando dependencias (requirements.txt)"
+        pip3 install --break-system-packages -r "$dest/requirements.txt" 2>/dev/null \
+            || pip3 install -r "$dest/requirements.txt" 2>/dev/null \
+            || _warn "Algumas dependencias podem ter falhado"
     fi
 
+    # ── Descobre entry point ──────────────────────────────────────────────────
     local entry=""
-    for f in "$dest/main.py" "$dest/${name}.py" "$dest/$(basename $repo).py" \
-              "$dest/main.sh" "$dest/${name}.sh"; do
-        [ -f "$f" ] && entry="$f" && break
-    done
-    # Procura tambem um nivel dentro (projetos com main.py em subpasta src/<name>/<name>.py)
+
+    # 1. entry point conhecido
+    [ -n "$_known_entry" ] && [ -f "$_known_entry" ] && entry="$_known_entry"
+
+    # 2. Candidatos padrao na raiz
     if [ -z "$entry" ]; then
-        entry=$(find "$dest" -maxdepth 2 -type f \( -name "${name}.py" -o -name "main.py" \) 2>/dev/null | head -1)
+        for f in \
+            "$dest/main.py"        "$dest/${name}.py"      \
+            "$dest/$(basename $repo).py"                    \
+            "$dest/main.sh"        "$dest/${name}.sh"       \
+            "$dest/$(basename $repo).sh"                    \
+            "$dest/run.sh"         "$dest/start.sh"         \
+            "$dest/${name}"        "$dest/$(basename $repo)"; do
+            [ -f "$f" ] && entry="$f" && break
+        done
     fi
 
+    # 3. Busca recursiva (ate 3 niveis)
+    if [ -z "$entry" ]; then
+        entry=$(find "$dest" -maxdepth 3 -type f \
+            \( -name "${name}.py" -o -name "main.py" \
+            -o -name "${name}.sh" -o -name "main.sh" \
+            -o -name "run.sh"     -o -name "start.sh" \) \
+            2>/dev/null | head -1)
+    fi
+
+    # ── Cria wrapper no PATH ──────────────────────────────────────────────────
     if [ -n "$entry" ]; then
-        local BPFX="${PREFIX:-/data/data/com.termux/files/usr}"
         local ext="${entry##*.}"
-        if [ "$ext" = "py" ]; then
-            printf '#!/usr/bin/env bash\ncd "%s"\nexec python3 "%s" "$@"\n' "$dest" "$entry" > "$BPFX/bin/$name"
-        else
-            printf '#!/usr/bin/env bash\ncd "%s"\nexec bash "%s" "$@"\n' "$dest" "$entry" > "$BPFX/bin/$name"
-        fi
+        chmod +x "$entry" 2>/dev/null
+        case "$ext" in
+            py)
+                printf '#!/usr/bin/env bash\ncd "%s"\nexec python3 "%s" "$@"\n' \
+                    "$dest" "$entry" > "$BPFX/bin/$name"
+                ;;
+            sh|bash)
+                printf '#!/usr/bin/env bash\ncd "%s"\nexec bash "%s" "$@"\n' \
+                    "$dest" "$entry" > "$BPFX/bin/$name"
+                ;;
+            pl)
+                printf '#!/usr/bin/env bash\ncd "%s"\nexec perl "%s" "$@"\n' \
+                    "$dest" "$entry" > "$BPFX/bin/$name"
+                ;;
+            *)
+                # sem extensao: tenta executar diretamente
+                if head -1 "$entry" 2>/dev/null | grep -q 'python'; then
+                    printf '#!/usr/bin/env bash\ncd "%s"\nexec python3 "%s" "$@"\n' \
+                        "$dest" "$entry" > "$BPFX/bin/$name"
+                else
+                    printf '#!/usr/bin/env bash\ncd "%s"\nexec bash "%s" "$@"\n' \
+                        "$dest" "$entry" > "$BPFX/bin/$name"
+                fi
+                ;;
+        esac
         chmod +x "$BPFX/bin/$name"
-        _ok "Wrapper criado em $BPFX/bin/$name"
+        _ok "Wrapper criado: $BPFX/bin/$name -> $entry"
     else
-        _die "Não foi possível localizar um ponto de entrada executável para $name — instalação incompleta"
+        _die "Nao foi possivel localizar entry point para $name em $dest"
     fi
 
-    command -v "$name" &>/dev/null || _die "$name foi instalado mas o comando não está disponível no PATH"
+    command -v "$name" &>/dev/null \
+        || _warn "$name instalado mas nao encontrado no PATH — tente: source ~/.bashrc"
 }
-
 _backend_source() {
     local repo="$1" name="$2"
     local dest="$HOME/.xpm/tools/${name}"
@@ -96895,12 +97021,66 @@ _is_installed() {
     [ -f "$XPM_INSTALLED/${1}.installed" ]
 }
 
+_is_pinned() {
+    [ -f "$XPM_PINS/${1}.pin" ]
+}
+
 _mark_installed() {
-    date "+%Y-%m-%d %H:%M:%S" > "$XPM_INSTALLED/${1}.installed"
+    local name="$1" ver="${2:-}"
+    local origin repo
+    origin=$(_db_get "$name" origin 2>/dev/null || echo "?")
+    repo=$(  _db_get "$name" repo   2>/dev/null || echo "?")
+    # detecta versão instalada se não foi passada
+    if [ -z "$ver" ]; then
+        ver=$(_detect_version "$name" "$origin" "$repo")
+    fi
+    {
+        echo "date=$(date '+%Y-%m-%d %H:%M:%S')"
+        echo "version=$ver"
+        echo "origin=$origin"
+        echo "repo=$repo"
+    } > "$XPM_INSTALLED/${name}.installed"
 }
 
 _mark_removed() {
     rm -f "$XPM_INSTALLED/${1}.installed"
+    rm -f "$XPM_PINS/${1}.pin"
+}
+
+# Lê um campo do arquivo .installed: _get_installed_meta <nome> <campo>
+_get_installed_meta() {
+    grep "^${2}=" "$XPM_INSTALLED/${1}.installed" 2>/dev/null | cut -d= -f2-
+}
+
+# Detecta versão do binário instalado via padrões comuns
+_detect_version() {
+    local name="$1" origin="$2" repo="$3"
+    local bin ver
+    bin=$(basename "${repo##*/}")
+    # tenta o nome do comando e o basename do repo
+    for cmd in "$name" "$bin"; do
+        command -v "$cmd" &>/dev/null || continue
+        ver=$("$cmd" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+        [ -n "$ver" ] && echo "$ver" && return
+        ver=$("$cmd" -V 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+        [ -n "$ver" ] && echo "$ver" && return
+        ver=$("$cmd" version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+        [ -n "$ver" ] && echo "$ver" && return
+    done
+    # pip: tenta importar como módulo
+    if [ "$origin" = "pip" ]; then
+        ver=$(pip3 show "$name" 2>/dev/null | grep '^Version:' | awk '{print $2}')
+        [ -n "$ver" ] && echo "$ver" && return
+    fi
+    # github/source: lê tag do git
+    local dest="$HOME/.xpm/tools/$name"
+    if [ -d "$dest/.git" ]; then
+        ver=$(git -C "$dest" describe --tags --abbrev=0 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+        [ -n "$ver" ] && echo "$ver" && return
+        ver=$(git -C "$dest" rev-parse --short HEAD 2>/dev/null)
+        [ -n "$ver" ] && echo "git-$ver" && return
+    fi
+    echo "unknown"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -96956,14 +97136,12 @@ _dispatch_install() {
     local name="$1" origin="$2" repo="$3"
     case "$origin" in
         apt)    pkg install -y "$repo" 2>/dev/null || _die "Falha ao instalar $repo via pkg" ;;
-        pip)    pip3 install --break-system-packages "$repo" 2>/dev/null \
-                || pip3 install "$repo" 2>/dev/null \
-                || _die "Falha ao instalar $repo via pip" ;;
+        pip)    _backend_pip "$repo" "$name" ;;
         go)     _backend_go "$repo" ;;
-        cargo)  cargo install "$repo" 2>/dev/null || _die "Falha ao instalar $repo via cargo" ;;
-        gem)    gem install "$repo" 2>/dev/null || _die "Falha ao instalar $repo via gem" ;;
+        cargo)  _backend_cargo "$repo" "$name" ;;
+        gem)    _backend_gem "$name" ;;
         npm)    _backend_npm "$repo" ;;
-        github) _backend_github "$name" "$repo" ;;
+        github) _backend_github "$repo" "$name" ;;
         source) _backend_source "$repo" "$name" ;;
         msf)    _backend_msf ;;
         apktool)   _backend_apktool ;;
@@ -97599,17 +97777,32 @@ _update_one() {
     local name="$1"
     _is_installed "$name" || { _warn "$name não está instalado. Use: xpm install $name"; return 1; }
 
-    local origin repo
+    # Respeita pin — não atualiza ferramenta travada
+    if _is_pinned "$name"; then
+        local pinver; pinver=$(cat "$XPM_PINS/${name}.pin" 2>/dev/null)
+        _warn "$name está pinado na versão ${pinver:-?}. Use 'xpm unpin $name' para liberar atualização."
+        return 0
+    fi
+
+    local origin repo ver_antes ver_depois
     origin=$(_db_get "$name" origin)
     repo=$(  _db_get "$name" repo)
+    ver_antes=$(_get_installed_meta "$name" "version")
 
     _head "Atualizando $name"
+    [ -n "$ver_antes" ] && [ "$ver_antes" != "unknown" ] && \
+        _info "Versão atual: $ver_antes"
 
     case "$origin" in
         apt)    pkg upgrade -y "$repo" 2>/dev/null || true ;;
-        pip)    pip3 install --upgrade "$name" 2>/dev/null || true ;;
+        pip)
+            local pkgname="$name"
+            case "$repo" in */*) pkgname="$name" ;; *) pkgname="$repo" ;; esac
+            pip3 install --upgrade "$pkgname" 2>/dev/null || \
+            pip3 install --upgrade "git+https://github.com/${repo}.git" 2>/dev/null || true
+            ;;
         go)     _backend_go "$repo" ;;
-        cargo)  cargo install "$name" --force 2>/dev/null || true ;;
+        cargo)  _backend_cargo "$repo" "$name" ;;
         gem)    gem update "$name" 2>/dev/null || true ;;
         source)
             _remove_one "$name"
@@ -97619,7 +97812,8 @@ _update_one() {
             local dest="$HOME/.xpm/tools/$name"
             if [ -d "$dest/.git" ]; then
                 git -C "$dest" pull 2>/dev/null || true
-                [ -f "$dest/requirements.txt" ] && pip3 install -r "$dest/requirements.txt" 2>/dev/null || true
+                [ -f "$dest/requirements.txt" ] && \
+                    pip3 install -r "$dest/requirements.txt" 2>/dev/null || true
                 # Reaplica a poda docs/spec/test/.github do metasploit depois
                 # do pull — com sparse-checkout ativo isso normalmente é um
                 # no-op, mas cobre instalações antigas sem sparse-checkout
@@ -97631,17 +97825,23 @@ _update_one() {
             fi
             ;;
         npm)    npm update -g "$repo" 2>/dev/null || true ;;
-        apktool)
-            _remove_one "$name"
-            _install_one "$name"
-            ;;
-        apkfull)
+        apktool|apkfull|apkeditor|appforge|apkinspect|wordmagic)
             _remove_one "$name"
             _install_one "$name"
             ;;
     esac
 
-    _ok "$name atualizado."
+    # Atualiza metadados com nova versão
+    ver_depois=$(_detect_version "$name" "$origin" "$repo")
+    _mark_installed "$name" "$ver_depois"
+
+    if [ -n "$ver_antes" ] && [ -n "$ver_depois" ] && \
+       [ "$ver_antes" != "unknown" ] && [ "$ver_depois" != "unknown" ] && \
+       [ "$ver_antes" != "$ver_depois" ]; then
+        _ok "$name atualizado: $ver_antes → $ver_depois"
+    else
+        _ok "$name atualizado."
+    fi
 }
 
 cmd_update() {
@@ -97772,14 +97972,49 @@ cmd_info() {
     _db_exists "$name" || _die "Ferramenta '$name' não encontrada."
 
     _head "Info: $name"
-    cat "$XPM_DB/${name}.tool" | while IFS='=' read -r k v; do
+    while IFS='=' read -r k v; do
         printf "  ${B}%-18s${R} %s\n" "$k" "$v"
-    done
+    done < "$XPM_DB/${name}.tool"
+
     if _is_installed "$name"; then
-        local inst_date
-        inst_date=$(cat "$XPM_INSTALLED/${name}.installed" 2>/dev/null)
+        local inst_date inst_ver
+        inst_date=$(_get_installed_meta "$name" "date")
+        inst_ver=$( _get_installed_meta "$name" "version")
+        # compatibilidade com formato antigo (arquivo era só a data)
+        [ -z "$inst_date" ] && inst_date=$(cat "$XPM_INSTALLED/${name}.installed" 2>/dev/null)
         printf "  ${G}%-18s${R} %s\n" "instalado_em" "$inst_date"
+        [ -n "$inst_ver" ] && printf "  ${G}%-18s${R} %s\n" "versao_instalada" "$inst_ver"
+        _is_pinned "$name" && \
+            printf "  ${Y}%-18s${R} %s\n" "pinado_em" "$(cat "$XPM_PINS/${name}.pin" 2>/dev/null)"
+    else
+        printf "  ${DIM}%-18s${R} não instalado\n" "status"
     fi
+}
+
+cmd_pin() {
+    local names=("$@")
+    [ "${#names[@]}" -eq 0 ] && { _err "Uso: xpm pin <ferramenta> [ferramenta2 ...]"; exit 1; }
+    for name in "${names[@]}"; do
+        _is_installed "$name" || { _warn "$name não está instalado."; continue; }
+        _is_pinned "$name" && { _warn "$name já está pinado."; continue; }
+        local ver
+        ver=$(_get_installed_meta "$name" "version" 2>/dev/null || echo "unknown")
+        echo "$ver" > "$XPM_PINS/${name}.pin"
+        _ok "$name pinado em v${ver} — não será atualizado pelo 'xpm upgrade'."
+    done
+}
+
+cmd_unpin() {
+    local names=("$@")
+    [ "${#names[@]}" -eq 0 ] && { _err "Uso: xpm unpin <ferramenta> [ferramenta2 ...]"; exit 1; }
+    for name in "${names[@]}"; do
+        if _is_pinned "$name"; then
+            rm -f "$XPM_PINS/${name}.pin"
+            _ok "$name despinado — será incluído nos próximos upgrades."
+        else
+            _warn "$name não está pinado."
+        fi
+    done
 }
 
 cmd_categories() {
@@ -98445,23 +98680,71 @@ cmd_cache() {
     local sz
     sz=$(du -sh "$XPM_CACHE" 2>/dev/null | cut -f1 || echo "0")
     printf "  Diretório: ${DIM}%s${R}\n" "$XPM_CACHE"
-    printf "  Tamanho:   ${W}%s${R}\n" "$sz"
+    printf "  Tamanho:   ${W}%s${R}\n\n" "$sz"
+
+    # Lista arquivos no cache
+    local count=0
+    for f in "$XPM_CACHE"/*; do
+        [ -e "$f" ] || continue
+        local fsz fname
+        fname=$(basename "$f")
+        fsz=$(du -sh "$f" 2>/dev/null | cut -f1 || echo "?")
+        printf "  ${DIM}%-30s${R} %s\n" "$fname" "$fsz"
+        count=$((count+1))
+    done
+    [ "$count" -eq 0 ] && _warn "Cache vazio." || \
+        printf "\n  ${DIM}%d arquivo(s) em cache${R}\n" "$count"
+    printf "\n  ${DIM}Use 'xpm clean' para limpar.${R}\n"
 }
 
 cmd_stats() {
     _head "Estatísticas XPM v${XPM_VERSION}"
-    local total installed
+    local total installed pinned
     total=$(ls "$XPM_DB"/*.tool 2>/dev/null | wc -l)
     installed=$(ls "$XPM_INSTALLED"/*.installed 2>/dev/null | wc -l)
-    printf "  ${W}%-25s${R} %d\n" "Ferramentas no catálogo:" "$total"
-    printf "  ${G}%-25s${R} %d\n" "Instaladas:" "$installed"
-    printf "\n  Por categoria:\n"
+    pinned=$(ls "$XPM_PINS"/*.pin 2>/dev/null | wc -l)
+    printf "  ${W}%-28s${R} %d\n" "Ferramentas no catálogo:" "$total"
+    printf "  ${G}%-28s${R} %d\n" "Instaladas:" "$installed"
+    printf "  ${Y}%-28s${R} %d\n" "Pinadas:" "$pinned"
+
+    # Uso de disco das ferramentas instaladas
+    local tools_dir="$HOME/.xpm/tools"
+    if [ -d "$tools_dir" ]; then
+        local disk_total
+        disk_total=$(du -sh "$tools_dir" 2>/dev/null | cut -f1 || echo "?")
+        printf "  ${DIM}%-28s${R} %s\n" "Disco (~/.xpm/tools):" "$disk_total"
+    fi
+
+    printf "\n  ${Y}Por categoria:${R}\n"
     for f in "$XPM_DB"/*.tool; do
         [ -f "$f" ] || continue
         grep "^category=" "$f" | cut -d= -f2-
     done | sort | uniq -c | sort -rn | while read -r cnt cat; do
-        printf "    ${DIM}%-28s${R} ${Y}%d${R}\n" "$cat" "$cnt"
+        printf "    ${DIM}%-30s${R} ${Y}%d${R}\n" "$cat" "$cnt"
     done
+
+    # Lista instaladas com versão
+    if [ "$installed" -gt 0 ]; then
+        printf "\n  ${G}Instaladas:${R}\n"
+        for f in "$XPM_INSTALLED"/*.installed; do
+            [ -f "$f" ] || continue
+            local n ver dt pin_mark=""
+            n=$(basename "$f" .installed)
+            ver=$(_get_installed_meta "$n" "version" 2>/dev/null || echo "?")
+            dt=$( _get_installed_meta "$n" "date"    2>/dev/null || cat "$f" 2>/dev/null | head -1)
+            _is_pinned "$n" && pin_mark=" ${Y}[pin]${R}"
+            printf "    ${G}%-20s${R} ${DIM}%-12s${R} %s%s\n" "$n" "${ver:-?}" "${dt:-?}" "$pin_mark"
+        done
+    fi
+
+    # Última atualização (arquivo .installed mais recente)
+    local last_f last_n last_dt
+    last_f=$(ls -t "$XPM_INSTALLED"/*.installed 2>/dev/null | head -1)
+    if [ -n "$last_f" ]; then
+        last_n=$(basename "$last_f" .installed)
+        last_dt=$(_get_installed_meta "$last_n" "date" 2>/dev/null || cat "$last_f" | head -1)
+        printf "\n  ${DIM}Última atividade: %s (%s)${R}\n" "$last_n" "$last_dt"
+    fi
 }
 
 _banner() {
@@ -98479,16 +98762,18 @@ _usage() {
     printf "  ${Y}Comandos:${R}\n"
     printf "    ${G}install${R}   <tool>    Instala uma ferramenta\n"
     printf "    ${G}remove${R}    <tool>    Remove uma ferramenta\n"
-    printf "    ${G}update${R}    <tool>    Atualiza uma ferramenta\n"
-    printf "    ${G}upgrade${R}             Atualiza todas as instaladas\n"
+    printf "    ${G}update${R}    <tool>    Atualiza uma ferramenta específica\n"
+    printf "    ${G}upgrade${R}             Atualiza todas as instaladas (respeita pins)\n"
+    printf "    ${G}pin${R}       <tool>    Trava ferramenta na versão atual\n"
+    printf "    ${G}unpin${R}     <tool>    Libera ferramenta para atualização\n"
     printf "    ${G}list${R}                Lista ferramentas instaladas\n"
     printf "    ${G}search${R}    <termo>   Busca no catálogo (use 'list' para ver tudo)\n"
-    printf "    ${G}info${R}      <tool>    Informações sobre uma ferramenta\n"
+    printf "    ${G}info${R}      <tool>    Informações e versão de uma ferramenta\n"
     printf "    ${G}categories${R}          Lista categorias disponíveis\n"
     printf "    ${G}doctor${R}              Diagnóstico do ambiente\n"
     printf "    ${G}clean${R}               Limpa o cache\n"
-    printf "    ${G}cache${R}               Mostra uso do cache\n"
-    printf "    ${G}stats${R}               Estatísticas do catálogo\n\n"
+    printf "    ${G}cache${R}               Mostra conteúdo do cache\n"
+    printf "    ${G}stats${R}               Estatísticas completas com versões\n\n"
     printf "  ${DIM}Exemplos:${R}\n"
     printf "    xpm install nuclei\n"
     printf "    xpm search web\n"
@@ -98507,13 +98792,15 @@ CMD="${1:-help}"
 shift 2>/dev/null || true
 
 case "$CMD" in
-    install)    cmd_install "$@" ;;
-    remove)     cmd_remove  "$@" ;;
-    update)     cmd_update  "$@" ;;
+    install)    cmd_install    "$@" ;;
+    remove)     cmd_remove     "$@" ;;
+    update)     cmd_update     "$@" ;;
     upgrade)    cmd_upgrade ;;
+    pin)        cmd_pin        "$@" ;;
+    unpin)      cmd_unpin      "$@" ;;
     list)       cmd_list ;;
-    search)     cmd_search  "$@" ;;
-    info)       cmd_info    "$@" ;;
+    search)     cmd_search     "$@" ;;
+    info)       cmd_info       "$@" ;;
     categories) cmd_categories ;;
     doctor)     cmd_doctor ;;
     clean)      cmd_clean ;;
