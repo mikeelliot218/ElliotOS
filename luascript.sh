@@ -32208,11 +32208,11 @@ static TaskInfo G_Tasks[MAX_TASKS];
 static int G_TaskCount = 0;
 static pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-/* ── ivar: forward declarations (definição completa mais abaixo) ── */
-static int g_ivar_enabled = 0; /* desativado por padrão — lido do disco no init */
-static int g_ivar_count   = 0;
+/* ── ivar: globals ── */
+static int  g_ivar_enabled = 1; /* ativado por padrao */
+static int  g_ivar_count   = 0;
 
-/* ── ivar: persistência em ~/.elliot_ivar.cfg ───────────────────────────── */
+/* ── ivar: persistência ── */
 static void ivar_config_save(void) {
     const char *home = getenv("HOME");
     if (!home) return;
@@ -32223,20 +32223,17 @@ static void ivar_config_save(void) {
     fprintf(f, "enabled=%d\n", g_ivar_enabled);
     fclose(f);
 }
-
 static void ivar_config_load(void) {
     const char *home = getenv("HOME");
     if (!home) return;
     char path[512];
     snprintf(path, sizeof(path), "%s/.elliot_ivar.cfg", home);
     FILE *f = fopen(path, "r");
-    if (!f) return; /* sem cfg → mantém default 0 */
+    if (!f) return;
     char line[64];
     while (fgets(line, sizeof(line), f)) {
-        int len = (int)strlen(line);
-        while (len > 0 && (line[len-1]=='\n'||line[len-1]=='\r')) line[--len]='\0';
-        if (strncmp(line, "enabled=", 8)==0)
-            g_ivar_enabled = (line[8]=='1') ? 1 : 0;
+        if (strncmp(line, "enabled=", 8) == 0)
+            g_ivar_enabled = (line[8] == '1') ? 1 : 0;
     }
     fclose(f);
 }
@@ -77736,7 +77733,7 @@ static const char *G_completions[] = {
     "util.sum(","util.min(","util.max(","util.chunk(","util.groupby(",
     "util.keys(","util.values(","util.pick(","util.omit(","util.merge(",
     "util.deepcopy(","util.partial(","util.memoize(","util.once(",
-    "util.retry(","util.with_file(","util.pp(","util.printf(","util.help()",
+    "util.retry(","util.with_file(","util.pp(","util.printf(","util.func(","util.help()",
     /* util.stats */
     "util.mean(","util.median(","util.mode(","util.variance(","util.stdev(",
     "util.stdev_sample(","util.percentile(","util.normalize(","util.clamp(","util.round(",
@@ -77872,6 +77869,8 @@ static const char *G_completions[] = {
     "math.abs(","math.sqrt(","math.pi","math.huge",
     "io.open(","io.read(","io.write(","io.lines(",
     "os.time()","os.date(","os.clock()","os.exit(","os.getenv(",
+    /* comandos especiais do REPL (sem parenteses) */
+    "help","clear","cls",
     NULL
 };
 
@@ -89927,6 +89926,7 @@ static void elliot_load_prelude(lua_State *L) {
 "  s('util.with_file(p,m,fn)', '-> abre arquivo, chama fn(f), fecha')\n"
 "  s('util.pp(v)',             '-> pretty-print de qualquer valor')\n"
 "  s('util.printf(fmt,...)',   '-> print com string.format')\n"
+"  s('util.func(mod)',         '-> lista funcoes do modulo (tabela ou string)')\n"
 "  print(R)\n"
 "end\n"
 
@@ -90401,6 +90401,7 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('\\027[0;90m  print(r2.code, r2.ok, r2:json())\\027[0m')\n"
 "  end\n"
 "end\n"
+
 
 /* -- Injeção de metodos em string via __index -------------------------- */
 /* Permite: (\"hello world\"):split(\" \")  ->  {\"hello\", \"world\"} */
@@ -91056,6 +91057,90 @@ static void elliot_load_prelude(lua_State *L) {
 "    print(C..'  -- Modulo de datas: date.help()'..R)\n"
 "  end\n"
 "end\n"
+
+/* util.func(mod) -- inspeciona modulo e detecta assinaturas */
+"function util.func(mod)\n"
+"  local E=string.char(27)\n"
+"  local C=E..'[1;33m'\n"
+"  local G=E..'[0;90m'\n"
+"  local R=E..'[0m'\n"
+"  local Y=E..'[1;32m'\n"
+"  local t = type(mod)\n"
+"  if t == 'string' then\n"
+"    local loaded = package.loaded[mod] or _G[mod]\n"
+"    if loaded == nil then\n"
+"      local ok2, m = pcall(require, mod)\n"
+"      if ok2 then loaded = m\n"
+"      else\n"
+"        print('[util.func] modulo nao encontrado: ' .. tostring(mod))\n"
+"        return {}\n"
+"      end\n"
+"    end\n"
+"    mod = loaded; t = type(mod)\n"
+"  end\n"
+"  if t ~= 'table' and t ~= 'userdata' then\n"
+"    print('[util.func] esperado tabela ou string, recebeu: ' .. t)\n"
+"    return {}\n"
+"  end\n"
+"  local mod_name = '?'\n"
+"  for k, v in pairs(_G) do\n"
+"    if v == mod and type(k) == 'string' then mod_name = k; break end\n"
+"  end\n"
+"  local function get_sig(fn)\n"
+"    if not debug or not debug.getinfo then return '' end\n"
+"    local info = debug.getinfo(fn, 'u')\n"
+"    if not info then return '' end\n"
+"    if info.what == 'C' then return G .. ' [C]' .. R end\n"
+"    local nparams = info.nparams or 0\n"
+"    if nparams == 0 then\n"
+"      return G .. (info.isvararg and '(...)' or '()') .. R\n"
+"    end\n"
+"    local params = {}\n"
+"    pcall(function()\n"
+"      for i = 1, nparams do\n"
+"        local name = debug.getlocal(fn, i)\n"
+"        table.insert(params, (name and name ~= '(*temporary)') and name or 'arg'..i)\n"
+"      end\n"
+"    end)\n"
+"    if #params < nparams then\n"
+"      for i = #params+1, nparams do table.insert(params, 'arg'..i) end\n"
+"    end\n"
+"    if info.isvararg then table.insert(params, '...') end\n"
+"    return G .. '(' .. table.concat(params, ', ') .. ')' .. R\n"
+"  end\n"
+"  local fns, others = {}, {}\n"
+"  for k, v in pairs(mod) do\n"
+"    if type(k) == 'string' then\n"
+"      if type(v) == 'function' then\n"
+"        table.insert(fns, {name=k, sig=get_sig(v)})\n"
+"      else\n"
+"        table.insert(others, {name=k, vtype=type(v)})\n"
+"      end\n"
+"    end\n"
+"  end\n"
+"  table.sort(fns, function(a,b) return a.name < b.name end)\n"
+"  table.sort(others, function(a,b) return a.name < b.name end)\n"
+"  if #fns + #others == 0 then\n"
+"    print('[util.func] modulo vazio ou sem campos acessiveis')\n"
+"    return {}\n"
+"  end\n"
+"  print(C .. '\\n-- ' .. mod_name .. '.* (' .. #fns .. ' funcoes'\n"
+"    .. (#others > 0 and ', ' .. #others .. ' campos' or '') .. ') --' .. R)\n"
+"  for _, fn in ipairs(fns) do\n"
+"    print('  ' .. Y .. mod_name .. '.' .. fn.name .. R .. fn.sig)\n"
+"  end\n"
+"  if #others > 0 then\n"
+"    print(G .. '\\n  -- campos nao-funcao:' .. R)\n"
+"    for _, o in ipairs(others) do\n"
+"      print('  ' .. G .. mod_name .. '.' .. o.name .. ' (' .. o.vtype .. ')' .. R)\n"
+"    end\n"
+"  end\n"
+"  local ret = {}\n"
+"  for _, fn in ipairs(fns) do table.insert(ret, fn.name) end\n"
+"  return ret\n"
+"end\n"
+"\n"
+
 
 /* -- Injeção de metodos em string via __index -------------------------- */
 /* Permite: (\"hello world\"):split(\" \")  ->  {\"hello\", \"world\"} */
@@ -92384,23 +92469,21 @@ static int l_adb_help(lua_State *L) {
  *  - Status:           ivar.status()  /  ivar.list()
  * ══════════════════════════════════════════════════════════════════════════ */
 
-#define ELLIOT_IVAR_MAX   512   /* máximo de variáveis indexadas por escopo */
+#define ELLIOT_IVAR_MAX 512
 
-/* Tabela global de variáveis indexadas: idx → nome */
-/* g_ivar_count e g_ivar_enabled foram declarados no topo do arquivo */
-static char   g_ivar_names[ELLIOT_IVAR_MAX][64];
+/* g_ivar_names: tabela global idx -> nome */
+static char g_ivar_names[ELLIOT_IVAR_MAX][64];
 
-/* ── helpers internos ─────────────────────────────────────────────────── */
 
-/* Retorna índice (1-based) de 'name' na tabela global, ou 0 se não existe */
+/* forward: definida mais abaixo */
+static int elliot_handle_help(const char *line, char *out_blank);
+
 static int ivar_find(const char *name) {
-    for (int i = 0; i < g_ivar_count; i++) {
+    for (int i = 0; i < g_ivar_count; i++)
         if (strcmp(g_ivar_names[i], name) == 0) return i + 1;
-    }
     return 0;
 }
 
-/* Registra variável se não existir ainda; retorna índice (1-based) */
 static int ivar_register(const char *name) {
     int idx = ivar_find(name);
     if (idx) return idx;
@@ -92410,108 +92493,83 @@ static int ivar_register(const char *name) {
     return ++g_ivar_count;
 }
 
-/* Retorna nome pelo índice 1-based, ou NULL */
 static const char *ivar_name_by_idx(int idx) {
     if (idx < 1 || idx > g_ivar_count) return NULL;
     return g_ivar_names[idx - 1];
 }
 
-/*
- * Verifica se o caractere na posição 'pos' da string 'src' está
- * dentro de um literal de string Lua (simples ou dupla), sem
- * suporte a strings longas [[ ]] (que raramente contêm !N).
- * Retorna 1 se estiver dentro de string, 0 caso contrário.
- */
 static int ivar_inside_string(const char *src, int pos) {
-    int in_sq = 0, in_dq = 0;
+    char in_str = 0;
     for (int i = 0; i < pos; i++) {
-        char c = src[i];
-        if (c == '\\' && (in_sq || in_dq)) { i++; continue; } /* escape */
-        if (!in_dq && c == '\'') in_sq = !in_sq;
-        else if (!in_sq && c == '"')  in_dq = !in_dq;
-    }
-    return in_sq || in_dq;
-}
-
-/* forward declaration — definida mais abaixo, usada em ivar_preprocess_line */
-static int elliot_handle_help(const char *line, char *out_blank);
-
-/*
- * Pré-processa uma linha de código Lua:
- *  1. Detecta declarações  (local )? nome = ...  e registra variáveis.
- *  2. Substitui referências !N pelo nome da variável, fora de strings.
- * Retorna ponteiro para buffer estático com a linha processada.
- * Buffer é válido até a próxima chamada.
- */
-static char *ivar_preprocess_line(const char *line) {
-    static char out[4096];
-    /* --- Passo 0: intercepta :help / help <tópico> --- */
-    if (elliot_handle_help(line, out)) return out;  /* out já contém "" */
-    /* --- Passo 1: detecta declaração de variável --- */
-    const char *p = line;
-    /* pula espaços */
-    while (*p == ' ' || *p == '\t') p++;
-    /* consome "local " opcional */
-    if (strncmp(p, "local ", 6) == 0) p += 6;
-    while (*p == ' ' || *p == '\t') p++;
-    /* coleta nome: [a-zA-Z_][a-zA-Z0-9_]* */
-    if ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '_') {
-        const char *name_start = p;
-        while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
-               (*p >= '0' && *p <= '9') || *p == '_') p++;
-        size_t nlen = (size_t)(p - name_start);
-        if (nlen < 63) {
-            /* pula espaços e verifica se vem '=' (não '==' nem '=>') */
-            const char *after = p;
-            while (*after == ' ' || *after == '\t') after++;
-            if (*after == '=' && *(after+1) != '=' && *(after+1) != '>') {
-                char name[64];
-                memcpy(name, name_start, nlen);
-                name[nlen] = '\0';
-                /* palavras reservadas Lua: ignora */
-                static const char *kw[] = {
-                    "and","break","do","else","elseif","end","false","for",
-                    "function","goto","if","in","local","nil","not","or",
-                    "repeat","return","then","true","until","while", NULL
-                };
-                int is_kw = 0;
-                for (int ki = 0; kw[ki]; ki++)
-                    if (strcmp(name, kw[ki]) == 0) { is_kw = 1; break; }
-                if (!is_kw) ivar_register(name);
-            }
+        if (in_str) {
+            if (src[i] == '\\') { i++; continue; }
+            if (src[i] == in_str) in_str = 0;
+        } else {
+            if (src[i] == '"' || src[i] == '\'') in_str = src[i];
         }
     }
+    return in_str != 0;
+}
 
-    /* --- Passo 2: substitui !N fora de strings --- */
-    const char *src = line;
-    int oi = 0;
-    for (int i = 0; src[i] && oi < 4090; ) {
+static const char *g_lua_kw[] = {
+    "and","break","do","else","elseif","end","false","for",
+    "function","goto","if","in","local","nil","not","or",
+    "repeat","return","then","true","until","while", NULL
+};
+static int ivar_is_keyword(const char *name) {
+    for (int i = 0; g_lua_kw[i]; i++)
+        if (strcmp(name, g_lua_kw[i]) == 0) return 1;
+    return 0;
+}
+
+static void ivar_detect_and_register(const char *line) {
+    const char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+    if (strncmp(p, "local ", 6) == 0) { p += 6; while (*p == ' ' || *p == '\t') p++; }
+    if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '_')) return;
+    const char *ns = p;
+    while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
+           (*p >= '0' && *p <= '9') || *p == '_') p++;
+    size_t nlen = (size_t)(p - ns);
+    if (nlen == 0 || nlen >= 63) return;
+    const char *after = p;
+    while (*after == ' ' || *after == '\t') after++;
+    if (!((*after == '=' && *(after+1) != '=' && *(after+1) != '>') || *after == ',')) return;
+    char name[64];
+    memcpy(name, ns, nlen); name[nlen] = '\0';
+    if (!ivar_is_keyword(name)) ivar_register(name);
+    if (*after == ',') {
+        after++;
+        while (*after == ' ' || *after == '\t') after++;
+        const char *ns2 = after;
+        while ((*after >= 'a' && *after <= 'z') || (*after >= 'A' && *after <= 'Z') ||
+               (*after >= '0' && *after <= '9') || *after == '_') after++;
+        size_t nl2 = (size_t)(after - ns2);
+        if (nl2 > 0 && nl2 < 63) {
+            char n2[64]; memcpy(n2, ns2, nl2); n2[nl2] = '\0';
+            if (!ivar_is_keyword(n2)) ivar_register(n2);
+        }
+    }
+}
+
+static char *ivar_expand(const char *src) {
+    size_t cap = strlen(src) * 4 + 256;
+    char *out = (char *)malloc(cap);
+    if (!out) return NULL;
+    size_t oi = 0;
+    for (int i = 0; src[i]; ) {
         if (src[i] == '!' && src[i+1] >= '1' && src[i+1] <= '9') {
-            /* verifica se está dentro de string */
-            if (ivar_inside_string(src, i)) {
-                out[oi++] = src[i++];
-                continue;
-            }
-            /* coleta número */
-            int num = 0;
-            int j = i + 1;
-            while (src[j] >= '0' && src[j] <= '9') {
-                num = num * 10 + (src[j] - '0');
-                j++;
-            }
+            if (ivar_inside_string(src, i)) { out[oi++] = src[i++]; continue; }
+            int num = 0, j = i + 1;
+            while (src[j] >= '0' && src[j] <= '9') { num = num*10 + (src[j]-'0'); j++; }
             const char *vname = ivar_name_by_idx(num);
             if (vname) {
                 size_t vl = strlen(vname);
-                if (oi + (int)vl < 4090) {
-                    memcpy(out + oi, vname, vl);
-                    oi += (int)vl;
-                }
-                i = j;
-            } else {
-                /* índice não existe: mantém literal !N */
-                out[oi++] = src[i++];
-            }
+                if (oi + vl + 2 >= cap) { cap = (oi+vl+2)*2; char *t=(char*)realloc(out,cap); if(!t){free(out);return NULL;}out=t; }
+                memcpy(out+oi, vname, vl); oi += vl; i = j;
+            } else { out[oi++] = src[i++]; }
         } else {
+            if (oi + 2 >= cap) { cap *= 2; char *t=(char*)realloc(out,cap); if(!t){free(out);return NULL;}out=t; }
             out[oi++] = src[i++];
         }
     }
@@ -92519,142 +92577,115 @@ static char *ivar_preprocess_line(const char *line) {
     return out;
 }
 
-/*
- * Pré-processa um bloco de código multi-linha (ex: arquivo .lua inteiro).
- * Retorna string alocada com malloc — chamador deve liberar com free().
- */
 char *elliot_ivar_preprocess_block(const char *code) {
-    /* ── :help / help — sempre interceptado, ivar ativo ou não ── */
+    if (!code) return NULL;
+    { char _h[1]; if (elliot_handle_help(code, _h)) { char *e=(char*)malloc(1); if(e)e[0]='\0'; return e; } }
     {
-        char _hout[1];
-        if (elliot_handle_help(code, _hout)) {
-            char *empty = (char *)malloc(1);
-            if (empty) empty[0] = '\0';
-            return empty;
+        const char *p = code;
+        while (*p == ' ' || *p == '\t') p++;
+        if (strcmp(p, "clear") == 0 || strcmp(p, "cls") == 0) {
+            if (system("clear") != 0) { fputs("\033[3J\033[2J\033[H", stdout); fflush(stdout); }
+            char *e=(char*)malloc(1); if(e)e[0]='\0'; return e;
+        }
+        /* cd: muda diretorio real do processo */
+        if (strncmp(p, "cd", 2) == 0 && (p[2] == '\0' || p[2] == ' ')) {
+            const char *dest = (p[2] == ' ') ? p+3 : NULL;
+            while (dest && *dest == ' ') dest++;
+            if (!dest || !dest[0] || strcmp(dest, "~") == 0) {
+                const char *home = getenv("HOME");
+                if (home) chdir(home);
+            } else {
+                if (chdir(dest) != 0)
+                    printf("\033[1;31mcd: %s: %s\033[0m\n", dest, strerror(errno));
+            }
+            char *e=(char*)malloc(1); if(e)e[0]='\0'; return e;
         }
     }
-    if (!g_ivar_enabled) {
-        /* não ativado: devolve cópia sem modificação */
-        char *copy = (char *)malloc(strlen(code) + 1);
-        if (copy) strcpy(copy, code);
-        return copy;
-    }
+    if (!g_ivar_enabled) { char *c=(char*)malloc(strlen(code)+1); if(c)strcpy(c,code); return c; }
 
-    /* tamanho máximo de saída: 4x o original (em caso de substituições longas) */
-    size_t cap = strlen(code) * 4 + 4096;
-    char *buf = (char *)malloc(cap);
-    if (!buf) return NULL;
-    size_t bpos = 0;
-
-    /* processa linha a linha */
+    size_t total_cap = strlen(code) * 4 + 4096;
+    char *result = (char *)malloc(total_cap);
+    if (!result) return NULL;
+    size_t rpos = 0;
     const char *p = code;
     while (*p) {
-        /* coleta linha */
-        const char *line_start = p;
+        const char *ls = p;
         while (*p && *p != '\n') p++;
-        size_t llen = (size_t)(p - line_start);
-        char line[4096];
-        if (llen >= sizeof(line) - 1) llen = sizeof(line) - 2;
-        memcpy(line, line_start, llen);
-        line[llen] = '\0';
-
-        const char *processed = ivar_preprocess_line(line);
-        size_t pl = strlen(processed);
-
-        /* garante espaço */
-        if (bpos + pl + 2 >= cap) {
-            cap = (bpos + pl + 2) * 2;
-            char *tmp = (char *)realloc(buf, cap);
-            if (!tmp) { free(buf); return NULL; }
-            buf = tmp;
+        size_t llen = (size_t)(p - ls);
+        char *line = (char *)malloc(llen + 2);
+        if (!line) break;
+        memcpy(line, ls, llen); line[llen] = '\0';
+        ivar_detect_and_register(line);
+        char *expanded = ivar_expand(line);
+        free(line);
+        if (!expanded) break;
+        size_t el = strlen(expanded);
+        if (rpos + el + 2 >= total_cap) {
+            total_cap = (rpos+el+2)*2;
+            char *t=(char*)realloc(result,total_cap);
+            if(!t){free(expanded);break;}result=t;
         }
-
-        memcpy(buf + bpos, processed, pl);
-        bpos += pl;
-        if (*p == '\n') { buf[bpos++] = '\n'; p++; }
+        memcpy(result+rpos, expanded, el); rpos += el;
+        free(expanded);
+        if (*p == '\n') { result[rpos++] = '\n'; p++; }
     }
-    buf[bpos] = '\0';
-    return buf;
+    result[rpos] = '\0';
+    return result;
 }
 
-/* ── API Lua: ivar.enable/disable/status/list/reset ─────────────────── */
-
+/* API Lua ivar.* */
 static int l_ivar_enable(lua_State *L) {
-    (void)L;
-    g_ivar_enabled = 1;
-    ivar_config_save();
+    (void)L; g_ivar_enabled = 1; ivar_config_save();
+    printf("\033[1;32m[ivar]\033[0m ativado. Variaveis declaradas recebem !N automaticamente.\n");
     return 0;
 }
-
 static int l_ivar_disable(lua_State *L) {
-    (void)L;
-    g_ivar_enabled = 0;
-    ivar_config_save();
+    (void)L; g_ivar_enabled = 0; ivar_config_save();
+    printf("\033[0;90m[ivar]\033[0m desativado.\n");
     return 0;
 }
-
 static int l_ivar_status(lua_State *L) {
     (void)L;
-    printf("\033[1;35m[ivar]\033[0m status: %s | variáveis registradas: %d\n",
-           g_ivar_enabled ? "\033[1;32mativado\033[0m" : "\033[1;33mdesativado\033[0m",
+    printf("\033[1;35m[ivar]\033[0m status: %s | variaveis: %d\n",
+           g_ivar_enabled ? "\033[1;32mativado\033[0m" : "\033[0;90mdesativado\033[0m",
            g_ivar_count);
     return 0;
 }
-
 static int l_ivar_list(lua_State *L) {
     (void)L;
-    if (g_ivar_count == 0) {
-        printf("\033[0;90m[ivar] nenhuma variável registrada ainda.\033[0m\n");
-        return 0;
-    }
-    printf("\033[1;35m[ivar] mapa de variáveis indexadas:\033[0m\n");
-    for (int i = 0; i < g_ivar_count; i++) {
-        printf("  \033[1;33m!%d\033[0m → \033[1;37m%s\033[0m\n", i + 1, g_ivar_names[i]);
-    }
+    if (g_ivar_count == 0) { printf("\033[0;90m[ivar] nenhuma variavel registrada.\033[0m\n"); return 0; }
+    printf("\033[1;35m[ivar] mapa:\033[0m\n");
+    for (int i = 0; i < g_ivar_count; i++)
+        printf("  \033[1;33m!%d\033[0m -> \033[1;37m%s\033[0m\n", i+1, g_ivar_names[i]);
     return 0;
 }
-
 static int l_ivar_reset(lua_State *L) {
     (void)L;
-    g_ivar_count = 0;
-    memset(g_ivar_names, 0, sizeof(g_ivar_names));
-    printf("\033[1;36m[ivar]\033[0m tabela de índices resetada.\n");
+    g_ivar_count = 0; memset(g_ivar_names, 0, sizeof(g_ivar_names));
+    printf("\033[1;36m[ivar]\033[0m tabela resetada.\n");
     return 0;
 }
-
-/*
- * ivar.preprocess(code_string) → string preprocessada
- * Útil para inspecionar o resultado antes de executar.
- */
 static int l_ivar_preprocess(lua_State *L) {
     const char *code = luaL_checkstring(L, 1);
-    char *result = elliot_ivar_preprocess_block(code);
-    if (!result) {
-        lua_pushstring(L, code);
-    } else {
-        lua_pushstring(L, result);
-        free(result);
-    }
+    char *r = elliot_ivar_preprocess_block(code);
+    lua_pushstring(L, r ? r : code);
+    if (r) free(r);
     return 1;
 }
-
 static int l_ivar_help(lua_State *L) {
     (void)L;
-    printf("\033[1;35m── ivar — Variáveis Indexadas (Experimental) ───────────────\033[0m\n");
-    printf("  \033[1;32mivar.enable()\033[0m        → ativa o recurso\n");
-    printf("  \033[1;32mivar.disable()\033[0m       → desativa o recurso\n");
-    printf("  \033[1;32mivar.status()\033[0m        → exibe status e contagem\n");
-    printf("  \033[1;32mivar.list()\033[0m          → exibe mapa !N → nome\n");
-    printf("  \033[1;32mivar.reset()\033[0m         → limpa todos os índices\n");
-    printf("  \033[1;32mivar.preprocess(code)\033[0m → retorna código pré-processado\n");
-    printf("\033[0;90m  Uso: ivar.enable() no REPL ou no topo do script.\033[0m\n");
-    printf("\033[0;90m  Exemplo:\033[0m\n");
-    printf("\033[0;90m    ivar.enable()\033[0m\n");
-    printf("\033[0;90m    nome = \"Mike\"   -- !1 → nome\033[0m\n");
-    printf("\033[0;90m    idade = 14      -- !2 → idade\033[0m\n");
-    printf("\033[0;90m    print(!1, !2)   -- equivale: print(nome, idade)\033[0m\n");
-    printf("\033[0;90m  Flags ms: ms -f script.lua  (pré-processa automaticamente)\033[0m\n");
-    printf("\033[0;90m  Nota: !N dentro de strings NÃO é substituído.\033[0m\n");
+    printf("\033[1;35m-- ivar -- Variaveis Indexadas -------\033[0m\n");
+    printf("  Ativado por padrao. Toda variavel declarada vira !N.\n\n");
+    printf("  \033[1;33mivar.enable()\033[0m    ativa (padrao)\n");
+    printf("  \033[1;33mivar.disable()\033[0m   desativa\n");
+    printf("  \033[1;33mivar.status()\033[0m    mostra status\n");
+    printf("  \033[1;33mivar.list()\033[0m      mostra mapa !N -> nome\n");
+    printf("  \033[1;33mivar.reset()\033[0m     limpa todos os indices\n");
+    printf("  \033[1;33mivar.preprocess(s)\033[0m retorna codigo expandido\n\n");
+    printf("\033[0;90m  Exemplo:\n");
+    printf("    nome = \"Mike\"   -- !1 -> nome\n");
+    printf("    idade = 22     -- !2 -> idade\n");
+    printf("    print(!1, !2)  -- print(\"Mike\", 22)\033[0m\n\n");
     return 0;
 }
 
@@ -92671,6 +92702,16 @@ static int elliot_handle_help(const char *line, char *out_blank) {
     /* pula espaços iniciais */
     const char *p = line;
     while (*p == ' ' || *p == '\t') p++;
+
+    /* clear / cls */
+    if (strcmp(p, "clear") == 0 || strcmp(p, "cls") == 0) {
+        /* chama o clear do sistema via terminfo -- funciona no Termux */
+        if (system("clear") != 0) {
+            fputs("\033[3J\033[2J\033[H", stdout); fflush(stdout);
+        }
+        if (out_blank) out_blank[0] = '\0';
+        return 1;
+    }
 
     /* aceita ":help" ou "help" (com ou sem dois-pontos) */
     int colon = 0;
@@ -92729,6 +92770,14 @@ static void elliot_ivar_init(lua_State *L) {
 /* ══ fim do módulo ivar ════════════════════════════════════════════════════ */
 
 /* ── help global: help() / help("topico") → ms --doc [topico] ── */
+static int l_elliot_clear_global(lua_State *L) {
+    (void)L;
+    if (system("clear") != 0) {
+        fputs("\033[3J\033[2J\033[H", stdout); fflush(stdout);
+    }
+    return 0;
+}
+
 static int l_elliot_help_global(lua_State *L) {
     const char *topic = lua_tostring(L, 1);
     char cmd[256];
@@ -93180,6 +93229,8 @@ int luaopen_net(lua_State *L) {
     {
         lua_pushcfunction(L, l_elliot_help_global);
         lua_setglobal(L, "help");
+        lua_pushcfunction(L, l_elliot_clear_global);
+        lua_setglobal(L, "clear");
     }
 
     return 0;
@@ -93250,9 +93301,15 @@ LIBNET_EOF
             print "  if (b) { char *_p = elliot_ivar_preprocess_block(b);"
             print "    if (_p) {"
             print "      size_t _n = strlen(_p);"
-            print "      size_t _cap = strlen(b);   /* buffer readline tem exatamente _cap+1 bytes */"
-            print "      if (_n > _cap) _n = _cap;  /* nunca escreve mais do que o buffer original */"
-            print "      memcpy(b, _p, _n); b[_n] = 0;"
+            print "      size_t _orig = strlen(b);"
+            print "      if (_n <= _orig) {"
+            print "        memcpy(b, _p, _n); b[_n] = 0;"
+            print "      } else {"
+            print "        /* linha expandida maior: substitui ponteiro (b e malloc do readline) */"
+            print "        char *_nb = (char*)realloc(b, _n + 2);"
+            print "        if (_nb) { memcpy(_nb, _p, _n); _nb[_n] = 0; b = _nb; }"
+            print "        else { memcpy(b, _p, _orig); b[_orig] = 0; }"
+            print "      }"
             print "      free(_p); } }"
             next
         }
@@ -101482,25 +101539,44 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;32m  ms --doc string\033[0m       extensoes string.*\n"
     printf "  \033[1;32m  ms --doc util\033[0m         stdlib funcional util.*\n"
     printf "  \033[1;32m  ms --doc json\033[0m         json.encode / json.decode\n\n"
+    printf "\033[1;35m═══ COMANDOS ESPECIAIS DO REPL ══════════════════════════════════════════════\033[0m\n\n"
+    printf "  Não são funções Lua. Não precisam de (). Interceptados antes do parser.\n\n"
+    printf "  \033[1;33m%-16s\033[0m %s\n" "help" "exibe a documentação (igual a ms --doc)"
+    printf "  \033[1;33m%-16s\033[0m %s\n" "help <modulo>" "doc de módulo: help net, help util..."
+    printf "  \033[1;33m%-16s\033[0m %s\n" "clear" "limpa a tela de verdade (via terminfo)"
+    printf "  \033[1;33m%-16s\033[0m %s\n" "cls" "alias de clear"
+    printf "  \033[1;33m%-16s\033[0m %s\n" "cd <dir>" "muda o diretório de trabalho"
+    printf "  \033[1;33m%-16s\033[0m %s\n" "exit / q" "sai do REPL"
+    printf "  \033[0;90m  Dica: também funcionam como função: help() e clear()\033[0m\n\n"
     printf "\033[1;35m═══ MODULOS DA API ════════════════════════════════════════════\033[0m\n\n"
     printf "  Modulos globais no REPL. Nunca use require().\n"
     printf "  Referencia especifica: \033[1;32mms --doc <modulo>\033[0m\n\n"
     printf "  \033[1;33m%-12s\033[0m %s\n" "net.*" "Rede: HTTP, TCP, UDP, DNS, port scan, sockets"
     printf "  \033[1;33m%-12s\033[0m %s\n" "mod.*" "Pentest: 23 scanners (XSS, SQLi, LFI, RCE...)"
     printf "  \033[1;33m%-12s\033[0m %s\n" "exploit.*" "REPLs de exploracao interativa"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "crypto.*" "Criptografia: MD5, SHA, AES, Base64, JWT"
     printf "  \033[1;33m%-12s\033[0m %s\n" "sys.*" "Sistema: threads, processos, env, sleep"
     printf "  \033[1;33m%-12s\033[0m %s\n" "fs.*" "Filesystem: read, write, list, stat, glob"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "crypto.*" "Criptografia: MD5, SHA, AES, Base64, JWT"
     printf "  \033[1;33m%-12s\033[0m %s\n" "ai.*" "IA (CYN): chat, code, search, providers"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "db.*" "Banco de dados SQLite"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "pent.*" "Pentest utilitarios extras"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "db.*" "Banco de dados SQLite embutido"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "web.*" "Parsing HTML, links, forms e servidor HTTP"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "dow.*" "Download de midia: video, audio, playlist, imagem"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "lmod.*" "Criador de modulos Lua customizados"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "adb.*" "Android Debug Bridge via Wi-Fi (sem root)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "pent.*" "Lab local vulneravel para praticar pentest"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "sh.*" "Shell direto: exec e captura de saida"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "cc.*" "Compilador C inline e transpilador Lua -> C"
     printf "  \033[1;33m%-12s\033[0m %s\n" "ui.*" "Interface de usuario no terminal"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "tui.*" "Terminal UI (menus, formularios)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "tui.*" "Terminal UI interativo (menus, formularios)"
     printf "  \033[1;33m%-12s\033[0m %s\n" "ell.*" "Encoder/Decoder de scripts (.ell)"
     printf "  \033[1;33m%-12s\033[0m %s\n" "agent.*" "Agente autonomo com tools"
     printf "  \033[1;33m%-12s\033[0m %s\n" "string.*" "Extensoes de string: trim, split, slugify, is*, pad..."
     printf "  \033[1;33m%-12s\033[0m %s\n" "util.*" "Stdlib funcional: map, filter, pipe, stats, iter, chain"
     printf "  \033[1;33m%-12s\033[0m %s\n" "json.*" "JSON encode/decode nativo"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "exploit.*" "REPLs de pós-exploração interativa (sqli, xss, lfi, rce, ssti, idor)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "ell.*" "Encoder/Decoder de scripts (.ell)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "agent.*" "Agente autônomo com tools (run, chat, reset)"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "ivar.*" "Variáveis indexadas no REPL (!N → nome)"
     }
     _doc_net() {
     printf "\033[1;35m═══ net.* — Módulo de Rede ════════════════════════════════════════\033[0m\n\n"
@@ -101862,6 +101938,10 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;33mutil.pp\033[0m(v)                → pretty-print de qualquer valor\n"
     printf "  \033[1;33mutil.with_file\033[0m(p, m, fn)  → abre arquivo, chama fn(f), fecha\n"
     printf "  \033[0;90m  util.with_file('saida.txt','w', function(f) f:write('linha\\n') end)\033[0m\n\n"
+    printf "  \033[1;33mutil.func\033[0m(mod)             → lista fun\xc3\xa7\xc3\xb5es de qualquer m\xc3\xb3dulo ou tabela\n"
+    printf "  \033[0;90m  util.func(math)     -- lista todas as fun\xc3\xa7\xc3\xb5es do math.*\033[0m\n"
+    printf "  \033[0;90m  util.func('socket')  -- carrega e inspeciona m\xc3\xb3dulo luarocks\033[0m\n"
+    printf "  \033[0;90m  util.func(net)       -- inspeciona m\xc3\xb3dulos do ElliotOS\033[0m\n\n"
     printf "\033[1;36m── ESTATÍSTICAS (util.help('stats')) ──────────────────────────────\033[0m\n\n"
     printf "  \033[1;33mutil.mean\033[0m(t)              → média aritmética\n"
     printf "  \033[1;33mutil.median\033[0m(t)            → mediana\n"
@@ -101949,6 +102029,367 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[0;90m  local back = json.decode(json.encode(orig))\033[0m\n"
     printf "  \033[0;90m  print(back.port, back.hosts[1])  --> 8080  127.0.0.1\033[0m\n\n"
     }
+    _doc_dow() {
+    printf "\033[1;35m═══ dow.* — Download de Mídia ════════════════════════════════════\033[0m\n\n"
+    printf "  Motor híbrido: YouTube usa yt-dlp; outros sites usam Cobalt API + wget.\n"
+    printf "  Todos os arquivos são salvos em ~/Downloads/\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mdow.video\033[0m(url)\n"
+    printf "  \033[0;90m  Baixa vídeo. YouTube → yt-dlp. Outros sites → Cobalt API.\033[0m\n"
+    printf "  \033[0;90m  dow.video('https://youtube.com/watch?v=...')\033[0m\n\n"
+    printf "  \033[1;33mdow.audio\033[0m(url)\n"
+    printf "  \033[0;90m  Extrai apenas o áudio do vídeo.\033[0m\n"
+    printf "  \033[0;90m  dow.audio('https://youtube.com/watch?v=...')\033[0m\n\n"
+    printf "  \033[1;33mdow.imagen\033[0m(url)\n"
+    printf "  \033[0;90m  Baixa imagem via URL direta.\033[0m\n"
+    printf "  \033[0;90m  dow.imagen('https://site.com/foto.jpg')\033[0m\n\n"
+    printf "  \033[1;33mdow.playlist\033[0m(url)\n"
+    printf "  \033[0;90m  Baixa playlist completa do YouTube via yt-dlp.\033[0m\n"
+    printf "  \033[0;90m  dow.playlist('https://youtube.com/playlist?list=...')\033[0m\n\n"
+    printf "  \033[1;33mdow.info\033[0m(url)\n"
+    printf "  \033[0;90m  Mostra status das ferramentas e instância Cobalt em uso.\033[0m\n\n"
+    printf "  \033[1;33mdow.reset\033[0m()\n"
+    printf "  \033[0;90m  Troca instância Cobalt em cache (útil se a atual falhar).\033[0m\n\n"
+    printf "  \033[1;33mdow.help\033[0m()\n"
+    printf "  \033[0;90m  Exibe ajuda completa do módulo.\033[0m\n\n"
+    printf "\033[1;36m── REQUISITOS ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;31m  ⚠ YouTube requer yt-dlp:\033[0m\n"
+    printf "  \033[0;90m  pkg install python-yt-dlp\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  dow.video('https://youtube.com/watch?v=dQw4w9WgXcQ')\033[0m\n"
+    printf "  \033[0;90m  dow.audio('https://youtube.com/watch?v=dQw4w9WgXcQ')\033[0m\n"
+    printf "  \033[0;90m  dow.playlist('https://youtube.com/playlist?list=PLxyz')\033[0m\n"
+    printf "  \033[0;90m  dow.imagen('https://site.com/imagem.png')\033[0m\n\n"
+    }
+    _doc_web() {
+    printf "\033[1;35m═══ web.* — Parsing HTML e Servidor Web ══════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mweb.get\033[0m(url [, opts])  →  html, code  ou  nil, errmsg\n"
+    printf "  \033[0;90m  Baixa HTML/CSS/JS, segue redirects, User-Agent de browser.\033[0m\n"
+    printf "  \033[0;90m  opts: {timeout, ua, quiet, headers, file}\033[0m\n"
+    printf "  \033[0;90m  local html, code = web.get('https://alvo.com')\033[0m\n\n"
+    printf "  \033[1;33mweb.links\033[0m(html)  →  tabela de URLs\n"
+    printf "  \033[0;90m  Extrai href de <a>/<link> e src de <img>/<script>.\033[0m\n"
+    printf "  \033[0;90m  local links = web.links(html)\033[0m\n"
+    printf "  \033[0;90m  for _, l in ipairs(links) do print(l) end\033[0m\n\n"
+    printf "  \033[1;33mweb.forms\033[0m(html)  →  tabela de formulários\n"
+    printf "  \033[0;90m  Extrai <form> com inputs, selects e textareas.\033[0m\n"
+    printf "  \033[0;90m  local forms = web.forms(html)\033[0m\n\n"
+    printf "  \033[1;33mweb.scripts\033[0m(html)  →  tabela de scripts\n"
+    printf "  \033[0;90m  Extrai <script> externos e inline.\033[0m\n\n"
+    printf "  \033[1;33mweb.serve\033[0m(path, port [, opts])\n"
+    printf "  \033[0;90m  Sobe servidor HTTP estático em background.\033[0m\n"
+    printf "  \033[0;90m  web.serve('/sdcard/meusite', 8080)\033[0m\n\n"
+    printf "  \033[1;33mweb.stop\033[0m()\n"
+    printf "  \033[0;90m  Para o servidor iniciado por web.serve().\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local html, code = web.get('https://alvo.com')\033[0m\n"
+    printf "  \033[0;90m  print('status:', code)\033[0m\n"
+    printf "  \033[0;90m  local links = web.links(html)\033[0m\n"
+    printf "  \033[0;90m  for _, l in ipairs(links) do print(l) end\033[0m\n\n"
+    printf "  \033[0;90m  -- auditar formulários de login:\033[0m\n"
+    printf "  \033[0;90m  local forms = web.forms(html)\033[0m\n"
+    printf "  \033[0;90m  for _, f in ipairs(forms) do\033[0m\n"
+    printf "  \033[0;90m    print(f.action, f.method)\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n\n"
+    printf "  \033[0;90m  -- servir projeto local:\033[0m\n"
+    printf "  \033[0;90m  web.serve('./meusite', 8080)\033[0m\n"
+    printf "  \033[0;90m  -- acessar no browser: http://localhost:8080\033[0m\n\n"
+    }
+    _doc_lmod() {
+    printf "\033[1;35m═══ lmod.* — Criador de Módulos Lua ══════════════════════════════\033[0m\n\n"
+    printf "  Cria e gerencia módulos Lua em ~/.lua-modules/\n"
+    printf "  Módulos criados com lmod são carregados via require('nome').\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mlmod.new\033[0m('nome' [, tipo])\n"
+    printf "  \033[0;90m  Cria módulo em ~/.lua-modules/nome.lua\033[0m\n"
+    printf "  \033[0;90m  tipos: scanner | recon | util | generic (padrão)\033[0m\n"
+    printf "  \033[0;90m  lmod.new('myscanner', 'scanner')\033[0m\n\n"
+    printf "  \033[1;33mlmod.mod\033[0m('arquivo.lua')\n"
+    printf "  \033[0;90m  Copia/registra arquivo Lua existente como módulo.\033[0m\n"
+    printf "  \033[0;90m  lmod.mod('meutool.lua')\033[0m\n\n"
+    printf "  \033[1;33mlmod.list\033[0m()\n"
+    printf "  \033[0;90m  Lista módulos instalados em ~/.lua-modules\033[0m\n\n"
+    printf "  \033[1;33mlmod.remove\033[0m('nome')\n"
+    printf "  \033[0;90m  Remove módulo pelo nome.\033[0m\n\n"
+    printf "  \033[1;33mlmod.path\033[0m()\n"
+    printf "  \033[0;90m  Mostra o diretório de módulos.\033[0m\n\n"
+    printf "  \033[1;33mlmod.help\033[0m()\n"
+    printf "  \033[0;90m  Ajuda com exemplos.\033[0m\n\n"
+    printf "\033[1;36m── FLUXO TÍPICO ───────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  lmod.new('authbypass', 'scanner') -- cria o template\033[0m\n"
+    printf "  \033[0;90m  ms -e ~/.lua-modules/authbypass.lua -- edita\033[0m\n"
+    printf "  \033[0;90m  -- no REPL ou em scripts:\033[0m\n"
+    printf "  \033[0;90m  local ab = require('authbypass')\033[0m\n"
+    printf "  \033[0;90m  ab.scan('https://alvo.com/login')\033[0m\n\n"
+    printf "\033[1;36m── TIPOS DE TEMPLATE ──────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33m%-10s\033[0m %s\n" "scanner" "template com scan(url) + detecção de vuln"
+    printf "  \033[1;33m%-10s\033[0m %s\n" "recon"   "template com run(host) para reconhecimento"
+    printf "  \033[1;33m%-10s\033[0m %s\n" "util"    "template utilitário genérico com helpers"
+    printf "  \033[1;33m%-10s\033[0m %s\n" "generic" "módulo vazio, estrutura mínima"
+    printf "\n"
+    }
+    _doc_adb() {
+    printf "\033[1;35m═══ adb.* — Android Debug Bridge via Wi-Fi ═══════════════════════\033[0m\n\n"
+    printf "  Usa o binário adb do Termux. Funciona sem root via ADB over TCP.\n"
+    printf "  \033[1;31m  ⚠ Requer: pkg install android-tools\033[0m\n\n"
+    printf "\033[1;36m── CONEXÃO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33madb.pair\033[0m('ip:porta', 'codigo')\n"
+    printf "  \033[0;90m  Pareia via Wi-Fi (Android 11+). Código aparece em:\033[0m\n"
+    printf "  \033[0;90m  Configurações → Desenvolvedor → Pareamento por código\033[0m\n"
+    printf "  \033[0;90m  adb.pair('192.168.1.5:37123', '123456')\033[0m\n\n"
+    printf "  \033[1;33madb.connect\033[0m('ip:porta')\n"
+    printf "  \033[0;90m  Conecta ao dispositivo após o pareamento.\033[0m\n"
+    printf "  \033[0;90m  adb.connect('192.168.1.5:5555')\033[0m\n\n"
+    printf "  \033[1;33madb.disconnect\033[0m()       Desconecta\n"
+    printf "  \033[1;33madb.devices\033[0m()          Lista dispositivos conectados\n"
+    printf "  \033[1;33madb.status\033[0m()           Status da conexão ADB\n\n"
+    printf "\033[1;36m── SHELL E ARQUIVOS ───────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33madb.shell\033[0m('cmd')        Executa comando como ADB shell\n"
+    printf "  \033[0;90m  adb.shell('pm list packages')\033[0m\n"
+    printf "  \033[0;90m  adb.shell('dumpsys battery')\033[0m\n\n"
+    printf "  \033[1;33madb.repl\033[0m()             Shell ADB interativo\n\n"
+    printf "  \033[1;33madb.push\033[0m('local', 'remoto')\n"
+    printf "  \033[0;90m  Copia arquivo para o device.\033[0m\n"
+    printf "  \033[0;90m  adb.push('/sdcard/arq.apk', '/sdcard/Download/arq.apk')\033[0m\n\n"
+    printf "  \033[1;33madb.pull\033[0m('remoto', 'local')\n"
+    printf "  \033[0;90m  Copia arquivo do device.\033[0m\n\n"
+    printf "  \033[1;33madb.install\033[0m('app.apk')  Instala APK no device\n\n"
+    printf "\033[1;36m── CONTROLE DO DEVICE ─────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33madb.tap\033[0m(x, y)             Simula toque na tela\n"
+    printf "  \033[1;33madb.swipe\033[0m(x1,y1,x2,y2)    Simula gesto de swipe\n"
+    printf "  \033[1;33madb.keyevent\033[0m(code)         Envia evento de tecla\n"
+    printf "  \033[1;33madb.text\033[0m('texto')          Digita texto\n"
+    printf "  \033[1;33madb.screenshot\033[0m()           Captura tela\n"
+    printf "  \033[1;33madb.reboot\033[0m('recovery')     Reinicia em recovery ou fastboot\n\n"
+    printf "\033[1;36m── INFORMAÇÕES DO SISTEMA ─────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33madb.prop\033[0m()               Lista propriedades do sistema\n"
+    printf "  \033[1;33madb.wifi\033[0m()               Info de Wi-Fi\n"
+    printf "  \033[1;33madb.screen_size\033[0m()         Resolução da tela\n"
+    printf "  \033[1;33madb.screen_density\033[0m()      Densidade da tela\n"
+    printf "  \033[1;33madb.forward\033[0m(lport, rport) Port forwarding\n"
+    printf "  \033[1;33madb.game_mode\033[0m(bool)       Ativa/desativa modo game\n"
+    printf "  \033[1;33madb.setup\033[0m()              Configura ambiente ADB\n\n"
+    printf "\033[1;36m── FLUXO TÍPICO (Android 11+) ─────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  -- 1. Ativar modo desenvolvedor + Pareamento por código\033[0m\n"
+    printf "  \033[0;90m  adb.pair('192.168.1.5:37123', '654321')\033[0m\n"
+    printf "  \033[0;90m  -- 2. Conectar\033[0m\n"
+    printf "  \033[0;90m  adb.connect('192.168.1.5:5555')\033[0m\n"
+    printf "  \033[0;90m  -- 3. Usar\033[0m\n"
+    printf "  \033[0;90m  adb.shell('id')\033[0m\n"
+    printf "  \033[0;90m  adb.screenshot()\033[0m\n"
+    printf "  \033[0;90m  adb.tap(540, 960)\033[0m\n\n"
+    }
+    _doc_db() {
+    printf "\033[1;35m═══ db.* — SQLite3 Embutido ═══════════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mdb.open\033[0m(path)      Abre/cria banco SQLite3\n"
+    printf "  \033[1;33mdb.close\033[0m()         Fecha o banco\n"
+    printf "  \033[1;33mdb.exec\033[0m(sql)       Executa sem retorno (CREATE, INSERT, UPDATE, DELETE)\n"
+    printf "  \033[1;33mdb.query\033[0m(sql)      SELECT → tabela Lua [{col=val,...}, ...]\n"
+    printf "  \033[1;33mdb.tables\033[0m()        Lista tabelas do banco\n"
+    printf "  \033[1;33mdb.help\033[0m()          Ajuda do módulo\n\n"
+    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  db.open('scan.db')\033[0m\n"
+    printf "  \033[0;90m  db.exec('CREATE TABLE IF NOT EXISTS vulns (host TEXT, tipo TEXT, url TEXT)')\033[0m\n"
+    printf "  \033[0;90m  db.exec(\"INSERT INTO vulns VALUES ('alvo.com','xss','/search')\")\033[0m\n"
+    printf "  \033[0;90m  local rows = db.query('SELECT * FROM vulns')\033[0m\n"
+    printf "  \033[0;90m  for _, r in ipairs(rows) do\033[0m\n"
+    printf "  \033[0;90m    print(r.host, r.tipo, r.url)\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n"
+    printf "  \033[0;90m  db.close()\033[0m\n\n"
+    printf "  \033[1;31m  ⚠ Sempre feche o banco com db.close() ao terminar!\033[0m\n\n"
+    }
+    _doc_pent() {
+    printf "\033[1;35m═══ pent.* — Lab Local Vulnerável ════════════════════════════════\033[0m\n\n"
+    printf "  Sobe um servidor HTTP vulnerável localmente para praticar pentest.\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mpent.start\033[0m(level, port)\n"
+    printf "  \033[0;90m  Sobe lab. level: 'easy', 'med' ou 'hard'\033[0m\n"
+    printf "  \033[0;90m  pent.start('easy', 8081)\033[0m\n\n"
+    printf "  \033[1;33mpent.stop\033[0m()          Para todos os labs\n"
+    printf "  \033[1;33mpent.status\033[0m()        Status dos labs rodando\n\n"
+    printf "\033[1;36m── PORTAS PADRÃO ──────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33m%-8s\033[0m  porta 8081\n" "easy"
+    printf "  \033[1;33m%-8s\033[0m  porta 8082\n" "med"
+    printf "  \033[1;33m%-8s\033[0m  porta 8083\n" "hard"
+    printf "\n"
+    printf "\033[1;36m── ENDPOINTS DISPONÍVEIS ──────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  /search  /login  /xss  /comment  /dom  /exec  /file  /path\033[0m\n"
+    printf "  \033[0;90m  /note  /tpl  /upload  /api/users  /api/me  /api/products\033[0m\n"
+    printf "  \033[0;90m  /redirect  /cors  /csrf  /jwt  /xxe  /admin  /register\033[0m\n"
+    printf "  \033[0;90m  /reset  /debug  /backup  /ssrf  /rate  /headers\033[0m\n\n"
+    printf "\033[1;36m── FLAGS EXEMPLO ──────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  FLAG{easy_sqli_win}    FLAG{nosql_auth_bypass}\033[0m\n"
+    printf "  \033[0;90m  FLAG{jwt_none_attack}  FLAG{lfi_found_you}\033[0m\n"
+    printf "  \033[0;90m  FLAG{ssrf_internal_fetch}\033[0m\n\n"
+    printf "\033[1;36m── FLUXO TÍPICO ───────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  pent.start('easy', 8081)\033[0m\n"
+    printf "  \033[0;90m  mod.sqli('http://localhost:8081/login')  -- testa sqli\033[0m\n"
+    printf "  \033[0;90m  mod.xss('http://localhost:8081/search')  -- testa xss\033[0m\n"
+    printf "  \033[0;90m  pent.stop()\033[0m\n\n"
+    }
+    _doc_sh() {
+    printf "\033[1;35m═══ sh.* — Shell Direto ══════════════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33msh.exec\033[0m(cmd)   Executa comando e retorna saída como string\n"
+    printf "  \033[1;33msh.read\033[0m(cmd)   Alias de sh.exec\n\n"
+    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  local out = sh.exec('uname -a')\033[0m\n"
+    printf "  \033[0;90m  print(out)\033[0m\n\n"
+    printf "  \033[0;90m  local files = sh.exec('ls -la ~')\033[0m\n"
+    printf "  \033[0;90m  print(files)\033[0m\n\n"
+    printf "  \033[0;90m  -- combinar com net e fs:\033[0m\n"
+    printf "  \033[0;90m  local ip = sh.exec('ip addr show wlan0 | grep inet')\033[0m\n"
+    printf "  \033[0;90m  fs.write('ip.txt', ip)\033[0m\n\n"
+    printf "  \033[1;31m  ⚠ sh.exec() captura stdout. Para stderr use 2>&1:\033[0m\n"
+    printf "  \033[0;90m  sh.exec('comando 2>&1')\033[0m\n\n"
+    }
+    _doc_cc() {
+    printf "\033[1;35m═══ cc.* — Compilador C Inline e Transpilador Lua→C ══════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcc.run\033[0m(codigo_c)\n"
+    printf "  \033[0;90m  Compila e executa código C direto do REPL.\033[0m\n"
+    printf "  \033[0;90m  cc.run([[\033[0m\n"
+    printf "  \033[0;90m    #include <stdio.h>\033[0m\n"
+    printf "  \033[0;90m    int main() { printf(\"ola do C!\\n\"); return 0; }\033[0m\n"
+    printf "  \033[0;90m  ]])\033[0m\n\n"
+    printf "  \033[1;33mcc.lua2c\033[0m(arquivo_lua)\n"
+    printf "  \033[0;90m  Transpila arquivo Lua para C (gera arquivo.c).\033[0m\n"
+    printf "  \033[0;90m  Cobre: funções, tabelas, retorno múltiplo, inferência de tipo.\033[0m\n"
+    printf "  \033[0;90m  cc.lua2c('meu_script.lua')\033[0m\n\n"
+    printf "  \033[1;33mcc.help\033[0m()   Ajuda do módulo\n\n"
+    printf "\033[1;36m── VIA LINHA DE COMANDO ───────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  ms -lua2c arquivo.lua       # transpila → arquivo.c\033[0m\n"
+    printf "  \033[0;90m  ms -lua2c -r arquivo.lua    # transpila e compila com cxx\033[0m\n\n"
+    }
+    _doc_ui() {
+    printf "\033[1;35m═══ ui.* — Interface de Terminal ══════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mui.color\033[0m(code, texto)  Texto colorido (códigos ANSI)\n"
+    printf "  \033[0;90m  ui.color('1;32', 'texto verde bold')\033[0m\n\n"
+    printf "  \033[1;33mui.box\033[0m(texto)          Desenha caixa ao redor do texto\n"
+    printf "  \033[0;90m  ui.box('ElliotOS')\033[0m\n\n"
+    printf "  \033[1;33mui.clear\033[0m()             Limpa a tela\n"
+    printf "  \033[1;33mui.sleep\033[0m(s)            Pausa em segundos\n\n"
+    printf "  \033[1;33mui.fig\033[0m(texto)          ASCII art via figlet\n"
+    printf "  \033[0;90m  ui.fig('ElliotOS')\033[0m\n\n"
+    printf "  \033[1;33mui.input\033[0m([prompt])     Lê linha do usuário\n"
+    printf "  \033[0;90m  local nome = ui.input('Seu nome: ')\033[0m\n"
+    printf "  \033[0;90m  print('Ola, ' .. nome)\033[0m\n\n"
+    printf "  \033[1;33mui.help\033[0m()              Ajuda do módulo\n\n"
+    printf "\033[1;36m── CÓDIGOS DE COR ─────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33m%-10s\033[0m  \033[1;32mVerde bold\033[0m\n"    "1;32"
+    printf "  \033[1;33m%-10s\033[0m  \033[1;31mVermelho bold\033[0m\n" "1;31"
+    printf "  \033[1;33m%-10s\033[0m  \033[1;33mAmarelo bold\033[0m\n"  "1;33"
+    printf "  \033[1;33m%-10s\033[0m  \033[1;36mCiano bold\033[0m\n"   "1;36"
+    printf "  \033[1;33m%-10s\033[0m  \033[0;90mCinza dim\033[0m\n"    "0;90"
+    printf "\n"
+    }
+    _doc_tui() {
+    printf "\033[1;35m═══ tui.* — Framework de UI Interativo ═══════════════════════════\033[0m\n\n"
+    printf "  Framework para criar interfaces interativas no terminal:\n"
+    printf "  menus, formulários, callbacks de teclado.\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mtui.main\033[0m()        Inicia loop principal de UI\n"
+    printf "  \033[1;33mtui.func\033[0m(fn)      Registra função de callback\n"
+    printf "  \033[1;33mtui.close\033[0m()       Encerra a UI\n"
+    printf "  \033[1;33mtui.read\033[0m()        Lê evento de teclado\n"
+    printf "  \033[1;33mtui.help\033[0m()        Ajuda do módulo\n\n"
+    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  tui.func(function()\033[0m\n"
+    printf "  \033[0;90m    ui.clear()\033[0m\n"
+    printf "  \033[0;90m    ui.fig('Menu')\033[0m\n"
+    printf "  \033[0;90m    local op = ui.input('Escolha [1-3]: ')\033[0m\n"
+    printf "  \033[0;90m    if op == '1' then\033[0m\n"
+    printf "  \033[0;90m      print(net.get('https://ifconfig.me'))\033[0m\n"
+    printf "  \033[0;90m    elseif op == 'q' then\033[0m\n"
+    printf "  \033[0;90m      tui.close()\033[0m\n"
+    printf "  \033[0;90m    end\033[0m\n"
+    printf "  \033[0;90m  end)\033[0m\n"
+    printf "  \033[0;90m  tui.main()\033[0m\n\n"
+    }
+    _doc_exploit() {
+    printf "\033[1;35m═══ exploit.* — REPLs de Pós-Exploração Interativa ════════════════\033[0m\n\n"
+    printf "  REPLs interativos para exploração passo a passo de vulnerabilidades.\n"
+    printf "  Cada REPL aceita payloads em loop até você sair (Ctrl+C ou 'q').\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mexploit.sqli\033[0m(url)   REPL de SQL Injection — extrai dados linha a linha\n"
+    printf "  \033[1;33mexploit.xss\033[0m(url)    REPL de XSS — injeta e verifica reflexão de payload\n"
+    printf "  \033[1;33mexploit.lfi\033[0m(url)    REPL de LFI — lê arquivos via path traversal\n"
+    printf "  \033[1;33mexploit.rce\033[0m(url)    REPL de RCE — shell interativo via execução remota\n"
+    printf "  \033[1;33mexploit.ssti\033[0m(url)   REPL de SSTI — injeta templates (Jinja2, Twig...)\n"
+    printf "  \033[1;33mexploit.idor\033[0m(url)   REPL de IDOR — fuzzing de IDs para acesso não autorizado\n"
+    printf "  \033[1;33mexploit.help\033[0m()      Exibe esta ajuda\n\n"
+    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  exploit.sqli('http://alvo.com/page?id=1')\033[0m\n"
+    printf "  \033[0;90m  exploit.rce('http://alvo.com/cmd?exec=')\033[0m\n"
+    printf "  \033[0;90m  exploit.lfi('http://alvo.com/view?file=')\033[0m\n\n"
+    printf "  \033[1;31m  ⚠ Use apenas em ambientes autorizados (lab / CTF).\033[0m\n\n"
+    }
+    _doc_ell() {
+    printf "\033[1;35m═══ ell.* — Encoder/Decoder de Scripts (.ell) ════════════════════\033[0m\n\n"
+    printf "  Converte scripts Lua/Python/Bash em formato .ell (ofuscado) e vice-versa.\n"
+    printf "  Útil para distribuir scripts sem expor o código-fonte.\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mell.encode\033[0m(path [, lang [, out]])\n"
+    printf "  \033[0;90m    Codifica arquivo para .ell. lang detectado pela extensão.\033[0m\n"
+    printf "  \033[0;90m    ell.encode('script.lua')            → gera script.ell\033[0m\n"
+    printf "  \033[0;90m    ell.encode('script.py', 'python')   → força linguagem\033[0m\n\n"
+    printf "  \033[1;33mell.decode\033[0m(path [, out])\n"
+    printf "  \033[0;90m    Restaura .ell para o código original.\033[0m\n"
+    printf "  \033[0;90m    ell.decode('script.ell')            → restaura script.lua\033[0m\n\n"
+    printf "  \033[1;33mell.encode_str\033[0m(code, lang)\n"
+    printf "  \033[0;90m    Codifica string de código → retorna string .ell\033[0m\n\n"
+    printf "  \033[1;33mell.decode_str\033[0m(data)\n"
+    printf "  \033[0;90m    Decodifica string .ell → retorna código original\033[0m\n\n"
+    printf "  \033[1;33mell.help\033[0m()            Exibe esta ajuda\n\n"
+    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  ell.encode('meu_scanner.lua')         -- gera meu_scanner.ell\033[0m\n"
+    printf "  \033[0;90m  ell.decode('meu_scanner.ell')         -- restaura o .lua\033[0m\n"
+    printf "  \033[0;90m  local s = ell.encode_str(code, 'lua') -- codifica em memória\033[0m\n\n"
+    }
+    _doc_agent() {
+    printf "\033[1;35m═══ agent.* — Agente Autônomo com Tools ══════════════════════════\033[0m\n\n"
+    printf "  Agente de IA que executa tarefas em loop: gera código,\n"
+    printf "  executa, analisa o resultado e itera automaticamente.\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33magent.run\033[0m('tarefa' [, opts])\n"
+    printf "  \033[0;90m    Executa tarefa com confirmação a cada bloco de código.\033[0m\n"
+    printf "  \033[0;90m    opts: { auto=true, lang='lua'|'c'|'bash', max=N }\033[0m\n"
+    printf "  \033[0;90m    agent.run('crie um port scanner')\033[0m\n"
+    printf "  \033[0;90m    agent.run('compile hello world', {auto=true, lang='c'})\033[0m\n\n"
+    printf "  \033[1;33magent.chat\033[0m('msg')\n"
+    printf "  \033[0;90m    Conversa livre sem execução de código.\033[0m\n"
+    printf "  \033[0;90m    agent.chat('explica buffer overflow')\033[0m\n\n"
+    printf "  \033[1;33magent.reset\033[0m()         Limpa o contexto/histórico do agente\n"
+    printf "  \033[1;33magent.help\033[0m()          Exibe esta ajuda\n\n"
+    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  agent.run('faça um servidor HTTP em Lua', {auto=true})\033[0m\n"
+    printf "  \033[0;90m  agent.run('crie um port scanner em bash')\033[0m\n"
+    printf "  \033[0;90m  agent.chat('como funciona heap spray?')\033[0m\n\n"
+    }
+    _doc_ivar() {
+    printf "\033[1;35m═══ ivar.* — Variáveis Indexadas no REPL ════════════════════════\033[0m\n\n"
+    printf "  Permite referenciar variáveis por índice numérico (!N) em vez do nome,\n"
+    printf "  acelerando a digitação no REPL interativo.\n\n"
+    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mivar.enable\033[0m()         Ativa o modo ivar no REPL\n"
+    printf "  \033[1;33mivar.disable\033[0m()        Desativa o modo ivar\n"
+    printf "  \033[1;33mivar.status\033[0m()         Exibe status e contagem de variáveis indexadas\n"
+    printf "  \033[1;33mivar.list\033[0m()           Exibe mapa !N → nome de todas as variáveis\n"
+    printf "  \033[1;33mivar.reset\033[0m()          Limpa todos os índices\n"
+    printf "  \033[1;33mivar.preprocess\033[0m(code)  Pré-processa string substituindo !N por nomes\n"
+    printf "  \033[1;33mivar.help\033[0m()           Exibe esta ajuda\n\n"
+    printf "\033[1;36m── COMO USAR ──────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  ivar.enable()          -- ativa no REPL\033[0m\n"
+    printf "  \033[0;90m  local x = 42           -- !1 agora aponta para x\033[0m\n"
+    printf "  \033[0;90m  print(!1)              -- equivale a print(x)\033[0m\n"
+    printf "  \033[0;90m  ivar.list()            -- mostra: !1 → x\033[0m\n\n"
+    printf "  Scripts com \033[1;32mivar.enable()\033[0m ou referências \033[1;32m!N\033[0m são\n"
+    printf "  pré-processados automaticamente pelo runner.\n\n"
+    printf "  Persistência: mapa salvo em \033[0;90m~/.elliot_ivar.cfg\033[0m\n\n"
+    }
     _DOC_SUB="\${2:-}"
     case "\$_DOC_SUB" in
       net|rede)
@@ -101970,8 +102411,36 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
       json)
         if [ -n "\$_DOC_PAGER" ]; then _doc_json | eval "\$_DOC_PAGER"; else _doc_json; fi ;;
       modulos|modules|api)
-        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_string; _doc_util; _doc_json; }
+        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_db; _doc_web; _doc_dow; _doc_lmod; _doc_adb; _doc_pent; _doc_sh; _doc_cc; _doc_ui; _doc_tui; _doc_exploit; _doc_ell; _doc_agent; _doc_ivar; _doc_string; _doc_util; _doc_json; }
         if [ -n "\$_DOC_PAGER" ]; then _all_mods | eval "\$_DOC_PAGER"; else _all_mods; fi ;;
+      dow|download|midia)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_dow | eval "\$_DOC_PAGER"; else _doc_dow; fi ;;
+      web)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_web | eval "\$_DOC_PAGER"; else _doc_web; fi ;;
+      lmod)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_lmod | eval "\$_DOC_PAGER"; else _doc_lmod; fi ;;
+      adb)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_adb | eval "\$_DOC_PAGER"; else _doc_adb; fi ;;
+      db|sqlite)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_db | eval "\$_DOC_PAGER"; else _doc_db; fi ;;
+      pent|lab)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_pent | eval "\$_DOC_PAGER"; else _doc_pent; fi ;;
+      sh|shell)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_sh | eval "\$_DOC_PAGER"; else _doc_sh; fi ;;
+      cc|compiler)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_cc | eval "\$_DOC_PAGER"; else _doc_cc; fi ;;
+      ui)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_ui | eval "\$_DOC_PAGER"; else _doc_ui; fi ;;
+      tui)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_tui | eval "\$_DOC_PAGER"; else _doc_tui; fi ;;
+      exploit|post)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_exploit | eval "\$_DOC_PAGER"; else _doc_exploit; fi ;;
+      ell|encoder)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_ell | eval "\$_DOC_PAGER"; else _doc_ell; fi ;;
+      agent|agente)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_agent | eval "\$_DOC_PAGER"; else _doc_agent; fi ;;
+      ivar)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_ivar | eval "\$_DOC_PAGER"; else _doc_ivar; fi ;;
       "")
         if [ -n "\$_DOC_PAGER" ]; then _doc_body | eval "\$_DOC_PAGER"; else _doc_body; fi ;;
       *)
@@ -101984,8 +102453,23 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
         printf "       \033[1;32mms --doc sys\033[0m       # sys.*\n"
         printf "       \033[1;32mms --doc fs\033[0m        # fs.*\n"
         printf "       \033[1;32mms --doc ai\033[0m        # ai.*\n"
+        printf "       \033[1;32mms --doc db\033[0m        # db.* (SQLite)\n"
+        printf "       \033[1;32mms --doc web\033[0m       # web.*\n"
+        printf "       \033[1;32mms --doc dow\033[0m       # dow.* (downloads)\n"
+        printf "       \033[1;32mms --doc lmod\033[0m      # lmod.* (modulos custom)\n"
+        printf "       \033[1;32mms --doc adb\033[0m       # adb.* (Android Debug Bridge)\n"
+        printf "       \033[1;32mms --doc pent\033[0m      # pent.* (lab vulneravel)\n"
+        printf "       \033[1;32mms --doc sh\033[0m        # sh.* (shell direto)\n"
+        printf "       \033[1;32mms --doc cc\033[0m        # cc.* (compilador C)\n"
+        printf "       \033[1;32mms --doc ui\033[0m        # ui.* (interface)\n"
+        printf "       \033[1;32mms --doc tui\033[0m       # tui.* (UI interativo)\n"
+        printf "       \033[1;32mms --doc exploit\033[0m   # exploit.* (pós-exploração)\n"
+        printf "       \033[1;32mms --doc ell\033[0m       # ell.* (encoder de scripts)\n"
+        printf "       \033[1;32mms --doc agent\033[0m     # agent.* (agente autônomo)\n"
+        printf "       \033[1;32mms --doc ivar\033[0m      # ivar.* (variáveis indexadas)\n"
         printf "       \033[1;32mms --doc string\033[0m    # extensoes string.*\n"
         printf "       \033[1;32mms --doc util\033[0m      # stdlib funcional util.*\n"
+        printf "       \033[1;32mms --doc json\033[0m      # json.*\n"
         ;;
     esac
     ;;
