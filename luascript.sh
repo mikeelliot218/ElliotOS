@@ -27843,6 +27843,8 @@ install_elliotos() {
     rm -rf "$BUILD_DIR" && mkdir -p "$BUILD_DIR"
     # Remove artefatos de build anteriores para evitar conflito na reinsatalação
     rm -f "$HOME/.elliot_libnet.log" "$HOME/.elliot_make.log" "$HOME/.elliot_vanilla.log"
+    # Reset ivar config — garante que ivar inicia ativado por padrão após reinstalação
+    rm -f "$HOME/.elliot_ivar.cfg"
     cd "$BUILD_DIR"
     _ok "Diretório de build: $BUILD_DIR"
 
@@ -32245,7 +32247,7 @@ static TaskInfo G_Tasks[MAX_TASKS];
 static int G_TaskCount = 0;
 static pthread_mutex_t task_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-/* ── ivar: globals ── */
+/* ── ivar: globals (declarados aqui; restante do ivar em bloco dedicado) ── */
 static int  g_ivar_enabled = 1; /* ativado por padrao */
 static int  g_ivar_count   = 0;
 
@@ -92488,61 +92490,178 @@ static int l_adb_help(lua_State *L) {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
- * VARIÁVEIS INDEXADAS AUTOMÁTICAS (EXPERIMENTAL)
+ * VARIÁVEIS INDEXADAS AUTOMÁTICAS (ivar) v2.0
  * ──────────────────────────────────────────────────────────────────────────
  * Toda variável declarada via  nome = valor  ou  local nome = valor
  * recebe automaticamente um índice sequencial:
  *   !1 → primeira variável declarada
  *   !2 → segunda variável declarada, etc.
  *
- * Regras:
- *  - Índice segue ordem de declaração (nunca reorganiza ao remover)
- *  - !N é resolvido pelo pré-processador ANTES da execução
- *  - Não substitui dentro de strings (conteúdo entre " " ou ' ')
- *  - Escopo local tem tabela própria de índices (ivar_local_*)
- *  - Variável global:  __ivar_global  (tabela índice→nome)
- *  - Variável local :  __ivar_local_N (tabela índice→nome por nível)
- *  - Habilitado com:   ivar.enable()  /  ivar.disable()
- *  - Status:           ivar.status()  /  ivar.list()
+ * Novidades v2.0:
+ *  - Aliases nomeados:  !hp = player_health   → !hp expande p/ player_health
+ *  - Escopo por função: dentro de function{} !1 reinicia do zero
+ *  - ivar.list()      : mostra !N → nome = valor_atual
+ *  - ivar.debug(bool) : avisa ao registrar cada variável
+ *  - ivar.alias(k,v)  : registra alias via Lua
  * ══════════════════════════════════════════════════════════════════════════ */
 
-#define ELLIOT_IVAR_MAX 512
+#define ELLIOT_IVAR_MAX       512
+#define ELLIOT_IVAR_ALIAS_MAX 128
+#define IVAR_SCOPE_MAX         32
+#define IVAR_BLOCK_MAX         64
 
-/* g_ivar_names: tabela global idx -> nome */
+/* tabela global índice → nome */
 static char g_ivar_names[ELLIOT_IVAR_MAX][64];
+/* g_ivar_count e g_ivar_enabled declarados antes de ivar_config_save */
 
+/* aliases nomeados: !key → varname */
+static char g_ivar_alias_key[ELLIOT_IVAR_ALIAS_MAX][64];
+static char g_ivar_alias_var[ELLIOT_IVAR_ALIAS_MAX][64];
+static int  g_ivar_alias_count = 0;
+
+/* modo debug */
+static int  g_ivar_debug = 0;
+
+/* pilha de escopos por função */
+static int  g_ivar_scope_base[IVAR_SCOPE_MAX];
+static int  g_ivar_scope_depth = 0;
+
+/* pilha de blocos para rastrear end */
+static int  g_ivar_block_is_fn[IVAR_BLOCK_MAX];
+static int  g_ivar_block_depth = 0;
 
 /* forward: definida mais abaixo */
 static int elliot_handle_help(const char *line, char *out_blank);
 
+/* ── helpers de alias ───────────────────────────────────────────────────── */
+static int ivar_alias_find(const char *key) {
+    for (int i = 0; i < g_ivar_alias_count; i++)
+        if (strcmp(g_ivar_alias_key[i], key) == 0) return i;
+    return -1;
+}
+static void ivar_alias_register(const char *key, const char *var) {
+    int idx = ivar_alias_find(key);
+    if (idx >= 0) {
+        strncpy(g_ivar_alias_var[idx], var, 63);
+        g_ivar_alias_var[idx][63] = '\0';
+        return;
+    }
+    if (g_ivar_alias_count >= ELLIOT_IVAR_ALIAS_MAX) return;
+    strncpy(g_ivar_alias_key[g_ivar_alias_count], key, 63);
+    g_ivar_alias_key[g_ivar_alias_count][63] = '\0';
+    strncpy(g_ivar_alias_var[g_ivar_alias_count], var, 63);
+    g_ivar_alias_var[g_ivar_alias_count][63] = '\0';
+    g_ivar_alias_count++;
+}
+static const char *ivar_alias_lookup(const char *key) {
+    int idx = ivar_alias_find(key);
+    return (idx >= 0) ? g_ivar_alias_var[idx] : NULL;
+}
+
+/* ── helpers de índice ──────────────────────────────────────────────────── */
 static int ivar_find(const char *name) {
     for (int i = 0; i < g_ivar_count; i++)
         if (strcmp(g_ivar_names[i], name) == 0) return i + 1;
     return 0;
 }
-
 static int ivar_register(const char *name) {
     int idx = ivar_find(name);
     if (idx) return idx;
     if (g_ivar_count >= ELLIOT_IVAR_MAX) return 0;
     strncpy(g_ivar_names[g_ivar_count], name, 63);
     g_ivar_names[g_ivar_count][63] = '\0';
-    return ++g_ivar_count;
+    int new_abs = ++g_ivar_count;
+    if (g_ivar_debug) {
+        int base = (g_ivar_scope_depth > 0) ? g_ivar_scope_base[g_ivar_scope_depth-1] : 0;
+        fprintf(stderr, "\033[0;90m[ivar:debug] !%d \xe2\x86\x92 %s\033[0m\n", new_abs - base, name);
+    }
+    return new_abs;
 }
 
+/* resolve !N relativo ao escopo atual */
 static const char *ivar_name_by_idx(int idx) {
-    if (idx < 1 || idx > g_ivar_count) return NULL;
-    return g_ivar_names[idx - 1];
+    int base = (g_ivar_scope_depth > 0) ? g_ivar_scope_base[g_ivar_scope_depth-1] : 0;
+    int abs_idx = base + idx - 1;
+    if (abs_idx >= 0 && abs_idx < g_ivar_count) return g_ivar_names[abs_idx];
+    if (idx >= 1 && idx <= g_ivar_count) return g_ivar_names[idx-1];
+    return NULL;
+}
+
+/* ── detecção de escopo de função ────────────────────────────────────────── */
+static void ivar_detect_scope_change(const char *line) {
+    const char *p = line;
+    while (*p == ' ' || *p == '\t') p++;
+
+    int is_fn = 0, opens = 0, closes = 0;
+
+    if (strncmp(p,"function",8)==0 &&
+        (p[8]==' '||p[8]=='('||p[8]=='\t'||p[8]=='\0')) { is_fn=1; opens=1; }
+    else if (strncmp(p,"local function",14)==0) { is_fn=1; opens=1; }
+    else if ((strncmp(p,"if ",3)==0)||(strncmp(p,"for ",4)==0)||
+             (strncmp(p,"while ",6)==0)||
+             (strncmp(p,"do",2)==0&&(p[2]=='\0'||p[2]==' '||p[2]=='\t'))) { opens=1; }
+    else if (strcmp(p,"end")==0||strncmp(p,"end ",4)==0||
+             strncmp(p,"end\t",4)==0||strncmp(p,"end--",5)==0) { closes=1; }
+
+    /* função anônima: "x = function(" */
+    if (!opens) {
+        const char *q = strstr(p, "function");
+        if (q && q > p) {
+            char prev = *(q-1);
+            if (prev==' '||prev=='='||prev=='('||prev==',') { is_fn=1; opens=1; }
+        }
+    }
+
+    if (opens && g_ivar_block_depth < IVAR_BLOCK_MAX) {
+        g_ivar_block_is_fn[g_ivar_block_depth] = is_fn;
+        g_ivar_block_depth++;
+        if (is_fn && g_ivar_scope_depth < IVAR_SCOPE_MAX) {
+            g_ivar_scope_base[g_ivar_scope_depth] = g_ivar_count;
+            g_ivar_scope_depth++;
+        }
+    } else if (closes && g_ivar_block_depth > 0) {
+        g_ivar_block_depth--;
+        if (g_ivar_block_is_fn[g_ivar_block_depth] && g_ivar_scope_depth > 0)
+            g_ivar_scope_depth--;
+    }
+}
+
+/* ── detecção de alias: "!alias = varname" ──────────────────────────────── */
+static int ivar_detect_alias_line(const char *line) {
+    const char *p = line;
+    while (*p==' '||*p=='\t') p++;
+    if (*p != '!') return 0;
+    p++;
+    if (!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||*p=='_')) return 0;
+    const char *ks = p;
+    while ((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='_') p++;
+    size_t klen=(size_t)(p-ks);
+    if (klen==0||klen>=63) return 0;
+    while (*p==' '||*p=='\t') p++;
+    if (!(*p=='='&&*(p+1)!='=')) return 0;
+    p++;
+    while (*p==' '||*p=='\t') p++;
+    const char *vs=p;
+    while ((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='_') p++;
+    size_t vlen=(size_t)(p-vs);
+    if (vlen==0||vlen>=63) return 0;
+    while (*p==' '||*p=='\t') p++;
+    if (*p!='\0'&&*p!='-'&&*p!='\n') return 0;
+    char key[64], var[64];
+    memcpy(key,ks,klen); key[klen]='\0';
+    memcpy(var,vs,vlen); var[vlen]='\0';
+    ivar_alias_register(key, var);
+    return 1;
 }
 
 static int ivar_inside_string(const char *src, int pos) {
     char in_str = 0;
     for (int i = 0; i < pos; i++) {
         if (in_str) {
-            if (src[i] == '\\') { i++; continue; }
-            if (src[i] == in_str) in_str = 0;
+            if (src[i]=='\\') { i++; continue; }
+            if (src[i]==in_str) in_str = 0;
         } else {
-            if (src[i] == '"' || src[i] == '\'') in_str = src[i];
+            if (src[i]=='"'||src[i]=='\'') in_str = src[i];
         }
     }
     return in_str != 0;
@@ -92561,168 +92680,256 @@ static int ivar_is_keyword(const char *name) {
 
 static void ivar_detect_and_register(const char *line) {
     const char *p = line;
-    while (*p == ' ' || *p == '\t') p++;
-    if (strncmp(p, "local ", 6) == 0) { p += 6; while (*p == ' ' || *p == '\t') p++; }
-    if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '_')) return;
-    const char *ns = p;
-    while ((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') ||
-           (*p >= '0' && *p <= '9') || *p == '_') p++;
-    size_t nlen = (size_t)(p - ns);
-    if (nlen == 0 || nlen >= 63) return;
-    const char *after = p;
-    while (*after == ' ' || *after == '\t') after++;
-    if (!((*after == '=' && *(after+1) != '=' && *(after+1) != '>') || *after == ',')) return;
-    char name[64];
-    memcpy(name, ns, nlen); name[nlen] = '\0';
+    while (*p==' '||*p=='\t') p++;
+    if (strncmp(p,"local ",6)==0) { p+=6; while(*p==' '||*p=='\t') p++; }
+    if (!((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||*p=='_')) return;
+    const char *ns=p;
+    while ((*p>='a'&&*p<='z')||(*p>='A'&&*p<='Z')||(*p>='0'&&*p<='9')||*p=='_') p++;
+    size_t nlen=(size_t)(p-ns);
+    if (nlen==0||nlen>=63) return;
+    const char *after=p;
+    while (*after==' '||*after=='\t') after++;
+    if (!((*after=='='&&*(after+1)!='='&&*(after+1)!='>')||*after==',')) return;
+    char name[64]; memcpy(name,ns,nlen); name[nlen]='\0';
     if (!ivar_is_keyword(name)) ivar_register(name);
-    if (*after == ',') {
+    if (*after==',') {
         after++;
-        while (*after == ' ' || *after == '\t') after++;
-        const char *ns2 = after;
-        while ((*after >= 'a' && *after <= 'z') || (*after >= 'A' && *after <= 'Z') ||
-               (*after >= '0' && *after <= '9') || *after == '_') after++;
-        size_t nl2 = (size_t)(after - ns2);
-        if (nl2 > 0 && nl2 < 63) {
-            char n2[64]; memcpy(n2, ns2, nl2); n2[nl2] = '\0';
+        while (*after==' '||*after=='\t') after++;
+        const char *ns2=after;
+        while ((*after>='a'&&*after<='z')||(*after>='A'&&*after<='Z')||
+               (*after>='0'&&*after<='9')||*after=='_') after++;
+        size_t nl2=(size_t)(after-ns2);
+        if (nl2>0&&nl2<63) {
+            char n2[64]; memcpy(n2,ns2,nl2); n2[nl2]='\0';
             if (!ivar_is_keyword(n2)) ivar_register(n2);
         }
     }
 }
 
+/* expande !N (escopo-relativo) e !alias */
 static char *ivar_expand(const char *src) {
-    size_t cap = strlen(src) * 4 + 256;
-    char *out = (char *)malloc(cap);
+    size_t cap=strlen(src)*4+256;
+    char *out=(char*)malloc(cap);
     if (!out) return NULL;
-    size_t oi = 0;
-    for (int i = 0; src[i]; ) {
-        if (src[i] == '!' && src[i+1] >= '1' && src[i+1] <= '9') {
-            if (ivar_inside_string(src, i)) { out[oi++] = src[i++]; continue; }
-            int num = 0, j = i + 1;
-            while (src[j] >= '0' && src[j] <= '9') { num = num*10 + (src[j]-'0'); j++; }
-            const char *vname = ivar_name_by_idx(num);
-            if (vname) {
-                size_t vl = strlen(vname);
-                if (oi + vl + 2 >= cap) { cap = (oi+vl+2)*2; char *t=(char*)realloc(out,cap); if(!t){free(out);return NULL;}out=t; }
-                memcpy(out+oi, vname, vl); oi += vl; i = j;
-            } else { out[oi++] = src[i++]; }
+    size_t oi=0;
+    for (int i=0; src[i]; ) {
+        if (src[i]=='!' && !ivar_inside_string(src,i)) {
+            /* numérico: !1 … !999 */
+            if (src[i+1]>='1'&&src[i+1]<='9') {
+                int num=0,j=i+1;
+                while (src[j]>='0'&&src[j]<='9'){num=num*10+(src[j]-'0');j++;}
+                const char *vname=ivar_name_by_idx(num);
+                if (vname) {
+                    size_t vl=strlen(vname);
+                    if (oi+vl+2>=cap){cap=(oi+vl+2)*2;char *t=(char*)realloc(out,cap);if(!t){free(out);return NULL;}out=t;}
+                    memcpy(out+oi,vname,vl);oi+=vl;i=j;
+                } else { out[oi++]=src[i++]; }
+            }
+            /* alias nomeado: !identificador */
+            else if ((src[i+1]>='a'&&src[i+1]<='z')||(src[i+1]>='A'&&src[i+1]<='Z')||src[i+1]=='_') {
+                int j=i+1;
+                while ((src[j]>='a'&&src[j]<='z')||(src[j]>='A'&&src[j]<='Z')||
+                       (src[j]>='0'&&src[j]<='9')||src[j]=='_') j++;
+                size_t alen=(size_t)(j-i-1);
+                if (alen>0&&alen<63) {
+                    char akey[64]; memcpy(akey,src+i+1,alen); akey[alen]='\0';
+                    const char *aval=ivar_alias_lookup(akey);
+                    if (aval) {
+                        size_t vl=strlen(aval);
+                        if (oi+vl+2>=cap){cap=(oi+vl+2)*2;char *t=(char*)realloc(out,cap);if(!t){free(out);return NULL;}out=t;}
+                        memcpy(out+oi,aval,vl);oi+=vl;i=j;
+                    } else { out[oi++]=src[i++]; }
+                } else { out[oi++]=src[i++]; }
+            } else { out[oi++]=src[i++]; }
         } else {
-            if (oi + 2 >= cap) { cap *= 2; char *t=(char*)realloc(out,cap); if(!t){free(out);return NULL;}out=t; }
-            out[oi++] = src[i++];
+            if (oi+2>=cap){cap*=2;char *t=(char*)realloc(out,cap);if(!t){free(out);return NULL;}out=t;}
+            out[oi++]=src[i++];
         }
     }
-    out[oi] = '\0';
+    out[oi]='\0';
     return out;
 }
 
 char *elliot_ivar_preprocess_block(const char *code) {
     if (!code) return NULL;
-    { char _h[1]; if (elliot_handle_help(code, _h)) { char *e=(char*)malloc(1); if(e)e[0]='\0'; return e; } }
+    { char _h[1]; if (elliot_handle_help(code,_h)) { char *e=(char*)malloc(1); if(e)e[0]='\0'; return e; } }
     {
-        const char *p = code;
-        while (*p == ' ' || *p == '\t') p++;
-        if (strcmp(p, "clear") == 0 || strcmp(p, "cls") == 0) {
-            if (system("clear") != 0) { fputs("\033[3J\033[2J\033[H", stdout); fflush(stdout); }
+        const char *p=code;
+        while (*p==' '||*p=='\t') p++;
+        if (strcmp(p,"clear")==0||strcmp(p,"cls")==0) {
+            if (system("clear")!=0) { fputs("\033[3J\033[2J\033[H",stdout); fflush(stdout); }
             char *e=(char*)malloc(1); if(e)e[0]='\0'; return e;
         }
-        /* cd: muda diretorio real do processo */
-        if (strncmp(p, "cd", 2) == 0 && (p[2] == '\0' || p[2] == ' ')) {
-            const char *dest = (p[2] == ' ') ? p+3 : NULL;
-            while (dest && *dest == ' ') dest++;
-            if (!dest || !dest[0] || strcmp(dest, "~") == 0) {
-                const char *home = getenv("HOME");
-                if (home) chdir(home);
+        if (strncmp(p,"cd",2)==0&&(p[2]=='\0'||p[2]==' ')) {
+            const char *dest=(p[2]==' ')?p+3:NULL;
+            while (dest&&*dest==' ') dest++;
+            if (!dest||!dest[0]||strcmp(dest,"~")==0) {
+                const char *home=getenv("HOME"); if(home) chdir(home);
             } else {
-                if (chdir(dest) != 0)
-                    printf("\033[1;31mcd: %s: %s\033[0m\n", dest, strerror(errno));
+                if (chdir(dest)!=0) printf("\033[1;31mcd: %s: %s\033[0m\n",dest,strerror(errno));
             }
             char *e=(char*)malloc(1); if(e)e[0]='\0'; return e;
         }
     }
     if (!g_ivar_enabled) { char *c=(char*)malloc(strlen(code)+1); if(c)strcpy(c,code); return c; }
 
-    size_t total_cap = strlen(code) * 4 + 4096;
-    char *result = (char *)malloc(total_cap);
+    size_t total_cap=strlen(code)*4+4096;
+    char *result=(char*)malloc(total_cap);
     if (!result) return NULL;
-    size_t rpos = 0;
-    const char *p = code;
+    size_t rpos=0;
+    const char *p=code;
     while (*p) {
-        const char *ls = p;
-        while (*p && *p != '\n') p++;
-        size_t llen = (size_t)(p - ls);
-        char *line = (char *)malloc(llen + 2);
+        const char *ls=p;
+        while (*p&&*p!='\n') p++;
+        size_t llen=(size_t)(p-ls);
+        char *line=(char*)malloc(llen+2);
         if (!line) break;
-        memcpy(line, ls, llen); line[llen] = '\0';
+        memcpy(line,ls,llen); line[llen]='\0';
+
+        ivar_detect_scope_change(line);
+
+        if (ivar_detect_alias_line(line)) {
+            free(line);
+            if (*p=='\n') { result[rpos++]='\n'; p++; }
+            continue;
+        }
+
         ivar_detect_and_register(line);
-        char *expanded = ivar_expand(line);
+
+        char *expanded=ivar_expand(line);
         free(line);
         if (!expanded) break;
-        size_t el = strlen(expanded);
-        if (rpos + el + 2 >= total_cap) {
-            total_cap = (rpos+el+2)*2;
+        size_t el=strlen(expanded);
+        if (rpos+el+2>=total_cap) {
+            total_cap=(rpos+el+2)*2;
             char *t=(char*)realloc(result,total_cap);
             if(!t){free(expanded);break;}result=t;
         }
-        memcpy(result+rpos, expanded, el); rpos += el;
+        memcpy(result+rpos,expanded,el); rpos+=el;
         free(expanded);
-        if (*p == '\n') { result[rpos++] = '\n'; p++; }
+        if (*p=='\n') { result[rpos++]='\n'; p++; }
     }
-    result[rpos] = '\0';
+    result[rpos]='\0';
     return result;
 }
 
-/* API Lua ivar.* */
+/* ── API Lua: ivar.* ─────────────────────────────────────────────────────── */
 static int l_ivar_enable(lua_State *L) {
-    (void)L; g_ivar_enabled = 1; ivar_config_save();
-    printf("\033[1;32m[ivar]\033[0m ativado. Variaveis declaradas recebem !N automaticamente.\n");
-    return 0;
+    (void)L; g_ivar_enabled=1; ivar_config_save(); return 0;
 }
 static int l_ivar_disable(lua_State *L) {
-    (void)L; g_ivar_enabled = 0; ivar_config_save();
-    printf("\033[0;90m[ivar]\033[0m desativado.\n");
-    return 0;
+    (void)L; g_ivar_enabled=0; ivar_config_save(); return 0;
 }
 static int l_ivar_status(lua_State *L) {
     (void)L;
-    printf("\033[1;35m[ivar]\033[0m status: %s | variaveis: %d\n",
-           g_ivar_enabled ? "\033[1;32mativado\033[0m" : "\033[0;90mdesativado\033[0m",
-           g_ivar_count);
+    int base=(g_ivar_scope_depth>0)?g_ivar_scope_base[g_ivar_scope_depth-1]:0;
+    printf("\033[1;35m[ivar]\033[0m status: %s | vars: %d | escopo: %d | aliases: %d\n",
+           g_ivar_enabled?"\033[1;32mativado\033[0m":"\033[0;90mdesativado\033[0m",
+           g_ivar_count-base, g_ivar_scope_depth, g_ivar_alias_count);
     return 0;
 }
 static int l_ivar_list(lua_State *L) {
-    (void)L;
-    if (g_ivar_count == 0) { printf("\033[0;90m[ivar] nenhuma variavel registrada.\033[0m\n"); return 0; }
-    printf("\033[1;35m[ivar] mapa:\033[0m\n");
-    for (int i = 0; i < g_ivar_count; i++)
-        printf("  \033[1;33m!%d\033[0m -> \033[1;37m%s\033[0m\n", i+1, g_ivar_names[i]);
+    int base=(g_ivar_scope_depth>0)?g_ivar_scope_base[g_ivar_scope_depth-1]:0;
+    int sc=g_ivar_count-base;
+    if (sc==0&&g_ivar_alias_count==0) {
+        printf("\033[0;90m[ivar] nenhuma variavel registrada.\033[0m\n"); return 0;
+    }
+    if (sc>0) {
+        printf("\033[1;35m[ivar] indices%s:\033[0m\n",
+               g_ivar_scope_depth>0?" (escopo atual)":"");
+        for (int i=0; i<sc; i++) {
+            const char *name=g_ivar_names[base+i];
+            lua_getglobal(L,name);
+            char vb[64]="nil";
+            int t=lua_type(L,-1);
+            if (t==LUA_TSTRING)      snprintf(vb,sizeof(vb),"\"%s\"",lua_tostring(L,-1));
+            else if (t==LUA_TNUMBER) snprintf(vb,sizeof(vb),"%s",lua_tostring(L,-1));
+            else if (t==LUA_TBOOLEAN)strcpy(vb,lua_toboolean(L,-1)?"true":"false");
+            else if (t==LUA_TFUNCTION)strcpy(vb,"[function]");
+            else if (t==LUA_TTABLE)  strcpy(vb,"[table]");
+            lua_pop(L,1);
+            printf("  \033[1;33m!%d\033[0m \xe2\x86\x92 \033[1;37m%-28s\033[0m \033[0;90m= %s\033[0m\n",
+                   i+1,name,vb);
+        }
+    }
+    if (g_ivar_alias_count>0) {
+        printf("\033[1;35m[ivar] aliases:\033[0m\n");
+        for (int i=0; i<g_ivar_alias_count; i++) {
+            lua_getglobal(L,g_ivar_alias_var[i]);
+            char vb[64]="nil";
+            int t=lua_type(L,-1);
+            if (t==LUA_TSTRING)      snprintf(vb,sizeof(vb),"\"%s\"",lua_tostring(L,-1));
+            else if (t==LUA_TNUMBER) snprintf(vb,sizeof(vb),"%s",lua_tostring(L,-1));
+            else if (t==LUA_TBOOLEAN)strcpy(vb,lua_toboolean(L,-1)?"true":"false");
+            else if (t==LUA_TFUNCTION)strcpy(vb,"[function]");
+            else if (t==LUA_TTABLE)  strcpy(vb,"[table]");
+            lua_pop(L,1);
+            printf("  \033[1;33m!%s\033[0m \xe2\x86\x92 \033[1;37m%-28s\033[0m \033[0;90m= %s\033[0m\n",
+                   g_ivar_alias_key[i],g_ivar_alias_var[i],vb);
+        }
+    }
+    return 0;
+}
+static int l_ivar_alias(lua_State *L) {
+    if (lua_gettop(L)==0) {
+        if (g_ivar_alias_count==0){printf("\033[0;90m[ivar] nenhum alias.\033[0m\n");return 0;}
+        for (int i=0;i<g_ivar_alias_count;i++)
+            printf("  \033[1;33m!%s\033[0m \xe2\x86\x92 \033[1;37m%s\033[0m\n",
+                   g_ivar_alias_key[i],g_ivar_alias_var[i]);
+        return 0;
+    }
+    const char *key=luaL_checkstring(L,1);
+    const char *var=luaL_checkstring(L,2);
+    ivar_alias_register(key,var);
+    return 0;
+}
+static int l_ivar_debug(lua_State *L) {
+    if (lua_gettop(L)>0) g_ivar_debug=lua_toboolean(L,1);
+    printf("\033[0;90m[ivar] debug: %s\033[0m\n",g_ivar_debug?"ativo":"inativo");
     return 0;
 }
 static int l_ivar_reset(lua_State *L) {
     (void)L;
-    g_ivar_count = 0; memset(g_ivar_names, 0, sizeof(g_ivar_names));
-    printf("\033[1;36m[ivar]\033[0m tabela resetada.\n");
+    g_ivar_count=0; memset(g_ivar_names,0,sizeof(g_ivar_names));
+    g_ivar_alias_count=0;
+    memset(g_ivar_alias_key,0,sizeof(g_ivar_alias_key));
+    memset(g_ivar_alias_var,0,sizeof(g_ivar_alias_var));
+    g_ivar_scope_depth=0; g_ivar_block_depth=0;
+    printf("\033[1;36m[ivar]\033[0m tabela, aliases e escopos resetados.\n");
     return 0;
 }
 static int l_ivar_preprocess(lua_State *L) {
-    const char *code = luaL_checkstring(L, 1);
-    char *r = elliot_ivar_preprocess_block(code);
-    lua_pushstring(L, r ? r : code);
+    const char *code=luaL_checkstring(L,1);
+    char *r=elliot_ivar_preprocess_block(code);
+    lua_pushstring(L,r?r:code);
     if (r) free(r);
     return 1;
 }
 static int l_ivar_help(lua_State *L) {
     (void)L;
-    printf("\033[1;35m-- ivar -- Variaveis Indexadas -------\033[0m\n");
-    printf("  Ativado por padrao. Toda variavel declarada vira !N.\n\n");
-    printf("  \033[1;33mivar.enable()\033[0m    ativa (padrao)\n");
-    printf("  \033[1;33mivar.disable()\033[0m   desativa\n");
-    printf("  \033[1;33mivar.status()\033[0m    mostra status\n");
-    printf("  \033[1;33mivar.list()\033[0m      mostra mapa !N -> nome\n");
-    printf("  \033[1;33mivar.reset()\033[0m     limpa todos os indices\n");
-    printf("  \033[1;33mivar.preprocess(s)\033[0m retorna codigo expandido\n\n");
-    printf("\033[0;90m  Exemplo:\n");
-    printf("    nome = \"Mike\"   -- !1 -> nome\n");
-    printf("    idade = 22     -- !2 -> idade\n");
-    printf("    print(!1, !2)  -- print(\"Mike\", 22)\033[0m\n\n");
+    printf("\033[1;35m-- ivar v2.0 -- Vari\xc3\xa1veis Indexadas ------\033[0m\n");
+    printf("  Ativado por padr\xc3\xa3o. Toda vari\xc3\xa1vel declarada vira !N.\n\n");
+    printf("  \033[1;33mivar.enable()\033[0m       ativa (padr\xc3\xa3o)\n");
+    printf("  \033[1;33mivar.disable()\033[0m      desativa\n");
+    printf("  \033[1;33mivar.status()\033[0m       status + contagem\n");
+    printf("  \033[1;33mivar.list()\033[0m         !N \xe2\x86\x92 nome = valor atual\n");
+    printf("  \033[1;33mivar.alias(k,v)\033[0m     registra !k \xe2\x86\x92 vari\xc3\xa1vel v\n");
+    printf("  \033[1;33mivar.alias()\033[0m        lista aliases\n");
+    printf("  \033[1;33mivar.debug(bool)\033[0m    avisa ao registrar cada var\n");
+    printf("  \033[1;33mivar.reset()\033[0m        limpa \xc3\xadndices, aliases e escopos\n\n");
+    printf("\033[0;90m  \xc3\x8dndices num\xc3\xa9ricos:\n");
+    printf("    nome_longo = valor   -- !1 \xe2\x86\x92 nome_longo\n");
+    printf("    outro_nome = valor   -- !2 \xe2\x86\x92 outro_nome\n");
+    printf("    print(!1, !2)        -- expande para os nomes reais\n\n");
+    printf("  Aliases nomeados (linha suprimida do Lua):\n");
+    printf("    !hp = player_health_percentage  -- registra alias\n");
+    printf("    print(!hp)                      -- expande para o nome real\n\n");
+    printf("  Escopo por fun\xc3\xa7\xc3\xa3o (autom\xc3\xa1tico):\n");
+    printf("    function ataque()\n");
+    printf("      dano_base    = 10  -- !1 neste escopo\n");
+    printf("      multiplicador = 2  -- !2 neste escopo\n");
+    printf("      return !1 * !2\n");
+    printf("    end\033[0m\n\n");
     return 0;
 }
 
@@ -92799,6 +93006,8 @@ static void elliot_ivar_init(lua_State *L) {
     lua_pushcfunction(L, l_ivar_disable);    lua_setfield(L, -2, "disable");
     lua_pushcfunction(L, l_ivar_status);     lua_setfield(L, -2, "status");
     lua_pushcfunction(L, l_ivar_list);       lua_setfield(L, -2, "list");
+    lua_pushcfunction(L, l_ivar_alias);      lua_setfield(L, -2, "alias");
+    lua_pushcfunction(L, l_ivar_debug);      lua_setfield(L, -2, "debug");
     lua_pushcfunction(L, l_ivar_reset);      lua_setfield(L, -2, "reset");
     lua_pushcfunction(L, l_ivar_preprocess); lua_setfield(L, -2, "preprocess");
     lua_pushcfunction(L, l_ivar_help);       lua_setfield(L, -2, "help");
@@ -99940,12 +100149,16 @@ printf "  \033[0;90mms --apk app.apk                        ms --apk-sign app-re
 
 printf "\033[0;90m  No REPL: ms.help()  mod.help()  crypto.help()  ai.help()  pent.help()\033[0m\n\n"
 
-printf "\033[1;33m── Variáveis Indexadas (Experimental) ──────────────────────────\033[0m\n"
-printf "  \033[1;32mivar.enable()\033[0m                — ativa variáveis indexadas no REPL\n"
-printf "  \033[1;32mivar.list()\033[0m                  — exibe mapa !N → nome\n"
-printf "  \033[1;32mivar.preprocess(code)\033[0m        — pré-processa string de código\n"
-printf "  \033[0;90m  Scripts com ivar.enable() ou !N são pré-processados automaticamente.\033[0m\n"
-printf "  \033[0;90m  Exemplo: nome=\"Mike\" → !1; print(!1) → print(nome)\033[0m\n\n"
+printf "\033[1;33m── Variáveis Indexadas (ivar v2.0) ─────────────────────────────\033[0m\n"
+printf "  \033[1;32mivar.enable()\033[0m                — ativa (padrão desde a instalação)\n"
+printf "  \033[1;32mivar.disable()\033[0m               — desativa\n"
+printf "  \033[1;32mivar.list()\033[0m                  — mapa !N → nome = valor atual\n"
+printf "  \033[1;32mivar.alias(\"hp\", \"player_hp\")\033[0m  — registra !hp → player_hp\n"
+printf "  \033[1;32mivar.debug(true)\033[0m             — avisa ao registrar cada variável\n"
+printf "  \033[1;32mivar.reset()\033[0m                 — limpa índices, aliases e escopos\n"
+printf "  \033[0;90m  !hp = player_hp              — alias nomeado (suprimido do Lua)\033[0m\n"
+printf "  \033[0;90m  nome_longo = 42  → !1; print(!1) → print(nome_longo)\033[0m\n"
+printf "  \033[0;90m  Dentro de function{}: !1 reinicia no escopo da função.\033[0m\n\n"
 }
 
 
@@ -100026,10 +100239,7 @@ local src = [[\$_src]]
 local f = io.open(src, 'r')
 if not f then io.stderr:write('ivar: nao foi possivel abrir ' .. src .. '\n') os.exit(1) end
 local code = f:read('*a'); f:close()
--- Ativa ivar internamente para registrar as vars e substituir !N
-ivar.enable()
 local out = ivar.preprocess(code)
-ivar.disable()
 local w = io.open([[\$_ivar_tmp]], 'w')
 if not w then io.stderr:write('ivar: nao foi possivel criar temp\n') os.exit(1) end
 w:write(out); w:close()
@@ -102686,25 +102896,45 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[0;90m  agent.chat('como funciona heap spray?')\033[0m\n\n"
     }
     _doc_ivar() {
-    printf "\033[1;35m═══ ivar.* — Variáveis Indexadas no REPL ════════════════════════\033[0m\n\n"
-    printf "  Permite referenciar variáveis por índice numérico (!N) em vez do nome,\n"
-    printf "  acelerando a digitação no REPL interativo.\n\n"
+    printf "\033[1;35m═══ ivar v2.0 — Variáveis Indexadas ═════════════════════════════\033[0m\n\n"
+    printf "  Ativado por padrão. Toda variável declarada recebe um índice !N,\n"
+    printf "  permitindo referenciá-la pelo número em vez do nome completo.\n"
+    printf "  Ideal para nomes longos em projetos sérios, UIs e jogos.\n\n"
     printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mivar.enable\033[0m()         Ativa o modo ivar no REPL\n"
-    printf "  \033[1;33mivar.disable\033[0m()        Desativa o modo ivar\n"
-    printf "  \033[1;33mivar.status\033[0m()         Exibe status e contagem de variáveis indexadas\n"
-    printf "  \033[1;33mivar.list\033[0m()           Exibe mapa !N → nome de todas as variáveis\n"
-    printf "  \033[1;33mivar.reset\033[0m()          Limpa todos os índices\n"
-    printf "  \033[1;33mivar.preprocess\033[0m(code)  Pré-processa string substituindo !N por nomes\n"
-    printf "  \033[1;33mivar.help\033[0m()           Exibe esta ajuda\n\n"
-    printf "\033[1;36m── COMO USAR ──────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  ivar.enable()          -- ativa no REPL\033[0m\n"
-    printf "  \033[0;90m  local x = 42           -- !1 agora aponta para x\033[0m\n"
-    printf "  \033[0;90m  print(!1)              -- equivale a print(x)\033[0m\n"
-    printf "  \033[0;90m  ivar.list()            -- mostra: !1 → x\033[0m\n\n"
-    printf "  Scripts com \033[1;32mivar.enable()\033[0m ou referências \033[1;32m!N\033[0m são\n"
-    printf "  pré-processados automaticamente pelo runner.\n\n"
-    printf "  Persistência: mapa salvo em \033[0;90m~/.elliot_ivar.cfg\033[0m\n\n"
+    printf "  \033[1;33mivar.enable\033[0m()           Ativa o ivar (padrão)\n"
+    printf "  \033[1;33mivar.disable\033[0m()          Desativa o ivar\n"
+    printf "  \033[1;33mivar.status\033[0m()           Status + contagem de vars, escopos e aliases\n"
+    printf "  \033[1;33mivar.list\033[0m()             Mapa !N → nome = valor_atual\n"
+    printf "  \033[1;33mivar.alias\033[0m(k, v)        Registra !k → variável v via Lua\n"
+    printf "  \033[1;33mivar.alias\033[0m()            Lista todos os aliases registrados\n"
+    printf "  \033[1;33mivar.debug\033[0m(bool)        Avisa em stderr ao registrar cada variável\n"
+    printf "  \033[1;33mivar.reset\033[0m()            Limpa índices, aliases e pilha de escopos\n"
+    printf "  \033[1;33mivar.preprocess\033[0m(code)   Pré-processa string substituindo !N e !alias\n"
+    printf "  \033[1;33mivar.help\033[0m()             Ajuda rápida\n\n"
+    printf "\033[1;36m── ÍNDICES NUMÉRICOS ──────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  nome_longo_aqui = 42     -- !1 → nome_longo_aqui\033[0m\n"
+    printf "  \033[0;90m  outro_nome = \"Mike\"      -- !2 → outro_nome\033[0m\n"
+    printf "  \033[0;90m  print(!1, !2)            -- print(nome_longo_aqui, outro_nome)\033[0m\n\n"
+    printf "\033[1;36m── ALIASES NOMEADOS ───────────────────────────────────────────────\033[0m\n\n"
+    printf "  Linha \033[1;32m!alias = varname\033[0m no script é interceptada pelo pré-processador,\n"
+    printf "  registra o alias e some do código Lua (não gera erro de sintaxe).\n\n"
+    printf "  \033[0;90m  player_health_percentage = 100\033[0m\n"
+    printf "  \033[0;90m  !hp = player_health_percentage   -- registra alias\033[0m\n"
+    printf "  \033[0;90m  print(!hp)                       -- expande para player_health_percentage\033[0m\n\n"
+    printf "  Também via Lua: \033[1;32mivar.alias(\"hp\", \"player_health_percentage\")\033[0m\n\n"
+    printf "\033[1;36m── ESCOPO POR FUNÇÃO (automático) ─────────────────────────────────\033[0m\n\n"
+    printf "  Dentro de cada \033[1;32mfunction\033[0m, !1 reinicia do zero — não conflita\n"
+    printf "  com variáveis do escopo externo.\n\n"
+    printf "  \033[0;90m  function ataque()\033[0m\n"
+    printf "  \033[0;90m    dano_base    = 10   -- !1 neste escopo\033[0m\n"
+    printf "  \033[0;90m    multiplicador = 2   -- !2 neste escopo\033[0m\n"
+    printf "  \033[0;90m    return !1 * !2\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n\n"
+    printf "\033[1;36m── MODO DEBUG ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  ivar.debug(true)         -- ativa avisos de registro\033[0m\n"
+    printf "  \033[0;90m  x = 10                   -- stderr: [ivar:debug] !1 → x\033[0m\n"
+    printf "  \033[0;90m  ivar.debug(false)        -- desativa\033[0m\n\n"
+    printf "  Persistência: estado salvo em \033[0;90m~/.elliot_ivar.cfg\033[0m\n\n"
     }
     _DOC_SUB="\${2:-}"
     case "\$_DOC_SUB" in

@@ -918,29 +918,55 @@ agent.chat('como funciona heap spray?')
 
 ---
 
-### `ivar.*` — Variáveis indexadas no REPL
+### `ivar.*` — Variáveis indexadas (v2.0)
 
-Permite referenciar variáveis por índice numérico (`!N`) em vez do nome, acelerando a digitação no REPL. **Ativado por padrão.**
+Toda variável declarada recebe automaticamente um índice `!N`, permitindo referenciá-la pelo número em vez do nome completo. Ideal para nomes longos em projetos sérios, UIs e jogos. **Ativado por padrão desde a instalação.**
 
 ```lua
-ivar.enable()         -- ativa (padrão)
-ivar.disable()        -- desativa
-ivar.status()         -- exibe status e contagem de variáveis indexadas
-ivar.list()           -- exibe mapa !N → nome de todas as variáveis
-ivar.reset()          -- limpa todos os índices
-ivar.preprocess(code) -- pré-processa string substituindo !N por nomes
-ivar.help()           -- ajuda do módulo
+ivar.enable()          -- ativa (padrão)
+ivar.disable()         -- desativa
+ivar.status()          -- status + vars, escopos e aliases
+ivar.list()            -- mapa !N → nome = valor_atual
+ivar.alias("hp", "player_health_percentage")  -- registra !hp → variável
+ivar.alias()           -- lista todos os aliases
+ivar.debug(true)       -- avisa em stderr ao registrar cada variável
+ivar.reset()           -- limpa índices, aliases e pilha de escopos
+ivar.preprocess(code)  -- pré-processa string substituindo !N e !alias
+ivar.help()            -- ajuda rápida
 ```
 
-**Como usar:**
+**Índices numéricos:**
 ```lua
-nome = "Mike"    -- !1 → nome
-idade = 22       -- !2 → idade
-print(!1, !2)    -- equivale a print(nome, idade)
-ivar.list()      -- mostra: !1 → nome  |  !2 → idade
+nome_longo_aqui = "Mike"   -- !1 → nome_longo_aqui
+player_score    = 9800     -- !2 → player_score
+print(!1, !2)              -- print(nome_longo_aqui, player_score)
+ivar.list()                -- !1 → nome_longo_aqui = "Mike" | !2 → player_score = 9800
 ```
 
-Persistência: estado salvo em `~/.elliot_ivar.cfg`.
+**Aliases nomeados** — a linha `!alias = varname` é interceptada pelo pré-processador e não chega ao Lua:
+```lua
+player_health_percentage = 100
+!hp = player_health_percentage   -- registra alias (linha some do código)
+print(!hp)                        -- expande para player_health_percentage
+```
+
+**Escopo por função** — dentro de cada `function`, `!1` reinicia do zero:
+```lua
+function ataque()
+    dano_base    = 10   -- !1 neste escopo
+    multiplicador = 2   -- !2 neste escopo
+    return !1 * !2      -- return dano_base * multiplicador
+end
+```
+
+**Modo debug:**
+```lua
+ivar.debug(true)   -- ativa
+x = 10             -- stderr: [ivar:debug] !1 → x
+ivar.debug(false)  -- desativa
+```
+
+Persistência: estado salvo em `~/.elliot_ivar.cfg`. Resetado automaticamente a cada reinstalação para garantir que o ivar inicie ativo.
 
 ---
 
