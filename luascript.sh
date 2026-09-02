@@ -64449,49 +64449,117 @@ static int l_sys_info(lua_State *L) {
         printf("  \033[0;90mUso:\033[0m           %s[%s]\033[0m %d%%\n\n", col, bar, pct);
     }
 
-    /* ── Armazenamento / Tamanho do MoonStyle ───────────────────────────── */
-    printf("  \033[1;33m── Tamanho do ElliotOS/MoonStyle no disco ───────────────────────\033[0m\n");
+    /* ── Armazenamento / Tamanho real do ElliotOS ──────────────────────── */
+    printf("  \033[1;33m── Tamanho do ElliotOS no disco ─────────────────────────────────\033[0m\n");
     {
         const char *home = getenv("HOME");
         if(!home) home = "/data/data/com.termux/files/home";
         const char *prefix = getenv("PREFIX");
         if(!prefix) prefix = "/data/data/com.termux/files/usr";
 
-        /* binário principal */
-        char bin_path[512];
-        snprintf(bin_path,511,"%s/bin/lua-net",prefix);
-        struct stat st;
-        long bin_bytes=0;
-        if(stat(bin_path,&st)==0) bin_bytes=st.st_size;
+        /* Helper: tamanho de um arquivo via stat (bytes exatos, sem fork) */
+        #define _FSIZE(path) ({ struct stat _s; (stat((path),&_s)==0)?(long)_s.st_size:0L; })
 
-        /* cache */
-        char cache_cmd[512];
-        snprintf(cache_cmd,511,"du -sb '%s/.lua-cache' 2>/dev/null | cut -f1",home);
-        FILE *f=popen(cache_cmd,"r"); long cache_bytes=0;
-        if(f){ fscanf(f,"%ld",&cache_bytes); pclose(f); }
+        /* Helper: du -sk de um dir → bytes (compatível com BSD du do Termux)
+           du -sk retorna KB; multiplica por 1024.
+           Se o diretório não existir, du falha e retorna 0 — sem falso positivo. */
+        #define _DSIZE(buf,fmt,...) ({ \
+            snprintf((buf),sizeof(buf),(fmt),__VA_ARGS__); \
+            FILE *_f=popen((buf),"r"); long _v=0; \
+            if(_f){ fscanf(_f,"%ld",&_v); pclose(_f); } \
+            _v * 1024L; })
 
-        /* ~/.elliotai (histórico, modelos) */
-        char ai_cmd[512];
-        snprintf(ai_cmd,511,"du -sb '%s/.elliotai' 2>/dev/null | cut -f1",home);
-        f=popen(ai_cmd,"r"); long ai_bytes=0;
-        if(f){ fscanf(f,"%ld",&ai_bytes); pclose(f); }
+        char _dcmd[768];
 
-        long total_bytes = bin_bytes + cache_bytes + ai_bytes;
-        double total_kb  = total_bytes/1024.0;
-        double total_mb  = total_kb/1024.0;
+        /* ── Binários ElliotOS ── */
+        const char *ell_bins[] = { "lua-net","ms","luar","cxx","lpm","xpm","ee","xtun", NULL };
+        const char *ell_blabels[] = { "lua-net (motor)","ms (CLI)","luar (Lua raw)","cxx (compilador)",
+                                       "lpm (pkg Lua)","xpm (pentest mgr)","ee (editor)","xtun (tunnel)", NULL };
+        long bins_total = 0;
+        printf("  \033[0;90mBinários:\033[0m\n");
+        for(int bi=0; ell_bins[bi]; bi++){
+            char bp[512];
+            snprintf(bp,sizeof(bp),"%s/bin/%s",prefix,ell_bins[bi]);
+            long sz = _FSIZE(bp);
+            bins_total += sz;
+            if(sz > 0)
+                printf("    \033[0;90m%-22s\033[0m \033[1;32m%6.1f KB\033[0m\n", ell_blabels[bi], sz/1024.0);
+            else
+                printf("    \033[0;90m%-22s\033[0m \033[0;90m—\033[0m\n", ell_blabels[bi]);
+        }
+        printf("  \033[0;90m  Subtotal binários:\033[0m   \033[1;33m%.1f KB\033[0m\n\n", bins_total/1024.0);
 
-        /* formata cada um */
-        printf("  \033[0;90mBinário lua-net:\033[0m  ");
-        if(bin_bytes>0) printf("\033[1;32m%.1f KB\033[0m \033[0;90m(%ld bytes)\033[0m\n",(double)bin_bytes/1024.0, bin_bytes);
-        else printf("\033[0;90mnão encontrado\033[0m\n");
+        /* ── Dados / dirs do usuário ── */
+        /* du -sk: BSD-safe, retorna KB */
+        long cache_bytes = _DSIZE(_dcmd,"du -sk '%s/.lua-cache'  2>/dev/null | cut -f1",home);
+        long ai_bytes    = _DSIZE(_dcmd,"du -sk '%s/.elliotai'   2>/dev/null | cut -f1",home);
+        long elliot_bytes= _DSIZE(_dcmd,"du -sk '%s/.elliot'     2>/dev/null | cut -f1",home);
+        long lmod_bytes  = _DSIZE(_dcmd,"du -sk '%s/.lua-modules' 2>/dev/null | cut -f1",home);
+        long xpm_bytes   = _DSIZE(_dcmd,"du -sk '%s/.xpm'        2>/dev/null | cut -f1",home);
+        long build_bytes = _DSIZE(_dcmd,"du -sk '%s/.lua-net-build' 2>/dev/null | cut -f1",home);
 
-        printf("  \033[0;90mCache Lua src:\033[0m    ");
-        if(cache_bytes>0) printf("\033[1;37m%.1f KB\033[0m \033[0;90m(%ld bytes)\033[0m\n",(double)cache_bytes/1024.0, cache_bytes);
-        else printf("\033[0;90mvazio\033[0m\n");
+        /* scripts instalados em $PREFIX/share */
+        long scripts_bytes = _DSIZE(_dcmd,"du -sk '%s/share/lua-scripts' 2>/dev/null | cut -f1",prefix);
+        long cscripts_bytes= _DSIZE(_dcmd,"du -sk '%s/share/c-scripts' 2>/dev/null | cut -f1",prefix);
+        long luamods_bytes = _DSIZE(_dcmd,"du -sk '%s/share/lua-modules' 2>/dev/null | cut -f1",prefix);
 
-        printf("  \033[0;90mDados IA/histórico:\033[0m ");
-        if(ai_bytes>0) printf("\033[1;37m%.1f KB\033[0m \033[0;90m(%ld bytes)\033[0m\n",(double)ai_bytes/1024.0, ai_bytes);
-        else printf("\033[0;90mvazio\033[0m\n");
+        /* arquivos pequenos */
+        char ivar_cfg[512]; snprintf(ivar_cfg,sizeof(ivar_cfg),"%s/.elliot_ivar.cfg",home);
+        char logs_f[512];   snprintf(logs_f,sizeof(logs_f),"%s/.elliot_logs",home);
+        long ivar_bytes  = _FSIZE(ivar_cfg);
+        long logs_bytes  = _FSIZE(logs_f);
+
+        printf("  \033[0;90mDiretórios e dados:\033[0m\n");
+        struct { const char *label; long sz; } dirs[] = {
+            {"~/.lua-cache (src Lua)",   cache_bytes},
+            {"~/.elliotai (IA/histórico)",ai_bytes},
+            {"~/.elliot (scripts/xpm)",  elliot_bytes},
+            {"~/.lua-modules (lmod)",    lmod_bytes},
+            {"~/.xpm (pins/meta)",       xpm_bytes},
+            {"~/.lua-net-build (build)", build_bytes},
+            {"share/lua-scripts",        scripts_bytes},
+            {"share/c-scripts",          cscripts_bytes},
+            {"share/lua-modules",        luamods_bytes},
+            {"~/.elliot_ivar.cfg",       ivar_bytes},
+            {"~/.elliot_logs",           logs_bytes},
+            {NULL,0}
+        };
+        long dirs_total = 0;
+        for(int di=0; dirs[di].label; di++){
+            dirs_total += dirs[di].sz;
+            if(dirs[di].sz > 0)
+                printf("    \033[0;90m%-30s\033[0m \033[1;37m%6.1f KB\033[0m\n",
+                       dirs[di].label, dirs[di].sz/1024.0);
+            else
+                printf("    \033[0;90m%-30s\033[0m \033[0;90m—\033[0m\n", dirs[di].label);
+        }
+        printf("  \033[0;90m  Subtotal dados:\033[0m      \033[1;33m%.1f KB\033[0m\n\n", dirs_total/1024.0);
+
+        long elliot_total_bytes = bins_total + dirs_total;
+        double elliot_total_mb  = elliot_total_bytes / 1048576.0;
+        double elliot_total_kb  = elliot_total_bytes / 1024.0;
+
+        /* barra de breakdown: binários vs dados */
+        {
+            int W=32;
+            int bins_pct = elliot_total_bytes>0 ? (int)(bins_total*100/elliot_total_bytes) : 0;
+            int data_pct = 100 - bins_pct;
+            int filled   = (bins_pct * W) / 100;
+            char bar[256]={0}; int bi2=0;
+            for(int i=0;i<filled;i++){    memcpy(bar+bi2,"\xe2\x96\x88",3); bi2+=3; }
+            for(int i=filled;i<W;i++){ memcpy(bar+bi2,"\xe2\x96\x91",3); bi2+=3; }
+            bar[bi2]=0;
+            printf("  \033[0;90mBinários vs dados:\033[0m \033[1;32m[%s]\033[0m \033[1;32m%d%%\033[0m bin / \033[1;37m%d%%\033[0m dados\n\n",
+                   bar, bins_pct, data_pct);
+        }
+
+        #undef _FSIZE
+        #undef _DSIZE
+
+        /* variáveis usadas no resumo final abaixo */
+        long total_bytes = elliot_total_bytes;
+        double total_kb  = elliot_total_kb;
+        double total_mb  = elliot_total_mb;
 
         /* ── dependências Termux ── */
         /* lista os pacotes que instalamos e soma o tamanho instalado */
@@ -64630,15 +64698,18 @@ static int l_sys_info(lua_State *L) {
             /* caixa de resumo */
             long grand_total = total_bytes + dep_total;
             double grand_mb  = grand_total / 1048576.0;
-            printf("  \033[1;35m┌──────────────────────────────────────────────────┐\033[0m\n");
+            printf("  \033[1;35m┌──────────────────────────────────────────────────────┐\033[0m\n");
+            printf("  \033[1;35m│\033[0m  \033[0;90mElliotOS — binários:         \033[0m\033[1;32m%8.1f KB\033[0m              \033[1;35m│\033[0m\n", bins_total/1024.0);
+            printf("  \033[1;35m│\033[0m  \033[0;90mElliotOS — dados/dirs:       \033[0m\033[1;37m%8.1f KB\033[0m              \033[1;35m│\033[0m\n", dirs_total/1024.0);
             if(total_mb >= 1.0)
-                printf("  \033[1;35m│\033[0m  ElliotOS (binário + cache + IA): \033[1;32m%.1f MB\033[0m                \033[1;35m│\033[0m\n", total_mb);
+                printf("  \033[1;35m│\033[0m  \033[1;37mElliotOS total:              \033[1;32m%8.1f MB\033[0m              \033[1;35m│\033[0m\n", total_mb);
             else
-                printf("  \033[1;35m│\033[0m  ElliotOS (binário + cache + IA): \033[1;32m%.0f KB\033[0m               \033[1;35m│\033[0m\n", total_kb);
-            printf("  \033[1;35m│\033[0m  ElliotOS bytes exatos:           \033[1;32m%ld\033[0m          \033[1;35m│\033[0m\n", total_bytes);
-            printf("  \033[1;35m│\033[0m  Dependências (core+pentest):     \033[1;33m%.1f MB\033[0m               \033[1;35m│\033[0m\n", dep_mb);
-            printf("  \033[1;35m│\033[0m  \033[1;37mTotal no dispositivo:            \033[1;32m%.1f MB\033[0m               \033[1;35m│\033[0m\n", grand_mb);
-            printf("  \033[1;35m└──────────────────────────────────────────────────┘\033[0m\n");
+                printf("  \033[1;35m│\033[0m  \033[1;37mElliotOS total:              \033[1;32m%8.1f KB\033[0m              \033[1;35m│\033[0m\n", total_kb);
+            printf("  \033[1;35m│\033[0m  \033[0;90mElliotOS bytes exatos:       \033[1;32m%12ld\033[0m          \033[1;35m│\033[0m\n", total_bytes);
+            printf("  \033[1;35m├──────────────────────────────────────────────────────┤\033[0m\n");
+            printf("  \033[1;35m│\033[0m  \033[0;90mDependências (core+pentest): \033[1;33m%8.1f MB\033[0m              \033[1;35m│\033[0m\n", dep_mb);
+            printf("  \033[1;35m│\033[0m  \033[1;37mTotal no dispositivo:        \033[1;32m%8.1f MB\033[0m              \033[1;35m│\033[0m\n", grand_mb);
+            printf("  \033[1;35m└──────────────────────────────────────────────────────┘\033[0m\n");
         }
     }
 
