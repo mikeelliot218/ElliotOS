@@ -33606,13 +33606,80 @@ static int l_net_fetch(lua_State *L) {
 
 static int l_net_import(lua_State *L) {
     const char *url = luaL_checkstring(L, 1);
+    /* mode: 0 = ms -f (ElliotOS script, padrão); 1 = luar (Lua puro) */
+    int mode = (int)luaL_optinteger(L, 2, 0);
+
     size_t len = 0;
     char *code_buf = fetch_raw(url, NULL, &len);
-    if(!code_buf || len == 0){ free(code_buf); lua_pushboolean(L, 0); return 1; }
-    int ok = (luaL_dostring(L, code_buf) == LUA_OK);
-    lua_settop(L, 0);
+    if(!code_buf || len == 0){
+        free(code_buf);
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "net.import: falha ao baixar URL (sem conteúdo ou erro de rede)");
+        return 2;
+    }
+
+    if(mode == 1){
+        /* ── Lua puro via luar ─────────────────────────────────────────── */
+        int load_rc = luaL_loadbuffer(L, code_buf, len, url);
+        free(code_buf);
+        if(load_rc != LUA_OK){
+            const char *err = lua_tostring(L, -1);
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, err ? err : "net.import: erro de compilação (luar)");
+            return 2;
+        }
+        int call_rc = lua_pcall(L, 0, LUA_MULTRET, 0);
+        if(call_rc != LUA_OK){
+            const char *err = lua_tostring(L, -1);
+            lua_pushboolean(L, 0);
+            lua_pushstring(L, err ? err : "net.import: erro de execução (luar)");
+            return 2;
+        }
+        lua_pushboolean(L, 1);
+        return 1;
+    }
+
+    /* ── ElliotOS script via ms -f (mode 0 ou 1) ──────────────────────── */
+    /* Salva em arquivo temporário e chama ms -f <tmp> */
+    char tmp_path[256];
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || tmpdir[0]=='\0'){
+        const char *pfx2 = getenv("PREFIX");
+        if(!pfx2 || pfx2[0]=='\0') pfx2 = "/data/data/com.termux/files/usr";
+        static char _td[512];
+        snprintf(_td, sizeof(_td), "%s/tmp", pfx2);
+        tmpdir = _td;
+    }
+    snprintf(tmp_path, sizeof(tmp_path), "%s/elliot_import_%d.ms", tmpdir, (int)getpid());
+    FILE *fp = fopen(tmp_path, "wb");
+    if(!fp){
+        free(code_buf);
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "net.import: não foi possível criar arquivo temporário");
+        return 2;
+    }
+    fwrite(code_buf, 1, len, fp);
+    fclose(fp);
     free(code_buf);
-    lua_pushboolean(L, ok);
+
+    /* Localiza ms via $PREFIX ou fallback Termux */
+    const char *pfx = getenv("PREFIX");
+    if(!pfx || pfx[0]=='\0') pfx = "/data/data/com.termux/files/usr";
+    char ms_bin[512];
+    snprintf(ms_bin, sizeof(ms_bin), "%s/bin/ms", pfx);
+
+    char cmd[800];
+    snprintf(cmd, sizeof(cmd), "\"%s\" -f \"%s\" 2>&1", ms_bin, tmp_path);
+
+    int ret = system(cmd);
+    remove(tmp_path);
+
+    if(ret != 0){
+        lua_pushboolean(L, 0);
+        lua_pushfstring(L, "net.import: ms -f saiu com código %d", ret);
+        return 2;
+    }
+    lua_pushboolean(L, 1);
     return 1;
 }
 // ============================================================================
@@ -93327,11 +93394,20 @@ static int l_ivar_help(lua_State *L) {
     printf("  \033[1;33mivar.alias()\033[0m        lista aliases\n");
     printf("  \033[1;33mivar.debug(bool)\033[0m    avisa ao registrar cada var\n");
     printf("  \033[1;33mivar.reset()\033[0m        limpa \xc3\xadndices, aliases e escopos\n\n");
-    printf("\033[0;90m  \xc3\x8dndices num\xc3\xa9ricos:\n");
+    printf("\033[0;90m  \xc3\x8dndices num\xc3\xa9ricos (!N — escopo atual):\n");
     printf("    nome_longo = valor   -- !1 \xe2\x86\x92 nome_longo\n");
     printf("    outro_nome = valor   -- !2 \xe2\x86\x92 outro_nome\n");
-    printf("    print(!1, !2)        -- expande para os nomes reais\n\n");
-    printf("  Aliases nomeados (linha suprimida do Lua):\n");
+    printf("    print(!1, !2)        -- expande para os nomes reais\033[0m\n\n");
+    printf("\033[1;33m  !!N — acesso a vari\xc3\xa1veis do escopo externo (pai/global):\033[0m\n");
+    printf("\033[0;90m    Dentro de uma fun\xc3\xa7\xc3\xa3o, !N reinicia do 1.\n");
+    printf("    Use !!N para acessar vari\xc3\xa1veis do escopo de fora.\n\n");
+    printf("    dano_global = 50      -- !1 global  / !!1 de dentro de fun\xc3\xa7\xc3\xa3o\n");
+    printf("    mult = 3              -- !2 global  / !!2 de dentro de fun\xc3\xa7\xc3\xa3o\n");
+    printf("    function calc()\n");
+    printf("      bonus = 10          -- !1 neste escopo\n");
+    printf("      return !!1 * !!2 + !1  -- 50 * 3 + 10 = 160\n");
+    printf("    end\033[0m\n\n");
+    printf("\033[0;90m  Aliases nomeados (linha suprimida do Lua):\n");
     printf("    !hp = player_health_percentage  -- registra alias\n");
     printf("    print(!hp)                      -- expande para o nome real\n\n");
     printf("  Escopo por fun\xc3\xa7\xc3\xa3o (autom\xc3\xa1tico):\n");
@@ -103349,10 +103425,21 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;33mivar.reset\033[0m()            Limpa índices, aliases e pilha de escopos\n"
     printf "  \033[1;33mivar.preprocess\033[0m(code)   Pré-processa string substituindo !N e !alias\n"
     printf "  \033[1;33mivar.help\033[0m()             Ajuda rápida\n\n"
-    printf "\033[1;36m── ÍNDICES NUMÉRICOS ──────────────────────────────────────────────\033[0m\n\n"
+    printf "\033[1;36m── ÍNDICES NUMÉRICOS (!N — escopo atual) ──────────────────────────\033[0m\n\n"
     printf "  \033[0;90m  nome_longo_aqui = 42     -- !1 → nome_longo_aqui\033[0m\n"
     printf "  \033[0;90m  outro_nome = \"Mike\"      -- !2 → outro_nome\033[0m\n"
     printf "  \033[0;90m  print(!1, !2)            -- print(nome_longo_aqui, outro_nome)\033[0m\n\n"
+    printf "\033[1;36m── !!N — ACESSO AO ESCOPO EXTERNO (pai/global) ────────────────────\033[0m\n\n"
+    printf "  Dentro de uma função, \033[1;32m!N\033[0m reinicia do 1 (escopo local).\n"
+    printf "  Use \033[1;32m!!N\033[0m para acessar variáveis do escopo de fora (global ou pai).\n\n"
+    printf "  \033[0;90m  dano_global = 50        -- !1 global / vira !!1 dentro de funções\033[0m\n"
+    printf "  \033[0;90m  multiplicador = 3       -- !2 global / vira !!2 dentro de funções\033[0m\n\n"
+    printf "  \033[0;90m  function calcular()\033[0m\n"
+    printf "  \033[0;90m    bonus = 10            -- !1 neste escopo (local)\033[0m\n"
+    printf "  \033[0;90m    return !!1 * !!2 + !1 -- (dano_global * multiplicador) + bonus\033[0m\n"
+    printf "  \033[0;90m  end\033[0m\n"
+    printf "  \033[0;90m  print(calcular())       -- 50 * 3 + 10 = 160\033[0m\n\n"
+    printf "  Regra: \033[1;33m!N\033[0m = escopo atual.  \033[1;33m!!N\033[0m = escopo pai (global ou função envolvente).\n\n"
     printf "\033[1;36m── ALIASES NOMEADOS ───────────────────────────────────────────────\033[0m\n\n"
     printf "  Linha \033[1;32m!alias = varname\033[0m no script é interceptada pelo pré-processador,\n"
     printf "  registra o alias e some do código Lua (não gera erro de sintaxe).\n\n"

