@@ -100586,7 +100586,8 @@ _LMOD_DIR="\$HOME/.lua-modules"
 _EXTRA_PATH="\${_LPM_LUA}/?.lua;\${_LPM_LUA}/?/init.lua;\${_LMOD_DIR}/?.lua;\${_LMOD_DIR}/?/init.lua"
 _SYS_LIB="\${PREFIX:-/data/data/com.termux/files/usr}/lib/lua/5.4"
 _EXTRA_CPATH="\${_LPM_LIB}/?.so;\${_LPM_LIB}/?/?.so;\${_SYS_LIB}/?.so;\${_SYS_LIB}/?/?.so"
-export LUA_PATH="\${_EXTRA_PATH};\${LUA_PATH:-;}"
+# Inclui diretório atual para que require("modulo") encontre ./modulo.lua
+export LUA_PATH="./?.lua;./?/init.lua;\${_EXTRA_PATH};\${LUA_PATH:-;}"
 export LUA_CPATH="\${_EXTRA_CPATH};\${LUA_CPATH:-}"
 
 _help() {
@@ -100683,7 +100684,9 @@ printf "\n"
 printf "\033[1;33m── Filesystem ──────────────────────────────────────────────────\033[0m\n"
 printf "  \033[1;32mms --cat \033[0;33marquivo\033[0m            — le e imprime arquivo\n"
 printf "  \033[1;32mms --ls \033[0;33m[dir]\033[0m              — lista diretorio\n"
-printf "  \033[1;32mms --write \033[0;33marq texto\033[0m        — escreve arquivo\n\n"
+printf "  \033[1;32mms --write \033[0;33marq texto\033[0m        — escreve arquivo\n"
+printf "  \033[1;32mms --lua-scan \033[0;33m[dir]\033[0m         — detecta .lua no diretorio e lista\n"
+printf "  \033[1;32mms --lua-scan \033[0;33m[dir] --export \033[0;33m[saida.lua]\033[0m — junta todos os .lua em um arquivo\n\n"
 
 # Crypto (md5/sha256) só meio e god; b64 existe em todos
 printf "\033[1;33m── Crypto ──────────────────────────────────────────────────────\033[0m\n"
@@ -103881,6 +103884,93 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     exec "\$_B" -e "fs.write('\$1','\$2') print('escrito: \$1')"
     ;;
 
+  # ── Lua Scanner ─────────────────────────────────────────────
+  --lua-scan)
+    shift
+    _SCAN_DIR="\${PWD}"
+    _SCAN_EXPORT=""
+    _SCAN_OUTFILE=""
+
+    # Processa argumentos: [dir] [--export [arquivo]]
+    while [ "\$#" -gt 0 ]; do
+      case "\$1" in
+        --export)
+          _SCAN_EXPORT=1
+          shift
+          # Próximo arg é o nome do arquivo de saída (opcional)
+          if [ -n "\${1:-}" ] && [ "\${1#-}" = "\$1" ]; then
+            _SCAN_OUTFILE="\$1"; shift
+          fi
+          ;;
+        *)
+          # Primeiro arg não-flag é o diretório
+          if [ -d "\$1" ]; then
+            _SCAN_DIR="\$1"
+          else
+            printf "\033[1;31m[✗]\033[0m Diretório não encontrado: \$1\n"
+            exit 1
+          fi
+          shift
+          ;;
+      esac
+    done
+
+    # Coleta arquivos .lua no diretório
+    _LUA_FILES=\$(find "\$_SCAN_DIR" -maxdepth 1 -name "*.lua" 2>/dev/null | sort)
+
+    if [ -z "\$_LUA_FILES" ]; then
+      printf "\033[1;33m[!]\033[0m Nenhum arquivo .lua encontrado em: \033[1;37m\$_SCAN_DIR\033[0m\n"
+      exit 0
+    fi
+
+    # Conta e lista
+    _LUA_COUNT=\$(printf '%s\n' "\$_LUA_FILES" | wc -l | tr -d ' ')
+    printf "\n\033[1;35m── Lua Scanner — ElliotOS ──────────────────────────────────────\033[0m\n"
+    printf "\033[0;90m  Diretório: \$_SCAN_DIR\033[0m\n"
+    printf "\033[1;32m  %s arquivo(s) .lua encontrado(s):\033[0m\n\n" "\$_LUA_COUNT"
+
+    _IDX=1
+    for _F in \$_LUA_FILES; do
+      _FNAME=\$(basename "\$_F")
+      _FSIZE=\$(wc -c < "\$_F" 2>/dev/null | tr -d ' ')
+      _FLINES=\$(wc -l < "\$_F" 2>/dev/null | tr -d ' ')
+      printf "  \033[1;36m[%d]\033[0m \033[1;37m%-28s\033[0m \033[0;90m%s bytes / %s linhas\033[0m\n" "\$_IDX" "\$_FNAME" "\$_FSIZE" "\$_FLINES"
+      _IDX=\$((_IDX + 1))
+    done
+    printf "\n"
+
+    # Modo export: junta tudo em um arquivo
+    if [ -n "\$_SCAN_EXPORT" ]; then
+      _OUTFILE="\${_SCAN_OUTFILE:-\${_SCAN_DIR}/bundle_\$(date +%Y%m%d_%H%M%S).lua}"
+      printf "\033[1;33m[*]\033[0m Exportando para: \033[1;37m\$_OUTFILE\033[0m\n\n"
+
+      # Cabeçalho do bundle
+      printf "-- ============================================================\n" > "\$_OUTFILE"
+      printf "-- ElliotOS Lua Bundle — gerado em %s\n" "\$(date)" >> "\$_OUTFILE"
+      printf "-- Diretório: %s\n" "\$_SCAN_DIR" >> "\$_OUTFILE"
+      printf "-- Arquivos: %s\n" "\$_LUA_COUNT" >> "\$_OUTFILE"
+      printf "-- ============================================================\n\n" >> "\$_OUTFILE"
+
+      # Injeta cada arquivo com separador
+      for _F in \$_LUA_FILES; do
+        _FNAME=\$(basename "\$_F")
+        printf "-- ── %s ──────────────────────────────────────────────\n" "\$_FNAME" >> "\$_OUTFILE"
+        printf "do -- início: %s\n" "\$_FNAME" >> "\$_OUTFILE"
+        cat "\$_F" >> "\$_OUTFILE"
+        printf "\nend -- fim: %s\n\n" "\$_FNAME" >> "\$_OUTFILE"
+        printf "  \033[1;32m✓\033[0m %s\n" "\$_FNAME"
+      done
+
+      _BUNDLE_SIZE=\$(wc -c < "\$_OUTFILE" 2>/dev/null | tr -d ' ')
+      _BUNDLE_LINES=\$(wc -l < "\$_OUTFILE" 2>/dev/null | tr -d ' ')
+      printf "\n\033[1;32m[✔]\033[0m Bundle criado: \033[1;37m\$_OUTFILE\033[0m\n"
+      printf "\033[0;90m    %s bytes / %s linhas totais\033[0m\n\n" "\$_BUNDLE_SIZE" "\$_BUNDLE_LINES"
+    else
+      printf "\033[0;90m  Dica: use --export para juntar tudo em um único arquivo.\033[0m\n"
+      printf "\033[0;90m  Ex: ms --lua-scan \$_SCAN_DIR --export bundle.lua\033[0m\n\n"
+    fi
+    ;;
+
   # ── Crypto ──────────────────────────────────────────────────
   --md5)
     shift
@@ -105415,7 +105505,27 @@ LAUNCHER_SCRIPT
     ;;
 
   "")
-    exec "\$_B"
+    # Detecta .lua no diretório atual e registra em package.preload (silencioso)
+    # O loader passa pelo ivar.preprocess() para suportar !N dentro dos modulos
+    _LUA_INIT=""
+    for _lf in "\${PWD}"/*.lua; do
+      if [ -f "\$_lf" ]; then
+        _lmod=\$(basename "\$_lf" .lua)
+        _lpath=\$(printf '%s' "\$_lf" | sed "s/'/\\\\\\\\'/g")
+        _LUA_INIT="\${_LUA_INIT}package.preload['\${_lmod}']=function(...)"
+        _LUA_INIT="\${_LUA_INIT}local _f=io.open('\${_lpath}','r');"
+        _LUA_INIT="\${_LUA_INIT}if not _f then error('nao foi possivel abrir \${_lpath}') end;"
+        _LUA_INIT="\${_LUA_INIT}local _c=_f:read('*a');_f:close();"
+        _LUA_INIT="\${_LUA_INIT}if type(ivar)=='table' and type(ivar.preprocess)=='function' then _c=ivar.preprocess(_c) end;"
+        _LUA_INIT="\${_LUA_INIT}local _ch,_e=load(_c,'@\${_lmod}.lua');if not _ch then error(_e) end;"
+        _LUA_INIT="\${_LUA_INIT}return _ch(...)end;"
+      fi
+    done
+    if [ -n "\$_LUA_INIT" ]; then
+      exec "\$_B" -e "\$_LUA_INIT" -i
+    else
+      exec "\$_B"
+    fi
     ;;
 
   *)
