@@ -34494,18 +34494,36 @@ static const char *net_syn_probe(const char *host, int port,
     connect(fd_sp, res_sp->ai_addr, res_sp->ai_addrlen);
     freeaddrinfo(res_sp);
 
-    /* aguarda SYN-ACK ou RST via select() */
-    fd_set wfds_sp;
+    /* aguarda SYN-ACK ou RST via select() — monitora read+write+except */
+    fd_set wfds_sp, rfds_sp, efds_sp;
     FD_ZERO(&wfds_sp); FD_SET(fd_sp, &wfds_sp);
+    FD_ZERO(&rfds_sp); FD_SET(fd_sp, &rfds_sp);
+    FD_ZERO(&efds_sp); FD_SET(fd_sp, &efds_sp);
     struct timeval tv_sp = {(timeout_s > 0 ? timeout_s : 5), 0};
     const char *sp_status = "filtered";
-    int sel_sp = select(fd_sp + 1, NULL, &wfds_sp, NULL, &tv_sp);
+    int sel_sp = select(fd_sp + 1, &rfds_sp, &wfds_sp, &efds_sp, &tv_sp);
     if (sel_sp > 0) {
         int err_sp = 0; socklen_t el_sp = sizeof(err_sp);
         getsockopt(fd_sp, SOL_SOCKET, SO_ERROR, &err_sp, &el_sp);
-        sp_status = (err_sp == 0)            ? "open"
-                  : (err_sp == ECONNREFUSED) ? "closed"
-                  :                            "filtered";
+        if (err_sp == 0) {
+            /* SO_ERROR==0 pode ser falso positivo em kernels Android sem rota:
+               o connect() resolveu localmente sem SYN sair de verdade.
+               Confirmamos com MSG_PEEK — se nao ha dados E nao e EAGAIN,
+               o socket fechou sem handshake real → filtered. */
+            char _probe[1];
+            ssize_t _r = recv(fd_sp, _probe, sizeof(_probe), MSG_PEEK | MSG_DONTWAIT);
+            if (_r < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+                sp_status = "open";    /* SYN-ACK real, sem dados ainda */
+            else if (_r > 0)
+                sp_status = "open";    /* ja tem dados = conectou de verdade */
+            else
+                sp_status = "filtered"; /* _r==0 ou erro != EAGAIN = sem rota */
+        } else {
+            sp_status = (err_sp == ECONNREFUSED)                          ? "closed"
+                      : (err_sp == EHOSTUNREACH || err_sp == ENETUNREACH
+                         || err_sp == ENETDOWN   || err_sp == ETIMEDOUT)  ? "filtered"
+                      :                                                      "filtered";
+        }
     }
 
     /* SO_LINGER {1,0} → RST imediato ao close(), sem ACK final */
@@ -65503,6 +65521,45 @@ static int l_sys_help(lua_State *L) {
     printf("    ms      : número (aceita float: 0.5 = 500us)\n");
     printf("    ex: sys.sleep(250)   -- dorme 250ms\n\n");
 
+    printf("  \033[1;36m── DATA / RELÓGIO ──────────────────────────────────────────────\033[0m\n\n");
+
+    printf("  \033[1;33msys.date\033[0m([fmt [, epoch]])\n");
+    printf("    Formata data/hora. fmt usa strftime (padrão: '%%Y-%%m-%%d %%H:%%M:%%S').\n");
+    printf("    fmt='*t' retorna tabela {year,month,day,hour,min,sec,wday,yday,isdst}.\n");
+    printf("    epoch : (opcional) timestamp unix — padrão: agora\n");
+    printf("    ex: sys.date()             --> '2026-09-04 23:41:00'\n");
+    printf("        sys.date('%%d/%%m/%%Y')   --> '04/09/2026'\n");
+    printf("        sys.date('*t')         --> tabela com campos individuais\n");
+    printf("        sys.date('%%H:%%M', t0)  --> hora de um epoch específico\n\n");
+
+    printf("  \033[1;33msys.today\033[0m()\n");
+    printf("    Atalho para a data atual no formato ISO.\n");
+    printf("    Retorna : string '2026-09-04'\n\n");
+
+    printf("  \033[1;33msys.now\033[0m()\n");
+    printf("    Hora atual no formato HH:MM:SS.\n");
+    printf("    Retorna : string '23:41:07'\n\n");
+
+    printf("  \033[1;33msys.clock\033[0m()\n");
+    printf("    Tempo de CPU consumido pelo processo (os.clock interno).\n");
+    printf("    Útil para medir custo de processamento (não wallclock).\n");
+    printf("    Retorna : float em segundos\n\n");
+
+    printf("  \033[1;33msys.uptime\033[0m()\n");
+    printf("    Segundos desde o boot do dispositivo. Lê /proc/uptime.\n");
+    printf("    Retorna : float  ou  nil, 'nao disponivel'\n");
+    printf("    ex: print(sys.fmt_dur(sys.uptime()))  --> '3h 42m 11s'\n\n");
+
+    printf("  \033[1;33msys.fmt_dur\033[0m(segundos)\n");
+    printf("    Converte duração em segundos para string legível.\n");
+    printf("    ex: sys.fmt_dur(3725)   --> '1h 2m 5s'\n");
+    printf("        sys.fmt_dur(90)     --> '1m 30s'\n\n");
+
+    printf("  \033[1;33msys.tz\033[0m()\n");
+    printf("    Fuso horário local. Lê /etc/timezone (Android/Termux).\n");
+    printf("    Fallback: offset numérico 'UTC+HH:MM' / 'UTC-HH:MM'.\n");
+    printf("    Retorna : string ex: 'America/Sao_Paulo' ou 'UTC-03:00'\n\n");
+
     printf("  \033[1;36m── MUTEX ───────────────────────────────────────────────────────\033[0m\n\n");
 
     printf("  \033[1;33msys.mutex\033[0m()\n");
@@ -78222,6 +78279,16 @@ static const char *G_completions[] = {
     /* sys.* */
     "sys.spawn(","sys.thread(","sys.list()","sys.kill(","sys.info()",
     "sys.env(","sys.pid()","sys.exit(","sys.help()","sys.net()","sys.storage(","sys.storage()",
+    "sys.date(","sys.date()","sys.today()","sys.now()","sys.clock()","sys.uptime()",
+    "sys.fmt_dur(","sys.tz()",
+    /* log.* */
+    "log.info(","log.ok(","log.warn(","log.err(","log.debug(","log.trace(",
+    "log.set_level(","log.set_output(","log.silent()","log.resume()",
+    "log.to_file(","log.timed(","log.help()",
+    "log","log.",
+    /* csv.* */
+    "csv.decode(","csv.encode(","csv.read(","csv.write(","csv.help()",
+    "csv","csv.",
     /* crypto.* */
     "crypto.md5(","crypto.sha1(","crypto.sha256(","crypto.sha512(",
     "crypto.hmac(","crypto.b64enc(","crypto.b64dec(",
@@ -78265,7 +78332,7 @@ static const char *G_completions[] = {
     "crypto","crypto.","db","db.","ui","ui.","tui","tui.",
     "exploit","exploit.","pent","pent.","ms","ms.",
     "adb","adb.","lmod","lmod.","ed.","web","web.","ivar","ivar.",
-    "dow","dow.",
+    "dow","dow.","log","log.","csv","csv.",
     /* lmod.* */
     "lmod.new(","lmod.mod(","lmod.list()","lmod.remove(",
     "lmod.path()","lmod.help()",
@@ -91722,6 +91789,313 @@ static void elliot_load_prelude(lua_State *L) {
    via getmetatable('').__index = string, então string.split etc. já
    ficam disponíveis como s:split() sem nenhuma metatable extra.       */
 
+/* ── log ────────────────────────────────────────────────────────────────
+   log.info / log.ok / log.warn / log.err / log.debug / log.trace
+   log.set_level(lvl)   — filtra abaixo do nível
+   log.set_output(fn)   — redireciona saída (fn(str))
+   log.silent()         — desativa toda saída
+   níveis: TRACE=0 DEBUG=1 INFO=2 OK=3 WARN=4 ERR=5
+   ─────────────────────────────────────────────────────────────────── */
+"do\n"
+"  local _L = {}\n"
+"  local LEVELS = {TRACE=0,DEBUG=1,INFO=2,OK=3,WARN=4,ERR=5}\n"
+"  local _lvl  = 0\n"
+"  local _out  = nil   -- nil = usa io.stderr\n"
+"  local _silent = false\n"
+"\n"
+"  local CLR = {\n"
+"    TRACE = '\\027[0;90m',\n"
+"    DEBUG = '\\027[0;36m',\n"
+"    INFO  = '\\027[1;37m',\n"
+"    OK    = '\\027[1;32m',\n"
+"    WARN  = '\\027[1;33m',\n"
+"    ERR   = '\\027[1;31m',\n"
+"  }\n"
+"  local RST = '\\027[0m'\n"
+"  local LBL = {\n"
+"    TRACE = 'TRACE', DEBUG = 'DEBUG', INFO = 'INFO ',\n"
+"    OK    = 'OK   ', WARN  = 'WARN ', ERR   = 'ERR  ',\n"
+"  }\n"
+"\n"
+"  local function _timestamp()\n"
+"    local t = os.time()\n"
+"    return os.date('%H:%M:%S', t)\n"
+"  end\n"
+"\n"
+"  local function _emit(level, ...)\n"
+"    if _silent then return end\n"
+"    if LEVELS[level] < _lvl then return end\n"
+"    local parts = {}\n"
+"    for i = 1, select('#', ...) do\n"
+"      parts[#parts+1] = tostring(select(i, ...))\n"
+"    end\n"
+"    local msg = table.concat(parts, ' ')\n"
+"    local line = CLR[level]..'['..LBL[level]..'] '..RST\n"
+"            ..'\\027[0;90m'..(_timestamp())..'\\027[0m '..msg\n"
+"    if _out then\n"
+"      _out(line)\n"
+"    else\n"
+"      io.write(line..'\\n')\n"
+"    end\n"
+"  end\n"
+"\n"
+"  function _L.trace(...)  _emit('TRACE', ...) end\n"
+"  function _L.debug(...)  _emit('DEBUG', ...) end\n"
+"  function _L.info(...)   _emit('INFO',  ...) end\n"
+"  function _L.ok(...)     _emit('OK',    ...) end\n"
+"  function _L.warn(...)   _emit('WARN',  ...) end\n"
+"  function _L.err(...)    _emit('ERR',   ...) end\n"
+"\n"
+"  function _L.set_level(lvl)\n"
+"    local n = tonumber(lvl)\n"
+"    if n then _lvl = n; return end\n"
+"    local u = tostring(lvl):upper()\n"
+"    if LEVELS[u] then _lvl = LEVELS[u] end\n"
+"  end\n"
+"  function _L.set_output(fn) _out = fn end\n"
+"  function _L.silent()  _silent = true  end\n"
+"  function _L.resume()  _silent = false end\n"
+"\n"
+"  -- log.to_file(path) — tee: escreve no arquivo E na saída padrão\n"
+"  function _L.to_file(path)\n"
+"    local f, e = io.open(path, 'a')\n"
+"    if not f then error('log.to_file: '..e) end\n"
+"    _out = function(line)\n"
+"      io.write(line..'\\n')\n"
+"      -- strip ANSI antes de gravar\n"
+"      local clean = line:gsub('\\027%[[%d;]*m', '')\n"
+"      f:write(clean..'\\n'); f:flush()\n"
+"    end\n"
+"  end\n"
+"\n"
+"  -- log.timed(label, fn) — mede e loga tempo de execução\n"
+"  function _L.timed(label, fn)\n"
+"    local t0 = os.clock()\n"
+"    local ok2, err2 = pcall(fn)\n"
+"    local dt = string.format('%.3f', os.clock() - t0)\n"
+"    if ok2 then _L.ok(label..' ('..dt..'s)')\n"
+"    else        _L.err(label..' FALHOU: '..tostring(err2)..' ('..dt..'s)') end\n"
+"    return ok2\n"
+"  end\n"
+"\n"
+"  function _L.help() os.execute('ms --doc log 2>/dev/null || lua-net --doc log 2>/dev/null || true') end\n"
+"\n"
+"  log = _L\n"
+"end\n"
+
+/* ── csv ────────────────────────────────────────────────────────────────
+   csv.decode(str, opts?)  -> tabela de tabelas
+   csv.encode(t, opts?)    -> string CSV
+   csv.read(path, opts?)   -> tabela (lê arquivo)
+   csv.write(path, t, opts?) -> grava arquivo
+   opts: { sep=',', header=true, quote='"' }
+   ─────────────────────────────────────────────────────────────────── */
+"do\n"
+"  local _C = {}\n"
+"\n"
+"  local function _parse_line(line, sep, qt)\n"
+"    local fields = {}\n"
+"    local i = 1\n"
+"    local len = #line\n"
+"    while i <= len do\n"
+"      local ch = line:sub(i,i)\n"
+"      if ch == qt then\n"
+"        -- campo entre aspas\n"
+"        local buf = {}\n"
+"        i = i + 1\n"
+"        while i <= len do\n"
+"          local c = line:sub(i,i)\n"
+"          if c == qt then\n"
+"            if line:sub(i+1,i+1) == qt then\n"
+"              buf[#buf+1] = qt; i = i + 2\n"
+"            else\n"
+"              i = i + 1; break\n"
+"            end\n"
+"          else\n"
+"            buf[#buf+1] = c; i = i + 1\n"
+"          end\n"
+"        end\n"
+"        fields[#fields+1] = table.concat(buf)\n"
+"        if line:sub(i,i) == sep then i = i + 1 end\n"
+"      else\n"
+"        -- campo simples\n"
+"        local ps = i\n"
+"        while i <= len and line:sub(i,i) ~= sep do i = i+1 end\n"
+"        fields[#fields+1] = line:sub(ps, i-1)\n"
+"        if line:sub(i,i) == sep then i = i + 1 end\n"
+"      end\n"
+"    end\n"
+"    return fields\n"
+"  end\n"
+"\n"
+"  function _C.decode(str, opts)\n"
+"    opts = opts or {}\n"
+"    local sep   = opts.sep    or ','\n"
+"    local qt    = opts.quote  or '\"'\n"
+"    local hdr   = opts.header ~= false\n"
+"    local rows  = {}\n"
+"    local headers = nil\n"
+"    -- normaliza quebras de linha\n"
+"    str = str:gsub('\\r\\n','\\n'):gsub('\\r','\\n')\n"
+"    if str:sub(-1) == '\\n' then str = str:sub(1,-2) end\n"
+"    for line in (str..'\\n'):gmatch('([^\\n]*)\\n') do\n"
+"      local fields = _parse_line(line, sep, qt)\n"
+"      if hdr and not headers then\n"
+"        headers = fields\n"
+"      else\n"
+"        if headers then\n"
+"          local row = {}\n"
+"          for i,h in ipairs(headers) do row[h] = fields[i] or '' end\n"
+"          row._fields = fields\n"
+"          rows[#rows+1] = row\n"
+"        else\n"
+"          rows[#rows+1] = fields\n"
+"        end\n"
+"      end\n"
+"    end\n"
+"    rows._headers = headers\n"
+"    return rows\n"
+"  end\n"
+"\n"
+"  local function _quote_field(v, sep, qt)\n"
+"    v = tostring(v)\n"
+"    if v:find(sep, 1, true) or v:find(qt, 1, true)\n"
+"       or v:find('\\n', 1, true) or v:find('\\r', 1, true) then\n"
+"      v = qt .. v:gsub(qt, qt..qt) .. qt\n"
+"    end\n"
+"    return v\n"
+"  end\n"
+"\n"
+"  function _C.encode(t, opts)\n"
+"    opts = opts or {}\n"
+"    local sep  = opts.sep   or ','\n"
+"    local qt   = opts.quote or '\"'\n"
+"    local hdr  = opts.header ~= false\n"
+"    local lines = {}\n"
+"    -- detecta headers: usa _headers se existir, senão keys da 1a linha\n"
+"    local headers = t._headers\n"
+"    if not headers and #t > 0 and type(t[1]) == 'table' then\n"
+"      headers = table.keys(t[1])\n"
+"      -- remove _fields do header se existir\n"
+"      local h2 = {}\n"
+"      for _,h in ipairs(headers) do\n"
+"        if h ~= '_fields' then h2[#h2+1] = h end\n"
+"      end\n"
+"      headers = h2\n"
+"    end\n"
+"    if hdr and headers then\n"
+"      local row = {}\n"
+"      for _,h in ipairs(headers) do row[#row+1] = _quote_field(h,sep,qt) end\n"
+"      lines[#lines+1] = table.concat(row, sep)\n"
+"    end\n"
+"    for _,row in ipairs(t) do\n"
+"      local fields = {}\n"
+"      if headers then\n"
+"        for _,h in ipairs(headers) do\n"
+"          fields[#fields+1] = _quote_field(row[h] or '', sep, qt)\n"
+"        end\n"
+"      else\n"
+"        for _,v in ipairs(row) do\n"
+"          fields[#fields+1] = _quote_field(v, sep, qt)\n"
+"        end\n"
+"      end\n"
+"      lines[#lines+1] = table.concat(fields, sep)\n"
+"    end\n"
+"    return table.concat(lines, '\\n')\n"
+"  end\n"
+"\n"
+"  function _C.read(path, opts)\n"
+"    local f, e = io.open(path, 'r')\n"
+"    if not f then error('csv.read: '..e) end\n"
+"    local str = f:read('*a'); f:close()\n"
+"    return _C.decode(str, opts)\n"
+"  end\n"
+"\n"
+"  function _C.write(path, t, opts)\n"
+"    local f, e = io.open(path, 'w')\n"
+"    if not f then error('csv.write: '..e) end\n"
+"    f:write(_C.encode(t, opts)); f:close()\n"
+"  end\n"
+"\n"
+"  function _C.help() os.execute('ms --doc csv 2>/dev/null || lua-net --doc csv 2>/dev/null || true') end\n"
+"\n"
+"  csv = _C\n"
+"end\n"
+
+/* ── sys.date / sys.clock / sys.fmt ─────────────────────────────────────
+   sys.date(fmt?, epoch?)  — formata data/hora  (padrão: local agora)
+   sys.clock()             — tempo de CPU do processo (segundos)
+   sys.uptime()            — segundos desde boot (lê /proc/uptime)
+   sys.fmt_dur(sec)        — formata duração: "1h 23m 45s"
+   sys.tz()                — nome do fuso horário local
+   Formatos rápidos:
+     sys.date()             -> "2026-09-04 23:41:00"
+     sys.date("%d/%m/%Y")   -> "04/09/2026"
+     sys.date("*t")         -> tabela {year,month,day,hour,min,sec,wday,...}
+   ─────────────────────────────────────────────────────────────────── */
+"do\n"
+"  local _raw_sys = sys  -- referência ao sys C existente\n"
+"\n"
+"  -- sys.date(fmt?, epoch?)\n"
+"  function _raw_sys.date(fmt, epoch)\n"
+"    epoch = epoch or os.time()\n"
+"    if fmt == '*t' then return os.date('*t', epoch) end\n"
+"    fmt = fmt or '%Y-%m-%d %H:%M:%S'\n"
+"    return os.date(fmt, epoch)\n"
+"  end\n"
+"\n"
+"  -- sys.clock() — tempo de CPU do processo\n"
+"  function _raw_sys.clock()\n"
+"    return os.clock()\n"
+"  end\n"
+"\n"
+"  -- sys.uptime() — segundos desde o boot (Android/Linux)\n"
+"  function _raw_sys.uptime()\n"
+"    local f = io.open('/proc/uptime', 'r')\n"
+"    if not f then return nil, 'nao disponivel' end\n"
+"    local s = f:read('*l'); f:close()\n"
+"    return tonumber(s:match('^([%d%.]+)'))\n"
+"  end\n"
+"\n"
+"  -- sys.fmt_dur(segundos) -> '1h 23m 45s'\n"
+"  function _raw_sys.fmt_dur(sec)\n"
+"    sec = math.floor(tonumber(sec) or 0)\n"
+"    if sec < 0 then sec = 0 end\n"
+"    local h = math.floor(sec / 3600)\n"
+"    local m = math.floor((sec % 3600) / 60)\n"
+"    local s = sec % 60\n"
+"    local parts = {}\n"
+"    if h > 0 then parts[#parts+1] = h..'h' end\n"
+"    if m > 0 then parts[#parts+1] = m..'m' end\n"
+"    parts[#parts+1] = s..'s'\n"
+"    return table.concat(parts, ' ')\n"
+"  end\n"
+"\n"
+"  -- sys.tz() — nome do fuso local\n"
+"  function _raw_sys.tz()\n"
+"    -- tenta ler /etc/timezone (Android/Termux)\n"
+"    local f = io.open('/etc/timezone', 'r')\n"
+"    if f then local z = f:read('*l'); f:close(); if z and #z > 0 then return z end end\n"
+"    -- fallback: offset numérico via os.date\n"
+"    local d = os.date('*t')\n"
+"    local utc = os.time(os.date('!*t'))\n"
+"    local off = os.difftime(os.time(), utc)\n"
+"    local h = math.floor(math.abs(off)/3600)\n"
+"    local m = math.floor((math.abs(off)%3600)/60)\n"
+"    return string.format('UTC%s%02d:%02d', off>=0 and '+' or '-', h, m)\n"
+"  end\n"
+"\n"
+"  -- sys.today() -> '2026-09-04'\n"
+"  function _raw_sys.today()\n"
+"    return os.date('%Y-%m-%d')\n"
+"  end\n"
+"\n"
+"  -- sys.now() -> '23:41:07'\n"
+"  function _raw_sys.now()\n"
+"    return os.date('%H:%M:%S')\n"
+"  end\n"
+"end\n"
+
     );  /* fim luaL_dostring -- ELLIOT PRELUDE */
     if (_prelude_rc != LUA_OK) {
         fprintf(stderr, "\033[1;31m[ElliotOS] ERRO FATAL prelude: %s\033[0m\n",
@@ -102649,7 +103023,9 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;32m  ms --doc ai\033[0m           modulo ai.*\n"
     printf "  \033[1;32m  ms --doc string\033[0m       extensoes string.*\n"
     printf "  \033[1;32m  ms --doc util\033[0m         stdlib funcional util.*\n"
-    printf "  \033[1;32m  ms --doc json\033[0m         json.encode / json.decode\n\n"
+    printf "  \033[1;32m  ms --doc json\033[0m         json.encode / json.decode\n"
+    printf "  \033[1;32m  ms --doc log\033[0m          modulo log.* — logging estruturado\n"
+    printf "  \033[1;32m  ms --doc csv\033[0m          modulo csv.* — parse e escrita de CSV\n\n"
     printf "\033[1;35m═══ COMANDOS ESPECIAIS DO REPL ══════════════════════════════════════════════\033[0m\n\n"
     printf "  Não são funções Lua. Não precisam de (). Interceptados antes do parser.\n\n"
     printf "  \033[1;33m%-16s\033[0m %s\n" "help" "exibe a documentação (igual a ms --doc)"
@@ -102684,6 +103060,8 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;33m%-12s\033[0m %s\n" "string.*" "Extensoes de string: trim, split, slugify, is*, pad..."
     printf "  \033[1;33m%-12s\033[0m %s\n" "util.*" "Stdlib funcional: map, filter, pipe, stats, iter, chain"
     printf "  \033[1;33m%-12s\033[0m %s\n" "json.*" "JSON encode/decode nativo"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "log.*" "Logging estruturado: info/ok/warn/err/debug com timestamp e cores"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "csv.*" "CSV parse/write: decode, encode, read, write"
     printf "  \033[1;33m%-12s\033[0m %s\n" "ivar.*" "Variaveis indexadas no REPL (!N -> nome)"
     }
     _doc_net() {
@@ -103143,6 +103521,86 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[0;90m  local back = json.decode(json.encode(orig))\033[0m\n"
     printf "  \033[0;90m  print(back.port, back.hosts[1])  --> 8080  127.0.0.1\033[0m\n\n"
     }
+    _doc_log() {
+    printf "\033[1;35m═══ log.* — Logging Estruturado ═══════════════════════════════════\033[0m\n\n"
+    printf "  Módulo de log com níveis, cores e timestamp. Nativo no ElliotOS.\n"
+    printf "  Não precisa de require() — disponível em qualquer script ou REPL.\n\n"
+    printf "\033[1;36m── NÍVEIS (do menor ao maior) ──────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90mTRACE=0  DEBUG=1  INFO=2  OK=3  WARN=4  ERR=5\033[0m\n\n"
+    printf "\033[1;36m── FUNÇÕES ─────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mlog.trace\033[0m(...)   \033[0;90m[TRACE] HH:MM:SS mensagem\033[0m\n"
+    printf "  \033[1;33mlog.debug\033[0m(...)   \033[0;36m[DEBUG] HH:MM:SS mensagem\033[0m\n"
+    printf "  \033[1;33mlog.info\033[0m(...)    \033[1;37m[INFO ] HH:MM:SS mensagem\033[0m\n"
+    printf "  \033[1;33mlog.ok\033[0m(...)      \033[1;32m[OK   ] HH:MM:SS mensagem\033[0m\n"
+    printf "  \033[1;33mlog.warn\033[0m(...)    \033[1;33m[WARN ] HH:MM:SS mensagem\033[0m\n"
+    printf "  \033[1;33mlog.err\033[0m(...)     \033[1;31m[ERR  ] HH:MM:SS mensagem\033[0m\n\n"
+    printf "  Aceita múltiplos argumentos — são concatenados com espaço:\n"
+    printf "  \033[0;90m  log.info('host:', host, 'porta:', port)\033[0m\n\n"
+    printf "\033[1;36m── CONFIGURAÇÃO ────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mlog.set_level\033[0m(lvl)\n"
+    printf "  \033[0;90m  Filtra mensagens abaixo do nível. Aceita nome ou número.\033[0m\n"
+    printf "  \033[0;90m  log.set_level('WARN')   -- só WARN e ERR aparecem\033[0m\n"
+    printf "  \033[0;90m  log.set_level(0)        -- tudo aparece (padrão)\033[0m\n\n"
+    printf "  \033[1;33mlog.to_file\033[0m(path)\n"
+    printf "  \033[0;90m  Duplica saída para arquivo (sem cores). Append automático.\033[0m\n"
+    printf "  \033[0;90m  log.to_file('scan.log')\033[0m\n\n"
+    printf "  \033[1;33mlog.set_output\033[0m(fn)\n"
+    printf "  \033[0;90m  Redireciona saída para função customizada.\033[0m\n"
+    printf "  \033[0;90m  log.set_output(function(s) ui.box(s) end)\033[0m\n\n"
+    printf "  \033[1;33mlog.silent\033[0m()    — desativa toda saída temporariamente\n"
+    printf "  \033[1;33mlog.resume\033[0m()    — reativa saída\n\n"
+    printf "\033[1;36m── UTILITÁRIOS ─────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mlog.timed\033[0m(label, fn)\n"
+    printf "  \033[0;90m  Executa fn(), mede tempo e loga OK/ERR com duração.\033[0m\n"
+    printf "  \033[0;90m  log.timed('download', function() net.get(url) end)\033[0m\n"
+    printf "  \033[0;90m  -- [OK   ] 23:41:01 download (0.312s)\033[0m\n\n"
+    printf "\033[1;36m── EXEMPLO COMPLETO ────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  log.to_file('app.log')\033[0m\n"
+    printf "  \033[0;90m  log.set_level('INFO')\033[0m\n"
+    printf "  \033[0;90m  log.info('iniciando scan em', host)\033[0m\n"
+    printf "  \033[0;90m  local ok, err = pcall(function() net.syn(host, 80) end)\033[0m\n"
+    printf "  \033[0;90m  if ok then log.ok('porta 80 aberta')\033[0m\n"
+    printf "  \033[0;90m  else      log.err('falhou:', err) end\033[0m\n\n"
+    }
+    _doc_csv() {
+    printf "\033[1;35m═══ csv.* — Parse e Escrita de CSV ════════════════════════════════\033[0m\n\n"
+    printf "  Parser CSV completo: suporta campos com aspas, CRLF, separador custom.\n"
+    printf "  Nativo no ElliotOS — sem require().\n\n"
+    printf "\033[1;36m── FUNÇÕES ─────────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33mcsv.decode\033[0m(str [, opts])  →  tabela de linhas\n"
+    printf "  \033[0;90m  Parse de string CSV. Com header=true (padrão), cada linha\033[0m\n"
+    printf "  \033[0;90m  é uma tabela com chaves pelos nomes das colunas.\033[0m\n"
+    printf "  \033[0;90m  local t = csv.decode('nome,idade\\nMike,20\\nAna,25')\033[0m\n"
+    printf "  \033[0;90m  print(t[1].nome, t[1].idade)   --> Mike  20\033[0m\n"
+    printf "  \033[0;90m  print(t[2].nome)               --> Ana\033[0m\n\n"
+    printf "  \033[1;33mcsv.encode\033[0m(t [, opts])  →  string CSV\n"
+    printf "  \033[0;90m  Converte tabela de tabelas em string CSV.\033[0m\n"
+    printf "  \033[0;90m  Adiciona aspas automaticamente quando necessário.\033[0m\n"
+    printf "  \033[0;90m  local s = csv.encode(t)\033[0m\n"
+    printf "  \033[0;90m  local s = csv.encode(t, {sep=';'})\033[0m\n\n"
+    printf "  \033[1;33mcsv.read\033[0m(path [, opts])  →  tabela\n"
+    printf "  \033[0;90m  Lê arquivo CSV do disco. Equivale a decode(fs.read(path)).\033[0m\n"
+    printf "  \033[0;90m  local t = csv.read('dados.csv')\033[0m\n"
+    printf "  \033[0;90m  local t = csv.read('dados.csv', {sep=';', header=false})\033[0m\n\n"
+    printf "  \033[1;33mcsv.write\033[0m(path, t [, opts])\n"
+    printf "  \033[0;90m  Grava tabela como arquivo CSV.\033[0m\n"
+    printf "  \033[0;90m  csv.write('saida.csv', t)\033[0m\n"
+    printf "  \033[0;90m  csv.write('saida.csv', t, {sep=';'})\033[0m\n\n"
+    printf "\033[1;36m── OPÇÕES (opts) ───────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[1;33msep\033[0m    separador de campo  (padrão: ',')\n"
+    printf "  \033[1;33mquote\033[0m  caractere de aspas  (padrão: '\"')\n"
+    printf "  \033[1;33mheader\033[0m true = primeira linha são cabeçalhos (padrão: true)\n\n"
+    printf "\033[1;36m── EXEMPLO COMPLETO ────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  -- ler, filtrar e reescrever\033[0m\n"
+    printf "  \033[0;90m  local t = csv.read('usuarios.csv')\033[0m\n"
+    printf "  \033[0;90m  local ativos = util.filter(t, function(r)\033[0m\n"
+    printf "  \033[0;90m    return r.status == 'ativo'\033[0m\n"
+    printf "  \033[0;90m  end)\033[0m\n"
+    printf "  \033[0;90m  csv.write('ativos.csv', ativos)\033[0m\n"
+    printf "  \033[0;90m  log.ok('filtrados:', #ativos, 'usuarios ativos')\033[0m\n\n"
+    printf "  \033[0;90m  -- ponto-e-vírgula (padrão BR de planilhas)\033[0m\n"
+    printf "  \033[0;90m  local t2 = csv.read('relatorio.csv', {sep=';'})\033[0m\n\n"
+    }
     _doc_dow() {
     printf "\033[1;35m═══ dow.* — Download de Mídia ════════════════════════════════════\033[0m\n\n"
     printf "  Motor híbrido: YouTube usa yt-dlp; outros sites usam Cobalt API + wget.\n"
@@ -103555,8 +104013,12 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
         if [ -n "\$_DOC_PAGER" ]; then _doc_util | eval "\$_DOC_PAGER"; else _doc_util; fi ;;
       json)
         if [ -n "\$_DOC_PAGER" ]; then _doc_json | eval "\$_DOC_PAGER"; else _doc_json; fi ;;
+      log)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_log | eval "\$_DOC_PAGER"; else _doc_log; fi ;;
+      csv)
+        if [ -n "\$_DOC_PAGER" ]; then _doc_csv | eval "\$_DOC_PAGER"; else _doc_csv; fi ;;
       modulos|modules|api)
-        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_db; _doc_web; _doc_dow; _doc_lmod; _doc_adb; _doc_pent; _doc_sh; _doc_cc; _doc_ui; _doc_tui; _doc_exploit; _doc_ell; _doc_agent; _doc_ivar; _doc_string; _doc_util; _doc_json; }
+        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_db; _doc_web; _doc_dow; _doc_lmod; _doc_adb; _doc_pent; _doc_sh; _doc_cc; _doc_ui; _doc_tui; _doc_exploit; _doc_ell; _doc_agent; _doc_ivar; _doc_string; _doc_util; _doc_json; _doc_log; _doc_csv; }
         if [ -n "\$_DOC_PAGER" ]; then _all_mods | eval "\$_DOC_PAGER"; else _all_mods; fi ;;
       dow|download|midia)
         if [ -n "\$_DOC_PAGER" ]; then _doc_dow | eval "\$_DOC_PAGER"; else _doc_dow; fi ;;
