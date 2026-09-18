@@ -122,7 +122,7 @@ _SKIP_PREFLIGHT=0
 _SKIP_PASS=0
 for _early_arg in "$@"; do
     case "$_early_arg" in
-        -h|--help|-u|--uninstall|-ua|--uninstall-all|--doctor|--gui)
+        -h|--help|-u|--uninstall|-ua|--uninstall-all|--doctor|--gui|--update|--update-ee|--ee)
             _SKIP_PREFLIGHT=1
             break
             ;;
@@ -140,10 +140,12 @@ if [ "$_SKIP_PREFLIGHT" = "1" ]; then
     _PF_CC="${CC:-clang}"
     if [ -d "/data/data/com.termux" ]; then
         _ENV_TERMUX=1
+        _PF_PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
     else
         _ENV_TERMUX=0
+        _PF_PREFIX="${PREFIX:-/usr/local}"
     fi
-    export _PF_ARCH_FLAGS _PF_CC _ENV_TERMUX
+    export _PF_ARCH_FLAGS _PF_CC _ENV_TERMUX _PF_PREFIX
 else
 
 # ============================================================================
@@ -28030,36 +28032,54 @@ install_elliotos() {
     _step "🎨" "Injetando banner e prompt colorido..."
 
     # Banner customizado
-    printf '\n' > $HOME/_pv_patch.c
-    printf '%s\n' 'static void print_version (void) {' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("\033[1;31m  _________ __   .__  .__        __   ________    _________\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf(" /   _____/|  |  |  | |__| _____/  |_ \\_____  \\  /   _____/\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf(" \\_____  \\ |  |  |  | |  |/  _ \\   __\\ /   |   \\ \\_____  \\\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf(" /        \\|  |_ |  |_|  (  <_> )  |  /    |    \\/        \\\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("/_______  /|____/|____/__|\\____/|__|  \\_______  /_______  /\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("        \\/                                     \\/        \\/ \n\033[0m");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("\033[1;37m[ ElliotOS v17.0 - IA Nativa + Pentest + Utiliarios]\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("\033[0;90m[ youtube.com/@Mikeelliotmkll12          ]\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '  printf("\033[1;33m[ CYN esta aqui. Sem Python. Sem root. Sem desculpas. ]\n\n\033[0m");' >> $HOME/_pv_patch.c
+    cat > $HOME/_pv_patch.c << 'PVEOF'
+
+static void _elliot_logo_banner(void) {
+  const char *P="\033[1;35m",*Y="\033[1;33m",*B="\033[1;34m",*C="\033[1;36m",*W="\033[1;37m",*R="\033[0m";
+  printf("\n");
+  printf("  %s ███████╗%s██╗     %s██╗     %s██╗%s ██████╗ %s████████╗%s\n",P,B,B,Y,P,C,W);
+  printf("  %s ██╔════╝%s██║     %s██║     %s██║%s██╔═══██╗%s╚══██╔══╝%s\n",P,B,B,Y,P,C,W);
+  printf("  %s █████╗  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n",P,B,B,Y,P,C,W);
+  printf("  %s ██╔══╝  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n",P,B,B,Y,P,C,W);
+  printf("  %s ███████╗%s███████╗%s███████╗%s██║%s╚██████╔╝%s   ██║   %s\n",P,B,B,Y,P,C,W);
+  printf("  %s ╚══════╝%s╚══════╝%s╚══════╝%s╚═╝%s ╚═════╝ %s   ╚═╝   %s\n",P,B,B,Y,P,C,W);
+  printf("\n");
+  printf("  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n",P,B,B,Y,P,C,W);
+  printf("  %s  ◆  %sOS v17.0%s  •  %sLua 5.4 + C + Bash%s  •  %sTermux / Linux%s  ◆\n",Y,W,Y,B,Y,P,R);
+  printf("  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n\n",P,B,B,Y,P,C,R);
+  fflush(stdout);
+}
+static void print_version (void) {
+  _elliot_logo_banner();
+PVEOF
     printf '%s\n' '  { char _bip[64]="sem rede";' >> $HOME/_pv_patch.c
-    printf '%s\n' '    /* ifconfig: compativel com Android/Termux sem ip/proc */' >> $HOME/_pv_patch.c
     printf '%s\n' '    FILE *_bf=popen("ifconfig 2>/dev/null | grep '\''inet '\'' | grep -v '\''127\\.0\\.0\\.1'\'' | head -1 | awk '\''{f=$2;gsub(/addr:/,\"\",f);gsub(/[^0-9.]/,\"\",f);print f}'\''","r");' >> $HOME/_pv_patch.c
     printf '%s\n' '    if(_bf){char _bl[64]={0};if(fgets(_bl,sizeof(_bl),_bf)){' >> $HOME/_pv_patch.c
-    printf '%s\n' '      size_t _l=strlen(_bl);while(_l>0&&(_bl[_l-1]=='\''\\n'\''||_bl[_l-1]=='\''\\r'\''||_bl[_l-1]=='\'' '\''))_l--;_bl[_l]=0;' >> $HOME/_pv_patch.c
+    printf '%s\n' '      size_t _l=strlen(_bl);while(_l>0&&(_bl[_l-1]=='\''\n'\''||_bl[_l-1]=='\''\r'\''||_bl[_l-1]=='\'' '\''))_l--;_bl[_l]=0;' >> $HOME/_pv_patch.c
     printf '%s\n' '      if(_l>0)strncpy(_bip,_bl,63);}pclose(_bf);}' >> $HOME/_pv_patch.c
-    printf '%s\n' '    char _but[48]="-";' >> $HOME/_pv_patch.c
-    printf '%s\n' '    /* uptime via comando shell — nao depende de /proc */' >> $HOME/_pv_patch.c
-    printf '%s\n' '    FILE *_buf=popen("uptime 2>/dev/null | sed '\''s/.*up //;s/,.*//;s/^ *//'\''","r");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    if(_buf){char _bl2[28]={0};if(fgets(_bl2,sizeof(_bl2),_buf)){' >> $HOME/_pv_patch.c
-    printf '%s\n' '      size_t _l2=strlen(_bl2);while(_l2>0&&(_bl2[_l2-1]=='\''\\n'\''||_bl2[_l2-1]=='\''\\r'\''||_bl2[_l2-1]=='\'' '\''))_l2--;_bl2[_l2]=0;' >> $HOME/_pv_patch.c
-    printf '%s\n' '      if(_l2>0)strncpy(_but,_bl2,27);}pclose(_buf);}' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  .------------------------------------.\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  |\033[0m \033[1;35mElliotOS v17.0\033[0m  Lua 5.4 + IA nativa \033[0;90m|\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  |\033[0m \033[1;36mIP    :\033[0m \033[1;37m%-27s\033[0;90m|\033[0m\n",_bip);' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  |\033[0m \033[1;36mUptime:\033[0m \033[0;90m%-27s|\033[0m\n",_but);' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  |\033[0m \033[0;32mnet fs sh sys ui ms ai mod web     \033[0;90m|\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  | ms.help() back() web.serve(.,8080) |\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;90m  '"'"'------------------------------------'"'"'\033[0m\n\n");' >> $HOME/_pv_patch.c
+    printf '%s\n' '    const char *_tips[]={' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "net.tcp(host,port) -- conecta TCP direto",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "sys.sh(cmd) -- executa shell e retorna saida",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "fs.read(path) -- le arquivo inteiro como string",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "ai.ask(prompt) -- consulta CYN inline no REPL",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "ms.help() -- lista todos os modulos e funcoes",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "net.scan(host,p1,p2) -- port scan rapido",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "crypto.md5(s) / crypto.sha256(s) -- hash inline",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "db.open(path) -- SQLite sem dependencias externas",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "web.serve(\".\",8080) -- HTTP estatico em background",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "lpm install <mod> -- instala modulo Lua extra",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "lmod.new(\"nome\") -- cria modulo em ~/.lua-modules/",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "net.dns(host) -- resolucao DNS direto no REPL",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "fs.ls(path) -- lista diretorio como tabela Lua",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "back() -- volta ao shell sem sair do ElliotOS",' >> $HOME/_pv_patch.c
+    printf '%s\n' '      "sys.env(\"VAR\") -- le variavel de ambiente"' >> $HOME/_pv_patch.c
+    printf '%s\n' '    };' >> $HOME/_pv_patch.c
+    printf '%s\n' '    int _nt=sizeof(_tips)/sizeof(_tips[0]);' >> $HOME/_pv_patch.c
+    printf '%s\n' '    srand((unsigned)time(NULL));' >> $HOME/_pv_patch.c
+    printf '%s\n' '    const char *_tip=_tips[rand()%_nt];' >> $HOME/_pv_patch.c
+    printf '%s\n' '    printf("\033[1;35mElliotOS v17.0\033[0m  \033[0;90mLua 5.4 + IA nativa\033[0m\n");' >> $HOME/_pv_patch.c
+    printf '%s\n' '    printf("\033[1;36mIP:\033[0m \033[1;37m%s\033[0m\n",_bip);' >> $HOME/_pv_patch.c
+    printf '%s\n' '    printf("\033[0;33mDica:\033[0m \033[0;90m%s\033[0m\n\n",_tip);' >> $HOME/_pv_patch.c
     printf '%s\n' '  }' >> $HOME/_pv_patch.c
     printf '%s\n' '}' >> $HOME/_pv_patch.c
     # Remover print_version original e inserir nova ANTES de pmain (que a chama)
@@ -28300,6 +28320,7 @@ PLEOF
 #include "lualib.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
@@ -28333,6 +28354,10 @@ PLEOF
 /* Forward declarations — evita "implicit function declaration" no clang */
 static int luaopen_net_thread(lua_State *L);
 int luaopen_net(lua_State *L);
+/* ElliotOS @std registry helpers — definidos em luaopen_net_thread */
+static void elliot_std_init(lua_State *L);
+static void elliot_std_set(lua_State *L, const char *name);
+static void elliot_std_get(lua_State *L, const char *name);
 /* Log de vulnerabilidades — definido em mod.params, usado em workers XSS/SQLi */
 static void elliot_log(const char *type, const char *url, const char *detail);
 static void ai_config_save(void);
@@ -29218,7 +29243,7 @@ static void gemini_build_payload(const char *system_prompt, const char *user_msg
         esc_usr, max_tokens);
 }
 
-// ── tgpt provider config ──────────────────────────────────────────────────
+// ── ai provider config ─────────────────────────────────────────────────────
 // Provider padrão: pollinations (sem API key)
 // Pode ser sobrescrito via env AI_TGPT_PROVIDER ou ai.add()
 static char g_ai_provider[64] = "openrouter";  // padrão: OpenRouter (sem chave)
@@ -29956,7 +29981,7 @@ static int l_ai_list(lua_State *L) {
     /* ai.list() — lista providers de IA disponíveis */
     if (!query || strlen(query) == 0 || strcasecmp(query, "online") == 0) {
         printf("\n\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n");
-        printf("\033[1;35m║  CYN — Providers disponíveis via tgpt                        ║\033[0m\n");
+        printf("\033[1;35m║  CYN — Providers: pollinations/openai/groq/gemini            ║\033[0m\n");
         printf("\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n");
         printf("  \033[0;90m── Gratuitos (sem key) ─────────────────────────────────────\033[0m\n");
         printf("\033[1;36m  Gratuitos (sem chave):\033[0m\n");
@@ -30042,7 +30067,7 @@ static void ai_config_load(void) {
     fclose(f);
 }
 
-// ai.provider([nome]) — mostra ou muda o provider tgpt
+// ai.provider([nome]) — mostra ou muda o provider de IA
 static int l_ai_provider(lua_State *L) {
     /* ── Forma tabela: ai.provider({base_url=, model=, api_key=}) ── */
     if (lua_type(L, 1) == LUA_TTABLE) {
@@ -30738,7 +30763,7 @@ static int l_ai_help(lua_State *L) {
     (void)L;
     printf("\n\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n");
     printf("\033[1;35m║  CYN — IA Central do ElliotOS                                ║\033[0m\n");
-    printf("\033[1;35m║  Backend: tgpt · sky/pollinations/isou (grátis) · groq/openai║\033[0m\n");
+    printf("\033[1;35m║  Backend: pollinations/openai/groq/gemini (configuravel)     ║\033[0m\n");
     printf("\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n");
 
     printf("  \033[1;36m── PROVIDER / MODELO ──────────────────────────────────────────\033[0m\n\n");
@@ -30746,7 +30771,7 @@ static int l_ai_help(lua_State *L) {
     printf("    Mostra provider e modelo ativos.\n\n");
     printf("  \033[1;33mai.provider\033[0m(provider [, modelo])\n");
     printf("    Muda provider e opcionalmente o modelo.\n\n");
-    printf("  \033[0;90m  Providers via tgpt:\033[0m\n");
+    printf("  \033[0;90m  Providers disponíveis:\033[0m\n");
     printf("  \033[0;90m  Sem key:  \033[0m\n");
     printf("  \033[1;32m  sky\033[0m            grátis, gpt-4.1-mini        \033[0;90m(recomendado)\033[0m\n");
     printf("  \033[1;32m  pollinations\033[0m   grátis, vários modelos      \033[0;90m(padrão atual)\033[0m\n");
@@ -64560,18 +64585,23 @@ static int l_sys_info(lua_State *L) {
         double elliot_total_mb  = elliot_total_bytes / 1048576.0;
         double elliot_total_kb  = elliot_total_bytes / 1024.0;
 
-        /* barra de breakdown: binários vs dados */
+        /* barra de breakdown: binários vs dados (escala log para ser visivel) */
         {
             int W=32;
-            int bins_pct = elliot_total_bytes>0 ? (int)(bins_total*100/elliot_total_bytes) : 0;
-            int data_pct = 100 - bins_pct;
-            int filled   = (bins_pct * W) / 100;
+            /* usa escala log para que binários (4MB) sejam visiveis vs dados (700MB+) */
+            double log_bins = bins_total>0 ? log((double)bins_total) : 0;
+            double log_data = dirs_total>0 ? log((double)dirs_total) : 0;
+            double log_total = log_bins + log_data;
+            int filled = log_total>0 ? (int)((log_bins/log_total)*W) : 0;
+            if(filled<1 && bins_total>0) filled=1;
             char bar[256]={0}; int bi2=0;
             for(int i=0;i<filled;i++){    memcpy(bar+bi2,"\xe2\x96\x88",3); bi2+=3; }
             for(int i=filled;i<W;i++){ memcpy(bar+bi2,"\xe2\x96\x91",3); bi2+=3; }
             bar[bi2]=0;
-            printf("  \033[0;90mBinários vs dados:\033[0m \033[1;32m[%s]\033[0m \033[1;32m%d%%\033[0m bin / \033[1;37m%d%%\033[0m dados\n\n",
-                   bar, bins_pct, data_pct);
+            double bins_mb = bins_total/1048576.0;
+            double data_mb = dirs_total/1048576.0;
+            printf("  \033[0;90mBinários vs dados:\033[0m \033[1;32m[%s]\033[0m \033[1;32mbins %.1fMB\033[0m / \033[1;37mdados %.1fMB\033[0m\n\n",
+                   bar, bins_mb, data_mb);
         }
 
         #undef _FSIZE
@@ -64644,24 +64674,6 @@ static int l_sys_info(lua_State *L) {
 
             /* ── IA / providers nativos ── */
             printf("\n  \033[1;33m── Dependências — IA (CYN) ──────────────────────────────────\033[0m\n");
-            {
-                FILE *t = popen("command -v tgpt 2>/dev/null","r");
-                char tpath[256]={0};
-                if(t){ fgets(tpath,sizeof(tpath),t); pclose(t); }
-                tpath[strcspn(tpath,"\n")]=0;
-                printf("  \033[0;90m%-22s\033[0m ", "tgpt (backend IA)");
-                if(tpath[0]){
-                    /* componente IA */
-                    struct stat tst; long tsz=0;
-                    if(stat(tpath,&tst)==0) tsz=tst.st_size;
-                    if(tsz>0)
-                        printf("\033[1;32m✓ %s\033[0m \033[0;90m(%.1f MB)\033[0m\n", tpath, tsz/1048576.0);
-                    else
-                        printf("\033[1;32m✓ %s\033[0m\n", tpath);
-                } else {
-                    printf("\033[0;31m✗ não encontrado  →  pkg install tgpt\033[0m\n");
-                }
-            }
             {
                 /* GEMINI_API_KEY configurada? */
                 const char *gk = getenv("GEMINI_API_KEY");
@@ -64819,7 +64831,7 @@ static int l_sys_info(lua_State *L) {
         /* dependências externas: clang, git, curl, nmap */
         printf("\n  \033[1;33m── Dependências ─────────────────────────────────────────────────\033[0m\n");
         const char *deps[] = {
-            "clang","tgpt","git","curl","nmap","figlet",
+            "clang","git","curl","nmap","figlet",
             "sqlite3","openssl","wget","pkg","bash","file", NULL
         };
         int dep_ok=0, dep_miss=0;
@@ -77672,7 +77684,7 @@ static int l_mod_chain(lua_State *L) {
     char **targets = collect_scan_targets(url, &n_targets);
 
     /* Também roda l_mod_spider para ter a classificação completa */
-    lua_getglobal(L,"mod");
+    elliot_std_get(L,"mod");
     lua_getfield(L,-1,"spider");
     lua_pushstring(L,url);
     lua_pushinteger(L,opt_pages);
@@ -77731,7 +77743,7 @@ static int l_mod_chain(lua_State *L) {
 
     /* Helper: chama mod.X(url) via Lua stack */
     #define CHAIN_CALL(modname, counter) do { \
-        lua_getglobal(L,"mod"); \
+        elliot_std_get(L,"mod"); \
         lua_getfield(L,-1,modname); \
         if(lua_isfunction(L,-1)){ \
             lua_pushstring(L,_ep); \
@@ -77791,7 +77803,7 @@ static int l_mod_chain(lua_State *L) {
             const char *_ep=cat_api[i];
             printf("\n\033[0;90m  [%d/%d] %s\033[0m\n",i+1,n_api,_ep);
             if(opt_params){
-                lua_getglobal(L,"mod"); lua_getfield(L,-1,"params");
+                elliot_std_get(L,"mod"); lua_getfield(L,-1,"params");
                 if(lua_isfunction(L,-1)){
                     lua_pushstring(L,_ep);
                     if(lua_pcall(L,1,3,0)==LUA_OK){
@@ -78392,6 +78404,7 @@ static const char *G_completions[] = {
     /* try.* — try/catch/finally */
     "try.call(","try.pcall(","try.xpcall(","try.must(","try.help()",
     "try","try.",
+    "trif ","tryelse ","tryelseif ","tryend",
     /* sys.* extras (novos) */
     "sys.which(","sys.hostname()","sys.cpu_count()","sys.mem()",
     /* fs.* extras (novos) */
@@ -78415,15 +78428,61 @@ static const char *G_completions[] = {
     "math.abs(","math.sqrt(","math.pi","math.huge",
     "io.open(","io.read(","io.write(","io.lines(",
     "os.time()","os.date(","os.clock()","os.exit(","os.getenv(",
+    /* ── Lua 5.4 stdlib completa ── */
+    /* globals base ausentes */
+    "unpack(","rawlen(","warn(",
+    "string.char(","string.dump(",
+    "math.tointeger(","math.type(","math.ult(",
+    "math.sin(","math.cos(","math.tan(","math.asin(","math.acos(",
+    "math.atan(","math.exp(","math.log(","math.fmod(","math.modf(",
+    "math.randomseed(","math.maxinteger","math.mininteger",
+    /* utf8.* */
+    "utf8.char(","utf8.codepoint(","utf8.codes(","utf8.len(",
+    "utf8.offset(","utf8.charpattern",
+    "utf8","utf8.",
+    /* debug.* */
+    "debug.getinfo(","debug.getlocal(","debug.setlocal(",
+    "debug.getmetatable(","debug.setmetatable(",
+    "debug.getupvalue(","debug.setupvalue(",
+    "debug.traceback(","debug.sethook(","debug.getregistry()",
+    "debug.upvalueid(","debug.upvaluejoin(",
+    "debug","debug.",
+    /* package.* */
+    "package.path","package.cpath","package.loaded","package.preload",
+    "package.loadlib(","package.searchpath(","package.searchers",
+    "package","package.",
+    /* io handles */
+    "io.stderr","io.stdin","io.stdout",
+    "io.tmpfile(","io.type(",
+    /* os extras */
+    "os.setlocale(",
+    /* coroutine extra */
+    "coroutine.close(",
+    /* keywords Lua (úteis no complete de palavras) */
+    "repeat","until","while","for","do","end","then","else","elseif",
+    "local","function","return","break","goto","in",
+    "nil","true","false","not","and","or",
+    /* table extras */
+    "table.move(",
     /* comandos especiais do REPL (sem parenteses) */
     "help","clear","cls",
     NULL
 };
 
 /* Pool dinâmico de completions de libs instaladas (lpm + lmod) */
+/* ═══════════════════════════════════════════════════════════════════
+ * ELLIOT ADAPTIVE COMPLETION ENGINE
+ * - G_dyn : libs instaladas no disco (lpm/lmod/luarocks)
+ * - G_lua : snapshot de _G em tempo real via lua_State
+ *   • variáveis simples → nome
+ *   • tabelas           → nome  +  nome.campo(  para cada field função
+ *   • require("mod")    → mod.campo(  ao detectar nova tabela em _G
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Pool de libs instaladas (disco) ─────────────────────────────── */
 #define DYN_MAX 512
 static char *G_dyn[DYN_MAX];
-static int   G_dyn_count = 0;
+static int   G_dyn_count  = 0;
 static int   G_dyn_loaded = 0;
 
 static void dyn_free(void) {
@@ -78431,7 +78490,6 @@ static void dyn_free(void) {
     G_dyn_count=0;
 }
 
-/* Escaneia diretório e adiciona nomes .lua/.so como completions */
 static void dyn_scan(const char *dirpath) {
     DIR *d = opendir(dirpath);
     if(!d) return;
@@ -78446,7 +78504,6 @@ static void dyn_scan(const char *dirpath) {
             if(!strcmp(dot,".lua")||!strcmp(dot,".so")) *dot='\0';
             else continue;
         }
-        /* dedup */
         int dup=0;
         for(int i=0;i<G_dyn_count;i++)
             if(!strcmp(G_dyn[i],name)){dup=1;break;}
@@ -78459,93 +78516,478 @@ static void dyn_load(void) {
     if(G_dyn_loaded) return;
     G_dyn_loaded=1;
     const char *home=getenv("HOME");
-    const char *pfx=getenv("PREFIX");
+    const char *pfx =getenv("PREFIX");
     char path[512];
     if(home){
-        snprintf(path,sizeof(path),"%s/.lua-modules",home);
-        dyn_scan(path);
-        snprintf(path,sizeof(path),"%s/.luarocks/share/lua/5.4",home);
-        dyn_scan(path);
+        snprintf(path,sizeof(path),"%s/.lua-modules",home);      dyn_scan(path);
+        snprintf(path,sizeof(path),"%s/.luarocks/share/lua/5.4",home); dyn_scan(path);
     }
     if(pfx){
-        snprintf(path,sizeof(path),"%s/share/lua/5.4",pfx);
-        dyn_scan(path);
+        snprintf(path,sizeof(path),"%s/share/lua/5.4",pfx); dyn_scan(path);
     } else {
         dyn_scan("/usr/share/lua/5.4");
         dyn_scan("/usr/local/share/lua/5.4");
     }
 }
 
-/* Completer com contexto:
- * - Se o texto contém ".", filtra só completions do mesmo módulo
- * - Se a linha atual começa com require( ou tem require(", lista módulos
- * - Senão, lista tudo (estático + libs dinâmicas instaladas) */
+/* ── Pool de arquivos @user/ (arquivos .lua do home) ────────────── */
+#define USER_FILE_MAX 256
+static char *G_user_files[USER_FILE_MAX];
+static int   G_user_files_count = 0;
+static char  G_user_files_dir[512] = {0};  /* diretório escaneado */
+
+static void user_files_free(void) {
+    for(int i=0;i<G_user_files_count;i++){free(G_user_files[i]);G_user_files[i]=NULL;}
+    G_user_files_count=0;
+}
+
+/* Resolve path com "../" sem depender de realpath() externo.
+ * base  = diretório base absoluto
+ * rel   = caminho relativo (pode conter ../)
+ * out   = buffer de saída
+ * olen  = tamanho do buffer */
+static void user_resolve_path(const char *base, const char *rel, char *out, size_t olen) {
+    /* Começa com base */
+    char tmp[1024];
+    snprintf(tmp, sizeof(tmp), "%s/%s", base, rel);
+
+    /* Processa segmento a segmento */
+    char result[1024] = {0};
+    char *parts[64];
+    int  nparts = 0;
+
+    char *copy = strdup(tmp);
+    char *tok  = strtok(copy, "/");
+    while(tok && nparts < 63) {
+        if(strcmp(tok,"..")==0) {
+            if(nparts > 0) nparts--;  /* sobe um nível */
+        } else if(strcmp(tok,".")!=0 && tok[0]!='\0') {
+            parts[nparts++] = tok;
+        }
+    tok = strtok(NULL, "/");
+    }
+
+    /* Reconstrói */
+    result[0] = '\0';
+    for(int i=0;i<nparts;i++) {
+        strncat(result, "/", sizeof(result)-strlen(result)-1);
+        strncat(result, parts[i], sizeof(result)-strlen(result)-1);
+    }
+    if(result[0]=='\0') strncpy(result, "/", sizeof(result)-1);
+
+    strncpy(out, result, olen-1);
+    out[olen-1] = '\0';
+    free(copy);
+}
+
+/* Escaneia diretório por arquivos .lua não ocultos.
+ * text = texto completo após a aspa: ex "@user/../files/meu"
+ *        Tudo após "@user/" é o path relativo ao HOME. */
+static void user_files_scan(const char *suffix) {
+    const char *home = getenv("HOME");
+    if(!home) return;
+
+    /* Separa a parte de diretório da parte de prefixo de arquivo */
+    char dir_rel[512] = {0};  /* path relativo ao home até a última "/" */
+    char file_prefix[256] = {0};  /* prefixo do nome do arquivo */
+
+    const char *last_slash = strrchr(suffix, '/');
+    if(last_slash) {
+        size_t dlen = (size_t)(last_slash - suffix);
+        strncpy(dir_rel, suffix, dlen < sizeof(dir_rel) ? dlen : sizeof(dir_rel)-1);
+        strncpy(file_prefix, last_slash+1, sizeof(file_prefix)-1);
+    } else {
+        /* sem "/": sufixo é prefixo de arquivo no home */
+        strncpy(file_prefix, suffix, sizeof(file_prefix)-1);
+    }
+
+    /* Resolve o diretório real (suporta ../) */
+    char dir_abs[1024];
+    user_resolve_path(home, dir_rel, dir_abs, sizeof(dir_abs));
+
+    /* Evita rescan desnecessário */
+    if(strcmp(G_user_files_dir, dir_abs)==0 && G_user_files_count>0
+       && file_prefix[0]=='\0') return;
+    strncpy(G_user_files_dir, dir_abs, sizeof(G_user_files_dir)-1);
+
+    user_files_free();
+    DIR *d = opendir(dir_abs);
+    if(!d) return;
+
+    struct dirent *ent;
+    while((ent=readdir(d)) && G_user_files_count < USER_FILE_MAX-1) {
+        if(ent->d_name[0]=='.') continue;  /* ocultos: ignora */
+
+        /* Filtra pelo prefixo digitado */
+        if(file_prefix[0] &&
+           strncmp(ent->d_name, file_prefix, strlen(file_prefix))!=0) continue;
+
+        /* Verifica se é diretório ou arquivo .lua */
+        char full_path[1024];
+        snprintf(full_path, sizeof(full_path), "%s/%s", dir_abs, ent->d_name);
+        struct stat st;
+        if(stat(full_path, &st)!=0) continue;
+
+        char entry[512];
+        if(S_ISDIR(st.st_mode)) {
+            /* Diretório: adiciona com "/" no final para o usuário navegar */
+            if(dir_rel[0])
+                snprintf(entry, sizeof(entry), "@user/%s/%s/", dir_rel, ent->d_name);
+            else
+                snprintf(entry, sizeof(entry), "@user/%s/", ent->d_name);
+            G_user_files[G_user_files_count++] = strdup(entry);
+        } else if(S_ISREG(st.st_mode)) {
+            /* Arquivo: só aceita .lua */
+            char *dot = strrchr(ent->d_name, '.');
+            if(!dot || strcmp(dot,".lua")!=0) continue;
+            size_t nlen = (size_t)(dot - ent->d_name);
+            if(dir_rel[0])
+                snprintf(entry, sizeof(entry), "@user/%s/%.*s", dir_rel, (int)nlen, ent->d_name);
+            else
+                snprintf(entry, sizeof(entry), "@user/%.*s", (int)nlen, ent->d_name);
+            G_user_files[G_user_files_count++] = strdup(entry);
+        }
+    }
+    closedir(d);
+}
+
+/* ── Pool Lua adaptativo (snapshot de _G) ────────────────────────── */
+#define LUA_COMPL_MAX 2048
+static char *G_lua[LUA_COMPL_MAX];
+static int   G_lua_count = 0;
+
+static void lua_compl_free(void) {
+    for(int i=0;i<G_lua_count;i++){free(G_lua[i]);G_lua[i]=NULL;}
+    G_lua_count=0;
+}
+
+/* Adiciona string ao pool sem duplicatas */
+static void lua_compl_add(const char *s) {
+    if(!s||!*s) return;
+    if(G_lua_count >= LUA_COMPL_MAX-1) return;
+    for(int i=0;i<G_lua_count;i++)
+        if(!strcmp(G_lua[i],s)) return;
+    G_lua[G_lua_count++]=strdup(s);
+}
+
+/* Referência ao lua_State global (preenchida em pmain após luaopen_net) */
+extern lua_State *_elliot_L;
+
+/*
+ * lua_scan_table — varre os campos de uma tabela Lua que está no topo da
+ * pilha e adiciona "prefix.campo(" ou "prefix.campo" ao pool.
+ * Não modifica a pilha (restaura ao estado original).
+ */
+static void lua_scan_table(lua_State *L, const char *prefix) {
+    if(!L||!prefix||!*prefix) return;
+    /* a tabela deve estar no topo */
+    if(lua_type(L,-1)!=LUA_TTABLE) return;
+
+    char entry[256];
+    lua_pushnil(L);
+    while(lua_next(L,-2)) {
+        /* key em -2, value em -1 */
+        if(lua_type(L,-2)==LUA_TSTRING) {
+            const char *k = lua_tostring(L,-2);
+            if(k && k[0]!='_') {
+                int is_fn = (lua_type(L,-1)==LUA_TFUNCTION);
+                if(is_fn)
+                    snprintf(entry,sizeof(entry),"%s.%s(",prefix,k);
+                else
+                    snprintf(entry,sizeof(entry),"%s.%s",prefix,k);
+                lua_compl_add(entry);
+            }
+        }
+        lua_pop(L,1); /* remove value, mantém key */
+    }
+    /* tabela: só adiciona "prefix." (com ponto) como hint de navegação.
+     * nunca adiciona "prefix" sem ponto — tabelas não são valores diretos. */
+    snprintf(entry,sizeof(entry),"%s.",prefix);
+    lua_compl_add(entry);
+}
+
+/*
+ * lua_scan — tira snapshot completo de _G:
+ *   - variáveis simples / funções globais → nome ou nome(
+ *   - tabelas → lua_scan_table para gerar prefix.campo
+ *
+ * Chamado a cada Tab (state==0) — rápido porque _G tem ≤ alguns centenas
+ * de entradas no REPL típico.
+ */
+static void lua_scan(void) {
+    lua_State *L = _elliot_L;
+    if(!L) return;
+
+    lua_compl_free();
+
+    /* Itera _G */
+    lua_pushglobaltable(L);         /* push _G           */
+    lua_pushnil(L);                 /* push nil (1ª key) */
+    while(lua_next(L,-2)) {
+        /* key em -2, value em -1 */
+        if(lua_type(L,-2)==LUA_TSTRING) {
+            const char *k = lua_tostring(L,-2);
+            if(!k || k[0]=='_') { lua_pop(L,1); continue; }
+
+            int vtype = lua_type(L,-1);
+            if(vtype==LUA_TFUNCTION) {
+                char fn[128];
+                snprintf(fn,sizeof(fn),"%s(",k);
+                lua_compl_add(fn);
+                /* não adiciona k sem "(" — evita duplicata e garante autopair */
+            } else if(vtype==LUA_TTABLE) {
+                /* varre a tabela para adicionar mod.fn( */
+                lua_scan_table(L, k);
+                /* tabela já adicionada pelo scan_table */
+            } else {
+                /* variável simples: string, number, bool, etc. */
+                lua_compl_add(k);
+            }
+        }
+        lua_pop(L,1); /* remove value */
+    }
+    lua_pop(L,1); /* remove _G */
+
+    /* Escreve cache para o editor ee ler — só funções e tabelas */
+    const char *_home = getenv("HOME");
+    if(_home) {
+        char _cache[512];
+        snprintf(_cache, sizeof(_cache), "%s/.elliot_ac_cache", _home);
+        FILE *_cf = fopen(_cache, "w");
+        if(_cf) {
+            for(int _i=0; _i<G_lua_count; _i++) {
+                const char *_e = G_lua[_i];
+                int _el = (int)strlen(_e);
+                /* só funções (terminam com '(') e tabelas (terminam com '.') */
+                if(_el>0 && (_e[_el-1]=='(' || _e[_el-1]=='.'))
+                    fprintf(_cf, "%s\n", _e);
+            }
+            fclose(_cf);
+        }
+    }
+}
+
+/* ── Módulos @std conhecidos e suas funções (fallback sem L) ─────── */
+/* Usado quando o módulo ainda não foi carregado mas o usuário digitou
+ * require("@std/net") — lista as funções típicas para orientar. */
+typedef struct { const char *mod; const char *fns[32]; } ElliotModHint;
+static const ElliotModHint G_mod_hints[] = {
+    {"@std/net", {"net.tcp(","net.udp(","net.scan(","net.dns(","net.http(","net.https(","net.socketex(","net.ping(","net.help()",NULL}},
+    {"@std/fs",  {"fs.read(","fs.write(","fs.append(","fs.ls(","fs.exists(","fs.mkdir(","fs.rm(","fs.cp(","fs.mv(","fs.stat(","fs.help()",NULL}},
+    {"@std/sys", {"sys.sh(","sys.exec(","sys.env(","sys.kill(","sys.pid()","sys.sleep(","sys.help()",NULL}},
+    {"@std/ai",  {"ai.ask(","ai.chat(","ai.reset()","ai.model(","ai.help()",NULL}},
+    {"@std/crypto",{"crypto.md5(","crypto.sha256(","crypto.sha1(","crypto.base64_enc(","crypto.base64_dec(","crypto.help()",NULL}},
+    {"@std/db",  {"db.open(","db.exec(","db.query(","db.close(","db.help()",NULL}},
+    {"@std/web", {"web.serve(","web.stop()","web.route(","web.help()",NULL}},
+    {"@std/re",  {"re.match(","re.find(","re.gmatch(","re.gsub(","re.split(","re.test(","re.compile(","re.help()",NULL}},
+    {"@std/util",{"util.trim(","util.split(","util.join(","util.keys(","util.values(","util.map(","util.filter(","util.reduce(","util.dump(","util.copy(","util.merge(","util.help()",NULL}},
+    {"@std/log", {"log.info(","log.warn(","log.error(","log.debug(","log.fatal(","log.set_level(","log.to_file(","log.help()",NULL}},
+    {"@std/csv", {"csv.parse(","csv.encode(","csv.read(","csv.write(","csv.headers(","csv.rows(","csv.help()",NULL}},
+    {"@std/json",{"json.encode(","json.decode(","json.pretty(","json.parse(","json.stringify(","json.help()",NULL}},
+    {"@std/mod", {"mod.xss(","mod.sqli(","mod.lfi(","mod.rce(","mod.ssrf(","mod.ssti(","mod.cors(","mod.csrf(","mod.jwt(","mod.idor(","mod.xxe(","mod.headers(","mod.waf(","mod.spider(","mod.dirs(","mod.secrets(","mod.subdomains(","mod.chain(","mod.fuzz(","mod.payload(","mod.help()",NULL}},
+    {"@std/tui",  {"tui.box(","tui.table(","tui.progress(","tui.color(","tui.help()",NULL}},
+    {"@std/ivar", {"ivar.get(","ivar.set(","ivar.list()","ivar.del(","ivar.help()",NULL}},
+    {"@std/exploit",{"exploit.run(","exploit.list(","exploit.search(","exploit.help()",NULL}},
+    {"@std/pent", {"pent.scan(","pent.enum(","pent.brute(","pent.help()",NULL}},
+    {"@std/adb",  {"adb.devices()","adb.shell(","adb.push(","adb.pull(","adb.help()",NULL}},
+    {"@std/agent",{"agent.new(","agent.run(","agent.help()",NULL}},
+    {"@std/lmod", {"lmod.new(","lmod.list()","lmod.install(","lmod.help()",NULL}},
+    {"@std/try", {"try.call(","try.pcall(","try.xpcall(","try.must(","try.help()",NULL}},
+    {"@std/cc",   {"cc.compile(","cc.run(","cc.help()",NULL}},
+
+    {"@std",     {"net.tcp(","fs.read(","sys.sh(","ai.ask(","crypto.md5(","db.open(","web.serve(","ms.help()",NULL}},
+    {NULL,{NULL}}
+};
+
+/* Pool de hints ativos (quando módulo foi detectado no require mas L ainda
+ * não tem a tabela — ex: primeira instalação) */
+#define HINT_MAX 256
+static char *G_hints[HINT_MAX];
+static int   G_hints_count=0;
+
+static void hints_free(void){
+    for(int i=0;i<G_hints_count;i++){free(G_hints[i]);G_hints[i]=NULL;}
+    G_hints_count=0;
+}
+
+static void hints_for_mod(const char *modname) {
+    for(int m=0;G_mod_hints[m].mod;m++){
+        if(strstr(modname,G_mod_hints[m].mod)||strstr(G_mod_hints[m].mod,modname)){
+            for(int f=0;G_mod_hints[m].fns[f]&&G_hints_count<HINT_MAX-1;f++){
+                int dup=0;
+                for(int i=0;i<G_hints_count;i++)
+                    if(!strcmp(G_hints[i],G_mod_hints[m].fns[f])){dup=1;break;}
+                if(!dup) G_hints[G_hints_count++]=strdup(G_mod_hints[m].fns[f]);
+            }
+            return;
+        }
+    }
+}
+
+/* Detecta require("...") na linha atual e extrai nome do módulo */
+static void parse_require_hints(const char *line) {
+    hints_free();
+    if(!line) return;
+    const char *p = line;
+    while((p=strstr(p,"require("))!=NULL) {
+        p+=8;
+        char q=0;
+        if(*p=='"'||*p=='\''){q=*p;p++;}
+        char mod[128]; int mi=0;
+        while(*p && *p!=q && *p!=')' && *p!=' ' && mi<(int)sizeof(mod)-1)
+            mod[mi++]=*p++;
+        mod[mi]='\0';
+        if(mi>0) hints_for_mod(mod);
+        if(*p) p++;
+    }
+}
+
+/* ── require_mode: lista módulos disponíveis ─────────────────────── */
+static const char *req_mods[] = {
+    "@std","@std/net","@std/fs","@std/sys","@std/ai",
+    "@std/crypto","@std/db","@std/web","@std/ui","@std/ms",
+    "@std/re","@std/util","@std/log","@std/csv","@std/json","@std/mod",
+    "@std/tui","@std/ivar","@std/exploit","@std/pent","@std/adb",
+    "@std/agent","@std/lmod","@std/sh","@std/cc","@std/try",
+    "os","io","math","table","string","coroutine","utf8","package","debug",
+    NULL
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+ * elliot_completer — engine principal
+ * Ordem de prioridade por contexto:
+ *  1. require("...  → módulos
+ *  2. texto com "." → só entradas do mesmo prefixo (G_completions + G_lua)
+ *  3. resto         → G_completions estáticos + G_lua adaptativo + G_dyn disco
+ * ═══════════════════════════════════════════════════════════════════ */
 static char *elliot_completer(const char *text, int state) {
-    static int idx; static int dyn_idx; static int tlen;
-    static char prefix[64]; static int in_dyn; static int require_mode;
-    if (state == 0) {
-        idx=0; dyn_idx=0; in_dyn=0; require_mode=0;
+    static int   idx, dyn_idx, lua_idx, hint_idx, user_idx, kw_idx, tlen;
+    static char  prefix[128];
+    static int   in_dyn, in_lua, in_hints, in_kw, require_mode;
+
+    if(state==0) {
+        idx=0; dyn_idx=0; lua_idx=0; hint_idx=0; user_idx=0; kw_idx=0;
+        in_dyn=0; in_lua=0; in_hints=0; in_kw=0; require_mode=0;
         tlen=(int)strlen(text);
         prefix[0]='\0';
 
-        /* Detecta contexto require("... ou require('... */
         const char *line = rl_line_buffer ? rl_line_buffer : "";
-        const char *rq = strstr(line, "require(");
-        if(rq) {
-            const char *q = rq+8;
-            /* pula aspas abertas */
+
+        /* ── Detecta require("... ── */
+        const char *rq=strstr(line,"require(");
+        if(rq){
+            const char *q=rq+8;
             if(*q=='"'||*q=='\'') q++;
-            /* só ativa se o cursor está dentro do require() */
-            if(q <= line + rl_point) {
-                require_mode = 1;
-                dyn_load();
+            if(q <= line+rl_point){
+                require_mode=1;
+                /* Detecta @user/ — agora "@" e "/" não são word-break,
+                 * então text chega como "@user/path..." inteiro */
+                if(strncmp(text,"@user",5)==0){
+                    const char *sfx = text+5;
+                    if(*sfx=='/') sfx++;
+                    user_files_scan(sfx);
+                    require_mode=2;
+                } else {
+                    dyn_load();
+                    parse_require_hints(line);
+                }
             }
         }
 
+        /* ── Prefixo de módulo (texto contém ".") ── */
         const char *dot=strrchr(text,'.');
-        if(dot && dot>text) {
+        if(dot && dot>text){
             size_t plen=(size_t)(dot-text)+1;
             if(plen<sizeof(prefix)){memcpy(prefix,text,plen);prefix[plen]='\0';}
         }
-        if(!prefix[0] && !require_mode) dyn_load();
+
+        /* ── Snapshot Lua adaptativo (sempre, a cada Tab) ── */
+        if(!require_mode) {
+            lua_scan();
+            if(!prefix[0]) dyn_load();
+        }
     }
 
-    /* Modo require: lista só módulos que realmente precisam de require */
-    if(require_mode) {
-        /* Apenas stdlib Lua — os globais ElliotOS não precisam de require */
-        static const char *req_mods[] = {
-            "os","io","math","table","string","coroutine","utf8","package","debug",
-            NULL
-        };
-        if(!in_dyn) {
-            while(req_mods[idx]) {
-                const char *c=req_mods[idx++];
-                if(strncmp(c,text,tlen)==0) return strdup(c);
-            }
-            in_dyn=1;
+    /* ══ MODO REQUIRE ══ */
+    if(require_mode==2){
+        /* Modo @user/: lista arquivos .lua — retorna todos do pool
+         * (já filtrados por prefixo em user_files_scan) */
+        while(user_idx<G_user_files_count){
+            return strdup(G_user_files[user_idx++]);
         }
-        /* Libs externas instaladas (luarocks + lmod + share/lua) */
-        while(dyn_idx < G_dyn_count) {
+        return NULL;
+    }
+    if(require_mode==1){
+        /* 1. stdlib + @std fixos */
+        while(req_mods[idx]){
+            const char *c=req_mods[idx++];
+            if(strncmp(c,text,tlen)==0) return strdup(c);
+        }
+        /* 2. libs do disco */
+        if(!in_dyn){ in_dyn=1; }
+        while(dyn_idx<G_dyn_count){
             const char *c=G_dyn[dyn_idx++];
             if(strncmp(c,text,tlen)==0) return strdup(c);
         }
         return NULL;
     }
 
-    /* 1. Completions estáticas */
-    if(!in_dyn) {
-        while(G_completions[idx]) {
-            const char *c=G_completions[idx++];
-            if(strncmp(c,text,tlen)==0) {
+    /* ══ MODO NORMAL ══ */
+
+    /* 1. Snapshot Lua (_G em tempo real) — fonte única quando L ativo */
+    if(!in_lua){ in_lua=1; }
+    while(lua_idx<G_lua_count){
+        const char *c=G_lua[lua_idx++];
+        if(strncmp(c,text,tlen)!=0) continue;
+        if(prefix[0] && strncmp(c,prefix,strlen(prefix))!=0) continue;
+        /* quando o usuário já digitou o ponto (prefix ativo), descarta o
+         * entry de navegação "mod." que não tem método após o ponto —
+         * ele só tem utilidade antes do ponto ser digitado. */
+        if(prefix[0] && strcmp(c,prefix)==0) continue;
+        return strdup(c);
+    }
+
+    /* 2. G_completions — SÓ quando L==NULL (antes do REPL iniciar) */
+    if(!in_dyn){
+        in_dyn=1;
+        if(G_lua_count==0){
+            while(G_completions[idx]){
+                const char *c=G_completions[idx++];
+                if(strncmp(c,text,tlen)!=0) continue;
                 if(prefix[0] && strncmp(c,prefix,strlen(prefix))!=0) continue;
                 return strdup(c);
             }
         }
-        in_dyn=1;
     }
-    /* 2. Libs dinâmicas (lpm/lmod) — só sem prefixo de módulo */
-    if(!prefix[0]) {
-        while(dyn_idx < G_dyn_count) {
+
+    /* 2b. Keywords Lua — sempre, independente de L estar ativo */
+    {
+        static const char *LUA_KEYWORDS[] = {
+            "repeat","until","while","for","do","end","then","else","elseif",
+            "local","function","return","break","goto","in",
+            "nil","true","false","not","and","or",
+            NULL
+        };
+        if(!in_kw){ in_kw=1; }
+        while(LUA_KEYWORDS[kw_idx]){
+            const char *c=LUA_KEYWORDS[kw_idx++];
+            if(strncmp(c,text,tlen)==0) return strdup(c);
+        }
+    }
+
+    /* 3. Hints de módulos detectados via require na linha */
+    if(!in_hints){
+        parse_require_hints(rl_line_buffer?rl_line_buffer:"");
+        in_hints=1;
+    }
+    while(hint_idx<G_hints_count){
+        const char *c=G_hints[hint_idx++];
+        if(strncmp(c,text,tlen)==0) return strdup(c);
+    }
+
+    /* 4. Libs do disco (só sem prefixo de módulo) */
+    if(!prefix[0]){
+        while(dyn_idx<G_dyn_count){
             const char *c=G_dyn[dyn_idx++];
             if(strncmp(c,text,tlen)==0) return strdup(c);
         }
@@ -78553,54 +78995,74 @@ static char *elliot_completer(const char *text, int state) {
     return NULL;
 }
 
-/* Histórico inteligente — busca comando anterior com mesmo prefixo */
+/* ── Histórico inteligente ────────────────────────────────────────── */
 static char *elliot_hist_search(const char *prefix) {
     int plen=(int)strlen(prefix);
     if(plen==0) return NULL;
-    /* Varre histórico de trás pra frente */
     HIST_ENTRY **hist=history_list();
     if(!hist) return NULL;
     int hlen=0; while(hist[hlen]) hlen++;
-    for(int i=hlen-1;i>=0;i--) {
-        if(strncmp(hist[i]->line,prefix,plen)==0)
-            return hist[i]->line;
-    }
+    for(int i=hlen-1;i>=0;i--)
+        if(strncmp(hist[i]->line,prefix,plen)==0) return hist[i]->line;
     return NULL;
 }
 
-/* Hook de pré-input: quando linha está vazia e usuário aperta seta cima,
- * já preenche com o último comando do mesmo tipo */
 static int elliot_pre_input(void) {
-    /* Vincula Ctrl+P a history-search-backward com prefixo atual */
-    rl_bind_keyseq("\\C-p", (rl_command_func_t*)rl_get_previous_history);
-    rl_bind_keyseq("\\C-n", (rl_command_func_t*)rl_get_next_history);
+    rl_bind_keyseq("\\C-p",(rl_command_func_t*)rl_get_previous_history);
+    rl_bind_keyseq("\\C-n",(rl_command_func_t*)rl_get_next_history);
     return 0;
 }
 
-/* Hook chamado após completion inserir texto — injeta ) e recua cursor */
-static int g_autopair_pending = 0;
+/* Callback registrado em rl_event_hook — roda durante rl_readline()
+ * enquanto aguarda input. Usamos para inserir "()" após o match. */
+static int g_pair_needed = 0;
+static int g_require_pair = 0;
+/* Forward declarations do mecanismo de highlight v2 */
+static int  hl2_event_hook(void);
+static int  hl2_active = 0;
+static int elliot_event_hook(void) {
+    if(g_require_pair) {
+        g_require_pair = 0;
+        rl_event_hook = hl2_active ? hl2_event_hook : NULL;
+        rl_insert_text("\"\")");
+        rl_point -= 2;  /* cursor entre as aspas: require("|") */
+        rl_redisplay();
+    } else if(g_pair_needed) {
+        g_pair_needed = 0;
+        rl_event_hook = hl2_active ? hl2_event_hook : NULL;
+        /* Agora readline já inseriu o match inteiro — modificamos a linha */
+        int save = rl_point;
+        rl_insert_text(")");
+        rl_point = save;   /* cursor volta para dentro: nome(|) */
+        rl_redisplay();
+    }
+    return 0;
+}
 
 static char **elliot_completion(const char *text, int start, int end) {
     (void)start; (void)end;
     rl_attempted_completion_over = 1;
+    g_pair_needed = 0;
 
     char **matches = rl_completion_matches(text, elliot_completer);
-    if (!matches) return NULL;
+    if(!matches) return NULL;
 
-    if (matches[0] && !matches[1]) {
-        /* Detecta se estamos dentro de require() */
+    if(matches[0] && !matches[1]){
         const char *line = rl_line_buffer ? rl_line_buffer : "";
-        if(strstr(line, "require(")) {
-            /* Dentro do require: só insere o nome, sem fechar aspas nem parêntese
-             * O auto-pair já fechou as aspas quando o usuário digitou " ou '  */
+        if(strstr(line,"require(")){
             rl_completion_suppress_append = 1;
         } else {
-            /* Completion normal de função */
             size_t mlen = strlen(matches[0]);
-            if (mlen > 0 && matches[0][mlen-1] == '(') {
-                matches[0][mlen-1] = '\0';
+            if(mlen > 0 && matches[0][mlen-1] == '('){
                 rl_completion_suppress_append = 1;
-                rl_stuff_char('(');
+                if(strcmp(matches[0],"require(") == 0){
+                    /* require( → insere require("") com cursor entre as aspas */
+                    g_require_pair = 1;
+                } else {
+                    /* demais funções → insere ) com cursor no meio: nome(|) */
+                    g_pair_needed = 1;
+                }
+                rl_event_hook = elliot_event_hook;
             }
         }
     }
@@ -78614,12 +79076,298 @@ static int elliot_ap_brace  (int c, int k);
 static int elliot_ap_dquote (int c, int k);
 static int elliot_ap_squote (int c, int k);
 
+
+
+
+/* ==========================================================================
+ * REPL Syntax Highlight -- hookado em rl_redisplay_function
+ * tokens: keywords Lua (azul), trif/try* (ciano), strings (verde),
+ *         numeros (amarelo), comentarios (cinza), @std/@user (magenta),
+ *         modulo.metodo (azul claro), operadores (amarelo), default (branco)
+ * ========================================================================== */
+#define SHC_RESET "\x1b[0m"
+#define SHC_KW    "\x1b[1;34m"
+#define SHC_TRY   "\x1b[1;36m"
+#define SHC_STR   "\x1b[0;32m"
+#define SHC_NUM   "\x1b[0;33m"
+#define SHC_CMT   "\x1b[2;90m"
+#define SHC_OP    "\x1b[0;33m"
+#define SHC_MOD   "\x1b[0;35m"
+#define SHC_FUNC  "\x1b[0;96m"
+#define SHC_DFLT  "\x1b[0;37m"
+
+static const char *sh_lua_kw[] = {
+    "and","break","do","else","elseif","end","false","for",
+    "function","goto","if","in","local","nil","not","or",
+    "repeat","return","then","true","until","while",NULL
+};
+static const char *sh_try_kw[] = {
+    "trif","tryelse","tryelseif","tryend",NULL
+};
+
+static int sh_kw_match(const char *s, int len, const char **kws) {
+    for (int i = 0; kws[i]; i++) {
+        int kl = (int)strlen(kws[i]);
+        if (kl == len && memcmp(s, kws[i], kl) == 0) return 1;
+    }
+    return 0;
+}
+
+static void sh_colorize(const char *src, int slen,
+                        char *out, int *olen, int outmax,
+                        int cursor_at, int *vis_before_cursor) {
+    int i = 0, o = 0, vis = 0, vcur = -1;
+    const char *cur_col = NULL;
+
+#define SH_COL(col) do { \
+    if (cur_col != (col)) { \
+        int _cl = (int)strlen(col); \
+        if (o+_cl < outmax) { memcpy(out+o, col, _cl); o += _cl; } \
+        cur_col = (col); \
+    } \
+} while(0)
+#define SH_CH(c) do { \
+    if (o < outmax-1) out[o++] = (c); \
+    if (i <= cursor_at) vis++; \
+} while(0)
+#define SH_BLK(s,l) do { int _l=(l); if(o+_l<outmax){memcpy(out+o,s,_l);o+=_l;} } while(0)
+#define SH_MARK() do { if (i == cursor_at && vcur < 0) vcur = vis; } while(0)
+
+    while (i < slen) {
+        SH_MARK();
+        char c = src[i];
+        /* comentario -- */
+        if (c == '-' && i+1 < slen && src[i+1] == '-') {
+            SH_COL(SHC_CMT);
+            while (i < slen) { SH_MARK(); SH_CH(src[i]); i++; }
+            break;
+        }
+        /* string */
+        if (c == '"' || c == '\'') {
+            char q = c; SH_COL(SHC_STR); SH_CH(src[i]); i++;
+            while (i < slen) {
+                SH_MARK();
+                char d = src[i]; SH_CH(d); i++;
+                if (d == '\\' && i < slen) { SH_MARK(); SH_CH(src[i]); i++; continue; }
+                if (d == q) break;
+            }
+            cur_col = NULL; continue;
+        }
+        /* @std/... @user/... */
+        if (c == '@') {
+            SH_COL(SHC_MOD);
+            while (i < slen && (isalnum((unsigned char)src[i]) ||
+                   src[i]=='@'||src[i]=='/'||src[i]=='_'||src[i]=='.')) {
+                SH_MARK(); SH_CH(src[i]); i++;
+            }
+            cur_col = NULL; continue;
+        }
+        /* numero */
+        if (isdigit((unsigned char)c) ||
+            (c=='.' && i+1<slen && isdigit((unsigned char)src[i+1]))) {
+            SH_COL(SHC_NUM);
+            while (i < slen && (isalnum((unsigned char)src[i]) ||
+                   src[i]=='.'||src[i]=='x'||src[i]=='X')) {
+                SH_MARK(); SH_CH(src[i]); i++;
+            }
+            cur_col = NULL; continue;
+        }
+        /* identificador / keyword */
+        if (isalpha((unsigned char)c) || c == '_') {
+            int start = i;
+            while (i < slen && (isalnum((unsigned char)src[i]) || src[i]=='_')) i++;
+            int wlen = i - start;
+            int is_call = (i < slen && (src[i]=='.'||src[i]=='('));
+            if      (sh_kw_match(src+start, wlen, sh_try_kw)) SH_COL(SHC_TRY);
+            else if (sh_kw_match(src+start, wlen, sh_lua_kw)) SH_COL(SHC_KW);
+            else if (is_call)                                   SH_COL(SHC_FUNC);
+            else                                                SH_COL(SHC_DFLT);
+            for (int j = start; j < i; j++) {
+                if (j == cursor_at && vcur < 0) vcur = vis;
+                SH_CH(src[j]);
+            }
+            cur_col = NULL; continue;
+        }
+        /* operadores */
+        if (c != ' ' && c != '\t' && strchr("+-*/%^#&|~<>=(){}[];:,.", c)) {
+            SH_COL(SHC_OP); SH_MARK(); SH_CH(src[i]); i++;
+            cur_col = NULL; continue;
+        }
+        /* espaco / outros */
+        SH_COL(SHC_DFLT); SH_MARK(); SH_CH(src[i]); i++;
+    }
+    if (vcur < 0) vcur = vis;
+    SH_BLK(SHC_RESET, (int)strlen(SHC_RESET));
+    out[o] = '\0'; *olen = o; *vis_before_cursor = vcur;
+#undef SH_COL
+#undef SH_CH
+#undef SH_BLK
+#undef SH_MARK
+}
+
+static int sh_visible_len(const char *s) {
+    int n = 0;
+    for (const char *p = s; *p; ) {
+        if (*p == '\x1b') { while (*p && *p != 'm') p++; if (*p) p++; continue; }
+        if (*p == '\001') { while (*p && *p != '\002') p++; if (*p) p++; continue; }
+        n++; p++;
+    }
+    return n;
+}
+
+static void sh_print_prompt(const char *prompt) {
+    for (const char *p = prompt; *p; p++) {
+        if (*p == '\001' || *p == '\002') continue;
+        fputc(*p, stdout);
+    }
+}
+
+/* Retorna o comprimento visivel da ultima linha do prompt multiline */
+static int sh_prompt_last_line_len(const char *s) {
+    int n = 0;
+    for (const char *p = s; *p; ) {
+        if (*p == '\n' || *p == '\r') { n = 0; p++; continue; }
+        if (*p == '\x1b') { while (*p && *p != 'm') p++; if (*p) p++; continue; }
+        if (*p == '\001') { while (*p && *p != '\002') p++; if (*p) p++; continue; }
+        n++; p++;
+    }
+    return n;
+}
+
+static void (*sh_orig_redisplay)(void) = NULL;
+
+static void elliot_sh_redisplay(void) {
+    /* Estrategia: deixa o readline fazer o redisplay normal (estado interno
+     * intacto, _rl_last_c_pos correto, newline funciona). Depois:
+     *   1. Salva posicao do cursor (DECSC \0337)
+     *   2. Move para inicio do input (apos prompt na ultima linha)
+     *   3. Sobrescreve com buffer colorizado
+     *   4. Restaura cursor (DECRC \0338)
+     * O readline nunca ve o cursor ser movido e continua em sincronia. */
+    if (sh_orig_redisplay) sh_orig_redisplay(); else rl_redisplay();
+
+    /* Nao colore linha vazia ou quando readline esta finalizando */
+    if (!elliot_rl_interactive || !rl_line_buffer || rl_end == 0 || rl_done)
+        return;
+
+    char colored[16384]; int clen = 0, vis_end = 0;
+    sh_colorize(rl_line_buffer, rl_end, colored, &clen,
+                (int)sizeof(colored), rl_end, &vis_end);
+
+    int pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
+
+    fputs("\0337", stdout);                    /* DECSC: salva cursor     */
+    fprintf(stdout, "\r\x1b[%dC", pvis);      /* move para apos prompt   */
+    fputs("\x1b[K", stdout);                   /* limpa ate fim da linha  */
+    fputs(colored, stdout);                     /* buffer colorizado       */
+    fputs("\0338", stdout);                    /* DECRC: restaura cursor  */
+    fflush(stdout);
+}
+
+/* ==========================================================================
+ * REPL Syntax Highlight v2 — via rl_event_hook permanente
+ *
+ * Estratégia: rl_event_hook é chamado periodicamente pelo readline enquanto
+ * aguarda input. Detectamos mudança em rl_line_buffer e reescrevemos a linha
+ * com cores ANSI diretamente no terminal — sem substituir rl_redisplay_function
+ * (evita corrupção do estado interno _rl_last_c_pos / _rl_last_v_pos).
+ *
+ * Fluxo por chamada:
+ *   1. Compara rl_line_buffer com hl2_last_buf.
+ *   2. Se mudou (ou cursor moveu): gera linha colorizada em hl2_colored[].
+ *   3. Move para início da linha (\r), avança sobre o prompt (pvis espaços),
+ *      apaga até fim (\033[K), imprime colorido, reposiciona cursor.
+ *   4. Atualiza hl2_last_buf e hl2_last_point.
+ * ========================================================================== */
+
+static char  hl2_last_buf[4096]   = {0};
+static int   hl2_last_point       = -1;
+static char  hl2_colored[16384]   = {0};
+/* hl2_active declarado acima como forward declaration */
+
+/* Gera buffer colorizado em out[], retorna comprimento */
+static int hl2_colorize(const char *src, int slen, char *out, int outmax) {
+    /* reutiliza sh_colorize() já definida acima — basta passar vis_before_cursor dummy */
+    int olen = 0, vis_dummy = 0;
+    sh_colorize(src, slen, out, &olen, outmax, slen, &vis_dummy);
+    return olen;
+}
+
+static int hl2_event_hook(void) {
+    /* Delega lógica de auto-pair (hook temporário) se rl_event_hook foi
+     * trocado por outra coisa — não deve acontecer, mas blindagem extra. */
+
+    if (!hl2_active || !elliot_rl_interactive) return 0;
+    if (!rl_line_buffer) return 0;
+
+    int cur_len   = rl_end;
+    int cur_point = rl_point;
+
+    /* Detecta mudança no buffer ou no cursor */
+    int buf_changed = (strncmp(hl2_last_buf, rl_line_buffer, 4095) != 0);
+    int cur_changed = (cur_point != hl2_last_point);
+    if (!buf_changed && !cur_changed) return 0;
+
+    /* Atualiza snapshot */
+    strncpy(hl2_last_buf, rl_line_buffer, 4095);
+    hl2_last_buf[4095] = '\0';
+    hl2_last_point = cur_point;
+
+    /* Linha vazia: nada a colorir */
+    if (cur_len == 0) return 0;
+
+    /* Comprimento visual do prompt na última linha */
+    int pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
+
+    /* Gera buffer colorizado */
+    int clen = hl2_colorize(rl_line_buffer, cur_len, hl2_colored, (int)sizeof(hl2_colored));
+    if (clen <= 0) return 0;
+
+    /* Calcula posição visual do cursor no buffer original */
+    int vis_cur = 0;
+    for (int i = 0; i < cur_point && i < cur_len; i++) {
+        /* conta só bytes visíveis (não temos escapes no buffer bruto) */
+        if ((unsigned char)rl_line_buffer[i] >= 0x20) vis_cur++;
+    }
+
+    /* Reescreve a linha:
+     *   \r                  — início da linha
+     *   \033[<pvis>C        — avança sobre o prompt (sem reimprimí-lo)
+     *   \033[K              — apaga até fim da linha
+     *   <colorizado>        — buffer com cores
+     *   \r + \033[<pvis+vis_cur>C — reposiciona cursor */
+    fputs("\r", stdout);
+    if (pvis > 0) fprintf(stdout, "\033[%dC", pvis);
+    fputs("\033[K", stdout);
+    fwrite(hl2_colored, 1, clen, stdout);
+
+    /* Reposiciona cursor: volta ao início e avança pvis + vis_cur */
+    int final_col = pvis + vis_cur;
+    fputs("\r", stdout);
+    if (final_col > 0) fprintf(stdout, "\033[%dC", final_col);
+    fflush(stdout);
+
+    return 0;
+}
+
+/* Ativa o highlight v2 — chamado em elliot_readline_init() */
+static void hl2_init(void) {
+    memset(hl2_last_buf, 0, sizeof(hl2_last_buf));
+    hl2_last_point = -1;
+    hl2_active = 1;
+    rl_event_hook = hl2_event_hook;
+}
+
 /* Inicializa readline: completion, histórico, auto-pair, bindings
  * NÃO é static — chamada via extern do lua.c patch */
 void elliot_readline_init(void) {
     /* Completion */
     rl_attempted_completion_function = elliot_completion;
     rl_completion_entry_function     = elliot_completer;
+
+    /* Word-break: remove "@" e "/" para que "@user/path" chegue inteiro como `text`.
+     * Mantém os demais defaults do bash/readline. */
+    rl_completer_word_break_characters = " \t\n\"'`;|&(=+*[]{}\\<>";
 
     /* Configurações de exibição */
     rl_completion_display_matches_hook = NULL;
@@ -78648,6 +79396,9 @@ void elliot_readline_init(void) {
     rl_bind_keyseq("\\e[1;2B", (rl_command_func_t*)rl_history_search_forward);
 
     rl_pre_input_hook  = elliot_pre_input;
+
+    /* Syntax highlight no REPL v2 — via rl_event_hook permanente */
+    hl2_init();
 
     /* ── Auto-pair: insere par e deixa cursor no meio ── */
     rl_bind_key('(',  elliot_ap_paren);
@@ -80830,7 +81581,7 @@ static int l_ms_test(lua_State *L) {
         if (eu) free(eu);
         // Lua API: ms.b64.enc → ms.b64.dec roundtrip
         int lua_ok = 0;
-        lua_getglobal(L, "ms");
+        elliot_std_get(L,"ms");
         lua_getfield(L, -1, "b64");
         lua_getfield(L, -1, "enc"); lua_pushstring(L, "TESTE_B64");
         if (lua_pcall(L, 1, 1, 0) == LUA_OK && lua_isstring(L, -1)) {
@@ -80855,7 +81606,7 @@ static int l_ms_test(lua_State *L) {
     // ui.sleep
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "ui"); lua_getfield(L, -1, "sleep"); lua_pushnumber(L, 0);
+        elliot_std_get(L,"ui"); lua_getfield(L, -1, "sleep"); lua_pushnumber(L, 0);
         int ok = lua_pcall(L, 1, 0, 0) == LUA_OK;
         if (!ok && lua_isstring(L, -1)) lua_pop(L, 1);
         lua_settop(L, base); t1 = mst_now_ms();
@@ -80864,7 +81615,7 @@ static int l_ms_test(lua_State *L) {
     // ui.color
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "ui"); lua_getfield(L, -1, "color");
+        elliot_std_get(L,"ui"); lua_getfield(L, -1, "color");
         lua_pushstring(L, "32"); lua_pushstring(L, "CHECK");
         int rc = lua_pcall(L, 2, 1, 0);
         int ok = rc == LUA_OK;
@@ -80877,7 +81628,7 @@ static int l_ms_test(lua_State *L) {
     // ui.box
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "ui"); lua_getfield(L, -1, "box");
+        elliot_std_get(L,"ui"); lua_getfield(L, -1, "box");
         lua_pushstring(L, "Self-Test"); lua_pushstring(L, "36");
         int ok = lua_pcall(L, 2, 0, 0) == LUA_OK;
         if (!ok && lua_isstring(L, -1)) lua_pop(L, 1);
@@ -80888,7 +81639,7 @@ static int l_ms_test(lua_State *L) {
     // ui.clear
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "ui"); lua_getfield(L, -1, "clear");
+        elliot_std_get(L,"ui"); lua_getfield(L, -1, "clear");
         int ok = lua_pcall(L, 0, 0, 0) == LUA_OK;
         if (!ok && lua_isstring(L, -1)) lua_pop(L, 1);
         lua_settop(L, base); t1 = mst_now_ms();
@@ -80897,7 +81648,7 @@ static int l_ms_test(lua_State *L) {
     // ui.fig
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "ui"); lua_getfield(L, -1, "fig"); lua_pushstring(L, "OK");
+        elliot_std_get(L,"ui"); lua_getfield(L, -1, "fig"); lua_pushstring(L, "OK");
         int ok = lua_pcall(L, 1, 0, 0) == LUA_OK;
         if (!ok && lua_isstring(L, -1)) lua_pop(L, 1);
         lua_settop(L, base); t1 = mst_now_ms();
@@ -80908,7 +81659,7 @@ static int l_ms_test(lua_State *L) {
 #ifdef ELLIOT_GOD
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "tui"); int ex = !lua_isnil(L,-1), fns_ok = 1;
+        elliot_std_get(L,"tui"); int ex = !lua_isnil(L,-1), fns_ok = 1;
         const char *mf = NULL;
         if (ex) {
             const char *f[] = {"main","func","close","read","help",NULL};
@@ -80932,7 +81683,7 @@ static int l_ms_test(lua_State *L) {
     {
         t0 = mst_now_ms();
         char tf[512]; snprintf(tf, sizeof(tf), "%s/.ms_wr", home);
-        lua_getglobal(L, "fs"); int ex = !lua_isnil(L,-1), ok = 0;
+        elliot_std_get(L,"fs"); int ex = !lua_isnil(L,-1), ok = 0;
         if (ex) {
             lua_getfield(L,-1,"write"); lua_pushstring(L,tf); lua_pushstring(L,"ELLIOT_RW_CHECK");
             int rc = lua_pcall(L,2,0,0); if(rc!=LUA_OK&&lua_isstring(L,-1)) lua_pop(L,1);
@@ -80956,7 +81707,7 @@ static int l_ms_test(lua_State *L) {
         snprintf(fa,sizeof(fa),"%s/.ms_a",home);
         snprintf(fb,sizeof(fb),"%s/.ms_b",home);
         snprintf(fc,sizeof(fc),"%s/.ms_c",home);
-        lua_getglobal(L,"fs"); int ex=!lua_isnil(L,-1);
+        elliot_std_get(L,"fs"); int ex=!lua_isnil(L,-1);
         int ap_ok=0, cp_ok=0, mv_ok=0;
         if (ex) {
             int rc;
@@ -81004,7 +81755,7 @@ static int l_ms_test(lua_State *L) {
     {
         t0 = mst_now_ms();
         char tf[512]; snprintf(tf,sizeof(tf),"%s/.ms_stat",home);
-        lua_getglobal(L,"fs"); int ex=!lua_isnil(L,-1);
+        elliot_std_get(L,"fs"); int ex=!lua_isnil(L,-1);
         int stat_ok=0, isf_ok=0, isd_ok=0;
         if (ex) {
             int rc;
@@ -81047,7 +81798,7 @@ static int l_ms_test(lua_State *L) {
         char td[512],tf[512];
         snprintf(td,sizeof(td),"%s/.ms_chk_dir",home);
         snprintf(tf,sizeof(tf),"%s/.ms_chk_dir/probe.lua",home);
-        lua_getglobal(L,"fs"); int ex=!lua_isnil(L,-1);
+        elliot_std_get(L,"fs"); int ex=!lua_isnil(L,-1);
         int md_ok=0, ex_ok=0, gl_ok=0, ch_ok=0;
         if (ex) {
             int rc;
@@ -81095,7 +81846,7 @@ static int l_ms_test(lua_State *L) {
     // sh.capture sucesso
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex) {
             lua_getfield(L,-1,"capture"); lua_pushstring(L,"echo SHOK_$$");
             int rc=lua_pcall(L,1,1,0);
@@ -81109,7 +81860,7 @@ static int l_ms_test(lua_State *L) {
     // sh.exec
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex) {
             lua_getfield(L,-1,"exec"); lua_pushstring(L,"true");
             ok=(lua_pcall(L,1,0,0)==LUA_OK);
@@ -81122,7 +81873,7 @@ static int l_ms_test(lua_State *L) {
     // sh.read
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sh"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex) {
             char tf2[512]; snprintf(tf2,sizeof(tf2),"%s/.ms_shread",home);
             FILE *tmp=fopen(tf2,"w"); if(tmp){fputs("SHREAD_OK",tmp);fclose(tmp);}
@@ -81145,7 +81896,7 @@ static int l_ms_test(lua_State *L) {
 #ifndef ELLIOT_NANO
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"cc"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"cc"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex) {
             lua_getfield(L,-1,"run");
             lua_pushstring(L,"#include<stdio.h>\nint main(){return 42;}");
@@ -81174,7 +81925,7 @@ static int l_ms_test(lua_State *L) {
     // sys.pid + sys.env
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), pid_ok=0, env_ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), pid_ok=0, env_ok=0;
         if(ex){
             lua_getfield(L,-1,"pid"); int rc=lua_pcall(L,0,1,0);
             pid_ok=(rc==LUA_OK&&lua_isnumber(L,-1)&&(int)lua_tonumber(L,-1)==(int)getpid());
@@ -81192,7 +81943,7 @@ static int l_ms_test(lua_State *L) {
     // sys.net — interfaces de rede via /proc/net/dev
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"net");
             if(lua_isfunction(L,-1)){
@@ -81216,7 +81967,7 @@ static int l_ms_test(lua_State *L) {
     // sys.storage — espaço em disco via statvfs
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"storage");
             if(lua_isfunction(L,-1)){
@@ -81241,7 +81992,7 @@ static int l_ms_test(lua_State *L) {
     // sys.env() tabela completa
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"env"); int rc=lua_pcall(L,0,1,0);
             if(rc==LUA_OK&&lua_istable(L,-1)){
@@ -81258,7 +82009,7 @@ static int l_ms_test(lua_State *L) {
     // sys.spawn — processo filho shell
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             /* Usa comando instantâneo — sleep bloquearia join subsequente */
             lua_getfield(L,-1,"spawn"); lua_pushstring(L,"true");
@@ -81273,7 +82024,7 @@ static int l_ms_test(lua_State *L) {
     // sys.sh — thread shell (pthread+sh)
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"sh");
             if(lua_isfunction(L,-1)){
@@ -81290,7 +82041,7 @@ static int l_ms_test(lua_State *L) {
     // sys.thread — pthread com Lua isolado, retorna tid
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"thread");
             if(lua_isfunction(L,-1)){
@@ -81307,7 +82058,7 @@ static int l_ms_test(lua_State *L) {
     // sys.join — espera resultado da thread Lua
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         int tid=-1;
         if(ex){
             lua_getfield(L,-1,"thread");
@@ -81317,7 +82068,7 @@ static int l_ms_test(lua_State *L) {
                 if(rc==LUA_OK&&lua_isnumber(L,-1)) tid=(int)lua_tonumber(L,-1);
                 if(rc==LUA_OK||lua_isstring(L,-1)) lua_pop(L,1);
             } else { lua_pop(L,1); }
-            lua_settop(L,base); lua_getglobal(L,"sys");
+            lua_settop(L,base); elliot_std_get(L,"sys");
             if(tid>0){
                 lua_getfield(L,-1,"join");
                 if(lua_isfunction(L,-1)){
@@ -81339,7 +82090,7 @@ static int l_ms_test(lua_State *L) {
     // sys.thread + join — calculo sum(1..100)=5050
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         int tid=-1;
         if(ex){
             lua_getfield(L,-1,"thread");
@@ -81349,7 +82100,7 @@ static int l_ms_test(lua_State *L) {
                 if(rc==LUA_OK&&lua_isnumber(L,-1)) tid=(int)lua_tonumber(L,-1);
                 if(rc==LUA_OK||lua_isstring(L,-1)) lua_pop(L,1);
             } else { lua_pop(L,1); }
-            lua_settop(L,base); lua_getglobal(L,"sys");
+            lua_settop(L,base); elliot_std_get(L,"sys");
             if(tid>0){
                 lua_getfield(L,-1,"join");
                 if(lua_isfunction(L,-1)){
@@ -81371,7 +82122,7 @@ static int l_ms_test(lua_State *L) {
     // sys.list
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"sys"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"list");
             int rc=lua_pcall(L,0,0,0);
@@ -81388,7 +82139,7 @@ static int l_ms_test(lua_State *L) {
 #ifdef ELLIOT_GOD
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"ai"); int ex=!lua_isnil(L,-1), fns_ok=1;
+        elliot_std_get(L,"ai"); int ex=!lua_isnil(L,-1), fns_ok=1;
         const char *mf=NULL;
         if(ex) {
             const char *f[]={"add","main","list","ask","forget","clear","history","help",NULL};
@@ -81424,7 +82175,7 @@ static int l_ms_test(lua_State *L) {
     // registro das 20 funções
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); int ex=!lua_isnil(L,-1), fns_ok=1;
+        elliot_std_get(L,"net"); int ex=!lua_isnil(L,-1), fns_ok=1;
         const char *mf=NULL;
         if(ex) {
             const char *f[]={"get","geth","post","fetch","connect","tcp","udp","tcp6","listen",
@@ -81477,7 +82228,7 @@ static int l_ms_test(lua_State *L) {
         // net.socketex TCP Lua
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0; char resp[64]={0};
+            elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
@@ -81503,7 +82254,7 @@ static int l_ms_test(lua_State *L) {
         // net.socketex UDP Lua
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0; char resp[64]={0};
+            elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
@@ -81530,7 +82281,7 @@ static int l_ms_test(lua_State *L) {
         // net.tcp Lua
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0;
+            elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"tcp");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
@@ -81547,7 +82298,7 @@ static int l_ms_test(lua_State *L) {
         // net.scan — porta do servidor local deve aparecer
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0;
+            elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"scan");
                 lua_pushstring(L,"127.0.0.1");
@@ -81582,7 +82333,7 @@ static int l_ms_test(lua_State *L) {
                 close(probe);
             }
             if (lp > 0) {
-                lua_getglobal(L,"net");
+                elliot_std_get(L,"net");
                 if(!lua_isnil(L,-1)){
                     lua_getfield(L,-1,"listen");
                     // net.listen(port, host, backlog) — port é arg1
@@ -81622,7 +82373,7 @@ static int l_ms_test(lua_State *L) {
         // net.dns
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0;
+            elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"dns"); lua_pushstring(L,"localhost");
                 int rc=lua_pcall(L,1,1,0);
@@ -81643,7 +82394,7 @@ static int l_ms_test(lua_State *L) {
         // sock:sendall — garante envio total
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0; char resp[64]={0};
+            elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
@@ -81672,7 +82423,7 @@ static int l_ms_test(lua_State *L) {
         // sock:peek — lê sem consumir + sock:wait
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0;
+            elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
@@ -81712,7 +82463,7 @@ static int l_ms_test(lua_State *L) {
         // sock:info + sock:local + sock:settimeout + sock:setsockopt
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0; char det2[128]={0};
+            elliot_std_get(L,"net"); int ok=0; char det2[128]={0};
             if(!lua_isnil(L,-1)){
                 lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
@@ -81753,7 +82504,7 @@ static int l_ms_test(lua_State *L) {
         // sock:bind + sendto + recvfrom (UDP)
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); int ok=0;
+            elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 /* receptor UDP no servidor local (sp já existe) */
                 /* envia via sendto + recebe via socketex normal */
@@ -81794,7 +82545,7 @@ static int l_ms_test(lua_State *L) {
 #ifndef ELLIOT_NANO
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "crypto"); int ex = !lua_isnil(L,-1), fns_ok = 1;
+        elliot_std_get(L,"crypto"); int ex = !lua_isnil(L,-1), fns_ok = 1;
         const char *mf = NULL;
         if (ex) {
             const char *f[] = {"md5","sha1","sha256","sha512","hmac",
@@ -81861,7 +82612,7 @@ static int l_ms_test(lua_State *L) {
 #ifndef ELLIOT_NANO
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "db"); int ex = !lua_isnil(L,-1), fns_ok = 1;
+        elliot_std_get(L,"db"); int ex = !lua_isnil(L,-1), fns_ok = 1;
         const char *mf = NULL;
         if (ex) {
             const char *f[] = {"open","close","exec","query","tables","help",NULL};
@@ -81933,7 +82684,7 @@ static int l_ms_test(lua_State *L) {
 #ifndef ELLIOT_NANO
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"mod"); int ex=!lua_isnil(L,-1), fns_ok=1;
+        elliot_std_get(L,"mod"); int ex=!lua_isnil(L,-1), fns_ok=1;
         const char *mf=NULL;
         if(ex){
             const char *f[]={"xss","sqli","lfi","ssrf","cors","headers","rce","redir",
@@ -81962,7 +82713,7 @@ static int l_ms_test(lua_State *L) {
     // ── pent — sobe lab easy, GET HTTP real, derruba ─────────────────────
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"pent"); int ex=!lua_isnil(L,-1), fns_ok=1, srv_ok=0;
+        elliot_std_get(L,"pent"); int ex=!lua_isnil(L,-1), fns_ok=1, srv_ok=0;
         const char *mf=NULL;
         if(ex){
             // 1) verificar funções registradas
@@ -82034,7 +82785,7 @@ static int l_ms_test(lua_State *L) {
     // mod novos — csrf/xxe/spider registrados
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "mod"); int ex = !lua_isnil(L,-1), fns_ok = 1;
+        elliot_std_get(L,"mod"); int ex = !lua_isnil(L,-1), fns_ok = 1;
         const char *mf = NULL;
         if (ex) {
             const char *nf[] = {"csrf","xxe","spider","graphql","ws",NULL};
@@ -82053,7 +82804,7 @@ static int l_ms_test(lua_State *L) {
     // cc.run complexo — struct + malloc + exit(77)
     {
         t0 = mst_now_ms();
-        lua_getglobal(L,"cc"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"cc"); int ex=!lua_isnil(L,-1), ok=0;
         if (ex) {
             lua_getfield(L,-1,"run");
             lua_pushstring(L,
@@ -82091,7 +82842,7 @@ static int l_ms_test(lua_State *L) {
     // sock:local() retorna ip + porta
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char localip[32]={0}; int localport=0;
@@ -82112,7 +82863,7 @@ static int l_ms_test(lua_State *L) {
     // sock:recvfrom retorna 3 valores (data, ip, port)
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char rfdata[64]={0}; char rfip[32]={0}; int rfport=0;
@@ -82139,7 +82890,7 @@ static int l_ms_test(lua_State *L) {
     // sock:shutdown("w")+("r") ambos
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0;
@@ -82158,7 +82909,7 @@ static int l_ms_test(lua_State *L) {
     // sock:getsockopt error=0 em socket saudavel
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int errval=-1;
@@ -82178,7 +82929,7 @@ static int l_ms_test(lua_State *L) {
     // sock:info() 11 campos presentes
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int fields=0;
@@ -82203,7 +82954,7 @@ static int l_ms_test(lua_State *L) {
     // sock:closed() false→true após close
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int c1=-1,c2=-1;
@@ -82223,7 +82974,7 @@ static int l_ms_test(lua_State *L) {
     // __tostring retorna Socket<...>
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char tostr[128]={0};
@@ -82242,7 +82993,7 @@ static int l_ms_test(lua_State *L) {
     // net.socket fire-and-forget TCP loopback
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         lua_pushstring(L,"PING_FF_TCP");
@@ -82258,7 +83009,7 @@ static int l_ms_test(lua_State *L) {
     // net.socket fire-and-forget UDP (loopback)
     if (sp > 0) {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         lua_pushstring(L,"PING_FF_UDP");
@@ -82270,7 +83021,7 @@ static int l_ms_test(lua_State *L) {
     // net.socket UDP host externo — testa connect() com rota real
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"8.8.8.8"); lua_pushinteger(L,53); lua_pushinteger(L,2);
         int ok=0; char det[128]={0};
@@ -82294,7 +83045,7 @@ static int l_ms_test(lua_State *L) {
 #ifdef ELLIOT_GOD
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"exploit"); int ok=0; int fns=0;
+        elliot_std_get(L,"exploit"); int ok=0; int fns=0;
         if(!lua_isnil(L,-1)){
             const char *ef[]={"sqli","xss","lfi","rce","ssti","idor","help",NULL};
             for(int i=0;ef[i];i++){
@@ -82311,7 +83062,7 @@ static int l_ms_test(lua_State *L) {
     // exploit.help() sem crash
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"exploit"); lua_getfield(L,-1,"help");
+        elliot_std_get(L,"exploit"); lua_getfield(L,-1,"help");
         int ok=(lua_pcall(L,0,0,0)==LUA_OK);
         lua_settop(L,base); t1=mst_now_ms();
         mst_result(&total,&failed,"exploit.help() sem crash",ok,t1-t0,ok?"OK":"erro Lua");
@@ -82332,7 +83083,7 @@ static int l_ms_test(lua_State *L) {
             NULL
         };
         t0 = mst_now_ms();
-        lua_getglobal(L,"mod");
+        elliot_std_get(L,"mod");
         int mod_exists = !lua_isnil(L,-1);
         int mod_ok = 1; int missing_count = 0;
         char missing[256]={0}; int mi=0;
@@ -82359,7 +83110,7 @@ static int l_ms_test(lua_State *L) {
     /* Testa mod.headers com localhost — deve retornar int sem crash */
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"mod"); lua_getfield(L,-1,"headers");
+        elliot_std_get(L,"mod"); lua_getfield(L,-1,"headers");
         int fn_ok=lua_isfunction(L,-1);
         int call_ok=0; char err_detail[128]="não é função";
         if(fn_ok){
@@ -82385,7 +83136,7 @@ static int l_ms_test(lua_State *L) {
     /* Testa mod.spider com URL inválida — deve retornar 0 sem crash */
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"mod"); lua_getfield(L,-1,"spider");
+        elliot_std_get(L,"mod"); lua_getfield(L,-1,"spider");
         int fn_ok=lua_isfunction(L,-1);
         int call_ok=0;
         if(fn_ok){
@@ -82404,7 +83155,7 @@ static int l_ms_test(lua_State *L) {
     /* Testa net.get com localhost — retorno deve ser nil ou string, nunca crash */
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"get");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"get");
         int fn_ok=lua_isfunction(L,-1);
         int call_ok=0;
         if(fn_ok){
@@ -82422,7 +83173,7 @@ static int l_ms_test(lua_State *L) {
     /* Testa net.scan com range mínimo — deve retornar tabela */
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"scan");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"scan");
         int fn_ok=lua_isfunction(L,-1);
         int call_ok=0;
         if(fn_ok){
@@ -82443,7 +83194,7 @@ static int l_ms_test(lua_State *L) {
     // net.ping(host) — loopback deve responder true
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"ping");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"ping");
         int fn_ok=lua_isfunction(L,-1), ok=0;
         if(fn_ok){
             lua_pushstring(L,"127.0.0.1");
@@ -82461,7 +83212,7 @@ static int l_ms_test(lua_State *L) {
     // net.fetch(url) — retorna body+code+headers para loopback (sem crash)
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"fetch");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"fetch");
         int fn_ok=lua_isfunction(L,-1), call_ok=0;
         if(fn_ok){
             lua_pushstring(L,"http://127.0.0.1:1/ms_fetch_probe");
@@ -82483,7 +83234,7 @@ static int l_ms_test(lua_State *L) {
     // net.os(host) — loopback: deve resolver, retornar tabela com campos básicos
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"os");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"os");
         int fn_ok=lua_isfunction(L,-1), ok=0;
         char det2[128]="função ausente";
         if(fn_ok){
@@ -82529,7 +83280,7 @@ static int l_ms_test(lua_State *L) {
     // lmod registrado com 6 funções
     {
         t0 = mst_now_ms();
-        lua_getglobal(L, "lmod"); int ex = !lua_isnil(L,-1), fns_ok = 1;
+        elliot_std_get(L,"lmod"); int ex = !lua_isnil(L,-1), fns_ok = 1;
         const char *mf = NULL;
         if (ex) {
             const char *f[] = {"new","mod","list","remove","path","help",NULL};
@@ -82546,7 +83297,7 @@ static int l_ms_test(lua_State *L) {
     // lmod.path() sem crash
     {
         t0 = mst_now_ms();
-        lua_getglobal(L,"lmod"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"lmod"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"path");
             int rc=lua_pcall(L,0,0,0);
@@ -82559,7 +83310,7 @@ static int l_ms_test(lua_State *L) {
     // lmod.list() sem crash
     {
         t0 = mst_now_ms();
-        lua_getglobal(L,"lmod"); int ex=!lua_isnil(L,-1), ok=0;
+        elliot_std_get(L,"lmod"); int ex=!lua_isnil(L,-1), ok=0;
         if(ex){
             lua_getfield(L,-1,"list");
             int rc=lua_pcall(L,0,0,0);
@@ -82578,7 +83329,7 @@ static int l_ms_test(lua_State *L) {
         snprintf(lmod_dest,   sizeof(lmod_dest),   "%s/ms_lmod_probe.lua",           lmod_dir_path);
         FILE *f2 = fopen(tf_lmod, "w");
         if (f2) { fputs("return 42\n", f2); fclose(f2); }
-        lua_getglobal(L,"lmod"); int ex=!lua_isnil(L,-1);
+        elliot_std_get(L,"lmod"); int ex=!lua_isnil(L,-1);
         int mod_ok=0, rm_ok=0;
         if (ex && f2) {
             lua_getfield(L,-1,"mod"); lua_pushstring(L,tf_lmod);
@@ -83089,7 +83840,7 @@ static void frc_result(ForceResult *fr, const char *name, int ok,
  * ret == -1 = função não existe
  * ret == -2 = erro Lua (crash/exceção no módulo) */
 static int frc_call_mod(lua_State *L, int base, const char *fn, const char *url) {
-    lua_getglobal(L, "mod");
+    elliot_std_get(L,"mod");
     if (lua_isnil(L,-1)) { lua_settop(L,base); return -1; }
     lua_getfield(L, -1, fn);
     if (!lua_isfunction(L,-1)) { lua_settop(L,base); return -1; }
@@ -83222,7 +83973,7 @@ static int l_ms_force(lua_State *L) {
             /* TEST 1: fire-and-forget */
             {
                 t0=mst_now_ms();
-                lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+                elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,eco_port); lua_pushinteger(L,2);
                 lua_pushstring(L,"HELLO_FF");
@@ -83239,7 +83990,7 @@ static int l_ms_force(lua_State *L) {
             /* TEST 2: socketex sendall + recv */
             {
                 t0=mst_now_ms();
-                lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+                elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,eco_port); lua_pushinteger(L,2);
                 int ok=0; char echoed[64]={0};
@@ -83261,7 +84012,7 @@ static int l_ms_force(lua_State *L) {
             /* TEST 3: wait + peek + recvline */
             {
                 t0=mst_now_ms();
-                lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+                elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,eco_port); lua_pushinteger(L,2);
                 int ok=0; int wok=0,pok=0,rlok=0; size_t peek_len=0;
@@ -83295,7 +84046,7 @@ static int l_ms_force(lua_State *L) {
         /* TEST UDP loopback: net.socket dgram para 127.0.0.1 */
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+            elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
             lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
             lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,53); lua_pushinteger(L,2);
             int ok=0; char det[128]={0};
@@ -83309,7 +84060,7 @@ static int l_ms_force(lua_State *L) {
         /* TEST UDP host externo: testa connect() com rota real */
         {
             t0=mst_now_ms();
-            lua_getglobal(L,"net"); lua_getfield(L,-1,"socket");
+            elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
             lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
             lua_pushstring(L,"8.8.8.8"); lua_pushinteger(L,53); lua_pushinteger(L,2);
             int ok=0; char det[128]={0};
@@ -83348,7 +84099,7 @@ static int l_ms_force(lua_State *L) {
     // sys.spawn
     {
         t0=mst_now_ms(); int ok=1;
-        lua_getglobal(L,"sys");
+        elliot_std_get(L,"sys");
         const char *cmds[]={"true","sleep 0","echo force_ok > /dev/null",NULL};
         for(int i=0;cmds[i];i++){
             lua_getfield(L,-1,"spawn"); lua_pushstring(L,cmds[i]);
@@ -83362,7 +84113,7 @@ static int l_ms_force(lua_State *L) {
     // sys.sh
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); lua_getfield(L,-1,"sh"); int ok=0;
+        elliot_std_get(L,"sys"); lua_getfield(L,-1,"sh"); int ok=0;
         if(lua_isfunction(L,-1)){
             lua_pushstring(L,"sleep 0");
             int rc=lua_pcall(L,1,1,0);
@@ -83376,7 +84127,7 @@ static int l_ms_force(lua_State *L) {
     // sys.thread — thread Lua simples
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); lua_getfield(L,-1,"thread"); int tid=-1, ok=0;
+        elliot_std_get(L,"sys"); lua_getfield(L,-1,"thread"); int tid=-1, ok=0;
         if(lua_isfunction(L,-1)){
             lua_pushstring(L,"return 99");
             int rc=lua_pcall(L,1,1,0);
@@ -83391,7 +84142,7 @@ static int l_ms_force(lua_State *L) {
     // sys.join — resultado
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); lua_getfield(L,-1,"thread"); int tid=-1, ok=0;
+        elliot_std_get(L,"sys"); lua_getfield(L,-1,"thread"); int tid=-1, ok=0;
         if(lua_isfunction(L,-1)){
             lua_pushstring(L,"local s=0;for i=1,100 do s=s+i end;return s");
             int rc=lua_pcall(L,1,1,0);
@@ -83400,7 +84151,7 @@ static int l_ms_force(lua_State *L) {
         } else { lua_pop(L,1); }
         lua_settop(L,base);
         if(tid>0){
-            lua_getglobal(L,"sys"); lua_getfield(L,-1,"join");
+            elliot_std_get(L,"sys"); lua_getfield(L,-1,"join");
             if(lua_isfunction(L,-1)){
                 lua_pushinteger(L,tid); lua_pushinteger(L,5000);
                 int rc=lua_pcall(L,2,1,0);
@@ -83424,7 +84175,7 @@ static int l_ms_force(lua_State *L) {
         int expected[3]={11,55,33};
         /* Lança as 3 threads com pcall protegido */
         for(int i=0;i<3;i++){
-            lua_getglobal(L,"sys");
+            elliot_std_get(L,"sys");
             if(lua_isnil(L,-1)){ lua_pop(L,1); ok=0; break; }
             lua_getfield(L,-1,"thread");
             if(!lua_isfunction(L,-1)){ lua_settop(L,base); ok=0; break; }
@@ -83439,7 +84190,7 @@ static int l_ms_force(lua_State *L) {
         /* Faz join em cada uma com timeout de 3s */
         for(int i=0;i<3;i++){
             if(tids[i]<0){ ok=0; continue; }
-            lua_getglobal(L,"sys"); lua_getfield(L,-1,"join");
+            elliot_std_get(L,"sys"); lua_getfield(L,-1,"join");
             if(lua_isfunction(L,-1)){
                 lua_pushinteger(L,tids[i]); lua_pushinteger(L,3000);
                 int rc=lua_pcall(L,2,1,0);
@@ -83457,7 +84208,7 @@ static int l_ms_force(lua_State *L) {
     // sys.list
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sys"); lua_getfield(L,-1,"list");
+        elliot_std_get(L,"sys"); lua_getfield(L,-1,"list");
         int rc=lua_pcall(L,0,0,0);
         lua_settop(L,base); t1=mst_now_ms();
         frc_result(&fr,"sys.list (sob carga)",rc==LUA_OK,t1-t0,rc==LUA_OK?"OK":"excecao");
@@ -83555,7 +84306,7 @@ static int l_ms_force(lua_State *L) {
     {
         t0=mst_now_ms();
         const char *jwt_none="eyJhbGciOiJub25lIn0.eyJ1c2VyIjoiYWRtaW4ifQ.";
-        lua_getglobal(L,"mod"); lua_getfield(L,-1,"jwt");
+        elliot_std_get(L,"mod"); lua_getfield(L,-1,"jwt");
         int fn_ok=lua_isfunction(L,-1);
         int r=-1;
         if(fn_ok){
@@ -83576,7 +84327,7 @@ static int l_ms_force(lua_State *L) {
         t0=mst_now_ms();
         char url_params[128];
         snprintf(url_params,sizeof(url_params),"http://127.0.0.1:%d/fuzz",port);
-        lua_getglobal(L,"mod"); lua_getfield(L,-1,"params");
+        elliot_std_get(L,"mod"); lua_getfield(L,-1,"params");
         int fn_ok=lua_isfunction(L,-1);
         int r=-1;
         if(fn_ok){
@@ -83625,7 +84376,7 @@ static int l_ms_force(lua_State *L) {
         t0=mst_now_ms();
         char url_chain[128];
         snprintf(url_chain,sizeof(url_chain),"http://127.0.0.1:%d/spider",port);
-        lua_getglobal(L,"mod"); lua_getfield(L,-1,"chain");
+        elliot_std_get(L,"mod"); lua_getfield(L,-1,"chain");
         int fn_ok=lua_isfunction(L,-1);
         int r=-1;
         if(fn_ok){
@@ -83677,7 +84428,7 @@ static int l_ms_force(lua_State *L) {
     printf("\n  \033[0;90m── net (API Lua — rede real) ─────────────────────────────────\033[0m\n");
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"get");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"get");
         char u[128]; snprintf(u,sizeof(u),"http://127.0.0.1:%d/",port);
         lua_pushstring(L,u);
         int rc=lua_pcall(L,1,1,0); int ok=0;
@@ -83694,7 +84445,7 @@ static int l_ms_force(lua_State *L) {
     }
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"post");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"post");
         char u[128]; snprintf(u,sizeof(u),"http://127.0.0.1:%d/fuzz",port);
         lua_pushstring(L,u); lua_pushstring(L,"x=test_force_post");
         int rc=lua_pcall(L,2,2,0);  /* agora retorna body, code */
@@ -83713,7 +84464,7 @@ static int l_ms_force(lua_State *L) {
     {
         t0=mst_now_ms();
         /* Tentar localhost, fallback para 8.8.8.8 (Termux bloqueia DNS de localhost) */
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"dns");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"dns");
         lua_pushstring(L,"localhost");
         int rc=lua_pcall(L,1,1,0); int ok=0;
         if(rc==LUA_OK&&lua_isstring(L,-1)){
@@ -83723,7 +84474,7 @@ static int l_ms_force(lua_State *L) {
         } else {
             lua_settop(L,base);
             /* fallback: tentar resolver dominio real */
-            lua_getglobal(L,"net"); lua_getfield(L,-1,"dns");
+            elliot_std_get(L,"net"); lua_getfield(L,-1,"dns");
             lua_pushstring(L,"one.one.one.one");
             rc=lua_pcall(L,1,1,0);
             if(rc==LUA_OK&&lua_isstring(L,-1)){
@@ -83737,7 +84488,7 @@ static int l_ms_force(lua_State *L) {
     }
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"tcp");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"tcp");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,port);
         int rc=lua_pcall(L,2,1,0);
         int ok=(rc==LUA_OK&&!lua_isnil(L,-1));
@@ -83748,7 +84499,7 @@ static int l_ms_force(lua_State *L) {
     }
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"scan");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"scan");
         lua_pushstring(L,"127.0.0.1");
         lua_pushinteger(L,port); lua_pushinteger(L,port);
         int rc=lua_pcall(L,3,1,0);
@@ -83758,7 +84509,7 @@ static int l_ms_force(lua_State *L) {
     }
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"ping");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"ping");
         lua_pushstring(L,"127.0.0.1");
         int rc=lua_pcall(L,1,1,0);
         int ok=(rc==LUA_OK);
@@ -83770,7 +84521,7 @@ static int l_ms_force(lua_State *L) {
     {
         /* setsockopt nodelay + getsockopt + info */
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,port); lua_pushinteger(L,3);
         int ok=0;
@@ -83800,7 +84551,7 @@ static int l_ms_force(lua_State *L) {
     {
         /* sock:shutdown("w") — FIN TCP */
         t0=mst_now_ms();
-        lua_getglobal(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,port); lua_pushinteger(L,3);
         int ok=0;
@@ -83819,7 +84570,7 @@ static int l_ms_force(lua_State *L) {
     {
         // struct + malloc + loop
         t0=mst_now_ms();
-        lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+        elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
         lua_pushstring(L,
             "#include<stdlib.h>\n#include<string.h>\n"
             "typedef struct{int id;char name[16];}Node;\n"
@@ -83841,7 +84592,7 @@ static int l_ms_force(lua_State *L) {
     {
         // recursao fibonacci
         t0=mst_now_ms();
-        lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+        elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
         lua_pushstring(L,
             "int fib(int n){return n<=1?n:fib(n-1)+fib(n-2);}\n"
             "int main(void){return fib(10)==55?66:1;}");
@@ -83855,7 +84606,7 @@ static int l_ms_force(lua_State *L) {
     {
         // sigaction + raise SIGUSR1
         t0=mst_now_ms();
-        lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+        elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
         lua_pushstring(L,
             "#include<signal.h>\n"
             "static volatile int caught=0;\n"
@@ -83878,7 +84629,7 @@ static int l_ms_force(lua_State *L) {
     {
         // ponteiros de funcao + qsort
         t0=mst_now_ms();
-        lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+        elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
         lua_pushstring(L,
             "#include<stdlib.h>\n"
             "int cmp(const void*a,const void*b){return *(int*)a-*(int*)b;}\n"
@@ -83909,10 +84660,10 @@ static int l_ms_force(lua_State *L) {
         }
 
         t0=mst_now_ms(); int ok=1;
-        lua_getglobal(L,"fs");
+        elliot_std_get(L,"fs");
         lua_getfield(L,-1,"mkdir"); lua_pushstring(L,ef_dir);
         if(lua_pcall(L,1,0,0)!=LUA_OK) ok=0;
-        lua_settop(L,base); lua_getglobal(L,"fs");
+        lua_settop(L,base); elliot_std_get(L,"fs");
         for(int i=0;i<3;i++){
             char p[600],c[32];
             snprintf(p,sizeof(p),"%s/f%d.txt",ef_dir,i);
@@ -83921,14 +84672,14 @@ static int l_ms_force(lua_State *L) {
             lua_pushstring(L,p); lua_pushstring(L,c);
             if(lua_pcall(L,2,0,0)!=LUA_OK) ok=0;
         }
-        lua_settop(L,base); lua_getglobal(L,"fs");
+        lua_settop(L,base); elliot_std_get(L,"fs");
         char _src[600],_dst[600];
         snprintf(_src,sizeof(_src),"%s/f0.txt",ef_dir);
         snprintf(_dst,sizeof(_dst),"%s/f0_bak.txt",ef_dir);
         lua_getfield(L,-1,"copy");
         lua_pushstring(L,_src); lua_pushstring(L,_dst);
         if(lua_pcall(L,2,0,0)!=LUA_OK) ok=0;
-        lua_settop(L,base); lua_getglobal(L,"fs");
+        lua_settop(L,base); elliot_std_get(L,"fs");
         lua_getfield(L,-1,"glob"); lua_pushstring(L,ef_dir); lua_pushstring(L,"*.txt");
         int grc=lua_pcall(L,2,1,0);
         int nfiles=0;
@@ -83936,7 +84687,7 @@ static int l_ms_force(lua_State *L) {
             lua_pushnil(L);
             while(lua_next(L,-2)!=0){nfiles++;lua_pop(L,1);}
         }
-        lua_settop(L,base); lua_getglobal(L,"sh");
+        lua_settop(L,base); elliot_std_get(L,"sh");
         char _rmcmd[640];
         snprintf(_rmcmd,sizeof(_rmcmd),"rm -rf %s",ef_dir);
         lua_getfield(L,-1,"exec"); lua_pushstring(L,_rmcmd);
@@ -83950,7 +84701,7 @@ static int l_ms_force(lua_State *L) {
     printf("\n  \033[0;90m── sh (capture + pipe + redirect) ───────────────────────────\033[0m\n");
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sh"); lua_getfield(L,-1,"capture");
+        elliot_std_get(L,"sh"); lua_getfield(L,-1,"capture");
         lua_pushstring(L,"echo hello | tr a-z A-Z");
         int rc=lua_pcall(L,1,1,0); int ok=0;
         if(rc==LUA_OK&&lua_isstring(L,-1)){
@@ -83963,7 +84714,7 @@ static int l_ms_force(lua_State *L) {
     }
     {
         t0=mst_now_ms();
-        lua_getglobal(L,"sh"); lua_getfield(L,-1,"capture");
+        elliot_std_get(L,"sh"); lua_getfield(L,-1,"capture");
         lua_pushstring(L,"for i in 1 2 3; do echo $i; done | paste -s -d+");
         int rc=lua_pcall(L,1,1,0); int ok=0;
         if(rc==LUA_OK&&lua_isstring(L,-1)){
@@ -83980,7 +84731,7 @@ static int l_ms_force(lua_State *L) {
     {
         t0=mst_now_ms();
         // cc.run
-        lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+        elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
         lua_pushstring(L,"int main(){return 37;}");
         int rc=lua_pcall(L,1,1,0); int val=-1;
         if(rc==LUA_OK&&lua_isnumber(L,-1)) val=(int)lua_tonumber(L,-1);
@@ -84003,7 +84754,7 @@ static int l_ms_force(lua_State *L) {
             "int main(){return 33;}"
         };
         for(int i=0;i<3;i++){
-            lua_getglobal(L,"cc"); lua_getfield(L,-1,"run");
+            elliot_std_get(L,"cc"); lua_getfield(L,-1,"run");
             lua_pushstring(L,codes[i]);
             int rc=lua_pcall(L,1,1,0);
             if(rc==LUA_OK&&lua_isnumber(L,-1)) vals[i]=(int)lua_tonumber(L,-1);
@@ -84023,14 +84774,14 @@ static int l_ms_force(lua_State *L) {
     printf("\n  \033[0;90m── pent + scanner (lab real + mod real) ─────────────────────\033[0m\n");
     {
         t0=mst_now_ms(); int ok=0;
-        lua_getglobal(L,"pent");
+        elliot_std_get(L,"pent");
         if(!lua_isnil(L,-1)){
             lua_getfield(L,-1,"start"); lua_pushstring(L,"easy");
             lua_pcall(L,1,0,0); usleep(600000);
             int r=frc_call_mod(L,base,"xss","http://127.0.0.1:8081/xss?msg=");
             int r2=frc_call_mod(L,base,"sqli","http://127.0.0.1:8081/search?name=");
             ok=(r>0||r2>0);
-            lua_getglobal(L,"pent"); lua_getfield(L,-1,"stop");
+            elliot_std_get(L,"pent"); lua_getfield(L,-1,"stop");
             lua_pcall(L,0,0,0); usleep(200000);
             snprintf(det,sizeof(det),"xss=%d sqli=%d no lab easy",r,r2);
         } else { snprintf(det,sizeof(det),"pent nao registrado"); }
@@ -84044,7 +84795,7 @@ static int l_ms_force(lua_State *L) {
     {
         t0=mst_now_ms(); int ok=1;
         const char *inputs[]={"ElliotOS","hello world","","abc123!@#$%",NULL};
-        lua_getglobal(L,"crypto");
+        elliot_std_get(L,"crypto");
         if (lua_isnil(L,-1)) {
             ok=0;
             printf("\033[0;90m  crypto não registrado\033[0m\n");
@@ -84087,7 +84838,7 @@ static int l_ms_force(lua_State *L) {
     printf("\n  \033[0;90m── db (SQLite :memory: operações reais) ─────────────────────\033[0m\n");
     {
         t0=mst_now_ms(); int ok=1;
-        lua_getglobal(L,"db");
+        elliot_std_get(L,"db");
         if (lua_isnil(L,-1)) {
             ok=0;
             printf("\033[0;90m  db não registrado\033[0m\n");
@@ -84141,7 +84892,7 @@ static int l_ms_force(lua_State *L) {
     {
         t0=mst_now_ms(); int ok=1;
         const char *inputs[]={"ElliotOS","","hello world","A","abc123!@#",NULL};
-        lua_getglobal(L,"ms"); lua_getfield(L,-1,"b64");
+        elliot_std_get(L,"ms"); lua_getfield(L,-1,"b64");
         for(int i=0;inputs[i];i++){
             // encode
             lua_getfield(L,-1,"enc"); lua_pushstring(L,inputs[i]);
@@ -84169,7 +84920,7 @@ static int l_ms_force(lua_State *L) {
         t0=mst_now_ms(); int ok=1;
         const char *fhome = getenv("HOME");
         if(!fhome||!fhome[0]) fhome="/data/data/com.termux/files/home";
-        lua_getglobal(L,"lmod"); int lmod_ex=!lua_isnil(L,-1);
+        elliot_std_get(L,"lmod"); int lmod_ex=!lua_isnil(L,-1);
         lua_settop(L,base);
         if(!lmod_ex){
             frc_result(&fr,"lmod.mod()+list()+remove() x3",0,0,"lmod não registrado");
@@ -84184,17 +84935,17 @@ static int l_ms_force(lua_State *L) {
                 if(fp){ fprintf(fp,"return %d\n",i*10); fclose(fp); }
             }
             for(int i=0;i<3;i++){
-                lua_getglobal(L,"lmod"); lua_getfield(L,-1,"mod");
+                elliot_std_get(L,"lmod"); lua_getfield(L,-1,"mod");
                 lua_pushstring(L,paths[i]);
                 int rc=lua_pcall(L,1,0,0);
                 if(rc!=LUA_OK){ ok=0; if(lua_isstring(L,-1)) lua_pop(L,1); }
                 lua_settop(L,base);
             }
-            lua_getglobal(L,"lmod"); lua_getfield(L,-1,"list");
+            elliot_std_get(L,"lmod"); lua_getfield(L,-1,"list");
             if(lua_pcall(L,0,0,0)!=LUA_OK){ ok=0; if(lua_isstring(L,-1)) lua_pop(L,1); }
             lua_settop(L,base);
             for(int i=0;i<3;i++){
-                lua_getglobal(L,"lmod"); lua_getfield(L,-1,"remove");
+                elliot_std_get(L,"lmod"); lua_getfield(L,-1,"remove");
                 lua_pushstring(L,names[i]);
                 int rc=lua_pcall(L,1,0,0);
                 if(rc!=LUA_OK){ ok=0; if(lua_isstring(L,-1)) lua_pop(L,1); }
@@ -84261,7 +85012,7 @@ static int l_ms_force(lua_State *L) {
         t0=mst_now_ms(); int ok=1;
         char det2[256]={0};
 
-        lua_getglobal(L,"tui");
+        elliot_std_get(L,"tui");
         if (lua_isnil(L,-1)) {
             ok=0; snprintf(det2,sizeof(det2),"tui nao registrado");
         } else {
@@ -87412,7 +88163,7 @@ static int l_crypto_aes_enc(lua_State *L) {
     /* base64 do resultado */
     lua_pushlstring(L,(char*)combined,total); free(combined);
     /* chama b64enc no topo da stack */
-    lua_getglobal(L,"crypto");
+    elliot_std_get(L,"crypto");
     lua_getfield(L,-1,"b64enc");
     lua_pushvalue(L,-3); lua_call(L,1,1);
     lua_remove(L,-2); lua_remove(L,-2);
@@ -87420,7 +88171,7 @@ static int l_crypto_aes_enc(lua_State *L) {
 }
 static int l_crypto_aes_dec(lua_State *L) {
     /* b64dec primeiro */
-    lua_getglobal(L,"crypto");
+    elliot_std_get(L,"crypto");
     lua_getfield(L,-1,"b64dec");
     lua_pushvalue(L,1); lua_call(L,1,1);
     size_t combined_len;
@@ -90508,9 +91259,35 @@ static int l_web_help(lua_State *L) {
     return 0;
 }
 
+
+/* ── ElliotOS @std registry — módulos armazenados em _elliot_std, não em _G ──
+ * elliot_std_set(L,"name"): pop da stack e guarda em _elliot_std["name"]
+ * elliot_std_get(L,"name"): push _elliot_std["name"] na stack
+ * Chamados no lugar de lua_setglobal/lua_getglobal para as APIs @std.
+ * ─────────────────────────────────────────────────────────────────────── */
+static void elliot_std_init(lua_State *L) {
+    /* Cria _elliot_std como tabela global leve (nome interno, não exposta ao usuário) */
+    lua_newtable(L);
+    lua_setglobal(L, "_elliot_std");
+}
+static void elliot_std_set(lua_State *L, const char *name) {
+    /* Valor está no topo da stack; guarda em _elliot_std[name] */
+    lua_getglobal(L, "_elliot_std");
+    lua_insert(L, -2);           /* _elliot_std | valor */
+    lua_setfield(L, -2, name);   /* _elliot_std[name] = valor */
+    lua_pop(L, 1);               /* pop _elliot_std */
+}
+static void elliot_std_get(lua_State *L, const char *name) {
+    /* Push _elliot_std[name] na stack */
+    lua_getglobal(L, "_elliot_std");
+    lua_getfield(L, -1, name);
+    lua_remove(L, -2);           /* remove _elliot_std, deixa só o valor */
+}
+
 static int luaopen_net_thread(lua_State *L) {
     signal(SIGPIPE, SIG_IGN);
     sock_register_meta(L);
+    elliot_std_init(L);  /* ElliotOS: inicializa registry @std */
 
 
     lua_newtable(L);
@@ -90521,7 +91298,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_ui_fig);    lua_setfield(L,-2,"fig");
     lua_pushcfunction(L,l_ui_input);  lua_setfield(L,-2,"input");
     lua_pushcfunction(L,l_ui_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"ui");
+    elliot_std_set(L,"ui");
 
     /* input() global — idêntico ao Python: input() / input("prompt: ") */
     lua_pushcfunction(L, l_global_input);
@@ -90543,14 +91320,14 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_fs_chmod);  lua_setfield(L,-2,"chmod");
     lua_pushcfunction(L,l_fs_glob);   lua_setfield(L,-2,"glob");
     lua_pushcfunction(L,l_fs_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"fs");
+    elliot_std_set(L,"fs");
 
     lua_newtable(L);
     lua_pushcfunction(L,l_sh_exec);    lua_setfield(L,-2,"exec");
     lua_pushcfunction(L,l_sh_read);    lua_setfield(L,-2,"read");
     lua_pushcfunction(L,l_sh_capture); lua_setfield(L,-2,"capture");
     lua_pushcfunction(L,l_sh_help);    lua_setfield(L,-2,"help");
-    lua_setglobal(L,"sh");
+    elliot_std_set(L,"sh");
 
 
 
@@ -90559,7 +91336,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_c_run);     lua_setfield(L,-2,"run");
     lua_pushcfunction(L,l_cc_lua2c);  lua_setfield(L,-2,"lua2c");
     lua_pushcfunction(L,l_cc_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"cc");
+    elliot_std_set(L,"cc");
 #endif /* !ELLIOT_NANO */
 
     lua_newtable(L);
@@ -90582,7 +91359,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_sys_channel);  lua_setfield(L,-2,"channel");
     lua_pushcfunction(L,l_sys_net);      lua_setfield(L,-2,"net");
     lua_pushcfunction(L,l_sys_storage);  lua_setfield(L,-2,"storage");
-    lua_setglobal(L,"sys");
+    elliot_std_set(L,"sys");
 
     /* lg() — global standalone: exibe apenas o logo do ElliotOS */
     lua_pushcfunction(L, l_lg);
@@ -90617,7 +91394,7 @@ static int luaopen_net_thread(lua_State *L) {
 
     lua_pushcfunction(L,l_net_os);       lua_setfield(L,-2,"os");
     lua_pushcfunction(L,l_net_scan_hosts); lua_setfield(L,-2,"ip");
-    lua_setglobal(L,"net");
+    elliot_std_set(L,"net");
 
     lua_newtable(L);
     lua_pushcfunction(L,l_mod_xss);     lua_setfield(L,-2,"xss");
@@ -90656,7 +91433,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_mod_git);           lua_setfield(L,-2,"git");
     lua_pushcfunction(L,l_mod_open_redirect); lua_setfield(L,-2,"open_redirect");
     lua_pushcfunction(L,l_mod_chain);         lua_setfield(L,-2,"chain");
-    lua_setglobal(L,"mod");
+    elliot_std_set(L,"mod");
 
     /* ══════════════════════════════════════════════════════════════════
        ms — MoonStyle  (utilitários do sistema + testes)
@@ -90685,7 +91462,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L, l_ms_help); lua_setfield(L,-2,"help");
 
 
-    lua_setglobal(L,"ms");
+    elliot_std_set(L,"ms");
 
     /* ── crypto.* ── */
 #ifndef ELLIOT_NANO
@@ -90703,7 +91480,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_crypto_aes_dec);lua_setfield(L,-2,"aes_dec");
     lua_pushcfunction(L,l_crypto_rand);   lua_setfield(L,-2,"rand");
     lua_pushcfunction(L,l_crypto_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"crypto");
+    elliot_std_set(L,"crypto");
 #endif /* !ELLIOT_NANO (crypto) */
 
 #ifndef ELLIOT_NANO
@@ -90715,7 +91492,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_db_query);  lua_setfield(L,-2,"query");
     lua_pushcfunction(L,l_db_tables); lua_setfield(L,-2,"tables");
     lua_pushcfunction(L,l_db_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"db");
+    elliot_std_set(L,"db");
 #endif /* !ELLIOT_NANO (db) */
 
 
@@ -90730,7 +91507,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_exploit_ssti);  lua_setfield(L,-2,"ssti");
     lua_pushcfunction(L,l_exploit_idor);  lua_setfield(L,-2,"idor");
     lua_pushcfunction(L,l_exploit_help);  lua_setfield(L,-2,"help");
-    lua_setglobal(L,"exploit");
+    elliot_std_set(L,"exploit");
 #endif /* ELLIOT_GOD (exploit) */
 
     /* ── web ── */
@@ -90743,7 +91520,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_web_forms);   lua_setfield(L,-2,"forms");
     lua_pushcfunction(L,l_web_scripts); lua_setfield(L,-2,"scripts");
     lua_pushcfunction(L,l_web_help);    lua_setfield(L,-2,"help");
-    lua_setglobal(L,"web");
+    elliot_std_set(L,"web");
 
     return 0;
 }
@@ -91404,7 +92181,7 @@ static void elliot_load_prelude(lua_State *L) {
     int _prelude_rc = luaL_dostring(L,
 
 /* -- util -------------------------------------------------------------- */
-"util = {}\n"
+"local util = {}\n"
 
 /* util.map(t, fn) -> nova tabela com fn aplicada a cada elemento */
 "function util.map(t, fn)\n"
@@ -91636,7 +92413,7 @@ static void elliot_load_prelude(lua_State *L) {
 "  for i = 1, n do\n"
 "    local ok, err = pcall(fn)\n"
 "    if ok then return true end\n"
-"    if i < n and delay_ms > 0 then sys.sleep(delay_ms/1000) end\n"
+"    if i < n and delay_ms > 0 then local _s=_G._elliot_std; if _s and _s.sys then _s.sys.sleep(delay_ms/1000) end end\n"
 "  end\n"
 "  return false\n"
 "end\n"
@@ -92079,8 +92856,8 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('\\027[0;90m    ms --doc json                -- doc completa\\027[0m')\n"
 "  end\n"
 "\n"
-"  -- Atalhos no global: json.encode / json.decode\n"
-"  _G.json = json\n"
+"  -- json via require(\"@std\") ou require(\"@std/json\")\n"
+"  do local _s=_G._elliot_std; if _s then _s.json=json end end\n"
 "end\n"
 
 /* ======================================================================
@@ -92092,6 +92869,7 @@ static void elliot_load_prelude(lua_State *L) {
                          reconstrói a URL final após redirects
    ====================================================================== */
 "do\n"
+"  local net = _G._elliot_std and _G._elliot_std.net\n"
 "  -- Parseia o texto bruto de headers (retorno de net.fetch) em uma tabela\n"
 "  -- chave->valor (chaves em minusculas, ultima resposta) e reconstroi a\n"
 "  -- URL final apos seguir os redirects (Location:) registrados no blob.\n"
@@ -93136,6 +93914,7 @@ static void elliot_load_prelude(lua_State *L) {
 "  return ret\n"
 "end\n"
 "\n"
+"do local _s=_G._elliot_std; if _s then _s.util=util end end\n"
 
 
 /* -- Injeção de metodos em string via __index -------------------------- */
@@ -93235,7 +94014,7 @@ static void elliot_load_prelude(lua_State *L) {
 "\n"
 "  function _L.help() os.execute('ms --doc log 2>/dev/null || lua-net --doc log 2>/dev/null || true') end\n"
 "\n"
-"  log = _L\n"
+"  do local _s=_G._elliot_std; if _s then _s.log=_L end end\n"
 "end\n"
 
 /* ── csv ────────────────────────────────────────────────────────────────
@@ -93374,7 +94153,7 @@ static void elliot_load_prelude(lua_State *L) {
 "\n"
 "  function _C.help() os.execute('ms --doc csv 2>/dev/null || lua-net --doc csv 2>/dev/null || true') end\n"
 "\n"
-"  csv = _C\n"
+"  do local _s=_G._elliot_std; if _s then _s.csv=_C end end\n"
 "end\n"
 
 /* ── lmod.extract ────────────────────────────────────────────────────────
@@ -93537,7 +94316,8 @@ static void elliot_load_prelude(lua_State *L) {
      sys.date("*t")         -> tabela {year,month,day,hour,min,sec,wday,...}
    ─────────────────────────────────────────────────────────────────── */
 "pcall(function()\n"
-"  local _raw_sys = sys\n"
+"  local _std_t = _G._elliot_std\n"
+"  local _raw_sys = (_std_t and _std_t.sys) or sys\n"
 "\n"
 "  -- sys.date(fmt?, epoch?)\n"
 "  function _raw_sys.date(fmt, epoch)\n"
@@ -93613,7 +94393,7 @@ static void elliot_load_prelude(lua_State *L) {
 "end)\n"
 
 /* ── str.* — strings de proposito geral (faltava no prelude) ─────────── */
-"str = {}\n"
+"local str = {}\n"
 
 /* str.starts / str.ends / str.contains / str.count */
 "function str.starts(s, prefix)\n"
@@ -93838,9 +94618,9 @@ static void elliot_load_prelude(lua_State *L) {
 "  print('  str.pad(\\'hi\\', 6, \\' \\', \\'center\\')  --> \\'  hi  \\'')\n"
 "  print('  str.fmt(\\'ola {n}\\', {n=\\'Elliot\\'}) --> \\'ola Elliot\\'')\n"
 "end\n"
-"_G.str = str\n"
+"do local _s=_G._elliot_std; if _s then _s.str=str end end\n"
 
-"num = {}\n"
+"local num = {}\n"
 
 /* num.parse(s) -> number or nil */
 "function num.parse(s)\n"
@@ -93936,6 +94716,7 @@ static void elliot_load_prelude(lua_State *L) {
 "  print('  num.clamp(15, 0, 10)              --> 10')\n"
 "  print('  num.to_hex(255)                   --> \\'ff\\'')\n"
 "end\n"
+"do local _s=_G._elliot_std; if _s then _s.num=num end end\n"
 
 /* ══════════════════════════════════════════════════════════════════════
    path.* — manipulação de caminhos (complementa fs.*)
@@ -94254,7 +95035,7 @@ static void elliot_load_prelude(lua_State *L) {
 /* ══════════════════════════════════════════════════════════════════════
    color.* — escape ANSI com nome
    ══════════════════════════════════════════════════════════════════════ */
-"color = {}\n"
+"local color = {}\n"
 "do\n"
 "  local codes = {\n"
 "    reset=0, bold=1, dim=2, italic=3, underline=4, blink=5,\n"
@@ -94310,6 +95091,7 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('  print(color.rgb(255, 100, 0, \\'laranja\\'))')\n"
 "  end\n"
 "end\n"
+"do local _s=_G._elliot_std; if _s then _s.color=color end end\n"
 
 /* ══════════════════════════════════════════════════════════════════════
    test.* — assertions simples para scripts testáveis
@@ -94428,13 +95210,13 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('  test.ok(1 == 1, \\'trivial\\')')\n"
 "    print('  test.report()')\n"
 "  end\n"
-"  test = _test_ns\n"
+"  do local _s=_G._elliot_std; if _s then _s.test=_test_ns end end\n"
 "end\n"
 
 /* ══════════════════════════════════════════════════════════════════════
    re.* extras — gmatch iterator e grupos nomeados
    ══════════════════════════════════════════════════════════════════════ */
-"re = {}\n"
+"local re = {}\n"
 "do\n"
 "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
 "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
@@ -94478,7 +95260,8 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
 "  end\n"
 "end\n"
-"try = {}\n"
+"do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
+"local try = {}\n"
 "do\n"
 "  function try.call(fn, ...)\n"
 "    local args = {...}\n"
@@ -94510,13 +95293,22 @@ static void elliot_load_prelude(lua_State *L) {
 "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
 "    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
 "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-"    print(C..'║  try.* -- Tratamento de Erros (try/catch/finally)            ║'..R)\n"
+"    print(C..'║  try.* — Tratamento de Erros                                 ║'..R)\n"
 "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
 "    local function f(sig, desc, ret)\n"
 "      print('  '..Y..sig..R..'  '..desc)\n"
 "      if ret then print('                          '..D..'Retorna: '..ret..R) end\n"
 "      print('')\n"
 "    end\n"
+"    print(C..'── Sintaxe trif (preprocessada — estilo if/else) ──'..R..'\\n')\n"
+"    print(D..'  trif <expr> then'..R)\n"
+"    print(D..'    -- bloco executado se <expr> não deu erro'..R)\n"
+"    print(D..'  tryelseif \"padrão\" then'..R)\n"
+"    print(D..'    -- erro que contém \"padrão\"'..R)\n"
+"    print(D..'  tryelse err then'..R)\n"
+"    print(D..'    -- qualquer outro erro (err = mensagem)'..R)\n"
+"    print(D..'  tryend'..R..'\\n')\n"
+"    print(C..'── Funções try.* (API programática) ──'..R..'\\n')\n"
 "    f('try.call(fn,...)',        'chama fn protegida; encadeia :catch/:finally/:ok/:err', 'objeto')\n"
 "    f('  :catch(handler)',       'handler(err) executado se fn deu erro',     'objeto (self)')\n"
 "    f('  :finally(handler)',     'handler() sempre executado',                'objeto (self)')\n"
@@ -94527,11 +95319,19 @@ static void elliot_load_prelude(lua_State *L) {
 "    f('try.must(fn,...)',        'executa fn; se der erro, propaga (error)',  'valores de fn')\n"
 "    f('try.help()',              'esta ajuda',                                 nil)\n"
 "    print(C..'── Exemplos ──'..R..'\\n')\n"
-"    print('  try.call(function() error(\\'falhou\\') end)')\n"
-"    print('    :catch(function(e) print(\\'erro: \\'..e) end)')\n"
-"    print('    :finally(function() print(\\'sempre roda\\') end)')\n"
+"    print(D..'  -- trif (recomendado para iniciantes):'..R)\n"
+"    print(D..'  trif net.get(\"https://exemplo.com\") then'..R)\n"
+"    print(D..'    print(\"ok\")'..R)\n"
+"    print(D..'  tryelse err then'..R)\n"
+"    print(D..'    print(\"erro: \"..err)'..R)\n"
+"    print(D..'  tryend'..R..'\\n')\n"
+"    print(D..'  -- try.call (API):'..R)\n"
+"    print(D..'  try.call(function() error(\\'falhou\\') end)'..R)\n"
+"    print(D..'    :catch(function(e) print(\\'erro: \\'..e) end)'..R)\n"
+"    print(D..'    :finally(function() print(\\'sempre roda\\') end)'..R)\n"
 "  end\n"
 "end\n"
+"do local _s=_G._elliot_std; if _s then _s.try=try end end\n"
 
 /* ══════════════════════════════════════════════════════════════════════
    try — pcall/xpcall wrappers com estilo try/catch/finally
@@ -94595,6 +95395,7 @@ static void elliot_load_prelude(lua_State *L) {
    fs.* extras — watch, tempfile
    ══════════════════════════════════════════════════════════════════════ */
 "do\n"
+"  local fs = (_G._elliot_std and _G._elliot_std.fs) or fs\n"
 "  if type(fs) == 'table' then\n"
 "    if not fs.tempfile then\n"
 "      function fs.tempfile(prefix, suffix)\n"
@@ -94620,7 +95421,7 @@ static void elliot_load_prelude(lua_State *L) {
 "        end\n"
 "        local i = 0\n"
 "        while true do\n"
-"          sys.sleep(interval)\n"
+"          local _ss=_G._elliot_std; if _ss and _ss.sys then _ss.sys.sleep(interval) else os.execute('sleep '..tostring(interval)) end\n"
 "          local now_exists = fs.exists and fs.exists(path)\n"
 "          if not existed and now_exists then\n"
 "            existed = true; callback(path, 'created')\n"
@@ -94681,6 +95482,86 @@ static void elliot_load_prelude(lua_State *L) {
 "  end\n"
 "end\n"
 
+
+/* \u2500\u2500 ElliotOS namespace resolver: @std / @user \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+ * Inserido no fim do prelude. N\u00e3o modifica nenhum m\u00f3dulo existente.
+ * APIs @std em _elliot_std (nao globais). Use require("@std/mod") ou require("@std").
+ * \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+"do\n"
+"  local _std_apis = {\n"
+"    net=true, fs=true, sys=true, sh=true, ai=true, crypto=true,\n"
+"    db=true, mod=true, ms=true, ui=true, tui=true, web=true,\n"
+"    pent=true, exploit=true, lmod=true, agent=true, adb=true,\n"
+"    util=true, json=true, re=true, cc=true, ivar=true,\n"
+"    dow=true, back=true, str=true,\n"
+"    log=true, csv=true, num=true, color=true, test=true, try=true,\n"
+"  }\n"
+"  local _orig_require = require\n"
+"  local function _std_collect()\n"
+"    local t = {}\n"
+"    local std = _G._elliot_std\n"
+"    if not std then return t end\n"
+"    for name in pairs(_std_apis) do\n"
+"      if std[name] ~= nil then t[name] = std[name] end\n"
+"    end\n"
+"    return t\n"
+"  end\n"
+"  function require(name)\n"
+"    if name == \"@std\" then\n"
+"      local apis = _std_collect()\n"
+"      for k,v in pairs(apis) do _G[k]=v end\n"
+"      return apis\n"
+"    end\n"
+"    local std_path = name:match(\"^@std/(.+)$\")\n"
+"    if std_path then\n"
+"      local parts = {}\n"
+"      for p in std_path:gmatch(\"[^/]+\") do parts[#parts+1]=p end\n"
+"      local _std = _G._elliot_std\n"
+"      local m = _std and _std[parts[1]]\n"
+"      if m == nil then\n"
+"        error(\"[ElliotOS] @std/\"..parts[1]..\": modulo nao encontrado\", 2)\n"
+"      end\n"
+"      for i=2,#parts do\n"
+"        if type(m) ~= \"table\" then\n"
+"          error(\"[ElliotOS] @std/\"..table.concat(parts,\"/\",1,i-1)..\": nao e tabela\",2)\n"
+"        end\n"
+"        local nxt = m[parts[i]]\n"
+"        if nxt == nil then\n"
+"          error(\"[ElliotOS] @std/\"..table.concat(parts,\"/\",1,i)..\": campo nao encontrado\",2)\n"
+"        end\n"
+"        m = nxt\n"
+"      end\n"
+"      return m\n"
+"    end\n"
+"    local user_path = name:match(\"^@user/(.+)$\")\n"
+"    if user_path then\n"
+"      local home = os.getenv(\"HOME\") or \".\"\n"
+"      local rel  = user_path:gsub(\"%.lua$\", \"\")\n"
+"      local abs_path = home .. \"/\" .. rel .. \".lua\"\n"
+"      local f = io.open(abs_path, \"r\")\n"
+"      if not f then\n"
+"        error(\"[ElliotOS] @user/\" .. user_path .. \": arquivo não encontrado\", 2)\n"
+"      end\n"
+"      local src = f:read(\"*a\"); f:close()\n"
+"      -- preprocessa trif/tryelse/tryend (acessa _elliot_std.ivar direto)\n"
+"      local _ivar_m=(type(_G._elliot_std)=='table' and _G._elliot_std.ivar) or _G.ivar\n"
+"      if _ivar_m and _ivar_m.trif_preprocess then src = _ivar_m.trif_preprocess(src) end\n"
+"      -- preprocessa ivar (!N -> variavel indexada)\n"
+"      if _ivar_m and _ivar_m.preprocess then src = _ivar_m.preprocess(src) end\n"
+"      local chunk, err = load(src, \"@\" .. abs_path)\n"
+"      if not chunk then\n"
+"        error(\"[ElliotOS] @user/\" .. user_path .. \": \" .. tostring(err), 2)\n"
+"      end\n"
+"      local ok2, result = pcall(chunk)\n"
+"      if not ok2 then\n"
+"        error(\"[ElliotOS] @user/\" .. user_path .. \": \" .. tostring(result), 2)\n"
+"      end\n"
+"      return result\n"
+"    end\n"
+"    return _orig_require(name)\n"
+"  end\n"
+"end\n"
+
     );  /* fim luaL_dostring -- ELLIOT PRELUDE */
     if (_prelude_rc != LUA_OK) {
         fprintf(stderr, "\033[1;31m[ElliotOS] ERRO FATAL prelude: %s\033[0m\n",
@@ -94690,7 +95571,7 @@ static void elliot_load_prelude(lua_State *L) {
     }
     /* Verifica prelude (falha silenciosa = catastrofica) */
     {
-        int _rc = luaL_dostring(L, "return type(util)=='table' and type(json)=='table'");
+        int _rc = luaL_dostring(L, "local s=_G._elliot_std; return type(s)=='table' and type(s.util)=='table' and type(s.json)=='table'");
         if (_rc == LUA_OK) {
             if (!lua_toboolean(L, -1))
                 fprintf(stderr, "\033[1;31m[ElliotOS] AVISO: prelude nao carregou (util/json nil)\033[0m\n");
@@ -96257,6 +97138,157 @@ static char *ivar_expand(const char *src) {
     return out;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ElliotOS — Preprocessador trif/tryelse/tryelseif/tryend
+ *
+ * Transforma sintaxe de alto nível em Lua válido antes do parser.
+ *
+ * Sintaxe suportada:
+ *   trif <expr> then          →  do local __ok,__err=pcall(function() <expr> end) if __ok then
+ *   tryelseif "<padrão>" then →  elseif not __ok and string.find(tostring(__err),"<padrão>") then local err=__err;
+ *   tryelse [var] then        →  else local <var>=__err;
+ *   tryend                    →  end end
+ *
+ * Exemplo:
+ *   trif http.get("url") then
+ *     print("ok")
+ *   tryelse err then
+ *     print("erro: "..err)
+ *   tryend
+ * ═══════════════════════════════════════════════════════════════════════════ */
+static int elliot_trif_has_keyword(const char *code) {
+    const char *p = code;
+    while (*p) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (strncmp(p,"trif ",5)==0 || strncmp(p,"trif\t",5)==0 ||
+            strncmp(p,"tryelse",7)==0 || strncmp(p,"tryend",6)==0 ||
+            strncmp(p,"tryelseif ",10)==0)
+            return 1;
+        while (*p && *p != '\n') p++;
+        if (*p == '\n') p++;
+    }
+    return 0;
+}
+
+static void trif_strip_then(char *s) {
+    size_t n = strlen(s);
+    /* remove espaços finais */
+    while (n > 0 && (s[n-1]==' '||s[n-1]=='\t')) { s[--n]='\0'; }
+    if (n >= 4 && strcmp(s+n-4,"then")==0) {
+        s[n-4]='\0'; n-=4;
+        while (n > 0 && (s[n-1]==' '||s[n-1]=='\t')) { s[--n]='\0'; }
+    }
+}
+
+char *elliot_trif_preprocess(const char *code) {
+    if (!code) return NULL;
+    if (!elliot_trif_has_keyword(code)) {
+        char *c=(char*)malloc(strlen(code)+1);
+        if(c) strcpy(c,code);
+        return c;
+    }
+
+    size_t cap = strlen(code)*6 + 8192;
+    char *out = (char*)malloc(cap);
+    if (!out) return NULL;
+    size_t opos = 0;
+
+    const char *p = code;
+    while (*p) {
+        const char *ls = p;
+        while (*p && *p != '\n') p++;
+        size_t llen = (size_t)(p - ls);
+        char *line = (char*)malloc(llen + 2);
+        if (!line) break;
+        memcpy(line, ls, llen); line[llen] = '\0';
+
+        /* ponteiro sem espaços iniciais */
+        const char *t = line;
+        while (*t == ' ' || *t == '\t') t++;
+
+        char buf[8192];
+        buf[0] = '\0';
+
+        /* ── trif <expr> [then] ───────────────────────────────────── */
+        if (strncmp(t,"trif ",5)==0 || strncmp(t,"trif\t",5)==0) {
+            char expr[4096];
+            strncpy(expr, t+5, sizeof(expr)-1);
+            expr[sizeof(expr)-1] = '\0';
+            while (expr[0]==' '||expr[0]=='\t') memmove(expr,expr+1,strlen(expr));
+            trif_strip_then(expr);
+            snprintf(buf, sizeof(buf),
+                "do local __trif_ok,__trif_val=xpcall(function() return %s end,"
+                "function(e) return tostring(e)..'\\n'..debug.traceback('',2) end) "
+                "local __trif_res=__trif_ok and __trif_val or nil "
+                "local __trif_err=(not __trif_ok) and __trif_val or nil "
+                "if __trif_ok and __trif_res then local res=__trif_res;",
+                expr);
+
+        /* ── tryelseif "<padrao>" [then] ──────────────────────────── */
+        } else if (strncmp(t,"tryelseif ",10)==0) {
+            char cond[2048];
+            strncpy(cond, t+10, sizeof(cond)-1);
+            cond[sizeof(cond)-1] = '\0';
+            while (cond[0]==' '||cond[0]=='\t') memmove(cond,cond+1,strlen(cond));
+            trif_strip_then(cond);
+            snprintf(buf, sizeof(buf),
+                "elseif not __trif_ok and __trif_err and "
+                "string.find(tostring(__trif_err),%s,1,true) then "
+                "local err=__trif_err;",
+                cond);
+
+        /* ── tryelse [varname] [then] ─────────────────────────────── */
+        } else if (strncmp(t,"tryelse",7)==0) {
+            const char *rest = t+7;
+            while (*rest==' '||*rest=='\t') rest++;
+            char var[64] = "err";
+            if (*rest && strncmp(rest,"then",4)!=0 && *rest!='\0') {
+                int vi=0;
+                while (*rest && *rest!=' ' && *rest!='\t' && vi<63)
+                    var[vi++]=*rest++;
+                var[vi]='\0';
+            }
+            snprintf(buf, sizeof(buf), "else local %s=__trif_err;", var);
+
+        /* ── tryfinally ──────────────────────────────────────────── */
+        } else if (strcmp(t,"tryfinally")==0) {
+            snprintf(buf, sizeof(buf), "end; do");
+
+        /* ── tryend ──────────────────────────────────────────────── */
+        } else if (strcmp(t,"tryend")==0) {
+            snprintf(buf, sizeof(buf), "end end");
+
+        /* ── linha normal ────────────────────────────────────────── */
+        } else {
+            snprintf(buf, sizeof(buf), "%s", line);
+        }
+
+        free(line);
+
+        size_t blen = strlen(buf);
+        if (opos + blen + 4 >= cap) {
+            cap = (opos + blen + 4) * 2;
+            char *tmp = (char*)realloc(out, cap);
+            if (!tmp) break;
+            out = tmp;
+        }
+        memcpy(out+opos, buf, blen);
+        opos += blen;
+        if (*p=='\n') { out[opos++]='\n'; p++; }
+    }
+    out[opos]='\0';
+    return out;
+}
+
+/* Binding Lua: ivar.trif_preprocess(src) -> src com trif expandido */
+static int l_trif_preprocess(lua_State *L) {
+    const char *src = luaL_checkstring(L, 1);
+    char *out = elliot_trif_preprocess(src);
+    if (out) { lua_pushstring(L, out); free(out); }
+    else { lua_pushstring(L, src); }
+    return 1;
+}
+
 char *elliot_ivar_preprocess_block(const char *code) {
     if (!code) return NULL;
     { char _h[1]; if (elliot_handle_help(code,_h)) { char *e=(char*)malloc(1); if(e)e[0]='\0'; return e; } }
@@ -96279,6 +97311,17 @@ char *elliot_ivar_preprocess_block(const char *code) {
         }
     }
     if (!g_ivar_enabled) { char *c=(char*)malloc(strlen(code)+1); if(c)strcpy(c,code); return c; }
+
+    /* ── ElliotOS trif: pré-processa antes do ivar ── */
+    if (elliot_trif_has_keyword(code)) {
+        char *_trif = elliot_trif_preprocess(code);
+        if (_trif) {
+            /* passa resultado pelo resto do pipeline (ivar !N etc) */
+            char *_final = elliot_ivar_preprocess_block(_trif);
+            free(_trif);
+            return _final;
+        }
+    }
 
     size_t total_cap=strlen(code)*4+4096;
     char *result=(char*)malloc(total_cap);
@@ -96525,9 +97568,10 @@ static void elliot_ivar_init(lua_State *L) {
     lua_pushcfunction(L, l_ivar_alias);      lua_setfield(L, -2, "alias");
     lua_pushcfunction(L, l_ivar_debug);      lua_setfield(L, -2, "debug");
     lua_pushcfunction(L, l_ivar_reset);      lua_setfield(L, -2, "reset");
-    lua_pushcfunction(L, l_ivar_preprocess); lua_setfield(L, -2, "preprocess");
-    lua_pushcfunction(L, l_ivar_help);       lua_setfield(L, -2, "help");
-    lua_setglobal(L, "ivar");
+    lua_pushcfunction(L, l_ivar_preprocess);      lua_setfield(L, -2, "preprocess");
+    lua_pushcfunction(L, l_trif_preprocess);      lua_setfield(L, -2, "trif_preprocess");
+    lua_pushcfunction(L, l_ivar_help);            lua_setfield(L, -2, "help");
+    elliot_std_set(L,"ivar");
 }
 /* ══ fim do módulo ivar ════════════════════════════════════════════════════ */
 
@@ -96621,7 +97665,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_tui_close); lua_setfield(L,-2,"close");
     lua_pushcfunction(L,l_tui_read);  lua_setfield(L,-2,"read");
     lua_pushcfunction(L,l_tui_help);  lua_setfield(L,-2,"help");
-    lua_setglobal(L,"tui");
+    elliot_std_set(L,"tui");
 
 /* -- ai — god apenas -- */
 #if !defined(ELLIOT_NANO) && !defined(ELLIOT_MEIO)
@@ -96642,7 +97686,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_ai_set_raw);     lua_setfield(L,-2,"raw_mode");
     lua_pushcfunction(L,l_ai_history);     lua_setfield(L,-2,"history");
     lua_pushcfunction(L,l_ai_help);        lua_setfield(L,-2,"help");
-    lua_setglobal(L,"ai");
+    elliot_std_set(L,"ai");
     /* carrega provider/model salvos pelo usuário */
     ai_config_load();
     /* carrega histórico de conversa salvo em disco */
@@ -96656,7 +97700,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_agent_chat);  lua_setfield(L,-2,"chat");
     lua_pushcfunction(L,l_agent_reset); lua_setfield(L,-2,"reset");
     lua_pushcfunction(L,l_agent_help);  lua_setfield(L,-2,"help");
-    lua_setglobal(L,"agent");
+    elliot_std_set(L,"agent");
 #endif
 
     /* pent — Lab de Pentest Local */
@@ -96667,7 +97711,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_pent_status); lua_setfield(L,-2,"status");
     lua_pushcfunction(L,l_pent_list);   lua_setfield(L,-2,"list");
     lua_pushcfunction(L,l_pent_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"pent");
+    elliot_std_set(L,"pent");
 #endif /* !ELLIOT_NANO (pent) */
 
     /* ── lmod ── */
@@ -96678,7 +97722,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_lmod_remove); lua_setfield(L,-2,"remove");
     lua_pushcfunction(L,l_lmod_path);   lua_setfield(L,-2,"path");
     lua_pushcfunction(L,l_lmod_help);   lua_setfield(L,-2,"help");
-    lua_setglobal(L,"lmod");
+    elliot_std_set(L,"lmod");
 
     /* ── web ── */
     lua_newtable(L);
@@ -96690,7 +97734,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_web_forms);   lua_setfield(L,-2,"forms");
     lua_pushcfunction(L,l_web_scripts); lua_setfield(L,-2,"scripts");
     lua_pushcfunction(L,l_web_help);    lua_setfield(L,-2,"help");
-    lua_setglobal(L,"web");
+    elliot_std_set(L,"web");
 
     /* ── dow — download de mídia (yt-dlp + Cobalt + wget) ── */
     luaL_dostring(L,
@@ -96847,7 +97891,7 @@ int luaopen_net(lua_State *L) {
         "  return nil,'resposta inesperada: '..(status or body:sub(1,80))\n"
         "end\n"
         "\n"
-        "dow = {}\n"
+        "local dow = {}\n"
         "\n"
         "function dow.video(url)\n"
         "  if is_youtube(url) then\n"
@@ -96938,6 +97982,7 @@ int luaopen_net(lua_State *L) {
         "  print('  \x1b[33mImagens \x1b[0m → wget direto')\n"
         "  print('  \x1b[90mSalvo   : ~/Downloads/\x1b[0m')\n"
         "end\n"
+        "do local _s=_G._elliot_std; if _s then _s.dow=dow end end\n"
         "end\n"
     );
 
@@ -96985,7 +98030,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_adb_text);           lua_setfield(L,-2,"text");
     lua_pushcfunction(L,l_adb_setup);          lua_setfield(L,-2,"setup");
     lua_pushcfunction(L,l_adb_help);      lua_setfield(L,-2,"help");
-    lua_setglobal(L,"adb");
+    elliot_std_set(L,"adb");
 
     /* ── help global: help / help("topico") → ms --doc [topico] ── */
     {
@@ -97037,7 +98082,7 @@ int luaopen_net(lua_State *L) {
         );
         /* re — wrappers de pattern matching Lua */
         luaL_dostring(L,
-            "re = {}\n"
+            "local re = {}\n"
             "do\n"
             "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
             "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
@@ -97097,10 +98142,11 @@ int luaopen_net(lua_State *L) {
             "    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
             "  end\n"
             "end\n"
+            "do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
         );
         /* try — pcall/xpcall estilo try/catch/finally */
         luaL_dostring(L,
-            "try = {}\n"
+            "local try = {}\n"
             "do\n"
             "  function try.call(fn,...)\n"
             "    local args={...}; local ok,err=pcall(fn,table.unpack(args))\n"
@@ -97118,13 +98164,22 @@ int luaopen_net(lua_State *L) {
             "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
             "    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
             "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-            "    print(C..'║  try.* -- Tratamento de Erros (try/catch/finally)            ║'..R)\n"
+            "    print(C..'║  try.* — Tratamento de Erros                                 ║'..R)\n"
             "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
             "    local function f(sig, desc, ret)\n"
             "      print('  '..Y..sig..R..'  '..desc)\n"
             "      if ret then print('                          '..D..'Retorna: '..ret..R) end\n"
             "      print('')\n"
             "    end\n"
+            "    print(C..'── Sintaxe trif (preprocessada — estilo if/else) ──'..R..'\\n')\n"
+            "    print(D..'  trif <expr> then'..R)\n"
+            "    print(D..'    -- bloco executado se <expr> não deu erro'..R)\n"
+            "    print(D..'  tryelseif \"padrão\" then'..R)\n"
+            "    print(D..'    -- erro que contém \"padrão\"'..R)\n"
+            "    print(D..'  tryelse err then'..R)\n"
+            "    print(D..'    -- qualquer outro erro (err = mensagem)'..R)\n"
+            "    print(D..'  tryend'..R..'\\n')\n"
+            "    print(C..'── Funções try.* (API programática) ──'..R..'\\n')\n"
             "    f('try.call(fn,...)',        'chama fn protegida; encadeia :catch/:finally/:ok/:err', 'objeto')\n"
             "    f('  :catch(handler)',       'handler(err) executado se fn deu erro',     'objeto (self)')\n"
             "    f('  :finally(handler)',     'handler() sempre executado',                'objeto (self)')\n"
@@ -97135,11 +98190,16 @@ int luaopen_net(lua_State *L) {
             "    f('try.must(fn,...)',        'executa fn; se der erro, propaga (error)',  'valores de fn')\n"
             "    f('try.help()',              'esta ajuda',                                 nil)\n"
             "    print(C..'── Exemplos ──'..R..'\\n')\n"
-            "    print('  try.call(function() error(\\'falhou\\') end)')\n"
-            "    print('    :catch(function(e) print(\\'erro: \\'..e) end)')\n"
-            "    print('    :finally(function() print(\\'sempre roda\\') end)')\n"
+            "    print(D..'  trif net.get(\"https://exemplo.com\") then'..R)\n"
+            "    print(D..'    print(\"ok\")'..R)\n"
+            "    print(D..'  tryelse err then'..R)\n"
+            "    print(D..'    print(\"erro: \"..err)'..R)\n"
+            "    print(D..'  tryend'..R..'\\n')\n"
+            "    print(D..'  try.call(function() error(\\'falhou\\') end)'..R)\n"
+            "    print(D..'    :catch(function(e) print(\\'erro: \\'..e) end)'..R)\n"
             "  end\n"
             "end\n"
+            "do local _s=_G._elliot_std; if _s then _s.try=try end end\n"
         );
         /* table.print — inspeção recursiva de tabelas */
         luaL_dostring(L,
@@ -97445,8 +98505,8 @@ int luaopen_net(lua_State *L) {
         "    print('\\027[0;90m    ms --doc json                -- doc completa\\027[0m')\n"
         "  end\n"
         "\n"
-        "  -- Atalhos no global: json.encode / json.decode\n"
-        "  _G.json = json\n"
+        "  -- json via require(\"@std\") ou require(\"@std/json\")\n"
+        "  do local _s=_G._elliot_std; if _s then _s.json=json end end\n"
         "end\n"
         "do\n"
         "  -- Parseia o texto bruto de headers (retorno de net.fetch) em uma tabela\n"
@@ -98564,7 +99624,7 @@ int luaopen_net(lua_State *L) {
         "\n"
         "  function _L.help() os.execute('ms --doc log 2>/dev/null || lua-net --doc log 2>/dev/null || true') end\n"
         "\n"
-        "  log = _L\n"
+        "  do local _s=_G._elliot_std; if _s then _s.log=_L end end\n"
         "end\n"
         "do\n"
         "  local _C = {}\n"
@@ -98704,7 +99764,7 @@ int luaopen_net(lua_State *L) {
         "\n"
         "  function _C.help() os.execute('ms --doc csv 2>/dev/null || lua-net --doc csv 2>/dev/null || true') end\n"
         "\n"
-        "  csv = _C\n"
+        "  do local _s=_G._elliot_std; if _s then _s.csv=_C end end\n"
         "end\n"
         "do\n"
         "  local function _lmod_extract(name, opts)\n"
@@ -98928,7 +99988,7 @@ int luaopen_net(lua_State *L) {
 
     /* ── num (independente) ── */
     luaL_dostring(L,
-        "num = {}\n"
+        "local num = {}\n"
         "function num.parse(s)\n"
         "  if type(s) == 'number' then return s end\n"
         "  local n = tonumber(s)\n"
@@ -99004,6 +100064,7 @@ int luaopen_net(lua_State *L) {
         "  print('  num.clamp(15, 0, 10)              --> 10')\n"
         "  print('  num.to_hex(255)                   --> \\'ff\\'')\n"
         "end\n"
+        "do local _s=_G._elliot_std; if _s then _s.num=num end end\n"
     );
 
     /* ── path (independente) ── */
@@ -99297,7 +100358,7 @@ int luaopen_net(lua_State *L) {
 
     /* ── color (independente) ── */
     luaL_dostring(L,
-        "color = {}\n"
+        "local color = {}\n"
         "do\n"
         "  local codes = {\n"
         "    reset=0, bold=1, dim=2, italic=3, underline=4, blink=5,\n"
@@ -99353,6 +100414,7 @@ int luaopen_net(lua_State *L) {
         "    print('  print(color.rgb(255, 100, 0, \\'laranja\\'))')\n"
         "  end\n"
         "end\n"
+        "do local _s=_G._elliot_std; if _s then _s.color=color end end\n"
     );
 
     /* ── test (independente) ── */
@@ -99470,13 +100532,13 @@ int luaopen_net(lua_State *L) {
         "    print('  test.ok(1 == 1, \\'trivial\\')')\n"
         "    print('  test.report()')\n"
         "  end\n"
-        "  test = _test_ns\n"
+        "  do local _s=_G._elliot_std; if _s then _s.test=_test_ns end end\n"
         "end\n"
     );
 
     /* ── re_lua (independente) ── */
     luaL_dostring(L,
-        "re = {}\n"
+        "local re = {}\n"
         "do\n"
         "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
         "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
@@ -99520,11 +100582,12 @@ int luaopen_net(lua_State *L) {
         "    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
         "  end\n"
         "end\n"
+        "do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
     );
 
     /* ── try (independente) ── */
     luaL_dostring(L,
-        "try = {}\n"
+        "local try = {}\n"
         "do\n"
         "  function try.call(fn, ...)\n"
         "    local args = {...}\n"
@@ -99556,13 +100619,22 @@ int luaopen_net(lua_State *L) {
         "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
         "    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
         "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-        "    print(C..'║  try.* -- Tratamento de Erros (try/catch/finally)            ║'..R)\n"
+        "    print(C..'║  try.* — Tratamento de Erros                                 ║'..R)\n"
         "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
         "    local function f(sig, desc, ret)\n"
         "      print('  '..Y..sig..R..'  '..desc)\n"
         "      if ret then print('                          '..D..'Retorna: '..ret..R) end\n"
         "      print('')\n"
         "    end\n"
+        "    print(C..'── Sintaxe trif (preprocessada — estilo if/else) ──'..R..'\\n')\n"
+        "    print(D..'  trif <expr> then'..R)\n"
+        "    print(D..'    -- bloco executado se <expr> não deu erro'..R)\n"
+        "    print(D..'  tryelseif \"padrão\" then'..R)\n"
+        "    print(D..'    -- erro que contém \"padrão\"'..R)\n"
+        "    print(D..'  tryelse err then'..R)\n"
+        "    print(D..'    -- qualquer outro erro (err = mensagem)'..R)\n"
+        "    print(D..'  tryend'..R..'\\n')\n"
+        "    print(C..'── Funções try.* (API programática) ──'..R..'\\n')\n"
         "    f('try.call(fn,...)',        'chama fn protegida; encadeia :catch/:finally/:ok/:err', 'objeto')\n"
         "    f('  :catch(handler)',       'handler(err) executado se fn deu erro',     'objeto (self)')\n"
         "    f('  :finally(handler)',     'handler() sempre executado',                'objeto (self)')\n"
@@ -99573,9 +100645,13 @@ int luaopen_net(lua_State *L) {
         "    f('try.must(fn,...)',        'executa fn; se der erro, propaga (error)',  'valores de fn')\n"
         "    f('try.help()',              'esta ajuda',                                 nil)\n"
         "    print(C..'── Exemplos ──'..R..'\\n')\n"
-        "    print('  try.call(function() error(\\'falhou\\') end)')\n"
-        "    print('    :catch(function(e) print(\\'erro: \\'..e) end)')\n"
-        "    print('    :finally(function() print(\\'sempre roda\\') end)')\n"
+        "    print(D..'  trif net.get(\"https://exemplo.com\") then'..R)\n"
+        "    print(D..'    print(\"ok\")'..R)\n"
+        "    print(D..'  tryelse err then'..R)\n"
+        "    print(D..'    print(\"erro: \"..err)'..R)\n"
+        "    print(D..'  tryend'..R..'\\n')\n"
+        "    print(D..'  try.call(function() error(\\'falhou\\') end)'..R)\n"
+        "    print(D..'    :catch(function(e) print(\\'erro: \\'..e) end)'..R)\n"
         "  end\n"
         "end\n"
         "do\n"
@@ -99713,6 +100789,7 @@ int luaopen_net(lua_State *L) {
         "    end\n"
         "  end\n"
         "end\n"
+        "do local _s=_G._elliot_std; if _s then _s.try=try end end\n"
     );
 
     return 0;
@@ -99732,18 +100809,12 @@ LIBNET_EOF
     # Injeta declaração extern se ainda não existir
     # Remove versão antiga de elliot_rl_interactive (extern) se presente — agora é definição em lua.c
     sed -i '/extern int elliot_rl_interactive/d' lua.c 2>/dev/null || true
+    # Injeta externs e definicao de elliot_rl_interactive no topo do lua.c (linha 1)
+    # para garantir que estejam antes de pushline() independente da estrutura do arquivo
     if ! grep -q "extern int luaopen_net" lua.c 2>/dev/null; then
-        awk '
-            /^#include/ { last_include = NR }
-            { lines[NR] = $0 }
-            END {
-                for (i = 1; i <= NR; i++) {
-                    print lines[i]
-                    if (i == last_include)
-                        print "extern int luaopen_net(lua_State *L);\nextern void elliot_readline_init(void);\nextern char *elliot_ivar_preprocess_block(const char *code);\nextern int elliot_handle_help(const char *line, char *out_blank);\nint elliot_rl_interactive = 0; /* ElliotOS: 1 quando REPL interativo esta ativo */"
-                }
-            }
-        ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
+        { printf '#include <time.h>\nextern char *elliot_ivar_preprocess_block(const char *code);\nint elliot_rl_interactive = 0; /* ElliotOS: 1 quando REPL interativo esta ativo */\n'; cat lua.c; } > lua.c.tmp && mv lua.c.tmp lua.c
+        # Injeta externs que dependem de lua_State apos os includes
+        awk '/^#include/ { last_include = NR } { lines[NR] = $0 } END { for (i=1;i<=NR;i++) { print lines[i]; if (i==last_include) print "extern int luaopen_net(lua_State *L);\nextern void elliot_readline_init(void);\nextern int elliot_handle_help(const char *line, char *out_blank);\nlua_State *_elliot_L = NULL;" } }' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
     fi
 
     # Garante definição de elliot_rl_interactive mesmo se o bloco extern já existia sem ela
@@ -99756,7 +100827,8 @@ LIBNET_EOF
         awk '/luaL_openlibs[[:space:]]*\([[:space:]]*L[[:space:]]*\)[[:space:]]*;/{
             print
             print "  luaopen_net(L);  /* ElliotOS: carrega módulos + prelude */"
-            print "  if (lua_stdin_is_tty()) elliot_readline_init();"
+            print "  _elliot_L = L; /* ElliotOS: salva L para print_version */"
+            print "  if (lua_stdin_is_tty()) { elliot_readline_init(); luaL_dostring(L, \"if type(lg)=='function' then lg() end\"); }"
             next
         } {print}' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
     fi
@@ -100779,6 +101851,7 @@ TRANSLATE_EOF
     # Validação — distingue erro de linker (libssh2/libcurl) de erro real de módulo
     # || true: set -e está ativo; se o binário sair com erro o instalador não deve morrer
     _val_raw=$("$BIN" -e '
+require("@std")
 local missing = {}
 for _, m in ipairs({"mod","net","fs","sh","sys","crypto","db","ai"}) do
     if type(_G[m]) ~= "table" then missing[#missing+1] = m.."(table)" end
@@ -106570,7 +107643,7 @@ if [ -z "\$ELLIOT_AI_KEY" ] && [ -z "\$GEMINI_API_KEY" ]; then
   _KEY=\$(grep -m1 'export GEMINI_API_KEY=' "\$HOME/.bashrc" "\$HOME/.profile" 2>/dev/null | head -1 | sed "s/.*GEMINI_API_KEY=['\"]\\?//;s/['\"].*//")
   [ -n "\$_KEY" ] && export GEMINI_API_KEY="\$_KEY" && export ELLIOT_AI_KEY="\$_KEY"
 fi
-# Propaga para todas as vars específicas de provider que o tgpt pode usar
+# Propaga para todas as vars específicas de provider de IA
 if [ -n "\$ELLIOT_AI_KEY" ]; then
   [ -z "\$GEMINI_API_KEY"  ] && export GEMINI_API_KEY="\$ELLIOT_AI_KEY"
   [ -z "\$GROQ_API_KEY"    ] && export GROQ_API_KEY="\$ELLIOT_AI_KEY"
@@ -106811,8 +107884,8 @@ _lua_run() {
 # gera um temporário pré-processado e executa esse arquivo.
 # Caso contrário, executa o arquivo original sem overhead.
 _ivar_needs_preprocess() {
-    # Retorna 0 (true) se o arquivo contiver ivar.enable() ou padrão !<digito>
-    grep -qE 'ivar\.enable\(\)|![0-9]' "\$1" 2>/dev/null
+    # Retorna 0 (true) se o arquivo contiver ivar.enable(), !<digito> ou sintaxe trif/tryif
+    grep -qE 'ivar\.enable\(\)|![0-9]|^[[:space:]]*(trif |tryif |tryelse|tryend|tryelseif )' "\$1" 2>/dev/null
 }
 
 _ivar_run_file() {
@@ -106821,11 +107894,14 @@ _ivar_run_file() {
     mkdir -p "\${HOME}/.cache/elliot"
     # Usa o próprio runtime para pré-processar via ivar.preprocess()
     "\$_B" -e "
+require('@std')
+local _ivar_mod = require('@std/ivar')
 local src = [[\$_src]]
 local f = io.open(src, 'r')
 if not f then io.stderr:write('ivar: nao foi possivel abrir ' .. src .. '\n') os.exit(1) end
 local code = f:read('*a'); f:close()
-local out = ivar.preprocess(code)
+code = ('\\n'..code):gsub('\\n([ \\t]*)tryif ', '\\n%1trif '):sub(2)
+local out = _ivar_mod.preprocess(code)
 local w = io.open([[\$_ivar_tmp]], 'w')
 if not w then io.stderr:write('ivar: nao foi possivel criar temp\n') os.exit(1) end
 w:write(out); w:close()
@@ -106833,7 +107909,7 @@ w:write(out); w:close()
     if [ -f "\$_ivar_tmp" ]; then
         # Injeta arg[0] com o nome real do script no topo do arquivo temporário
         local _tmp2="\${HOME}/.cache/elliot/ivar_pp2_\$\$.lua"
-        printf 'arg[0]="%s"\n' "\$_src" > "\$_tmp2"
+        printf 'require("@std")\narg[0]="%s"\n' "\$_src" > "\$_tmp2"
         cat "\$_ivar_tmp" >> "\$_tmp2"
         mv "\$_tmp2" "\$_ivar_tmp"
         _lua_run "\$_B" "\$_ivar_tmp" "\$@"
@@ -106842,7 +107918,7 @@ w:write(out); w:close()
         return \$_rc
     else
         # Fallback: executa original sem preprocessamento
-        _lua_run "\$_B" "\$_src" "\$@"
+        _lua_run "\$_B" -e "require('@std')" "\$_src" "\$@"
     fi
 }
 
@@ -106921,27 +107997,27 @@ case "\$1" in
     fi
     ;;
   -t)
-    exec "\$_B" -e "ms.check()"
+    exec "\$_B" -e "require('@std');ms.check()"
     ;;
   -tv|-vt)
-    exec "\$_B" -e "ms.check('v')"
+    exec "\$_B" -e "require('@std');ms.check('v')"
     ;;
   -T)
-    exec "\$_B" -e "ms.force()"
+    exec "\$_B" -e "require('@std');ms.force()"
     ;;
   -Tv|-vT)
-    exec "\$_B" -e "ms.force('v')"
+    exec "\$_B" -e "require('@std');ms.force('v')"
     ;;
   -p)
     shift
     if [ -z "\$1" ] || [ "\$1" = "stop" ]; then
-      exec "\$_B" -e "pent.stop()"
+      exec "\$_B" -e "require('@std');pent.stop()"
     else
-      exec "\$_B" -e "pent.start('\$1')"
+      exec "\$_B" -e "require('@std');pent.start('\$1')"
     fi
     ;;
   -i|--info)
-    exec "\$_B" -e "sys.info()"
+    exec "\$_B" -e "require('@std');sys.info()"
     ;;
 
   # ── Servidor Web HTML ────────────────────────────────────────
@@ -107245,11 +108321,11 @@ CYNEOF
         "pesquise na internet"*|"busque na internet"*|\
         "search "*|"buscar na web"*|"buscar na internet"*)
           export _MS_Q _MS_FILES
-          exec "\$_B" -e "local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.search(q)"
+          exec "\$_B" -e "require('@std');local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.search(q)"
           ;;
         *)
           export _MS_Q _MS_FILES
-          exec "\$_B" -e "local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.ask(q)"
+          exec "\$_B" -e "require('@std');local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.ask(q)"
           ;;
       esac
     fi
@@ -107285,7 +108361,7 @@ MSRAWEOF
     shift
     _MS_SEARCH_Q="\$*"
     export _MS_SEARCH_Q
-    exec "\$_B" -e "local q=os.getenv('_MS_SEARCH_Q') or '' ai.search(q)"
+    exec "\$_B" -e "require('@std');local q=os.getenv('_MS_SEARCH_Q') or '' ai.search(q)"
     ;;
 
   --codigo|--code)
@@ -107315,7 +108391,7 @@ MSRAWEOF
     _MS_CODE_OUT="\$_CODE_OUT"
     _MS_CODE_FILES="\$_CODE_FILES"
     export _MS_CODE_PROMPT _MS_CODE_OUT _MS_CODE_FILES
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local p=os.getenv('_MS_CODE_PROMPT') or ''
 local o=os.getenv('_MS_CODE_OUT') or ''
 local f=os.getenv('_MS_CODE_FILES') or ''
@@ -107328,11 +108404,11 @@ if o~='' then ai.code(p,o) else ai.code(p) end
   # ── Rede ────────────────────────────────────────────────────
   -g|--get)
     shift
-    exec "\$_B" -e "print(net.geth('\$1'))"
+    exec "\$_B" -e "require('@std');print(net.geth('\$1'))"
     ;;
   -d|--dns)
     shift
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local h='\$1'
 h=h:gsub('^https?://',''):gsub('^ftp://',''):gsub('/.*',''):gsub(':.*','')
 if h=='' then print('uso: ms -d host') else
@@ -107345,19 +108421,19 @@ end"
     ;;
   -P|--ping)
     shift
-    exec "\$_B" -e "print(net.ping('\$1'))"
+    exec "\$_B" -e "require('@std');print(net.ping('\$1'))"
     ;;
   --scan)
     shift
-    exec "\$_B" -e "local t=net.scan('\$1',\$2,\${3:-\$2}) for _,p in pairs(t) do print(p) end"
+    exec "\$_B" -e "require('@std');local t=net.scan('\$1',\$2,\${3:-\$2}) for _,p in pairs(t) do print(p) end"
     ;;
   --socket)
     # ms --socket ipv4 stream host port [payload]
     shift
-    exec "\$_B" -e "print(net.socket('\$1','\$2','\$3',\$4,5,'\${5:-}'))"
+    exec "\$_B" -e "require('@std');print(net.socket('\$1','\$2','\$3',\$4,5,'\${5:-}'))"
     ;;
   --ip)
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local ESC=string.char(27)
 local ip = net.geth('https://api.ipify.org')
 if ip and #ip > 0 then
@@ -107368,7 +108444,7 @@ end"
     ;;
   --post)
     shift
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local url='\$1'
 local data='\$2'
 if url=='' then print('uso: ms --post url dados') os.exit(1) end
@@ -107402,7 +108478,7 @@ end"
     ;;
   --jwt)
     shift
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local ESC=string.char(27)
 local M = ESC..'[1;35m' local W = ESC..'[1;37m'
 local D = ESC..'[0;90m' local R = ESC..'[1;31m' local Z = ESC..'[0m'
@@ -108664,7 +109740,7 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;32m  ms --doc test\033[0m         test.* — assertions para scripts testáveis\n"
     printf "  \033[1;32m  ms --doc re\033[0m           re.* — expressões regulares (match/sub/named)\n"
     printf "  \033[1;32m  ms --doc queue\033[0m        Queue/Stack — estruturas FIFO/LIFO\n"
-    printf "  \033[1;32m  ms --doc try\033[0m          try.* — tratamento de erros try/catch/finally\n\n"
+    printf "  \033[1;32m  ms --doc try\033[0m          try.* — trif/tryelse/tryend + try.call/pcall/must\n\n"
     printf "\033[1;35m═══ COMANDOS ESPECIAIS DO REPL ══════════════════════════════════════════════\033[0m\n\n"
     printf "  Não são funções Lua. Não precisam de (). Interceptados antes do parser.\n\n"
     printf "  \033[1;33m%-16s\033[0m %s\n" "help" "exibe a documentação (igual a ms --doc)"
@@ -108674,8 +109750,28 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;33m%-16s\033[0m %s\n" "cd <dir>" "muda o diretório de trabalho"
     printf "  \033[1;33m%-16s\033[0m %s\n" "exit / q" "sai do REPL"
     printf "  \033[0;90m  Dica: também funcionam como função: help() e clear()\033[0m\n\n"
+    printf "\033[1;35m\u2550\u2550\u2550 SISTEMA DE NAMESPACES (require) \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\033[0m\n\n"
+    printf "  Os modulos do ElliotOS NAO sao globais por padrao.\n"
+    printf "  Voce escolhe o que importar com require().\n\n"
+    printf "  \033[1;36m@std \u2014 Biblioteca padrao do ElliotOS:\033[0m\n\n"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@std")' "importa TODOS os modulos como globais"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'local net = require("@std/net")' "importa so o modulo net"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'local get = require("@std/net/get")' "importa so a funcao net.get"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'local enc = require("@std/crypto/sha256")' "importa so crypto.sha256"
+    printf "\n"
+    printf "  \033[1;36m@user \u2014 Modulos proprios do usuario:\033[0m\n\n"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/MeuMod")' "$HOME/MeuMod.lua"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/libs/utils")' "$HOME/libs/utils.lua"
+    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/../files/mod")' "$HOME/../files/mod.lua"
+    printf "\n"
+    printf "  \033[0;90m  Path em @user e relativo ao HOME. Voce pode usar ../ livremente.\033[0m\n"
+    printf "  \033[0;90m  require() normal (sem @) continua funcionando para modulos Lua padrao.\033[0m\n\n"
+    printf "  \033[1;36mExemplos:\033[0m\n\n"
+    printf "  \033[0;90m  local net    = require("@std/net")           -- modulo net\033[0m\n"
+    printf "  \033[0;90m  local sha256 = require("@std/crypto/sha256") -- funcao especifica\033[0m\n"
+    printf "  \033[0;90m  local MyAPI  = require("@user/method")       -- $HOME/method.lua\033[0m\n\n"
     printf "\033[1;35m═══ MODULOS DA API ════════════════════════════════════════════\033[0m\n\n"
-    printf "  Modulos globais no REPL. Nunca use require().\n"
+    printf "  Use require(\"@std\") para todos os modulos, ou require(\"@std/mod\") para um especifico.\n"
     printf "  Referencia especifica: \033[1;32mms --doc <modulo>\033[0m\n\n"
     printf "  \033[1;33m%-12s\033[0m %s\n" "net.*" "Rede: HTTP, TCP, UDP, DNS, port scan, sockets"
     printf "  \033[1;33m%-12s\033[0m %s\n" "mod.*" "Pentest: 23 scanners (XSS, SQLi, LFI, RCE...)"
@@ -108708,7 +109804,7 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[1;33m%-12s\033[0m %s\n" "color.*" "ANSI: red/green/bold/rgb/bg_rgb/strip/len..."
     printf "  \033[1;33m%-12s\033[0m %s\n" "test.*" "Assertions: ok/eq/neq/gt/err/deep_eq/suite/report..."
     printf "  \033[1;33m%-12s\033[0m %s\n" "Queue/Stack" "Estruturas FIFO/LIFO: push/pop/peek/size/to_table"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "try.*" "try/catch/finally: try.call/pcall/xpcall/must"
+    printf "  \033[1;33m%-12s\033[0m %s\n" "try.*" "trif/tryelse/tryend + try.call/pcall/xpcall/must"
     printf "  \033[1;33m%-12s\033[0m %s\n" "table.*" "Extras: map/filter/reduce/flat/zip/group_by/sorted..."
     }
     _doc_str() {
@@ -108904,26 +110000,30 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     printf "  \033[0;90m  Padrões usam sintaxe Lua: %%d %%a %%s %%w %%p etc.\033[0m\n\n"
     }
     _doc_try() {
-    printf "\033[1;35m═══ try.* — Tratamento de Erros (try/catch/finally) ══════════════\033[0m\n\n"
+    printf "\033[1;35m═══ try.* — Tratamento de Erros ══════════════════════════════════\033[0m\n\n"
+    printf "\033[1;36m── Sintaxe trif (preprocessada — estilo if/else do Lua) ───────────\033[0m\n\n"
+    printf "  \033[1;33mtrif\033[0m <expr> then\n"
+    printf "  \033[0;90m    -- executado se <expr> não deu erro\033[0m\n"
+    printf "  \033[1;33mtryelseif\033[0m \"padrão\" then\n"
+    printf "  \033[0;90m    -- erro que contém \"padrão\" (opcional, repetível)\033[0m\n"
+    printf "  \033[1;33mtryelse\033[0m [var] then\n"
+    printf "  \033[0;90m    -- qualquer outro erro; var recebe a mensagem (padrão: err)\033[0m\n"
+    printf "  \033[1;33mtryend\033[0m\n\n"
+    printf "\033[1;36m── Exemplo trif ────────────────────────────────────────────────────\033[0m\n\n"
+    printf "  \033[0;90m  trif net.get(\"https://exemplo.com\") then\033[0m\n"
+    printf "  \033[0;90m    print(\"enviado\")\033[0m\n"
+    printf "  \033[0;90m  tryelseif \"timeout\" then\033[0m\n"
+    printf "  \033[0;90m    print(\"sem resposta\")\033[0m\n"
+    printf "  \033[0;90m  tryelse err then\033[0m\n"
+    printf "  \033[0;90m    print(\"erro: \"..err)\033[0m\n"
+    printf "  \033[0;90m  tryend\033[0m\n\n"
+    printf "\033[1;36m── API try.* (programática) ────────────────────────────────────────\033[0m\n\n"
     printf "  \033[1;33mtry.call\033[0m(fn, ...)         → objeto com métodos encadeáveis\n"
-    printf "  \033[0;90m    try.call(fn)\n"
-    printf "  \033[0;90m      :catch(function(err) print(err) end)\n"
-    printf "  \033[0;90m      :finally(function() print('sempre') end)\033[0m\n\n"
-    printf "  \033[1;33m  :catch(handler)\033[0m          → fn(err) chamada se houve erro\n"
-    printf "  \033[1;33m  :finally(handler)\033[0m        → fn() sempre executada\n"
-    printf "  \033[1;33m  :ok()\033[0m                    → true se sem erro\n"
-    printf "  \033[1;33m  :err()\033[0m                   → mensagem de erro ou nil\n\n"
+    printf "  \033[0;90m    :catch(function(err) print(err) end)\033[0m\n"
+    printf "  \033[0;90m    :finally(function() print('sempre') end)\033[0m\n\n"
     printf "  \033[1;33mtry.pcall\033[0m(fn, ...)         → ok, err  (alias direto de pcall)\n"
     printf "  \033[1;33mtry.xpcall\033[0m(fn, msgh, ...)  → ok, err  (alias de xpcall)\n"
-    printf "  \033[1;33mtry.must\033[0m(fn, ...)          → executa ou propaga erro (2 levels up)\n\n"
-    printf "\033[1;36m── Exemplo ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  try.call(function()\n"
-    printf "  \033[0;90m    error('algo deu errado')\n"
-    printf "  \033[0;90m  end):catch(function(e)\n"
-    printf "  \033[0;90m    print('erro: '..e)\n"
-    printf "  \033[0;90m  end):finally(function()\n"
-    printf "  \033[0;90m    print('fim')\n"
-    printf "  \033[0;90m  end)\033[0m\n\n"
+    printf "  \033[1;33mtry.must\033[0m(fn, ...)          → executa ou propaga erro\n\n"
     }
     _doc_net() {
     printf "\033[1;35m═══ net.* — Módulo de Rede ════════════════════════════════════════\033[0m\n\n"
@@ -109259,7 +110359,7 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     }
     _doc_util() {
     printf "\n\033[1;35m═══ util.* — Stdlib Funcional ═════════════════════════════════════\033[0m\n\n"
-    printf "  \033[0;90mDisponível globalmente. Nunca use require().\033[0m\n"
+    printf "  \033[0;90mUse: local mod = require(\"@std/mod\")\033[0m\n"
     printf "  \033[0;90mutil.help() / util.help('stats') / util.help('iter') / util.help('fn')\033[0m\n\n"
     printf "\033[1;36m── TRANSFORMAÇÃO ──────────────────────────────────────────────────\033[0m\n\n"
     printf "  \033[1;33mutil.map\033[0m(t, fn)           → nova tabela com fn(v,i) em cada item\n"
@@ -110071,7 +111171,7 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
             if _ivar_needs_preprocess "\$_FULL"; then
                 _ivar_run_file "\$_FULL" "\$@"
             else
-                _lua_run "\$_B" "\$_FULL" "\$@"
+                _lua_run "\$_B" -e "require('@std')" "\$_FULL" "\$@"
             fi
             ;;
         c_src)
@@ -110123,7 +111223,7 @@ print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
     ;;
   --listen)
     shift
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local ESC=string.char(27)
 local C=ESC..'[1;36m' local W=ESC..'[1;37m'
 local D=ESC..'[0;90m' local G=ESC..'[1;32m' local R=ESC..'[1;31m' local Z=ESC..'[0m'
@@ -110146,40 +111246,40 @@ end"
     ;;
   -x|--xss)
     shift
-    exec "\$_B" -e "mod.xss('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.xss('\$1',nil,\${2:-1})"
     ;;
   -q|--sqli)
     shift
-    exec "\$_B" -e "mod.sqli('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.sqli('\$1',nil,\${2:-1})"
     ;;
   -l|--lfi)
     shift
-    exec "\$_B" -e "mod.lfi('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.lfi('\$1',nil,\${2:-1})"
     ;;
   -r|--rce)
     shift
-    exec "\$_B" -e "mod.rce('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.rce('\$1',nil,\${2:-1})"
     ;;
   --ssrf)
     shift
-    exec "\$_B" -e "mod.ssrf('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.ssrf('\$1',nil,\${2:-1})"
     ;;
   --redir)
     shift
-    exec "\$_B" -e "mod.redir('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.redir('\$1',nil,\${2:-1})"
     ;;
   --ssti)
     shift
-    exec "\$_B" -e "mod.ssti('\$1',nil,\${2:-1})"
+    exec "\$_B" -e "require('@std');mod.ssti('\$1',nil,\${2:-1})"
     ;;
   -N|--nosql)
     shift
-    exec "\$_B" -e "mod.nosql('\$1')"
+    exec "\$_B" -e "require('@std');mod.nosql('\$1')"
     ;;
   --scan-all)
     # roda todos os scanners em uma URL com spider integrado
     shift
-    exec "\$_B" -e "
+    exec "\$_B" -e "require('@std');
 local url='\$1'
 local lim=tonumber('\${2:-0}') or 0
 print('\n\027[1;35m[scan-all] '..url..'\027[0m')
@@ -110254,16 +111354,16 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     ;;
   --cat)
     shift
-    exec "\$_B" -e "print(fs.read('\$1'))"
+    exec "\$_B" -e "require('@std');print(fs.read('\$1'))"
     ;;
   --ls)
     shift
-    exec "\$_B" -e "for _,f in ipairs(fs.glob('\${1:-.}/*')) do print(f) end"
+    exec "\$_B" -e "require('@std');for _,f in ipairs(fs.glob('\${1:-.}/*')) do print(f) end"
     ;;
   --write)
     # ms --write arquivo "conteudo"
     shift
-    exec "\$_B" -e "fs.write('\$1','\$2') print('escrito: \$1')"
+    exec "\$_B" -e "require('@std');fs.write('\$1','\$2') print('escrito: \$1')"
     ;;
 
   # ── Lua Scanner ─────────────────────────────────────────────
@@ -110356,19 +111456,19 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
   # ── Crypto ──────────────────────────────────────────────────
   --md5)
     shift
-    exec "\$_B" -e "print(crypto.md5('\$*'))"
+    exec "\$_B" -e "require('@std');print(crypto.md5('\$*'))"
     ;;
   --sha256)
     shift
-    exec "\$_B" -e "print(crypto.sha256('\$*'))"
+    exec "\$_B" -e "require('@std');print(crypto.sha256('\$*'))"
     ;;
   --b64e)
     shift
-    exec "\$_B" -e "print(ms.b64.enc('\$*'))"
+    exec "\$_B" -e "require('@std');print(ms.b64.enc('\$*'))"
     ;;
   --b64d)
     shift
-    exec "\$_B" -e "print(ms.b64.dec('\$*'))"
+    exec "\$_B" -e "require('@std');print(ms.b64.dec('\$*'))"
     ;;
 
   # ── Shell/Sys ────────────────────────────────────────────────
@@ -110377,18 +111477,18 @@ print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m
     exec "\$_B" -e "print(sh.capture('\$*'))"
     ;;
   --ps)
-    exec "\$_B" -e "sys.list()"
+    exec "\$_B" -e "require('@std');sys.list()"
     ;;
   --kill)
     shift
-    exec "\$_B" -e "sys.kill(\$1)"
+    exec "\$_B" -e "require('@std');sys.kill(\$1)"
     ;;
   --env)
     shift
     if [ -n "\$1" ]; then
-      exec "\$_B" -e "print(sys.env('\$1'))"
+      exec "\$_B" -e "require('@std');print(sys.env('\$1'))"
     else
-      exec "\$_B" -e "for k,v in pairs(sys.env()) do print(k..'='..v) end"
+      exec "\$_B" -e "require('@std');for k,v in pairs(sys.env()) do print(k..'='..v) end"
     fi
     ;;
 
@@ -111922,7 +113022,7 @@ LAUNCHER_SCRIPT
         if [ -f "\$_SCRIPT" ] && _ivar_needs_preprocess "\$_SCRIPT"; then
             _ivar_run_file "\$_SCRIPT" "\$@"
         else
-            _lua_run "\$_B" "\$_SCRIPT" "\$@"
+            _lua_run "\$_B" -e "require('@std')" "\$_SCRIPT" "\$@"
         fi
         ;;
     esac
@@ -112805,7 +113905,7 @@ XTUNSRCEOF
 -- ║  Trilha 3: C no ElliotOS             (lições 22-27)        ║
 -- ║  Trilha 4: Projetos reais            (lições 28-30)        ║
 -- ╚══════════════════════════════════════════════════════════════╝
-
+require('@std')
 local C = {
     titulo = '\027[1;35m', ok    = '\027[1;32m',
     info   = '\027[1;36m', cmd   = '\027[1;33m',
@@ -113793,7 +114893,7 @@ LEARNEOF
     cat > "$_EX_DIR/payload.lua" << 'PAYLOADINSTEOF'
 -- payload.lua — ElliotOS Payload Generator
 -- ms --payload  ou  ms payload.lua
-
+require('@std')
 local C = {
     ok    = '\027[1;32m',
     err   = '\027[1;31m',
@@ -114423,7 +115523,7 @@ PAYLOADINSTEOF
 #!/usr/bin/env ms
 -- recon.lua — Recon completo de um alvo
 -- Uso: ms recon.lua <ip_ou_host>
-
+require('@std')
 local YEL='\027[93m'; local GRN='\027[0;92m'; local BLU='\027[0;94m'
 local RED='\027[0;91m'; local DIM='\027[0;90m'; local RST='\027[0m'; local B='\027[1m'
 local CYN='\027[0;96m'
@@ -114587,7 +115687,7 @@ RECONEOF
 -- Ex:  ms -f portscan.lua -- 192.168.1.1             (scan 1-1024)
 -- Ex:  ms -f portscan.lua -- 192.168.1.1 80          (so porta 80)
 -- Ex:  ms -f portscan.lua -- 192.168.1.1 1 9999 32   (range + threads)
-
+require('@std')
 local GRN='\027[0;92m'; local YEL='\027[93m'; local RED='\027[0;91m'
 local DIM='\027[0;90m'; local CYN='\027[0;96m'; local RST='\027[0m'; local B='\027[1m'
 
@@ -114717,7 +115817,7 @@ PORTSCANEOF
 #!/usr/bin/env ms
 -- webcheck.lua — Verifica headers de segurança de um site
 -- Uso: ms -f webcheck.lua -- <url>
-
+require('@std')
 local GRN='\027[0;92m'; local YEL='\027[93m'; local RED='\027[0;91m'
 local DIM='\027[0;90m'; local RST='\027[0m'; local B='\027[1m'
 
@@ -114800,7 +115900,7 @@ WEBCHECKEOF
 -- hashcrack.lua — Compara hash MD5/SHA256 com wordlist
 -- Uso: ms -f hashcrack.lua -- <hash> <wordlist.txt>
 -- Ex:  ms -f hashcrack.lua -- 5f4dcc3b5aa765d61d8327deb882cf99 ~/wordlist.txt
-
+require('@std')
 local GRN='\027[0;92m'; local YEL='\027[93m'; local RED='\027[0;91m'
 local DIM='\027[0;90m'; local RST='\027[0m'; local B='\027[1m'
 
@@ -114864,7 +115964,7 @@ HASHEOF
     cat > "$_EX_DIR/nexus.lua" << 'NEXUSEOF'
 #!/usr/bin/env ms
 -- nexus.lua — ElliotOS Edition (nexus + slownexus integrados)
-
+require('@std')
 local YEL  = '\027[93m'
 local BLU  = '\027[0;94m'
 local GRN  = '\027[0;92m'
@@ -116380,4864 +117480,7339 @@ _install_editor() {
     _EE_BIN="$_TPFX/bin/ee"
 
     # editor.c embutido em base64
-    base64 -d << 'EDITOR_B64_EOF' > "$_EE_SRC"
-LyoKICog4paI4paI4paI4paI4paI4paI4paI4pWX4paI4paI4pWXICAgICDilojilojilZcgICAg
-IOKWiOKWiOKVlyDilojilojilojilojilojilojilZcg4paI4paI4paI4paI4paI4paI4paI4paI
-4pWXCiAqIOKWiOKWiOKVlOKVkOKVkOKVkOKVkOKVneKWiOKWiOKVkSAgICAg4paI4paI4pWRICAg
-ICDilojilojilZHilojilojilZTilZDilZDilZDilojilojilZfilZrilZDilZDilojilojilZTi
-lZDilZDilZ0KICog4paI4paI4paI4paI4paI4pWXICDilojilojilZEgICAgIOKWiOKWiOKVkSAg
-ICAg4paI4paI4pWR4paI4paI4pWRICAg4paI4paI4pWRICAg4paI4paI4pWRCiAqIOKWiOKWiOKV
-lOKVkOKVkOKVnSAg4paI4paI4pWRICAgICDilojilojilZEgICAgIOKWiOKWiOKVkeKWiOKWiOKV
-kSAgIOKWiOKWiOKVkSAgIOKWiOKWiOKVkQogKiDilojilojilojilojilojilojilojilZfiloji
-lojilojilojilojilojilojilZfilojilojilojilojilojilojilojilZfilojilojilZHilZri
-lojilojilojilojilojilojilZTilZ0gICDilojilojilZEKICog4pWa4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWd4pWa4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWd4pWa4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWd4pWa
-4pWQ4pWdIOKVmuKVkOKVkOKVkOKVkOKVkOKVnSAgICDilZrilZDilZ0KICogIEVsbGlvdE9TIEVk
-aXRvciDigJQgZWRpdG9yIENMSSBuYXRpdm8gZG8gRWxsaW90T1MKICoKICogIENvbXBpbGFyOiBj
-YyAtbyBlbGxpb3QtZWRpdCBlZGl0b3IuYwogKiAgVXNvOiAgICAgIGVsbGlvdC1lZGl0IFthcnF1
-aXZvXQogKgogKiAgQXRhbGhvczoKICogICAgQ3RybCtTICBTYWx2YXIgICAgICAgICBDdHJsK1Eg
-IFNhaXIKICogICAgQ3RybCtGICBCdXNjYXIgICAgICAgICBDdHJsK0cgIElyIHBhcmEgbGluaGEK
-ICogICAgQ3RybCtLICBEZWxldGFyIGxpbmhhICBDdHJsK0QgIER1cGxpY2FyIGxpbmhhCiAqICAg
-IEN0cmwrVSAgRGVzZmF6ZXIgICAgICAgQ3RybCsvICBDb21lbnRhci9kZXNjb21lbnRhciBsaW5o
-YQogKiAgICBDdHJsK0wgIEVzY29saGVyIGxpbmd1YWdlbSAgICAgQ3RybCtSICBGb3JtYXRhciBj
-w7NkaWdvCiAqICAgIEN0cmwrViAgQ2hlY2FyIGPDs2RpZ28gKGFuw6FsaXNlICsgY2xhbmcgc2Ug
-ZGlzcG9uw612ZWwpCiAqICAgIFRhYiAgICAgQ29tcGxldGFyL2luZGVudCAgICAgICAgU2hpZnQr
-VGFiICBEZWluZGVudAogKiAgICBBbHQrVXAvRG93biAgTW92ZXIgbGluaGEgcGFyYSBjaW1hL2Jh
-aXhvCiAqICAgICggIFsgIHsgICIgICcgIGAgICBBdXRvLXBhaXIgLyBhdXRvLWNsb3NlCiAqICAg
-ICkgIF0gIH0gICAgICAgICAgICBTa2lwIHNlIGrDoSBmZWNoYWRvCiAqICAgIEJhY2tzcGFjZSAg
-ICAgICAgICAgU21hcnQ6IGFwYWdhIHBhciB2YXppbwogKi8KCiNkZWZpbmUgX0RFRkFVTFRfU09V
-UkNFCiNkZWZpbmUgX0JTRF9TT1VSQ0UKI2RlZmluZSBfR05VX1NPVVJDRQoKI2luY2x1ZGUgPHN0
-ZGlvLmg+CiNpbmNsdWRlIDxzdGRsaWIuaD4KI2luY2x1ZGUgPHN0cmluZy5oPgojaW5jbHVkZSA8
-c3RkYXJnLmg+CiNpbmNsdWRlIDxjdHlwZS5oPgojaW5jbHVkZSA8ZXJybm8uaD4KI2luY2x1ZGUg
-PGZjbnRsLmg+CiNpbmNsdWRlIDx0aW1lLmg+CiNpbmNsdWRlIDx1bmlzdGQuaD4KI2luY2x1ZGUg
-PHRlcm1pb3MuaD4KI2luY2x1ZGUgPHNpZ25hbC5oPgojaW5jbHVkZSA8c3lzL2lvY3RsLmg+CiNp
-bmNsdWRlIDxzeXMvdHlwZXMuaD4KI2luY2x1ZGUgPHN5cy93YWl0Lmg+CiNpbmNsdWRlIDxzeXMv
-c3RhdC5oPgojaW5jbHVkZSA8ZGlyZW50Lmg+CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogQ09OU1RBTlRFUwogKiDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCiNkZWZpbmUg
-RURJVE9SX1ZFUlNJT04gICAiMy4wLUVsbGlvdE9TIgojZGVmaW5lIFRBQl9TSVpFICAgICAgICAg
-NAojZGVmaW5lIFVORE9fTElNSVQgICAgICAgMjU2CiNkZWZpbmUgU1RBVFVTX01TR19USU1FICAy
-CgojZGVmaW5lIEhFTFBfTVNHIFwKICAgICJDdHJsK1Mgc2FsdmFyICBDdHJsK1Egc2FpciAgQ3Ry
-bCtGIGJ1c2NhciAgQ3RybCtcXCBzdWJzdGl0dWlyICBDdHJsK0cgbGluaGEgICIgXAogICAgIkN0
-cmwrQyBjb3BpYXIgIEN0cmwrWCBjb3J0YXIgIEN0cmwrQiBjb2xhciAgU2hpZnQr4oaR4oaT4oaQ
-4oaSIHNlbGVjaW9uYXIgICIgXAogICAgIkN0cmwrVSBkZXNmYXogIEN0cmwrWSByZWZheiAgQ3Ry
-bCtLIGRlbC5saW5oYSAgQ3RybCtEIGR1cCAgIiBcCiAgICAiQ3RybCsvIGNvbWVudGFyICBDdHJs
-K1IgZm9ybWF0YXIgIEN0cmwrViBjaGVjYXIgIEN0cmwrSiBkZWZpbmnDp8OjbyAgIiBcCiAgICAi
-Q3RybCtOIHNuaXBwZXRzICBDdHJsK1AgYXJxdWl2b3MgIEN0cmwrTyBzw61tYm9sb3MgIEN0cmwr
-TCBsaW5ndWFnZW0gICIgXAogICAgIkFsdCvihpHihpMgbW92ZXIgIEYyL0YzIGJ1ZmZlcnMgIEN0
-cmwrVyBhanVkYSIKI2RlZmluZSBDT01QTEVUSU9OX01BWCAgIDUxMgojZGVmaW5lIENPTVBMRVRJ
-T05fU0hPVyAgMTIKI2RlZmluZSBDVFJMKGspICAgICAgICAgICgoaykgJiAweDFmKQojZGVmaW5l
-IEdVVFRFUiAgICAgICAgICAgNSAgIC8qIGxhcmd1cmEgZG8gbsO6bWVybyBkZSBsaW5oYTogNCBk
-w61naXRvcyArIDEgZXNwYcOnbyAqLwoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIFRFQ0xBUyBFU1BFQ0lBSVMKICog4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgplbnVtIEtl
-eSB7CiAgICBCQUNLU1BBQ0UgICAgPSAxMjcsCiAgICBBUlJPV19MRUZUICAgPSAxMDAwLCBBUlJP
-V19SSUdIVCwgQVJST1dfVVAsIEFSUk9XX0RPV04sCiAgICBQQUdFX1VQLCBQQUdFX0RPV04sCiAg
-ICBIT01FX0tFWSwgRU5EX0tFWSwgREVMX0tFWSwKICAgIEFMVF9VUCwgQUxUX0RPV04sCiAgICBT
-SElGVF9UQUIsCiAgICBTSElGVF9MRUZULCBTSElGVF9SSUdIVCwgU0hJRlRfVVAsIFNISUZUX0RP
-V04sCiAgICBNT1VTRV9NT1ZFLAogICAgRjEsIEYyLCBGMywgRjQsIEY1Cn07CgovKiDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogSElHSExJ
-R0hUIOKAlCBJRHMKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQICovCgojZGVmaW5lIEhMX05PUk1BTCAgIDAKI2RlZmluZSBITF9DT01NRU5U
-ICAxCiNkZWZpbmUgSExfS0VZV09SRDEgMiAgIC8qIGNvbnRyb2xlIGRlIGZsdXhvICovCiNkZWZp
-bmUgSExfS0VZV09SRDIgMyAgIC8qIGJ1aWx0aW5zIC8gc3RkbGliICovCiNkZWZpbmUgSExfU1RS
-SU5HICAgNAojZGVmaW5lIEhMX05VTUJFUiAgIDUKI2RlZmluZSBITF9NQVRDSCAgICA2ICAgLyog
-cmVzdWx0YWRvIGRlIGJ1c2NhICovCiNkZWZpbmUgSExfU1lNQk9MICAgNwojZGVmaW5lIEhMX1RZ
-UEUgICAgIDggICAvKiB0aXBvcyBDIC8gbmFtZXNwYWNlcyBFbGxpb3RPUyAqLwojZGVmaW5lIEhM
-X1BSRVBST0MgIDkgICAvKiBkaXJldGl2YXMgI2luY2x1ZGUgZXRjICovCiNkZWZpbmUgSExfTUVU
-SE9EICAgMTAgIC8qIG3DqXRvZG9zIEVsbGlvdE9TIGFww7NzIHBvbnRvICovCiNkZWZpbmUgSExf
-VkFSICAgICAgMTEgIC8qICRWQVIgbm8gQmFzaCAqLwojZGVmaW5lIEhMX09QRVJBVE9SIDEyICAv
-KiBvcGVyYWRvcmVzIGVzcGVjaWFpczogLT4gOjogKiogKi8KI2RlZmluZSBITF9UQUcgICAgICAx
-MyAgLyogdGFncyBIVE1MIDx0YWc+ICovCiNkZWZpbmUgSExfQVRUUiAgICAgMTQgIC8qIGF0cmli
-dXRvcyBIVE1MICovCgojZGVmaW5lIEhMX0ZMQUdfTlVNQkVSUyAoMTw8MCkKI2RlZmluZSBITF9G
-TEFHX1NUUklOR1MgKDE8PDEpCgp0eXBlZGVmIHN0cnVjdCB7CiAgICBjb25zdCBjaGFyICAqZmls
-ZXR5cGU7CiAgICBjb25zdCBjaGFyICoqZXh0ZW5zaW9uczsKICAgIGNvbnN0IGNoYXIgKiprd19m
-bG93OyAgICAgIC8qIGlmL2Vsc2UvZm9yL3doaWxlLi4uICovCiAgICBjb25zdCBjaGFyICoqa3df
-YnVpbHRpbjsgICAvKiBmdW7Dp8O1ZXMgc3RkbGliICovCiAgICBjb25zdCBjaGFyICoqa3dfdHlw
-ZXM7ICAgICAvKiB0aXBvcyBDIC8gbmFtZXNwYWNlcyBFbGxpb3RPUyAqLwogICAgY29uc3QgY2hh
-ciAqKmt3X3ByZXByb2M7ICAgLyogI2RpcmV0aXZhcyBDIC8gbcOpdG9kb3MgRWxsaW90T1MgKi8K
-ICAgIGNvbnN0IGNoYXIgICpzY29tbWVudDsKICAgIGNvbnN0IGNoYXIgICptY3MsICptY2U7ICAg
-LyogbXVsdGktbGluZSBjb21tZW50IHN0YXJ0L2VuZCAqLwogICAgaW50IGZsYWdzOwp9IFN5bnRh
-eDsKCi8qIOKUgOKUgCBDIC8gQysrIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCAqLwpzdGF0aWMgY29uc3QgY2hh
-ciAqY19leHRbXSAgID0geyAiLmMiLCIuaCIsIE5VTEwgfTsKc3RhdGljIGNvbnN0IGNoYXIgKmNw
-cF9leHRbXSA9IHsgIi5jcHAiLCIuY2MiLCIuY3h4IiwiLmhwcCIsIi5oeHgiLCIuaW5sIiwgTlVM
-TCB9OwpzdGF0aWMgY29uc3QgY2hhciAqY19mbG93W10gPSB7CiAgICAiaWYiLCJlbHNlIiwid2hp
-bGUiLCJmb3IiLCJkbyIsInN3aXRjaCIsImNhc2UiLCJicmVhayIsImNvbnRpbnVlIiwKICAgICJy
-ZXR1cm4iLCJnb3RvIiwiZGVmYXVsdCIsInNpemVvZiIsInR5cGVvZiIsImFsaWdub2YiLCJvZmZz
-ZXRvZiIsCiAgICAidHlwZWRlZiIsInN0cnVjdCIsImVudW0iLCJ1bmlvbiIsImNsYXNzIiwibmFt
-ZXNwYWNlIiwidGVtcGxhdGUiLAogICAgInR5cGVuYW1lIiwicHVibGljIiwicHJpdmF0ZSIsInBy
-b3RlY3RlZCIsInZpcnR1YWwiLCJvdmVycmlkZSIsImZpbmFsIiwKICAgICJleHRlcm4iLCJzdGF0
-aWMiLCJjb25zdCIsImNvbnN0ZXhwciIsImNvbnN0ZXZhbCIsImNvbnN0aW5pdCIsCiAgICAidm9s
-YXRpbGUiLCJpbmxpbmUiLCJyZWdpc3RlciIsImF1dG8iLCJleHBsaWNpdCIsIm9wZXJhdG9yIiwi
-ZnJpZW5kIiwKICAgICJuZXciLCJkZWxldGUiLCJ0aHJvdyIsInRyeSIsImNhdGNoIiwidXNpbmci
-LCJzdGF0aWNfYXNzZXJ0IiwKICAgICJub2V4Y2VwdCIsIm51bGxwdHIiLCJ0aGlzIiwiZGVjbHR5
-cGUiLCJzdGF0aWNfY2FzdCIsInJlaW50ZXJwcmV0X2Nhc3QiLAogICAgImR5bmFtaWNfY2FzdCIs
-ImNvbnN0X2Nhc3QiLCJjb19hd2FpdCIsImNvX3JldHVybiIsImNvX3lpZWxkIixOVUxMCn07CnN0
-YXRpYyBjb25zdCBjaGFyICpjX2JpW10gICA9IHsKICAgIC8qIHRpcG9zIHByaW1pdGl2b3MgKi8K
-ICAgICJ2b2lkIiwiaW50IiwiY2hhciIsImxvbmciLCJzaG9ydCIsImZsb2F0IiwiZG91YmxlIiwi
-dW5zaWduZWQiLCJzaWduZWQiLAogICAgImJvb2wiLCJ3Y2hhcl90IiwiY2hhcjhfdCIsImNoYXIx
-Nl90IiwiY2hhcjMyX3QiLAogICAgLyogdmFsb3JlcyBlc3BlY2lhaXMgKi8KICAgICJOVUxMIiwi
-dHJ1ZSIsImZhbHNlIiwiRU9GIiwiU0VFS19TRVQiLCJTRUVLX0NVUiIsIlNFRUtfRU5EIiwKICAg
-IC8qIGZ1bsOnw7VlcyBzdGRsaWIgY29tdW5zICovCiAgICAicHJpbnRmIiwiZnByaW50ZiIsInNw
-cmludGYiLCJzbnByaW50ZiIsInNjYW5mIiwic3NjYW5mIiwiZnNjYW5mIiwKICAgICJtYWxsb2Mi
-LCJjYWxsb2MiLCJyZWFsbG9jIiwiZnJlZSIsIm1lbWNweSIsIm1lbW1vdmUiLCJtZW1zZXQiLCJt
-ZW1jbXAiLAogICAgInN0cmxlbiIsInN0cmNweSIsInN0cm5jcHkiLCJzdHJjYXQiLCJzdHJuY2F0
-Iiwic3RyY21wIiwic3RybmNtcCIsCiAgICAic3RyY2hyIiwic3RycmNociIsInN0cnN0ciIsInN0
-cnRvayIsInN0cmR1cCIsInN0cm5kdXAiLAogICAgImZvcGVuIiwiZmNsb3NlIiwiZnJlYWQiLCJm
-d3JpdGUiLCJmZ2V0cyIsImZwdXRzIiwiZmdldGMiLCJmcHV0YyIsCiAgICAiZnNlZWsiLCJmdGVs
-bCIsInJld2luZCIsImZlb2YiLCJmZXJyb3IiLCJmZmx1c2giLCJmdHJ1bmNhdGUiLAogICAgIm9w
-ZW4iLCJjbG9zZSIsInJlYWQiLCJ3cml0ZSIsImxzZWVrIiwic3RhdCIsImZzdGF0IiwibHN0YXQi
-LAogICAgImZvcmsiLCJleGVjIiwiZXhlY2wiLCJleGVjdiIsImV4ZWN2cCIsImV4ZWNscCIsIndh
-aXRwaWQiLCJleGl0IiwiX2V4aXQiLAogICAgImdldGVudiIsInNldGVudiIsInB1dGVudiIsInN5
-c3RlbSIsInBvcGVuIiwicGNsb3NlIiwKICAgICJhdG9pIiwiYXRvbCIsImF0b2YiLCJzdHJ0b2wi
-LCJzdHJ0b3VsIiwic3RydG9kIiwiYWJzIiwibGFicyIsImZhYnMiLAogICAgInNpbiIsImNvcyIs
-InRhbiIsInNxcnQiLCJwb3ciLCJsb2ciLCJsb2cyIiwibG9nMTAiLCJmbG9vciIsImNlaWwiLCJy
-b3VuZCIsCiAgICAicmFuZCIsInNyYW5kIiwicXNvcnQiLCJic2VhcmNoIiwKICAgICJhc3NlcnQi
-LCJhYm9ydCIsInBlcnJvciIsInN0cmVycm9yIiwKICAgICJ0aW1lIiwiY2xvY2siLCJkaWZmdGlt
-ZSIsIm1rdGltZSIsImdtdGltZSIsImxvY2FsdGltZSIsCiAgICAicHRocmVhZF9jcmVhdGUiLCJw
-dGhyZWFkX2pvaW4iLCJwdGhyZWFkX211dGV4X2xvY2siLCJwdGhyZWFkX211dGV4X3VubG9jayIs
-CiAgICAic29ja2V0IiwiYmluZCIsImxpc3RlbiIsImFjY2VwdCIsImNvbm5lY3QiLCJzZW5kIiwi
-cmVjdiIsInNlbmR0byIsInJlY3Zmcm9tIiwKICAgICJpbmV0X2F0b24iLCJpbmV0X250b2EiLCJp
-bmV0X3B0b24iLCJpbmV0X250b3AiLCJodG9ucyIsImh0b25sIiwibnRvaHMiLCJudG9obCIsCiAg
-ICAiZ2V0YWRkcmluZm8iLCJmcmVlYWRkcmluZm8iLCJnZXRuYW1laW5mbyIsImdldGhvc3RieW5h
-bWUiLE5VTEwKfTsKc3RhdGljIGNvbnN0IGNoYXIgKmNfdHlwZXNbXT0gewogICAgInVpbnQ4X3Qi
-LCJ1aW50MTZfdCIsInVpbnQzMl90IiwidWludDY0X3QiLAogICAgImludDhfdCIsImludDE2X3Qi
-LCJpbnQzMl90IiwiaW50NjRfdCIsCiAgICAic2l6ZV90Iiwic3NpemVfdCIsInB0cmRpZmZfdCIs
-InVpbnRwdHJfdCIsImludHB0cl90IiwKICAgICJvZmZfdCIsIm1vZGVfdCIsInVpZF90IiwiZ2lk
-X3QiLCJkZXZfdCIsImlub190IiwibmxpbmtfdCIsCiAgICAicGlkX3QiLCJ0aWRfdCIsInB0aHJl
-YWRfdCIsInB0aHJlYWRfbXV0ZXhfdCIsInB0aHJlYWRfY29uZF90IiwKICAgICJGSUxFIiwiRElS
-IiwidGltZV90IiwiY2xvY2tfdCIsInN1c2Vjb25kc190IiwKICAgICJzb2NrYWRkciIsInNvY2th
-ZGRyX2luIiwic29ja2FkZHJfaW42Iiwic29ja2FkZHJfdW4iLCJzb2NrbGVuX3QiLAogICAgImlu
-X2FkZHIiLCJpbjZfYWRkciIsImFkZHJpbmZvIiwiaG9zdGVudCIsInNlcnZlbnQiLAogICAgImZk
-X3NldCIsInNpZ3NldF90Iiwic3RydWN0IiwidmFfbGlzdCIsCiAgICAibHVhX1N0YXRlIiwibHVh
-X0ludGVnZXIiLCJsdWFfTnVtYmVyIiwibHVhX0NGdW5jdGlvbiIsImx1YV9EZWJ1ZyIsCiAgICAi
-bHVhTF9SZWciLCJsdWFMX0J1ZmZlciIsCiAgICAvKiBDKysgU1RMICovCiAgICAic3RyaW5nIiwi
-dmVjdG9yIiwibWFwIiwidW5vcmRlcmVkX21hcCIsInNldCIsInVub3JkZXJlZF9zZXQiLAogICAg
-Imxpc3QiLCJkZXF1ZSIsInF1ZXVlIiwic3RhY2siLCJhcnJheSIsInR1cGxlIiwicGFpciIsIm9w
-dGlvbmFsIiwKICAgICJ2YXJpYW50Iiwic2hhcmVkX3B0ciIsInVuaXF1ZV9wdHIiLCJ3ZWFrX3B0
-ciIsImZ1bmN0aW9uIiwKICAgICJ0aHJlYWQiLCJtdXRleCIsImNvbmRpdGlvbl92YXJpYWJsZSIs
-ImF0b21pYyIsImZ1dHVyZSIsInByb21pc2UiLAogICAgInN0cmluZ3N0cmVhbSIsImZzdHJlYW0i
-LCJpZnN0cmVhbSIsIm9mc3RyZWFtIiwiaW9zdHJlYW0iLAogICAgIml0ZXJhdG9yIiwiaW5pdGlh
-bGl6ZXJfbGlzdCIsImV4Y2VwdGlvbiIsInJ1bnRpbWVfZXJyb3IiLE5VTEwKfTsKc3RhdGljIGNv
-bnN0IGNoYXIgKmNfcHBbXSAgID0gewogICAgIiNpbmNsdWRlIiwiI2RlZmluZSIsIiN1bmRlZiIs
-IiNpZmRlZiIsIiNpZm5kZWYiLCIjaWYiLCIjZWxzZSIsCiAgICAiI2VsaWYiLCIjZW5kaWYiLCIj
-cHJhZ21hIiwiI2Vycm9yIiwiI3dhcm5pbmciLCIjbGluZSIsCiAgICAiI2RlZmluZWQiLCJvbmNl
-IiwiTlVMTCIsTlVMTAp9OwoKLyog4pSA4pSAIEx1YSAvIEVsbGlvdE9TIOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCAqLwpzdGF0aWMgY29uc3QgY2hh
-ciAqbHVhX2V4dFtdID0geyAiLmx1YSIsIE5VTEwgfTsKc3RhdGljIGNvbnN0IGNoYXIgKmx1YV9m
-bG93W109IHsKICAgICJpZiIsInRoZW4iLCJlbHNlIiwiZWxzZWlmIiwiZW5kIiwiZm9yIiwid2hp
-bGUiLCJkbyIsInJlcGVhdCIsCiAgICAidW50aWwiLCJmdW5jdGlvbiIsImxvY2FsIiwicmV0dXJu
-IiwiYnJlYWsiLCJnb3RvIiwiaW4iLAogICAgImFuZCIsIm9yIiwibm90IixOVUxMCn07CnN0YXRp
-YyBjb25zdCBjaGFyICpsdWFfYmlbXSAgPSB7CiAgICAvKiB2YWxvcmVzICovCiAgICAibmlsIiwi
-dHJ1ZSIsImZhbHNlIiwKICAgIC8qIGZ1bsOnw7VlcyBnbG9iYWlzICovCiAgICAicHJpbnQiLCJy
-ZXF1aXJlIiwidHlwZSIsInRvc3RyaW5nIiwidG9udW1iZXIiLCJlcnJvciIsImFzc2VydCIsCiAg
-ICAicGNhbGwiLCJ4cGNhbGwiLCJpcGFpcnMiLCJwYWlycyIsIm5leHQiLCJzZWxlY3QiLCJ1bnBh
-Y2siLAogICAgInJhd2dldCIsInJhd3NldCIsInJhd2VxdWFsIiwicmF3bGVuIiwKICAgICJzZXRt
-ZXRhdGFibGUiLCJnZXRtZXRhdGFibGUiLCJzZXRmZW52IiwiZ2V0ZmVudiIsCiAgICAibG9hZCIs
-ImxvYWRmaWxlIiwibG9hZHN0cmluZyIsImRvZmlsZSIsImNvbGxlY3RnYXJiYWdlIiwKICAgICJt
-b2R1bGUiLCJwYWNrYWdlIiwicmVxdWlyZSIsCiAgICAvKiBpdGVyYWRvcmVzIGUgbWlzYyAqLwog
-ICAgIl9HIiwiX0VOViIsIl9WRVJTSU9OIiwiLi4uIiwiYXJnIiwKICAgIC8qIGNvcm91dGluZSAq
-LwogICAgImNvcm91dGluZSIsImNvcm91dGluZS5jcmVhdGUiLCJjb3JvdXRpbmUucmVzdW1lIiwi
-Y29yb3V0aW5lLnlpZWxkIiwKICAgICJjb3JvdXRpbmUud3JhcCIsImNvcm91dGluZS5zdGF0dXMi
-LCJjb3JvdXRpbmUuaXN5aWVsZGFibGUiLAogICAgLyogc3RyaW5nICovCiAgICAic3RyaW5nIiwi
-c3RyaW5nLmZvcm1hdCIsInN0cmluZy5maW5kIiwic3RyaW5nLm1hdGNoIiwic3RyaW5nLmdtYXRj
-aCIsCiAgICAic3RyaW5nLmdzdWIiLCJzdHJpbmcuc3ViIiwic3RyaW5nLmxlbiIsInN0cmluZy51
-cHBlciIsInN0cmluZy5sb3dlciIsCiAgICAic3RyaW5nLnJlcCIsInN0cmluZy5ieXRlIiwic3Ry
-aW5nLmNoYXIiLCJzdHJpbmcucmV2ZXJzZSIsInN0cmluZy5kdW1wIiwKICAgIC8qIHRhYmxlICov
-CiAgICAidGFibGUiLCJ0YWJsZS5pbnNlcnQiLCJ0YWJsZS5yZW1vdmUiLCJ0YWJsZS5jb25jYXQi
-LCJ0YWJsZS5zb3J0IiwKICAgICJ0YWJsZS51bnBhY2siLCJ0YWJsZS5tb3ZlIiwidGFibGUucGFj
-ayIsCiAgICAvKiBtYXRoICovCiAgICAibWF0aCIsIm1hdGguZmxvb3IiLCJtYXRoLmNlaWwiLCJt
-YXRoLmFicyIsIm1hdGgubWF4IiwibWF0aC5taW4iLAogICAgIm1hdGgucmFuZG9tIiwibWF0aC5y
-YW5kb21zZWVkIiwibWF0aC5zcXJ0IiwibWF0aC5odWdlIiwibWF0aC5waSIsCiAgICAibWF0aC5z
-aW4iLCJtYXRoLmNvcyIsIm1hdGgudGFuIiwibWF0aC5leHAiLCJtYXRoLmxvZyIsIm1hdGgubW9k
-ZiIsCiAgICAibWF0aC5mbW9kIiwibWF0aC50eXBlIiwibWF0aC50b2ludGVnZXIiLCJtYXRoLm1h
-eGludGVnZXIiLCJtYXRoLm1pbmludGVnZXIiLAogICAgLyogaW8gKi8KICAgICJpbyIsImlvLm9w
-ZW4iLCJpby5yZWFkIiwiaW8ud3JpdGUiLCJpby5saW5lcyIsImlvLmNsb3NlIiwKICAgICJpby5m
-bHVzaCIsImlvLmlucHV0IiwiaW8ub3V0cHV0IiwiaW8udG1wZmlsZSIsImlvLnBvcGVuIiwKICAg
-IC8qIG9zICovCiAgICAib3MiLCJvcy50aW1lIiwib3MuZGF0ZSIsIm9zLmV4ZWN1dGUiLCJvcy5j
-bG9jayIsIm9zLmV4aXQiLAogICAgIm9zLmdldGVudiIsIm9zLnJlbW92ZSIsIm9zLnJlbmFtZSIs
-Im9zLnRtcG5hbWUiLAogICAgLyogdXRmOCAqLwogICAgInV0ZjgiLCJ1dGY4LmNoYXIiLCJ1dGY4
-LmNvZGVzIiwidXRmOC5jb2RlcG9pbnQiLCJ1dGY4LmxlbiIsTlVMTAp9OwovKiBuYW1lc3BhY2Vz
-IEVsbGlvdE9TIOKGkiBkZXN0YWNhZG9zIGNvbW8gdGlwb3MgKi8Kc3RhdGljIGNvbnN0IGNoYXIg
-Kmx1YV9uc1tdICA9IHsKICAgICJuZXQiLCJtb2QiLCJhaSIsImFnZW50IiwiZnMiLCJzeXMiLCJj
-cnlwdG8iLCJsbW9kIiwibXMiLAogICAgInV0aWwiLCJkYXRlIiwianNvbiIsIndlYiIsIml2YXIi
-LCJkYiIsImNjIiwidWkiLCJ0dWkiLAogICAgInNoIiwiZXhwbG9pdCIsInBlbnQiLAogICAgIm51
-bSIsInBhdGgiLCJjb2xvciIsInRlc3QiLCJRdWV1ZSIsIlN0YWNrIixOVUxMCn07Ci8qIG3DqXRv
-ZG9zIEVsbGlvdE9TIOKGkiBkZXN0YWNhZG9zIGNvbW8gSExfTUVUSE9EICovCnN0YXRpYyBjb25z
-dCBjaGFyICpsdWFfbWV0aFtdPSB7CiAgICAvKiBuZXQgKi8KICAgICJnZXQiLCJwb3N0IiwiZ2V0
-aCIsImZldGNoIiwiY29ubmVjdCIsInRjcCIsInRjcDYiLCJ1ZHAiLCJsaXN0ZW4iLAogICAgInNv
-Y2tldGV4Iiwic29ja2V0Iiwic2VuZCIsInJlY3YiLCJyZWN2YWxsIiwicmVjdmxpbmUiLCJyZWN2
-ZnJvbSIsCiAgICAiY2xvc2UiLCJzY2FuIiwiZG5zIiwicGluZyIsImhvc3RzIiwiaXAiLCJvcyIs
-ImltcG9ydCIsCiAgICAiYmluZCIsImFjY2VwdCIsInBlZXIiLCJpbmZvIiwid2FpdCIsImxpbmVz
-Iiwic2VuZGFsbCIsInNlbmR0byIsCiAgICAicGVlayIsInNodXRkb3duIiwic2V0dGltZW91dCIs
-InNldHNvY2tvcHQiLCJnZXRzb2Nrb3B0IiwKICAgIC8qIG1vZCAqLwogICAgInhzcyIsInNxbGki
-LCJub3NxbCIsImxmaSIsInJjZSIsInNzcmYiLCJzc3RpIiwicmVkaXIiLCJjb3JzIiwiY3NyZiIs
-CiAgICAiand0IiwiaWRvciIsInh4ZSIsImhlYWRlcnMiLCJ3YWYiLCJzcGlkZXIiLCJkaXJzIiwi
-YmFja3VwIiwic2VjcmV0cyIsCiAgICAicGFyYW1zIiwic3ViZG9tYWlucyIsImNoYWluIiwiZm9y
-Y2UiLCJzY2FuIiwicmVjb24iLCJwYXlsb2FkIiwKICAgICJncmFwaHFsIiwid3MiLCJjcmxmIiwi
-Z2l0Iiwib3Blbl9yZWRpcmVjdCIsImRvcyIsImZ1enoiLCJhdXRoIiwiaW5mbyIsCiAgICAvKiBh
-aSAqLwogICAgImFzayIsImNvZGUiLCJtb2RlbCIsImtleSIsImNsZWFyIiwiZm9yZ2V0IiwiaGlz
-dG9yeSIsInJwIiwicGVyc29uYSIsCiAgICAicHJvdmlkZXIiLCJhZGQiLCJyZW1vdmUiLCJsaXN0
-IiwibWFpbiIsIm1vZGVsc19jb2RlIiwKICAgIC8qIGFnZW50ICovCiAgICAicnVuIiwiY2hhdCIs
-InJlc2V0IiwKICAgIC8qIGZzICovCiAgICAicmVhZCIsIndyaXRlIiwiYXBwZW5kIiwiY29weSIs
-Im1vdmUiLCJkZWxldGUiLCJybSIsIm1rZGlyIiwibHMiLAogICAgImV4aXN0cyIsImdsb2IiLCJj
-aG1vZCIsInN0YXQiLCJpc2ZpbGUiLCJpc2RpciIsCiAgICAvKiBzaCAqLwogICAgImV4ZWMiLCJj
-YXB0dXJlIiwKICAgIC8qIHN5cyAqLwogICAgInRocmVhZCIsImpvaW4iLCJzcGF3biIsInNoIiwi
-a2lsbCIsImVudiIsInBpZCIsImV4aXQiLCJsaXN0IiwKICAgICJuZXQiLCJzdG9yYWdlIiwidGlt
-ZSIsInRpbWVfbXMiLCJzbGVlcCIsIm11dGV4IiwiY2hhbm5lbCIsCiAgICAvKiBjcnlwdG8gKi8K
-ICAgICJtZDUiLCJzaGExIiwic2hhMjU2Iiwic2hhNTEyIiwiYjY0ZW5jIiwiYjY0ZGVjIiwKICAg
-ICJoZXhlbmMiLCJoZXhkZWMiLCJobWFjIiwiYWVzX2VuYyIsImFlc19kZWMiLCJyYW5kIiwKICAg
-IC8qIGRiICovCiAgICAib3BlbiIsImV4ZWMiLCJxdWVyeSIsInRhYmxlcyIsCiAgICAvKiBjYyAq
-LwogICAgInJ1biIsImx1YTJjIiwKICAgIC8qIHVpICovCiAgICAiY29sb3IiLCJib3giLCJjbGVh
-ciIsInNsZWVwIiwiZmlnIiwiaW5wdXQiLAogICAgLyogdHVpICovCiAgICAibWFpbiIsImZ1bmMi
-LCJjbG9zZSIsInJlYWQiLAogICAgLyogd2ViICovCiAgICAic2F2ZSIsInNlcnZlIiwic3RvcCIs
-ImxpbmtzIiwiZm9ybXMiLCJzY3JpcHRzIiwKICAgIC8qIGl2YXIgKi8KICAgICJlbmFibGUiLCJk
-aXNhYmxlIiwic3RhdHVzIiwicmVzZXQiLCJwcmVwcm9jZXNzIiwKICAgIC8qIG51bSAqLwogICAg
-InBhcnNlIiwiZm9ybWF0IiwiY2xhbXAiLCJsZXJwIiwicm91bmQiLCJzaWduIiwiaXNfaW50Iiwi
-aXNfbmFuIiwiaW5fcmFuZ2UiLAogICAgInRvX2JpbiIsInRvX2hleCIsInRvX29jdCIsImF2ZyIs
-CiAgICAvKiBwYXRoICovCiAgICAiam9pbiIsImJhc2VuYW1lIiwiZGlybmFtZSIsImV4dCIsInN0
-ZW0iLCJhYnMiLCJleHBhbmR1c2VyIiwicGFydHMiLCJzcGxpdCIsCiAgICAvKiBjb2xvciAqLwog
-ICAgInJlZCIsImdyZWVuIiwieWVsbG93IiwiYmx1ZSIsIm1hZ2VudGEiLCJjeWFuIiwid2hpdGUi
-LCJibGFjayIsImJvbGQiLCJkaW0iLAogICAgIml0YWxpYyIsInVuZGVybGluZSIsImJsaW5rIiwi
-YnJpZ2h0X3JlZCIsImJyaWdodF9ncmVlbiIsImJyaWdodF95ZWxsb3ciLAogICAgImJyaWdodF9i
-bHVlIiwiYnJpZ2h0X21hZ2VudGEiLCJicmlnaHRfY3lhbiIsImJyaWdodF93aGl0ZSIsCiAgICAi
-YmdfcmVkIiwiYmdfZ3JlZW4iLCJiZ195ZWxsb3ciLCJiZ19ibHVlIiwiYmdfbWFnZW50YSIsImJn
-X2N5YW4iLCJiZ193aGl0ZSIsCiAgICAicmdiIiwiYmdfcmdiIiwic3RyaXAiLCJsZW4iLAogICAg
-LyogdGVzdCAqLwogICAgIm9rIiwiZXEiLCJuZXEiLCJndCIsImx0IiwiZ3RlIiwibHRlIiwibmls
-XyIsIm5vdF9uaWwiLCJ0eXBlX2lzIiwiZGVlcF9lcSIsCiAgICAiY29udGFpbnMiLCJtYXRjaCIs
-ImVyciIsIm5vX2VyciIsInN1aXRlIiwicmVwb3J0IiwKICAgIC8qIFF1ZXVlL1N0YWNrICovCiAg
-ICAicHVzaCIsInBvcCIsInBlZWsiLCJzaXplIiwiaXNfZW1wdHkiLCJ0b190YWJsZSIsCiAgICAv
-KiB0YWJsZSBleHRyYXMgKi8KICAgICJmbGF0IiwicmV2ZXJzZSIsInNvcnRlZCIsInNsaWNlIiwi
-ZmluZCIsImFueSIsImFsbCIsImluZGV4X29mIiwKICAgICJjb25jYXRfYWxsIiwiemlwIiwiZ3Jv
-dXBfYnkiLAogICAgLyoganNvbiBleHRyYXMgKi8KICAgICJwcmV0dHkiLCJxdWVyeSIsCiAgICAv
-KiBzeXMgZXh0cmFzICovCiAgICAid2hpY2giLCJob3N0bmFtZSIsImNwdV9jb3VudCIsIm1lbSIs
-CiAgICAvKiBmcyBleHRyYXMgKi8KICAgICJ0ZW1wZmlsZSIsIndhdGNoIiwKICAgIC8qIHJlIGV4
-dHJhcyAqLwogICAgIm5hbWVkIiwiZ21hdGNoIiwKICAgIC8qIGV4cGxvaXQgKi8KICAgICJzcWxp
-IiwieHNzIiwibGZpIiwicmNlIiwic3N0aSIsImlkb3IiLAogICAgLyogcGVudCAqLwogICAgInN0
-YXJ0Iiwic3RvcCIsImxpc3QiLAogICAgLyogdXRpbCAqLwogICAgIm1hcCIsImZpbHRlciIsInJl
-ZHVjZSIsImFueSIsImFsbCIsImNvdW50IiwicmFuZ2UiLCJlbnVtZXJhdGUiLCJ6aXAiLAogICAg
-ImZsYXR0ZW4iLCJ1bmlxdWUiLCJzb3J0ZWQiLCJzdW0iLCJtaW4iLCJtYXgiLCJjaHVuayIsImdy
-b3VwYnkiLAogICAgImtleXMiLCJ2YWx1ZXMiLCJwaWNrIiwib21pdCIsIm1lcmdlIiwiZGVlcGNv
-cHkiLCJwYXJ0aWFsIiwibWVtb2l6ZSIsCiAgICAib25jZSIsInJldHJ5Iiwid2l0aF9maWxlIiwi
-cHAiLCJwcmludGYiLAogICAgIm1lYW4iLCJtZWRpYW4iLCJtb2RlIiwidmFyaWFuY2UiLCJzdGRl
-diIsInN0ZGV2X3NhbXBsZSIsCiAgICAicGVyY2VudGlsZSIsIm5vcm1hbGl6ZSIsImNsYW1wIiwi
-cm91bmQiLAogICAgIml0ZXIiLCJnZW5lcmF0b3IiLCJ0YWtlIiwiZHJvcCIsInN0ZXAiLCJ0YWxs
-eSIsImZsYXRfbWFwIiwiaW50ZXJsZWF2ZSIsCiAgICAiZmlyc3QiLCJsYXN0IiwiaW5kZXhfb2Yi
-LCJ3aXRob3V0IiwiZGlmZmVyZW5jZSIsImludGVyc2VjdGlvbiIsInVuaW9uIiwKICAgICJyb3Rh
-dGUiLCJ0cmFuc3Bvc2UiLCJjb21iaW5hdGlvbnMiLCJwZXJtdXRhdGlvbnMiLAogICAgInBpcGUi
-LCJjb21wb3NlIiwiaWRlbnRpdHkiLCJub29wIiwiYWx3YXlzIiwiZmxpcCIsInRhcCIsImRlZmF1
-bHQiLAogICAgInRydXRoeSIsImZhbHN5IiwKICAgIC8qIGRhdGUgKi8KICAgICJub3ciLCJ0b2Rh
-eSIsImZvcm1hdCIsInBhcnNlIiwiZGlmZiIsImFkZCIsInN1YiIsIndlZWtkYXkiLAogICAgImlz
-X2xlYXAiLCJ0aW1lc3RhbXAiLCJmcm9tX3RpbWVzdGFtcCIsCiAgICAvKiBqc29uICovCiAgICAi
-ZW5jb2RlIiwiZGVjb2RlIiwKICAgIC8qIG1zICovCiAgICAiY2hlY2siLCJhbGlhcyIsImZvcmNl
-IiwKICAgIC8qIGxtb2QgKi8KICAgICJuZXciLCJwYXRoIiwibW9kIiwibGlzdCIsInJlbW92ZSIs
-CiAgICAvKiBoZWxwIOKAlCBjb21wYXJ0aWxoYWRvICovCiAgICAiaGVscCIsTlVMTAp9OwoKLyog
-4pSA4pSAIEJhc2ggLyBTaGVsbCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIAgKi8Kc3RhdGljIGNvbnN0IGNoYXIgKnNoX2V4dFtdICA9
-IHsgIi5zaCIsIi5iYXNoIiwiLnpzaCIsIi5rc2giLCBOVUxMIH07CnN0YXRpYyBjb25zdCBjaGFy
-ICpzaF9mbG93W10gPSB7CiAgICAiaWYiLCJ0aGVuIiwiZWxzZSIsImVsaWYiLCJmaSIsImZvciIs
-IndoaWxlIiwiZG8iLCJkb25lIiwiY2FzZSIsCiAgICAiZXNhYyIsImZ1bmN0aW9uIiwicmV0dXJu
-IiwiYnJlYWsiLCJjb250aW51ZSIsImV4aXQiLCJzZWxlY3QiLAogICAgInVudGlsIiwidGltZSIs
-ImluIiwibG9jYWwiLCJkZWNsYXJlIiwidHlwZXNldCIsTlVMTAp9OwpzdGF0aWMgY29uc3QgY2hh
-ciAqc2hfYmlbXSAgID0gewogICAgLyogY29tYW5kb3MgZGUgb3V0cHV0ICovCiAgICAiZWNobyIs
-InByaW50ZiIsInJlYWQiLAogICAgLyogbmF2ZWdhw6fDo28gZSBhcnF1aXZvcyAqLwogICAgImNk
-IiwibHMiLCJta2RpciIsInJtZGlyIiwicm0iLCJjcCIsIm12IiwiY2F0IiwidG91Y2giLCJsbiIs
-CiAgICAiZmluZCIsImxvY2F0ZSIsIndoaWNoIiwid2hlcmVpcyIsInR5cGUiLCJmaWxlIiwic3Rh
-dCIsCiAgICAvKiB0ZXh0byAqLwogICAgImdyZXAiLCJlZ3JlcCIsImZncmVwIiwic2VkIiwiYXdr
-IiwiY3V0IiwidHIiLCJzb3J0IiwidW5pcSIsIndjIiwKICAgICJoZWFkIiwidGFpbCIsImxlc3Mi
-LCJtb3JlIiwiZGlmZiIsInBhdGNoIiwiY29sdW1uIiwiZm10IiwiZm9sZCIsCiAgICAvKiBwZXJt
-aXNzw7VlcyAqLwogICAgImNobW9kIiwiY2hvd24iLCJjaGdycCIsInVtYXNrIiwiaWQiLCJ3aG9h
-bWkiLCJncm91cHMiLAogICAgLyogcHJvY2Vzc29zICovCiAgICAia2lsbCIsImtpbGxhbGwiLCJw
-a2lsbCIsInBncmVwIiwicHMiLCJ0b3AiLCJqb2JzIiwiYmciLCJmZyIsIndhaXQiLAogICAgInNs
-ZWVwIiwibmljZSIsIm5vaHVwIiwidGltZW91dCIsIndhdGNoIiwKICAgIC8qIHZhcmnDoXZlaXMg
-ZSBhbWJpZW50ZSAqLwogICAgImV4cG9ydCIsInVuc2V0Iiwic2V0IiwiZW52IiwicHJpbnRlbnYi
-LCJzb3VyY2UiLCJhbGlhcyIsInVuYWxpYXMiLAogICAgInJlYWRvbmx5IiwiZXZhbCIsImV4ZWMi
-LCJzaGlmdCIsInRyYXAiLAogICAgLyogc3RyaW5ncyBlIGFyaXRtw6l0aWNhICovCiAgICAidGVz
-dCIsImV4cHIiLCJsZXQiLCJiYXNlbmFtZSIsImRpcm5hbWUiLCJyZWFscGF0aCIsInJlYWRsaW5r
-IiwKICAgIC8qIHJlZGUgKi8KICAgICJjdXJsIiwid2dldCIsInBpbmciLCJzc2giLCJzY3AiLCJy
-c3luYyIsIm5ldHN0YXQiLCJzcyIsImlwIiwKICAgICJuYyIsIm5jYXQiLCJubWFwIiwiZGlnIiwi
-bnNsb29rdXAiLCJob3N0IiwidHJhY2Vyb3V0ZSIsCiAgICAvKiBjb21wcmVzc8OjbyAqLwogICAg
-InRhciIsImd6aXAiLCJndW56aXAiLCJ6aXAiLCJ1bnppcCIsImJ6aXAyIiwieHoiLAogICAgLyog
-bWlzYyAqLwogICAgInRlZSIsInhhcmdzIiwicGFyYWxsZWwiLCJ5ZXMiLCJ0cnVlIiwiZmFsc2Ui
-LCJub29wIiwKICAgICJkYXRlIiwiY2FsIiwiYmMiLCJkYyIsImpxIiwiYmFzZTY0IiwKICAgIC8q
-IHBrZyAqLwogICAgInBrZyIsImFwdCIsImFwdC1nZXQiLCJkcGtnIiwiYnJldyIsInBpcCIsIm5w
-bSIsImNhcmdvIiwKICAgIC8qIGNvbXBpbGFkb3JlcyAqLwogICAgImNjIiwiZ2NjIiwiY2xhbmci
-LCJnKysiLCJjbGFuZysrIiwibWFrZSIsImNtYWtlIiwibGQiLAogICAgLyogb3V0cm9zIHNoZWxs
-cyAvIGludGVycHJldGVycyAqLwogICAgImJhc2giLCJzaCIsInpzaCIsInB5dGhvbjMiLCJub2Rl
-IiwibHVhIiwicGVybCIsInJ1YnkiLE5VTEwKfTsKc3RhdGljIGNvbnN0IGNoYXIgKnNoX3ZhcnNb
-XSA9IHsKICAgIC8qIHZhcmnDoXZlaXMgZXNwZWNpYWlzICovCiAgICAiSE9NRSIsIlBBVEgiLCJQ
-UkVGSVgiLCJJRlMiLCJURVJNIiwiVVNFUiIsIlNIRUxMIiwiTE9HTkFNRSIsCiAgICAiUFdEIiwi
-T0xEUFdEIiwiRURJVE9SIiwiVklTVUFMIiwiUEFHRVIiLCJMQU5HIiwiTENfQUxMIiwiTENfVFlQ
-RSIsCiAgICAiQkFTSF9WRVJTSU9OIiwiQkFTSF9TT1VSQ0UiLCJCQVNIX0xJTkVOTyIsIkJBU0hf
-Q09NTUFORCIsCiAgICAiRlVOQ05BTUUiLCJMSU5FTk8iLCJSQU5ET00iLCJTRUNPTkRTIiwiUElQ
-RVNUQVRVUyIsCiAgICAiUkVQTFkiLCJPUFRBUkciLCJPUFRJTkQiLCJPUFRFUlIiLAogICAgLyog
-cG9zaWNpb25haXMgZSBlc3BlY2lhaXMgKi8KICAgICIwIiwiMSIsIjIiLCIzIiwiNCIsIjUiLCI2
-IiwiNyIsIjgiLCI5IiwKICAgICJAIiwiKiIsIiMiLCI/IiwiISIsIiQiLCItIiwKICAgIC8qIFRl
-cm11eCAqLwogICAgIlRFUk1VWF9WRVJTSU9OIiwiQU5EUk9JRF9ST09UIiwiQU5EUk9JRF9EQVRB
-IixOVUxMCn07CgovKiDilIDilIAgSFRNTCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAgKi8K
-c3RhdGljIGNvbnN0IGNoYXIgKmh0bWxfZXh0W10gPSB7ICIuaHRtbCIsIi5odG0iLCIueGh0bWwi
-LCBOVUxMIH07CgovKiBrd19mbG93IOKGkiB0YWdzIGVzdHJ1dHVyYWlzIChITF9LRVlXT1JEMSA9
-IGF6dWwvY2lhbm8pICovCnN0YXRpYyBjb25zdCBjaGFyICpodG1sX2Zsb3dbXSA9IHsKICAgICJo
-dG1sIiwiaGVhZCIsImJvZHkiLCJoZWFkZXIiLCJmb290ZXIiLCJtYWluIiwibmF2Iiwic2VjdGlv
-biIsCiAgICAiYXJ0aWNsZSIsImFzaWRlIiwiZGl2Iiwic3BhbiIsInRlbXBsYXRlIiwic2xvdCIs
-InNoYWRvdyIsTlVMTAp9OwovKiBrd19idWlsdGluIOKGkiB0YWdzIGRlIGNvbnRlw7pkbyAoSExf
-S0VZV09SRDIgPSB2ZXJkZSkgKi8Kc3RhdGljIGNvbnN0IGNoYXIgKmh0bWxfYmlbXSA9IHsKICAg
-ICJhIiwicCIsImgxIiwiaDIiLCJoMyIsImg0IiwiaDUiLCJoNiIsInVsIiwib2wiLCJsaSIsImRs
-IiwiZHQiLCJkZCIsCiAgICAidGFibGUiLCJ0aGVhZCIsInRib2R5IiwidGZvb3QiLCJ0ciIsInRo
-IiwidGQiLCJjYXB0aW9uIiwiY29sZ3JvdXAiLCJjb2wiLAogICAgImZvcm0iLCJpbnB1dCIsImJ1
-dHRvbiIsInNlbGVjdCIsIm9wdGlvbiIsIm9wdGdyb3VwIiwidGV4dGFyZWEiLCJsYWJlbCIsCiAg
-ICAiZmllbGRzZXQiLCJsZWdlbmQiLCJkYXRhbGlzdCIsIm91dHB1dCIsInByb2dyZXNzIiwibWV0
-ZXIiLAogICAgImltZyIsImZpZ3VyZSIsImZpZ2NhcHRpb24iLCJwaWN0dXJlIiwic291cmNlIiwi
-dmlkZW8iLCJhdWRpbyIsInRyYWNrIiwKICAgICJpZnJhbWUiLCJlbWJlZCIsIm9iamVjdCIsImNh
-bnZhcyIsInN2ZyIsIm1hdGgiLAogICAgInByZSIsImNvZGUiLCJibG9ja3F1b3RlIiwicSIsImNp
-dGUiLCJhYmJyIiwiYWNyb255bSIsCiAgICAic3Ryb25nIiwiZW0iLCJiIiwiaSIsInUiLCJzIiwi
-ZGVsIiwiaW5zIiwibWFyayIsInNtYWxsIiwic3ViIiwic3VwIiwKICAgICJiciIsImhyIiwid2Jy
-IiwiZGV0YWlscyIsInN1bW1hcnkiLCJkaWFsb2ciLCJtZW51IiwibWVudWl0ZW0iLAogICAgInNj
-cmlwdCIsInN0eWxlIiwibGluayIsIm1ldGEiLCJiYXNlIiwidGl0bGUiLAogICAgImFkZHJlc3Mi
-LCJ0aW1lIiwiZGF0YSIsInZhciIsInNhbXAiLCJrYmQiLCJiZGkiLCJiZG8iLCJydWJ5IiwicnQi
-LCJycCIsTlVMTAp9OwovKiBrd190eXBlcyDihpIgYXRyaWJ1dG9zIGNvbXVucyAoSExfVFlQRSA9
-IGFtYXJlbG8pICovCnN0YXRpYyBjb25zdCBjaGFyICpodG1sX2F0dHJzW10gPSB7CiAgICAiY2xh
-c3MiLCJpZCIsInN0eWxlIiwic3JjIiwiaHJlZiIsImFsdCIsInRpdGxlIiwidHlwZSIsIm5hbWUi
-LCJ2YWx1ZSIsCiAgICAicGxhY2Vob2xkZXIiLCJhY3Rpb24iLCJtZXRob2QiLCJlbmN0eXBlIiwi
-dGFyZ2V0IiwicmVsIiwiY2hhcnNldCIsCiAgICAiY29udGVudCIsImxhbmciLCJkaXIiLCJ0YWJp
-bmRleCIsImFjY2Vzc2tleSIsImRyYWdnYWJsZSIsImhpZGRlbiIsCiAgICAiZGlzYWJsZWQiLCJy
-ZWFkb25seSIsInJlcXVpcmVkIiwiY2hlY2tlZCIsInNlbGVjdGVkIiwibXVsdGlwbGUiLAogICAg
-IndpZHRoIiwiaGVpZ2h0IiwiY29sc3BhbiIsInJvd3NwYW4iLCJzY29wZSIsImZvciIsImZvcm0i
-LAogICAgImRhdGEtIiwiYXJpYS0iLCJyb2xlIiwieG1sbnMiLCJhc3luYyIsImRlZmVyIiwiY3Jv
-c3NvcmlnaW4iLAogICAgImxvYWRpbmciLCJkZWNvZGluZyIsInNyY3NldCIsInNpemVzIiwibWVk
-aWEiLCJpbnRlZ3JpdHkiLAogICAgIm9ubG9hZCIsIm9uY2xpY2siLCJvbmNoYW5nZSIsIm9uaW5w
-dXQiLCJvbnN1Ym1pdCIsIm9uZXJyb3IiLE5VTEwKfTsKLyoga3dfcHJlcHJvYyDihpIgRE9DVFlQ
-RSBlIGVudGlkYWRlcyAoSExfUFJFUFJPQyA9IG1hZ2VudGEpICovCnN0YXRpYyBjb25zdCBjaGFy
-ICpodG1sX3BwW10gPSB7CiAgICAiRE9DVFlQRSIsIiZhbXA7IiwiJmx0OyIsIiZndDsiLCImcXVv
-dDsiLCImYXBvczsiLCImbmJzcDsiLAogICAgIiZjb3B5OyIsIiZyZWc7IiwiJnRyYWRlOyIsIiZt
-ZGFzaDsiLCImbmRhc2g7IiwiJmhlbGxpcDsiLE5VTEwKfTsKCnN0YXRpYyBTeW50YXggSExEQltd
-ID0gewogICAgeyAiQyIsICAgICAgICAgICBjX2V4dCwgICBjX2Zsb3csICBjX2JpLCAgIGNfdHlw
-ZXMsIGNfcHAsCiAgICAgICIvLyIsIi8qIiwiKi8iLCBITF9GTEFHX05VTUJFUlN8SExfRkxBR19T
-VFJJTkdTIH0sCiAgICB7ICJDKysiLCAgICAgICAgIGNwcF9leHQsIGNfZmxvdywgIGNfYmksICAg
-Y190eXBlcywgY19wcCwKICAgICAgIi8vIiwiLyoiLCIqLyIsIEhMX0ZMQUdfTlVNQkVSU3xITF9G
-TEFHX1NUUklOR1MgfSwKICAgIHsgIkx1YS9FbGxpb3RPUyIsbHVhX2V4dCwgbHVhX2Zsb3csbHVh
-X2JpLCBsdWFfbnMsICBsdWFfbWV0aCwKICAgICAgIi0tIiwiLS1bWyIsIl1dIixITF9GTEFHX05V
-TUJFUlN8SExfRkxBR19TVFJJTkdTIH0sCiAgICB7ICJCYXNoIiwgICAgICAgIHNoX2V4dCwgIHNo
-X2Zsb3csIHNoX2JpLCAgc2hfdmFycywgTlVMTCwKICAgICAgIiMiLE5VTEwsTlVMTCwgIEhMX0ZM
-QUdfTlVNQkVSU3xITF9GTEFHX1NUUklOR1MgfSwKICAgIHsgIkhUTUwiLCAgICAgICAgaHRtbF9l
-eHQsaHRtbF9mbG93LGh0bWxfYmksaHRtbF9hdHRycyxodG1sX3BwLAogICAgICBOVUxMLCI8IS0t
-IiwiLS0+IiwgSExfRkxBR19TVFJJTkdTIH0sCn07CiNkZWZpbmUgSExEQl9TSVpFIChpbnQpKHNp
-emVvZihITERCKS9zaXplb2YoSExEQlswXSkpCgovKiDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogQ09NUExFVElPTlMg4oCUIEFQSSBFbGxp
-b3RPUyArIHN0ZGxpYiBMdWEKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgovKiBDT01QTEVUSU9OUzogZm9udGUgdW5pY2EgY29tcGFy
-dGlsaGFkYSBjb20gR19jb21wbGV0aW9ucyBkbyBSRVBMCiAqIC0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tICovCnN0YXRp
-YyBjb25zdCBjaGFyICpDT01QTEVUSU9OU1tdID0gewogICAgLyogdXRpbC4qICovCiAgICAidXRp
-bC5tYXAoIiwidXRpbC5maWx0ZXIoIiwidXRpbC5yZWR1Y2UoIiwidXRpbC5hbnkoIiwidXRpbC5h
-bGwoIiwidXRpbC5jb3VudCgiLAogICAgInV0aWwucmFuZ2UoIiwidXRpbC5lbnVtZXJhdGUoIiwi
-dXRpbC56aXAoIiwidXRpbC5mbGF0dGVuKCIsInV0aWwudW5pcXVlKCIsInV0aWwuc29ydGVkKCIs
-CiAgICAidXRpbC5zdW0oIiwidXRpbC5taW4oIiwidXRpbC5tYXgoIiwidXRpbC5jaHVuaygiLCJ1
-dGlsLmdyb3VwYnkoIiwKICAgICJ1dGlsLmtleXMoIiwidXRpbC52YWx1ZXMoIiwidXRpbC5waWNr
-KCIsInV0aWwub21pdCgiLCJ1dGlsLm1lcmdlKCIsCiAgICAidXRpbC5kZWVwY29weSgiLCJ1dGls
-LnBhcnRpYWwoIiwidXRpbC5tZW1vaXplKCIsInV0aWwub25jZSgiLAogICAgInV0aWwucmV0cnko
-IiwidXRpbC53aXRoX2ZpbGUoIiwidXRpbC5wcCgiLCJ1dGlsLnByaW50ZigiLCJ1dGlsLmZ1bmMo
-IiwidXRpbC5oZWxwKCkiLAogICAgInV0aWwubWVhbigiLCJ1dGlsLm1lZGlhbigiLCJ1dGlsLm1v
-ZGUoIiwidXRpbC52YXJpYW5jZSgiLCJ1dGlsLnN0ZGV2KCIsCiAgICAidXRpbC5zdGRldl9zYW1w
-bGUoIiwidXRpbC5wZXJjZW50aWxlKCIsInV0aWwubm9ybWFsaXplKCIsInV0aWwuY2xhbXAoIiwi
-dXRpbC5yb3VuZCgiLAogICAgInV0aWwuaXRlcigiLCJ1dGlsLmdlbmVyYXRvcigiLCJ1dGlsLnRh
-a2UoIiwidXRpbC5kcm9wKCIsInV0aWwuc3RlcCgiLCJ1dGlsLmNoYWluKCIsCiAgICAidXRpbC50
-YWxseSgiLCJ1dGlsLmZsYXRfbWFwKCIsInV0aWwuaW50ZXJsZWF2ZSgiLCJ1dGlsLmZpcnN0KCIs
-InV0aWwubGFzdCgiLAogICAgInV0aWwuaW5kZXhfb2YoIiwidXRpbC53aXRob3V0KCIsInV0aWwu
-ZGlmZmVyZW5jZSgiLCJ1dGlsLmludGVyc2VjdGlvbigiLCJ1dGlsLnVuaW9uKCIsCiAgICAidXRp
-bC5yb3RhdGUoIiwidXRpbC50cmFuc3Bvc2UoIiwidXRpbC5jb21iaW5hdGlvbnMoIiwidXRpbC5w
-ZXJtdXRhdGlvbnMoIiwKICAgICJ1dGlsLnBpcGUoIiwidXRpbC5jb21wb3NlKCIsInV0aWwuaWRl
-bnRpdHkoIiwidXRpbC5ub29wKCkiLCJ1dGlsLmFsd2F5cygiLAogICAgInV0aWwuZmxpcCgiLCJ1
-dGlsLnRhcCgiLCJ1dGlsLmRlZmF1bHQoIiwidXRpbC50cnV0aHkoIiwidXRpbC5mYWxzeSgiLAog
-ICAgInV0aWwiLCJ1dGlsLiIsCiAgICAvKiBkYXRlLiogKi8KICAgICJkYXRlLm5vdygpIiwiZGF0
-ZS50b2RheSgpIiwiZGF0ZS5mb3JtYXQoIiwiZGF0ZS5wYXJzZSgiLCJkYXRlLmRpZmYoIiwKICAg
-ICJkYXRlLmFkZCgiLCJkYXRlLnN1YigiLCJkYXRlLndlZWtkYXkoIiwiZGF0ZS5pc19sZWFwKCIs
-ImRhdGUudGltZXN0YW1wKCkiLAogICAgImRhdGUuZnJvbV90aW1lc3RhbXAoIiwiZGF0ZS5oZWxw
-KCkiLAogICAgImRhdGUiLCJkYXRlLiIsCiAgICAvKiBqc29uLiogKi8KICAgICJqc29uLmVuY29k
-ZSgiLCJqc29uLmRlY29kZSgiLAogICAgImpzb24iLCJqc29uLiIsCiAgICAvKiBzdHJpbmcgZXh0
-ZW5zaW9ucyAqLwogICAgInN0cmluZy5zcGxpdCgiLCJzdHJpbmcudHJpbSgiLCJzdHJpbmcubHRy
-aW0oIiwic3RyaW5nLnJ0cmltKCIsCiAgICAic3RyaW5nLnN0YXJ0c3dpdGgoIiwic3RyaW5nLmVu
-ZHN3aXRoKCIsInN0cmluZy5jb250YWlucygiLAogICAgInN0cmluZy5scGFkKCIsInN0cmluZy5y
-cGFkKCIsInN0cmluZy5jZW50ZXIoIiwic3RyaW5nLnRydW5jYXRlKCIsCiAgICAic3RyaW5nLmNv
-dW50X29jYygiLCJzdHJpbmcubGluZXMoIiwic3RyaW5nLndvcmRzKCIsInN0cmluZy5zbHVnaWZ5
-KCIsCiAgICAic3RyaW5nLmVzY2FwZV9odG1sKCIsInN0cmluZy51bmVzY2FwZV9odG1sKCIsInN0
-cmluZy5pbnRlcnBvbGF0ZSgiLAogICAgInN0cmluZy5yZXBlYXRfc3RyKCIsInN0cmluZy5oZWxw
-KCkiLAogICAgInN0cmluZy5pc251bWVyaWMoIiwic3RyaW5nLmlzaW50ZWdlcigiLCJzdHJpbmcu
-aXNhbHBoYSgiLCJzdHJpbmcuaXNhbG51bSgiLAogICAgInN0cmluZy5pc3NwYWNlKCIsInN0cmlu
-Zy5pc2xvd2VyKCIsInN0cmluZy5pc3VwcGVyKCIsCiAgICAic3RyaW5nLnpmaWxsKCIsInN0cmlu
-Zy5zd2FwY2FzZSgiLCJzdHJpbmcudGl0bGUoIiwic3RyaW5nLmNhcGl0YWxpemUoIiwKICAgICJz
-dHJpbmcucmVtb3ZlcHJlZml4KCIsInN0cmluZy5yZW1vdmVzdWZmaXgoIiwKICAgICJzdHJpbmcu
-bGp1c3QoIiwic3RyaW5nLnJqdXN0KCIsCiAgICAic3RyaW5nLnBhcnRpdGlvbigiLCJzdHJpbmcu
-cnBhcnRpdGlvbigiLCJzdHJpbmcuZXhwYW5kdGFicygiLAogICAgInN0cmluZy5lbmNvZGVfdXJs
-KCIsInN0cmluZy5kZWNvZGVfdXJsKCIsCiAgICAvKiB0YWJsZSBleHRlbnNpb25zICovCiAgICAi
-dGFibGUua2V5cygiLCJ0YWJsZS52YWx1ZXMoIiwidGFibGUuY29udGFpbnMoIiwidGFibGUuY29w
-eSgiLAogICAgInRhYmxlLmV4dGVuZCgiLCJ0YWJsZS5jbGVhcigiLCJ0YWJsZS5sZW5ndGgoIiwK
-ICAgIC8qIGFpLiogKi8KICAgICJhaS5hc2soIiwiYWkuY29kZSgiLCJhaS5rZXkoIiwiYWkua2V5
-KCkiLCJhaS5hZGQoIiwiYWkucmVtb3ZlKCIsCiAgICAiYWkucHJvdmlkZXIoIiwiYWkubW9kZWwo
-IiwiYWkubW9kZWxzX2NvZGUoIiwiYWkubW9kZWxzX2NvZGUoKSIsCiAgICAiYWkubWFpbigiLCJh
-aS5saXN0KCkiLCJhaS5saXN0KCIsCiAgICAiYWkucnAoIiwiYWkucGVyc29uYSgiLAogICAgImFp
-LmZvcmdldCgpIiwiYWkuY2xlYXIoKSIsImFpLmhpc3RvcnkoKSIsImFpLmhlbHAoKSIsCiAgICAv
-KiBhZ2VudC4qICovCiAgICAiYWdlbnQucnVuKCIsImFnZW50LnJ1bignIiwiYWdlbnQuY2hhdCgi
-LCJhZ2VudC5yZXNldCgpIiwiYWdlbnQuaGVscCgpIiwKICAgIC8qIG1vZC4qICovCiAgICAibW9k
-LnhzcygiLCJtb2Quc3FsaSgiLCJtb2QubGZpKCIsIm1vZC5zc3JmKCIsIm1vZC5jb3JzKCIsIm1v
-ZC5oZWFkZXJzKCIsCiAgICAibW9kLnJjZSgiLCJtb2QucmVjb24oIiwibW9kLmluZm8oIiwibW9k
-LnNjYW4oIiwibW9kLmlkb3IoIiwibW9kLmRvcygiLAogICAgIm1vZC5mdXp6KCIsIm1vZC5qd3Qo
-IiwibW9kLnNzdGkoIiwibW9kLmF1dGgoIiwibW9kLnN1YmRvbWFpbnMoIiwibW9kLnBheWxvYWQo
-IiwKICAgICJtb2QuY3NyZigiLCJtb2QueHhlKCIsIm1vZC5zcGlkZXIoIiwibW9kLmdyYXBocWwo
-IiwibW9kLndzKCIsCiAgICAibW9kLmRpcnMoIiwibW9kLnNlY3JldHMoIiwibW9kLmdpdCgiLCJt
-b2Qub3Blbl9yZWRpcmVjdCgiLAogICAgIm1vZC5wYXJhbXMoIiwibW9kLm5vc3FsKCIsIm1vZC5i
-YWNrdXAoIiwibW9kLmNybGYoIiwKICAgICJtb2QuY2hhaW4oIiwibW9kLmNoYWluKCciLCJtb2Qu
-cmVkaXIoIiwibW9kLmhlbHAoKSIsCiAgICAvKiBuZXQuKiAqLwogICAgIm5ldC5kbnMoIiwibmV0
-LmdldCgiLCJuZXQuZ2V0aCgiLCJuZXQucG9zdCgiLCJuZXQuY29ubmVjdCgiLAogICAgIm5ldC50
-Y3AoIiwibmV0LnVkcCgiLCJuZXQudGNwNigiLCJuZXQubGlzdGVuKCIsCiAgICAibmV0LnNvY2tl
-dCgiLCJuZXQuc29ja2V0ZXgoIiwibmV0LnN5bigiLCJuZXQuc2VuZCgiLCJuZXQucmVjdigiLCJu
-ZXQuY2xvc2UoIiwKICAgICJuZXQuaXAoIiwibmV0Lmhvc3RzKCIsIm5ldC5zY2FuKCIsIm5ldC5m
-ZXRjaCgiLCJuZXQucGluZygiLAogICAgIm5ldC5vcygiLCJuZXQuaW1wb3J0KCIsIm5ldC5oZWxw
-KCkiLAogICAgLyogZnMuKiAqLwogICAgImZzLmV4aXN0cygiLCJmcy5ta2RpcigiLCJmcy5ybSgi
-LCJmcy5tb3ZlKCIsImZzLmNvcHkoIiwKICAgICJmcy5yZWFkKCIsImZzLndyaXRlKCIsImZzLmFw
-cGVuZCgiLCJmcy5saXN0KCkiLCJmcy5saXN0KCIsCiAgICAiZnMuc3RhdCgiLCJmcy5pc2Rpcigi
-LCJmcy5pc2ZpbGUoIiwiZnMuY2htb2QoIiwiZnMuZ2xvYigiLCJmcy5oZWxwKCkiLAogICAgLyog
-c2guKiAqLwogICAgInNoLmV4ZWMoIiwic2guY2FwdHVyZSgiLCJzaC5oZWxwKCkiLAogICAgLyog
-c3lzLiogKi8KICAgICJzeXMuc3Bhd24oIiwic3lzLnNoKCIsInN5cy50aHJlYWQoIiwic3lzLmpv
-aW4oIiwic3lzLmxpc3QoKSIsCiAgICAic3lzLmtpbGwoIiwic3lzLmluZm8oKSIsInN5cy5oZWxw
-KCkiLCJzeXMuZW52KCIsInN5cy5waWQoKSIsCiAgICAic3lzLmV4aXQoIiwic3lzLnRpbWUoKSIs
-InN5cy50aW1lX21zKCkiLCJzeXMuc2xlZXAoIiwKICAgICJzeXMubmV0KCkiLCJzeXMuc3RvcmFn
-ZSgiLCJzeXMuc3RvcmFnZSgpIiwic3lzLm11dGV4KCIsInN5cy5jaGFubmVsKCkiLAogICAgLyog
-Y3J5cHRvLiogKi8KICAgICJjcnlwdG8ubWQ1KCIsImNyeXB0by5zaGExKCIsImNyeXB0by5zaGEy
-NTYoIiwiY3J5cHRvLnNoYTUxMigiLAogICAgImNyeXB0by5obWFjKCIsImNyeXB0by5iNjRlbmMo
-IiwiY3J5cHRvLmI2NGRlYygiLAogICAgImNyeXB0by5oZXhlbmMoIiwiY3J5cHRvLmhleGRlYygi
-LCJjcnlwdG8uYWVzX2VuYygiLCJjcnlwdG8uYWVzX2RlYygiLAogICAgImNyeXB0by5yYW5kKCIs
-ImNyeXB0by5oZWxwKCkiLAogICAgLyogZGIuKiAqLwogICAgImRiLm9wZW4oIiwiZGIuY2xvc2Uo
-KSIsImRiLmV4ZWMoIiwiZGIucXVlcnkoIiwiZGIudGFibGVzKCkiLCJkYi5oZWxwKCkiLAogICAg
-LyogY2MuKiAqLwogICAgImNjLnJ1bigiLCJjYy5sdWEyYygiLCJjYy5oZWxwKCkiLAogICAgLyog
-dWkuKiAqLwogICAgInVpLmNvbG9yKCIsInVpLmJveCgiLCJ1aS5jbGVhcigpIiwidWkuc2xlZXAo
-IiwidWkuZmlnKCIsInVpLmlucHV0KCIsInVpLmhlbHAoKSIsCiAgICAvKiB0dWkuKiAqLwogICAg
-InR1aS5tYWluKCIsInR1aS5mdW5jKCIsInR1aS5jbG9zZSgpIiwidHVpLnJlYWQoIiwidHVpLmhl
-bHAoKSIsCiAgICAvKiBleHBsb2l0LiogKi8KICAgICJleHBsb2l0LnNxbGkoIiwiZXhwbG9pdC54
-c3MoIiwiZXhwbG9pdC5sZmkoIiwKICAgICJleHBsb2l0LnJjZSgiLCJleHBsb2l0LnNzdGkoIiwi
-ZXhwbG9pdC5pZG9yKCIsImV4cGxvaXQuaGVscCgpIiwKICAgIC8qIHBlbnQuKiAqLwogICAgInBl
-bnQuc3RhcnQoIiwicGVudC5zdG9wKCkiLCJwZW50LnN0YXR1cygpIiwicGVudC5saXN0KCkiLCJw
-ZW50LmhlbHAoKSIsCiAgICAvKiB3ZWIuKiAqLwogICAgIndlYi5nZXQoIiwid2ViLnNhdmUoIiwi
-d2ViLnNlcnZlKCIsIndlYi5zdG9wKCkiLCJ3ZWIubGlua3MoIiwKICAgICJ3ZWIuZm9ybXMoIiwi
-d2ViLnNjcmlwdHMoIiwid2ViLmhlbHAoKSIsCiAgICAvKiBkb3cuKiAtIGRvd25sb2FkIGRlIG1p
-ZGlhICovCiAgICAiZG93LnZpZGVvKCIsImRvdy5hdWRpbygiLCJkb3cuaW1hZ2VuKCIsImRvdy5w
-bGF5bGlzdCgiLCJkb3cuaW5mbygiLCJkb3cucmVzZXQoKSIsImRvdy5oZWxwKCkiLAogICAgImRv
-dyIsImRvdy4iLAogICAgLyogYWRiLiogLSBBbmRyb2lkIERlYnVnIEJyaWRnZSAqLwogICAgImFk
-Yi5zaGVsbCgiLCJhZGIucmVwbCgpIiwiYWRiLnNldHVwKCIsImFkYi5wYWlyKCIsImFkYi5wYWly
-KCkiLAogICAgImFkYi5jb25uZWN0KCIsImFkYi5kaXNjb25uZWN0KCkiLCJhZGIuZGlzY29ubmVj
-dCgiLAogICAgImFkYi5kZXZpY2VzKCkiLCJhZGIucHVzaCgiLCJhZGIucHVsbCgiLCJhZGIuaW5z
-dGFsbCgiLAogICAgImFkYi51bmluc3RhbGwoIiwiYWRiLmxvZ2NhdCgpIiwiYWRiLmxvZ2NhdCgi
-LCJhZGIucmVib290KCkiLAogICAgImFkYi5yZWJvb3QoIiwiYWRiLnNjcmVlbnNob3QoKSIsImFk
-Yi5zY3JlZW5zaG90KCIsCiAgICAiYWRiLnByb3AoKSIsImFkYi5wcm9wKCIsImFkYi5mb3J3YXJk
-KCIsImFkYi53aWZpKCkiLAogICAgImFkYi53aWZpKCIsImFkYi5zdGF0dXMoKSIsImFkYi5oZWxw
-KCkiLAogICAgImFkYi5zY3JlZW5fc2l6ZSgiLCJhZGIuc2NyZWVuX2RlbnNpdHkoIiwiYWRiLnNj
-cmVlbl9yZXNldCgpIiwKICAgICJhZGIuc2NyZWVuX2luZm8oKSIsImFkYi5vdmVyc2NhbigiLCJh
-ZGIuZ2FtZV9tb2RlKCIsCiAgICAiYWRiLnRhcCgiLCJhZGIuc3dpcGUoIiwiYWRiLmtleWV2ZW50
-KCIsImFkYi50ZXh0KCIsCiAgICAiYWRiIiwiYWRiLiIsCiAgICAvKiBtcy4qICovCiAgICAibXMu
-YjY0LmVuYygiLCJtcy5iNjQuZGVjKCIsIm1zLmI2NC5hdXRvKCIsIm1zLmI2NC5oZWxwKCkiLAog
-ICAgIm1zLmNoZWNrKCkiLCJtcy5jaGVjaygndicpIiwibXMuZm9yY2UoIiwibXMuaGVscCgpIiwi
-bXMuaGVscCgnIiwibXMuYWxpYXMoIiwibXMuYWxpYXMoKSIsCiAgICAvKiBsbW9kLiogKi8KICAg
-ICJsbW9kLm5ldygiLCJsbW9kLm1vZCgiLCJsbW9kLmxpc3QoKSIsImxtb2QucmVtb3ZlKCIsCiAg
-ICAibG1vZC5wYXRoKCkiLCJsbW9kLmhlbHAoKSIsCiAgICAvKiBpdmFyLiogKi8KICAgICJpdmFy
-LmVuYWJsZSgpIiwiaXZhci5kaXNhYmxlKCkiLCJpdmFyLnN0YXR1cygpIiwiaXZhci5saXN0KCki
-LAogICAgIml2YXIucmVzZXQoKSIsIml2YXIucHJlcHJvY2VzcygiLCJpdmFyLmhlbHAoKSIsCiAg
-ICAvKiBtb2R1bG9zIHN0YW5kYWxvbmUgKi8KICAgICJhaSIsImFpLiIsImFnZW50IiwiYWdlbnQu
-IiwibW9kIiwibW9kLiIsIm5ldCIsIm5ldC4iLAogICAgImZzIiwiZnMuIiwic2giLCJzaC4iLCJz
-eXMiLCJzeXMuIiwiY2MiLCJjYy4iLAogICAgImNyeXB0byIsImNyeXB0by4iLCJkYiIsImRiLiIs
-InVpIiwidWkuIiwidHVpIiwidHVpLiIsCiAgICAiZXhwbG9pdCIsImV4cGxvaXQuIiwicGVudCIs
-InBlbnQuIiwibXMiLCJtcy4iLAogICAgImFkYiIsImFkYi4iLCJsbW9kIiwibG1vZC4iLCJ3ZWIi
-LCJ3ZWIuIiwiaXZhciIsIml2YXIuIiwKICAgICJudW0iLCJudW0uIiwicGF0aCIsInBhdGguIiwi
-Y29sb3IiLCJjb2xvci4iLAogICAgInRlc3QiLCJ0ZXN0LiIsIlF1ZXVlIiwiU3RhY2siLAogICAg
-LyogTHVhIHN0ZGxpYiAqLwogICAgInByaW50KCIsInJlcXVpcmUoIiwidHlwZSgiLCJ0b3N0cmlu
-ZygiLCJ0b251bWJlcigiLCJwYWlycygiLAogICAgImlwYWlycygiLCJwY2FsbCgiLCJ4cGNhbGwo
-IiwiZXJyb3IoIiwiYXNzZXJ0KCIsInNldG1ldGF0YWJsZSgiLAogICAgImdldG1ldGF0YWJsZSgi
-LCJyYXdnZXQoIiwicmF3c2V0KCIsInNlbGVjdCgiLCJ1bnBhY2soIiwKICAgICJsb2FkKCIsImRv
-ZmlsZSgiLCJsb2FkZmlsZSgiLAogICAgIm9zIiwib3MuIiwiaW8iLCJpby4iLCJtYXRoIiwibWF0
-aC4iLCJ0YWJsZSIsInRhYmxlLiIsCiAgICAic3RyaW5nIiwic3RyaW5nLiIsImNvcm91dGluZSIs
-ImNvcm91dGluZS4iLCJ1dGY4IiwidXRmOC4iLAogICAgInBhY2thZ2UiLCJwYWNrYWdlLiIsImRl
-YnVnIiwiZGVidWcuIiwKICAgICJzdHJpbmcuZm9ybWF0KCIsInN0cmluZy5maW5kKCIsInN0cmlu
-Zy5tYXRjaCgiLCJzdHJpbmcuZ21hdGNoKCIsCiAgICAic3RyaW5nLmdzdWIoIiwic3RyaW5nLnN1
-YigiLCJzdHJpbmcubGVuKCIsInN0cmluZy51cHBlcigiLAogICAgInN0cmluZy5sb3dlcigiLCJz
-dHJpbmcucmVwKCIsInN0cmluZy5ieXRlKCIsInN0cmluZy5jaGFyKCIsCiAgICAic3RyaW5nLnJl
-dmVyc2UoIiwKICAgICJ0YWJsZS5pbnNlcnQoIiwidGFibGUucmVtb3ZlKCIsInRhYmxlLmNvbmNh
-dCgiLCJ0YWJsZS5zb3J0KCIsCiAgICAidGFibGUudW5wYWNrKCIsInRhYmxlLm1vdmUoIiwKICAg
-ICJtYXRoLmZsb29yKCIsIm1hdGguY2VpbCgiLCJtYXRoLmFicygiLCJtYXRoLm1heCgiLCJtYXRo
-Lm1pbigiLAogICAgIm1hdGgucmFuZG9tKCIsIm1hdGgucmFuZG9tc2VlZCgiLCJtYXRoLnNxcnQo
-IiwibWF0aC5odWdlIiwibWF0aC5waSIsCiAgICAibWF0aC5zaW4oIiwibWF0aC5jb3MoIiwibWF0
-aC50YW4oIiwibWF0aC5sb2coIiwKICAgICJvcy50aW1lKCkiLCJvcy5kYXRlKCIsIm9zLmV4ZWN1
-dGUoIiwib3MuY2xvY2soKSIsIm9zLmV4aXQoIiwKICAgICJvcy5nZXRlbnYoIiwib3MudG1wbmFt
-ZSgiLCJvcy5yZW5hbWUoIiwib3MucmVtb3ZlKCIsCiAgICAiaW8ub3BlbigiLCJpby5yZWFkKCIs
-ImlvLndyaXRlKCIsImlvLmxpbmVzKCIsImlvLmNsb3NlKCIsCiAgICAiaW8ucG9wZW4oIiwiaW8u
-Zmx1c2goKSIsCiAgICAiY29yb3V0aW5lLmNyZWF0ZSgiLCJjb3JvdXRpbmUucmVzdW1lKCIsImNv
-cm91dGluZS55aWVsZCgiLAogICAgImNvcm91dGluZS53cmFwKCIsImNvcm91dGluZS5zdGF0dXMo
-IiwiY29yb3V0aW5lLnJ1bm5pbmcoKSIsCiAgICAvKiBsb2cuKiAqLwogICAgImxvZy5pbmZvKCIs
-ImxvZy5vaygiLCJsb2cud2FybigiLCJsb2cuZXJyKCIsImxvZy5kZWJ1ZygiLCJsb2cudHJhY2Uo
-IiwKICAgICJsb2cuc2V0X2xldmVsKCIsImxvZy5zZXRfb3V0cHV0KCIsImxvZy5zaWxlbnQoKSIs
-ImxvZy5yZXN1bWUoKSIsCiAgICAibG9nLnRvX2ZpbGUoIiwibG9nLnRpbWVkKCIsImxvZy5oZWxw
-KCkiLAogICAgImxvZyIsImxvZy4iLAogICAgLyogY3N2LiogKi8KICAgICJjc3YuZGVjb2RlKCIs
-ImNzdi5lbmNvZGUoIiwiY3N2LnJlYWQoIiwiY3N2LndyaXRlKCIsImNzdi5oZWxwKCkiLAogICAg
-ImNzdiIsImNzdi4iLAogICAgLyogcmUuKiAqLwogICAgInJlLm1hdGNoKCIsInJlLnNlYXJjaCgi
-LCJyZS5maW5kYWxsKCIsInJlLnN1YigiLCJyZS5zcGxpdCgiLCJyZS5jb21waWxlKCIsCiAgICAi
-cmUuZmluZGl0ZXIoIiwicmUubmFtZWQoIiwicmUuZ21hdGNoKCIsCiAgICAicmUiLCJyZS4iLAog
-ICAgLyogbnVtLiogKi8KICAgICJudW0ucGFyc2UoIiwibnVtLmZvcm1hdCgiLCJudW0uY2xhbXAo
-IiwibnVtLmxlcnAoIiwibnVtLnJvdW5kKCIsCiAgICAibnVtLnNpZ24oIiwibnVtLmlzX2ludCgi
-LCJudW0uaXNfbmFuKCIsIm51bS5pbl9yYW5nZSgiLAogICAgIm51bS50b19iaW4oIiwibnVtLnRv
-X2hleCgiLCJudW0udG9fb2N0KCIsCiAgICAibnVtLnN1bSgiLCJudW0uYXZnKCIsIm51bS5taW4o
-IiwibnVtLm1heCgiLCJudW0uaGVscCgpIiwKICAgIC8qIHBhdGguKiAqLwogICAgInBhdGguam9p
-bigiLCJwYXRoLmJhc2VuYW1lKCIsInBhdGguZGlybmFtZSgiLCJwYXRoLmV4dCgiLAogICAgInBh
-dGguc3RlbSgiLCJwYXRoLmV4aXN0cygiLCJwYXRoLmFicygiLCJwYXRoLmV4cGFuZHVzZXIoIiwK
-ICAgICJwYXRoLnNwbGl0KCIsInBhdGgucGFydHMoIiwicGF0aC5oZWxwKCkiLAogICAgLyogY29s
-b3IuKiAqLwogICAgImNvbG9yLnJlZCgiLCJjb2xvci5ncmVlbigiLCJjb2xvci55ZWxsb3coIiwi
-Y29sb3IuYmx1ZSgiLAogICAgImNvbG9yLm1hZ2VudGEoIiwiY29sb3IuY3lhbigiLCJjb2xvci53
-aGl0ZSgiLCJjb2xvci5ibGFjaygiLAogICAgImNvbG9yLmJyaWdodF9yZWQoIiwiY29sb3IuYnJp
-Z2h0X2dyZWVuKCIsImNvbG9yLmJyaWdodF95ZWxsb3coIiwKICAgICJjb2xvci5icmlnaHRfYmx1
-ZSgiLCJjb2xvci5icmlnaHRfbWFnZW50YSgiLCJjb2xvci5icmlnaHRfY3lhbigiLAogICAgImNv
-bG9yLmJyaWdodF93aGl0ZSgiLCJjb2xvci5ib2xkKCIsImNvbG9yLmRpbSgiLCJjb2xvci5pdGFs
-aWMoIiwKICAgICJjb2xvci51bmRlcmxpbmUoIiwiY29sb3IuYmxpbmsoIiwKICAgICJjb2xvci5i
-Z19yZWQoIiwiY29sb3IuYmdfZ3JlZW4oIiwiY29sb3IuYmdfeWVsbG93KCIsImNvbG9yLmJnX2Js
-dWUoIiwKICAgICJjb2xvci5iZ19tYWdlbnRhKCIsImNvbG9yLmJnX2N5YW4oIiwiY29sb3IuYmdf
-d2hpdGUoIiwKICAgICJjb2xvci5yZ2IoIiwiY29sb3IuYmdfcmdiKCIsImNvbG9yLnN0cmlwKCIs
-ImNvbG9yLmxlbigiLAogICAgImNvbG9yLnJlc2V0KCkiLCJjb2xvci5oZWxwKCkiLAogICAgLyog
-dGVzdC4qICovCiAgICAidGVzdC5vaygiLCJ0ZXN0LmVxKCIsInRlc3QubmVxKCIsInRlc3QuZ3Qo
-IiwidGVzdC5sdCgiLAogICAgInRlc3QuZ3RlKCIsInRlc3QubHRlKCIsInRlc3QubmlsXygiLCJ0
-ZXN0Lm5vdF9uaWwoIiwKICAgICJ0ZXN0LnR5cGVfaXMoIiwidGVzdC5jb250YWlucygiLCJ0ZXN0
-Lm1hdGNoKCIsInRlc3QuZGVlcF9lcSgiLAogICAgInRlc3QuZXJyKCIsInRlc3Qubm9fZXJyKCIs
-InRlc3Quc3VpdGUoIiwidGVzdC5yZXBvcnQoKSIsCiAgICAidGVzdC5yZXNldCgpIiwidGVzdC5o
-ZWxwKCkiLAogICAgLyogUXVldWUgLyBTdGFjayAqLwogICAgIlF1ZXVlLm5ldygpIiwiU3RhY2su
-bmV3KCkiLAogICAgLyoganNvbiBleHRyYXMgKi8KICAgICJqc29uLnByZXR0eSgiLCJqc29uLnF1
-ZXJ5KCIsCiAgICAvKiB0YWJsZSBleHRyYXMgKi8KICAgICJ0YWJsZS5tYXAoIiwidGFibGUuZmls
-dGVyKCIsInRhYmxlLnJlZHVjZSgiLCJ0YWJsZS5mbGF0KCIsCiAgICAidGFibGUudW5pcXVlKCIs
-InRhYmxlLnJldmVyc2UoIiwidGFibGUuc29ydGVkKCIsInRhYmxlLnNsaWNlKCIsCiAgICAidGFi
-bGUuZmluZCgiLCJ0YWJsZS5hbnkoIiwidGFibGUuYWxsKCIsInRhYmxlLmNvdW50KCIsCiAgICAi
-dGFibGUuaW5kZXhfb2YoIiwidGFibGUubWVyZ2UoIiwidGFibGUuY29uY2F0X2FsbCgiLAogICAg
-InRhYmxlLnppcCgiLCJ0YWJsZS5ncm91cF9ieSgiLAogICAgLyogc3lzIGV4dHJhcyAqLwogICAg
-InN5cy53aGljaCgiLCJzeXMuaG9zdG5hbWUoKSIsInN5cy5jcHVfY291bnQoKSIsInN5cy5tZW0o
-KSIsCiAgICAic3lzLnRvZGF5KCkiLCJzeXMubm93KCkiLCJzeXMuZm10X2R1cigiLCJzeXMudHoo
-KSIsCiAgICAic3lzLmRhdGUoIiwic3lzLmRhdGUoKSIsInN5cy5jbG9jaygpIiwic3lzLnVwdGlt
-ZSgpIiwKICAgIC8qIGZzIGV4dHJhcyAqLwogICAgImZzLnRlbXBmaWxlKCIsImZzLndhdGNoKCIs
-CiAgICAvKiBlbnRyYWRhcyBmYWx0YW50ZXMgKHN5bmMgR19jb21wbGV0aW9ucyBSRVBMKSAqLwog
-ICAgImVkLiIsCiAgICAid2ViLmhlbHAoIiwKICAgICJhaS5tb2RlbHNfY29kZSgpIiwiYWkucGVy
-c29uYSgiLCJhaS5ycCgiLAogICAgImNvcm91dGluZS5jcmVhdGUoIiwiY29yb3V0aW5lLnJlc3Vt
-ZSgiLCJjb3JvdXRpbmUucnVubmluZygpIiwKICAgICJjb3JvdXRpbmUuc3RhdHVzKCIsImNvcm91
-dGluZS53cmFwKCIsImNvcm91dGluZS55aWVsZCgiLAogICAgImdldG1ldGF0YWJsZSgiLCJyYXdn
-ZXQoIiwicmF3c2V0KCIsInNlbGVjdCgiLCJ1bnBhY2soIiwKICAgICJpby5jbG9zZSgiLCJpby5m
-bHVzaCgpIiwiaW8ucG9wZW4oIiwKICAgICJtYXRoLmNvcygiLCJtYXRoLmxvZygiLCJtYXRoLnJh
-bmRvbXNlZWQoIiwibWF0aC5zaW4oIiwibWF0aC50YW4oIiwKICAgICJtcy5mb3JjZSgiLAogICAg
-Im9zLmV4ZWN1dGUoIiwib3MucmVtb3ZlKCIsIm9zLnJlbmFtZSgiLCJvcy50bXBuYW1lKCIsCiAg
-ICAic2V0bWV0YXRhYmxlKCIsCiAgICAic3RyaW5nLmNoYXIoIiwic3RyaW5nLmdtYXRjaCgiLCJz
-dHJpbmcucmV2ZXJzZSgiLAogICAgInN5cy5jaGFubmVsKCkiLCJzeXMuam9pbigiLCJzeXMubXV0
-ZXgoIiwic3lzLnNoKCIsCiAgICAic3lzLnNsZWVwKCIsInN5cy50aW1lKCkiLCJzeXMudGltZV9t
-cygpIiwKICAgICJ0YWJsZS5tb3ZlKCIsCiAgICAid2ViLmhlbHAoKSIsCiAgICAvKiBnbG9iYWxz
-IHB1cm9zIGRvIFJFUEwgKi8KICAgICJpbnB1dCgiLCJiYWNrKCkiLCJsZygpIiwiaWMoKSIsCiAg
-ICAvKiBjb21hbmRvcyBSRVBMICovCiAgICAiaGVscCIsImNsZWFyIiwiY2xzIiwKICAgIE5VTEwK
-fTsKCi8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkAogKiBJTkNMVURFIC8gUkVRVUlSRSBDT01QTEVUSU9OUwogKiDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCi8qIEhlYWRlcnMgQyBw
-dXJvIChzdGRsaWIgKyBQT1NJWCArIFRlcm11eCkgKi8Kc3RhdGljIGNvbnN0IGNoYXIgKkNfSEVB
-REVSU1tdID0gewogICAgLyogQyBzdGRsaWIgKi8KICAgICJhc3NlcnQuaCIsImNvbXBsZXguaCIs
-ImN0eXBlLmgiLCJlcnJuby5oIiwiZmVudi5oIiwiZmxvYXQuaCIsCiAgICAiaW50dHlwZXMuaCIs
-ImlzbzY0Ni5oIiwibGltaXRzLmgiLCJsb2NhbGUuaCIsIm1hdGguaCIsInNldGptcC5oIiwKICAg
-ICJzaWduYWwuaCIsInN0ZGFyZy5oIiwic3RkYm9vbC5oIiwic3RkZGVmLmgiLCJzdGRpbnQuaCIs
-InN0ZGlvLmgiLAogICAgInN0ZGxpYi5oIiwic3RyaW5nLmgiLCJ0Z21hdGguaCIsInRpbWUuaCIs
-InVjaGFyLmgiLCJ3Y2hhci5oIiwid2N0eXBlLmgiLAogICAgLyogUE9TSVggKi8KICAgICJkaXJl
-bnQuaCIsImZjbnRsLmgiLCJmbm1hdGNoLmgiLCJnbG9iLmgiLCJncnAuaCIsIm5ldGRiLmgiLAog
-ICAgInBvbGwuaCIsInB0aHJlYWQuaCIsInB3ZC5oIiwicmVnZXguaCIsInNjaGVkLmgiLCJzZW1h
-cGhvcmUuaCIsCiAgICAic3Bhd24uaCIsInN0cmluZ3MuaCIsInN5c2xvZy5oIiwidGVybWlvcy5o
-IiwidW5pc3RkLmgiLCJ1dGltZS5oIiwKICAgICJ3b3JkZXhwLmgiLAogICAgLyogc3lzLyAqLwog
-ICAgInN5cy9lcG9sbC5oIiwic3lzL2lub3RpZnkuaCIsInN5cy9pb2N0bC5oIiwic3lzL21tYW4u
-aCIsCiAgICAic3lzL21vdW50LmgiLCJzeXMvcGFyYW0uaCIsInN5cy9wcmN0bC5oIiwic3lzL3B0
-cmFjZS5oIiwKICAgICJzeXMvcmVzb3VyY2UuaCIsInN5cy9zZWxlY3QuaCIsInN5cy9zZW5kZmls
-ZS5oIiwic3lzL3NpZ25hbGZkLmgiLAogICAgInN5cy9zb2NrZXQuaCIsInN5cy9zdGF0LmgiLCJz
-eXMvc3RhdHZmcy5oIiwic3lzL3RpbWUuaCIsCiAgICAic3lzL3RpbWVyZmQuaCIsInN5cy90eXBl
-cy5oIiwic3lzL3Vpby5oIiwic3lzL3VuLmgiLCJzeXMvd2FpdC5oIiwKICAgIC8qIG5ldCAqLwog
-ICAgImFycGEvaW5ldC5oIiwibmV0L2lmLmgiLCJuZXRpbmV0L2luLmgiLCJuZXRpbmV0L3RjcC5o
-IiwKICAgICJuZXRpbmV0L3VkcC5oIiwibmV0cGFja2V0L3BhY2tldC5oIiwKICAgIE5VTEwKfTsK
-Ci8qIEhlYWRlcnMgQysrIChTVEwgKyB3cmFwcGVycyBDKSAqLwpzdGF0aWMgY29uc3QgY2hhciAq
-Q1BQX0hFQURFUlNbXSA9IHsKICAgIC8qIEMrKyBTVEwgKi8KICAgICJhbGdvcml0aG0iLCJhcnJh
-eSIsImF0b21pYyIsImJpdHNldCIsImNocm9ubyIsImNvbmRpdGlvbl92YXJpYWJsZSIsCiAgICAi
-ZGVxdWUiLCJleGNlcHRpb24iLCJmaWxlc3lzdGVtIiwiZm9yd2FyZF9saXN0IiwiZnN0cmVhbSIs
-ImZ1bmN0aW9uYWwiLAogICAgImZ1dHVyZSIsImluaXRpYWxpemVyX2xpc3QiLCJpb21hbmlwIiwi
-aW9zIiwiaW9zdHJlYW0iLCJpc3RyZWFtIiwKICAgICJpdGVyYXRvciIsImxpbWl0cyIsImxpc3Qi
-LCJtYXAiLCJtZW1vcnkiLCJtdXRleCIsIm51bWVyaWMiLCJvcHRpb25hbCIsCiAgICAib3N0cmVh
-bSIsInF1ZXVlIiwicmFuZG9tIiwicmVnZXgiLCJzZXQiLCJzaGFyZWRfbXV0ZXgiLCJzc3RyZWFt
-IiwKICAgICJzdGFjayIsInN0ZGV4Y2VwdCIsInN0cmluZyIsInN0cmluZ192aWV3IiwidGhyZWFk
-IiwidHVwbGUiLAogICAgInR5cGVfdHJhaXRzIiwidW5vcmRlcmVkX21hcCIsInVub3JkZXJlZF9z
-ZXQiLCJ1dGlsaXR5IiwidmFyaWFudCIsInZlY3RvciIsCiAgICAvKiBDIHdyYXBwZXJzIEMrKyAq
-LwogICAgImNhc3NlcnQiLCJjY3R5cGUiLCJjZXJybm8iLCJjZmxvYXQiLCJjbGltaXRzIiwiY21h
-dGgiLCJjc3RkaW50IiwKICAgICJjc3RkaW8iLCJjc3RkbGliIiwiY3N0cmluZyIsImN0aW1lIiwK
-ICAgIC8qIFBPU0lYICh0YW1iw6ltIHVzYWRvcyBlbSBDKyspICovCiAgICAiZGlyZW50LmgiLCJm
-Y250bC5oIiwiZm5tYXRjaC5oIiwiZ2xvYi5oIiwiZ3JwLmgiLCJuZXRkYi5oIiwKICAgICJwb2xs
-LmgiLCJwdGhyZWFkLmgiLCJwd2QuaCIsInJlZ2V4LmgiLCJzY2hlZC5oIiwic2VtYXBob3JlLmgi
-LAogICAgInNwYXduLmgiLCJzdHJpbmdzLmgiLCJzeXNsb2cuaCIsInRlcm1pb3MuaCIsInVuaXN0
-ZC5oIiwidXRpbWUuaCIsCiAgICAid29yZGV4cC5oIiwKICAgIC8qIHN5cy8gKi8KICAgICJzeXMv
-ZXBvbGwuaCIsInN5cy9pbm90aWZ5LmgiLCJzeXMvaW9jdGwuaCIsInN5cy9tbWFuLmgiLAogICAg
-InN5cy9tb3VudC5oIiwic3lzL3BhcmFtLmgiLCJzeXMvcHJjdGwuaCIsInN5cy9wdHJhY2UuaCIs
-CiAgICAic3lzL3Jlc291cmNlLmgiLCJzeXMvc2VsZWN0LmgiLCJzeXMvc2VuZGZpbGUuaCIsInN5
-cy9zaWduYWxmZC5oIiwKICAgICJzeXMvc29ja2V0LmgiLCJzeXMvc3RhdC5oIiwic3lzL3N0YXR2
-ZnMuaCIsInN5cy90aW1lLmgiLAogICAgInN5cy90aW1lcmZkLmgiLCJzeXMvdHlwZXMuaCIsInN5
-cy91aW8uaCIsInN5cy91bi5oIiwic3lzL3dhaXQuaCIsCiAgICAvKiBuZXQgKi8KICAgICJhcnBh
-L2luZXQuaCIsIm5ldC9pZi5oIiwibmV0aW5ldC9pbi5oIiwibmV0aW5ldC90Y3AuaCIsCiAgICAi
-bmV0aW5ldC91ZHAuaCIsIm5ldHBhY2tldC9wYWNrZXQuaCIsCiAgICBOVUxMCn07CgovKiBNw7Nk
-dWxvcyBMdWEgcGFkcsOjbyAocmVxdWlyZSkgKyBFbGxpb3RPUyBnbG9iYWxzICovCnN0YXRpYyBj
-b25zdCBjaGFyICpMVUFfU1REX01PRFNbXSA9IHsKICAgIC8qIHN0ZGxpYiBMdWEgKi8KICAgICJp
-byIsIm9zIiwibWF0aCIsInN0cmluZyIsInRhYmxlIiwiY29yb3V0aW5lIiwicGFja2FnZSIsImRl
-YnVnIiwKICAgICJ1dGY4IiwiYml0MzIiLAogICAgLyogRWxsaW90T1MgZ2xvYmFscyAoZGlzcG9u
-w612ZWlzIHNlbSByZXF1aXJlIG5vIFJFUEwpICovCiAgICAibmV0IiwibW9kIiwic3lzIiwiZnMi
-LCJzaCIsImNjIiwiY3J5cHRvIiwiZGIiLCJ1aSIsInR1aSIsCiAgICAiYWkiLCJhZ2VudCIsImV4
-cGxvaXQiLCJwZW50Iiwid2ViIiwiYWRiIiwibXMiLCJsbW9kIiwiaXZhciIsCiAgICAidXRpbCIs
-ImRhdGUiLCJqc29uIiwiZG93IiwiZWxsIiwKICAgICJudW0iLCJwYXRoIiwiY29sb3IiLCJ0ZXN0
-IiwiUXVldWUiLCJTdGFjayIsCiAgICBOVUxMCn07CgovKiDilIDilIAgZnVuw6fDtWVzIGRlIGRl
-dGVjdC9zY2FuL2NvbXBfb3Blbl9pbmNsdWRlL3JlcXVpcmUgZGVmaW5pZGFzIGFww7NzIEVkaXRv
-ciDilIDilIAgKi8KCi8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkAogKiBFU1RSVVRVUkFTIFBSSU5DSVBBSVMKICog4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgp0eXBlZGVmIHN0cnVj
-dCB7CiAgICBpbnQgc2l6ZSwgcnNpemU7CiAgICBjaGFyICpjaGFycywgKnJlbmRlcjsKICAgIHVu
-c2lnbmVkIGNoYXIgKmhsOwogICAgaW50IGhsX29wZW5fY29tbWVudDsKICAgIGludCBpc19kaXJ0
-eTsgIC8qIDEgc2UgbGluaGEgZm9pIG1vZGlmaWNhZGEgZGVzZGUgbyDDumx0aW1vIHNhdmUgKi8K
-fSBSb3c7Cgp0eXBlZGVmIHN0cnVjdCB7IGNoYXIgKmRhdGE7IGludCBsZW47IGludCBjeCwgY3k7
-IH0gVW5kb0VudHJ5OwoKdHlwZWRlZiBzdHJ1Y3QgewogICAgY2hhciAqaXRlbXNbQ09NUExFVElP
-Tl9NQVhdOwogICAgaW50IGNvdW50LCBzZWxlY3RlZCwgYWN0aXZlOwogICAgaW50IHRyaWdnZXJf
-Y3g7Cn0gQ29tcDsKCnR5cGVkZWYgc3RydWN0IHsKICAgIGludCBjeCwgY3ksIHJ4LCByb3dvZmYs
-IGNvbG9mZiwgcm93cywgY29sczsKICAgIGludCBudW1yb3dzOwogICAgUm93ICpyb3c7CiAgICBp
-bnQgZGlydHk7CiAgICBjaGFyICpmaWxlbmFtZTsKICAgIGNoYXIgc3RhdHVzbXNnWzI1Nl07CiAg
-ICB0aW1lX3Qgc3RhdHVzbXNnX3RpbWU7CiAgICBTeW50YXggKnN5bnRheDsKICAgIHN0cnVjdCB0
-ZXJtaW9zIG9yaWdfdGVybWlvczsKICAgIFVuZG9FbnRyeSB1bmRvW1VORE9fTElNSVRdOwogICAg
-aW50IHVuZG9fdG9wOwogICAgVW5kb0VudHJ5IHJlZG9fc3RhY2tbVU5ET19MSU1JVF07CiAgICBp
-bnQgcmVkb190b3A7CiAgICAvKiBzZWxlw6fDo28gZGUgdGV4dG8gKi8KICAgIGludCBzZWxfYWN0
-aXZlOwogICAgaW50IHNlbF9heCwgc2VsX2F5OyAgICAgICAgLyogw6JuY29yYSBkYSBzZWxlw6fD
-o28gKi8KICAgIC8qIGNsaXBib2FyZCBpbnRlcm5vICovCiAgICBjaGFyICpjbGlwYm9hcmQ7CiAg
-ICBpbnQgICBjbGlwYm9hcmRfbGVuOwogICAgLyogbXVsdGktYnVmZmVyICovCiAgICBjaGFyICBi
-dWZfbGlzdFs4XVsyNTZdOyAgIC8qIGxpc3RhIGRlIGFycXVpdm9zIGFiZXJ0b3MgKi8KICAgIGlu
-dCAgIGJ1Zl9jeFs4XSwgYnVmX2N5WzhdLCBidWZfcm9bOF0sIGJ1Zl9jb1s4XTsKICAgIGludCAg
-IGJ1Zl9jb3VudDsKICAgIGludCAgIGJ1Zl9pZHg7ICAgICAgICAgICAgLyogw61uZGljZSBkbyBi
-dWZmZXIgYXR1YWwgKi8KICAgIENvbXAgY29tcDsKICAgIGludCB1c2VfdGFiczsKfSBFZGl0b3I7
-CgpzdGF0aWMgRWRpdG9yIEU7CgovKiBmb3J3YXJkIGRlY2xhcmF0aW9ucyAqLwpzdGF0aWMgdm9p
-ZCBjb21wX2Nsb3NlKHZvaWQpOwpzdGF0aWMgdm9pZCB1cGRhdGVfcm93KFJvdyAqcm93KTsKc3Rh
-dGljIHZvaWQgdXBkYXRlX3N5bnRheChSb3cgKnJvdyk7CnN0YXRpYyB2b2lkIHNldF9zdGF0dXMo
-Y29uc3QgY2hhciAqZm10LCAuLi4pOwpzdGF0aWMgdm9pZCByZWZyZXNoX3NjcmVlbih2b2lkKTsK
-Ci8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kAogKiBJTkNMVURFIC8gUkVRVUlSRSDigJQgZGV0ZWPDp8OjbyBkZSBjb250ZXh0byBlIGNvbXBs
-ZXRpb24KICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQICovCgovKiBSZXRvcm5hIDEgc2UgbyBjdXJzb3IgZXN0w6EgZGVudHJvIGRlICNpbmNs
-dWRlIDwuLi4+IG91ICNpbmNsdWRlICIuLi4iCiAqIFByZWVuY2hlICpwcmVmaXggY29tIG8gcXVl
-IGrDoSBmb2kgZGlnaXRhZG8gZSAqdXNlX2FuZ2xlICgxPTw+IDA9IiIpICovCnN0YXRpYyBpbnQg
-ZGV0ZWN0X2luY2x1ZGVfY3R4KGNoYXIgKnByZWZpeCwgaW50IGJ1ZnN6LCBpbnQgKnVzZV9hbmds
-ZSkgewogICAgaWYgKEUuY3kgPj0gRS5udW1yb3dzKSByZXR1cm4gMDsKICAgIFJvdyAqcm93ID0g
-JkUucm93W0UuY3ldOwogICAgY2hhciAqbGluZSA9IHJvdy0+Y2hhcnM7CiAgICBpbnQgaSA9IDA7
-CiAgICB3aGlsZSAoaSA8IHJvdy0+c2l6ZSAmJiAobGluZVtpXT09JyAnfHxsaW5lW2ldPT0nXHQn
-KSkgaSsrOwogICAgaWYgKHN0cm5jbXAobGluZStpLCAiI2luY2x1ZGUiLCA4KSAhPSAwKSByZXR1
-cm4gMDsKICAgIGkgKz0gODsKICAgIHdoaWxlIChpIDwgcm93LT5zaXplICYmIChsaW5lW2ldPT0n
-ICd8fGxpbmVbaV09PSdcdCcpKSBpKys7CiAgICBpZiAoaSA+PSByb3ctPnNpemUpIHJldHVybiAw
-OwogICAgY2hhciBvcGVuID0gbGluZVtpXTsKICAgIGlmIChvcGVuICE9ICc8JyAmJiBvcGVuICE9
-ICciJykgcmV0dXJuIDA7CiAgICBjaGFyIGNsb3NlID0gKG9wZW4gPT0gJzwnKSA/ICc+JyA6ICci
-JzsKICAgICp1c2VfYW5nbGUgPSAob3BlbiA9PSAnPCcpOwogICAgaW50IG9wZW5fcG9zID0gaTsK
-ICAgIGkrKzsKICAgIGludCBjeCA9IEUuY3g7CiAgICBpZiAoY3ggPD0gb3Blbl9wb3MpIHJldHVy
-biAwOwogICAgaW50IGNsb3NlX3BvcyA9IC0xOwogICAgZm9yIChpbnQgaiA9IG9wZW5fcG9zKzE7
-IGogPCByb3ctPnNpemU7IGorKykKICAgICAgICBpZiAobGluZVtqXSA9PSBjbG9zZSkgeyBjbG9z
-ZV9wb3MgPSBqOyBicmVhazsgfQogICAgaWYgKGNsb3NlX3BvcyAhPSAtMSAmJiBjeCA+IGNsb3Nl
-X3BvcykgcmV0dXJuIDA7CiAgICBpbnQgcGxlbiA9IGN4IC0gKG9wZW5fcG9zICsgMSk7CiAgICBp
-ZiAocGxlbiA8IDApIHBsZW4gPSAwOwogICAgaWYgKHBsZW4gPj0gYnVmc3opIHBsZW4gPSBidWZz
-eiAtIDE7CiAgICBtZW1jcHkocHJlZml4LCBsaW5lICsgb3Blbl9wb3MgKyAxLCBwbGVuKTsKICAg
-IHByZWZpeFtwbGVuXSA9ICdcMCc7CiAgICByZXR1cm4gMTsKfQoKLyogUmV0b3JuYSAxIHNlIG8g
-Y3Vyc29yIGVzdMOhIGRlbnRybyBkZSByZXF1aXJlKCIuLi4iKSBvdSByZXF1aXJlKCcuLi4nKSAq
-LwpzdGF0aWMgaW50IGRldGVjdF9yZXF1aXJlX2N0eChjaGFyICpwcmVmaXgsIGludCBidWZzeikg
-ewogICAgaWYgKEUuY3kgPj0gRS5udW1yb3dzKSByZXR1cm4gMDsKICAgIFJvdyAqcm93ID0gJkUu
-cm93W0UuY3ldOwogICAgY2hhciAqbGluZSA9IHJvdy0+Y2hhcnM7CiAgICBpbnQgY3ggPSBFLmN4
-OwogICAgaW50IHJwb3MgPSAtMTsKICAgIGZvciAoaW50IGkgPSAwOyBpIDw9IGN4IC0gODsgaSsr
-KSB7CiAgICAgICAgaWYgKHN0cm5jbXAobGluZStpLCAicmVxdWlyZSIsIDcpID09IDApIHsKICAg
-ICAgICAgICAgaW50IGogPSBpICsgNzsKICAgICAgICAgICAgd2hpbGUgKGogPCBjeCAmJiAobGlu
-ZVtqXT09JyAnfHxsaW5lW2pdPT0nXHQnKSkgaisrOwogICAgICAgICAgICBpZiAoaiA8IGN4ICYm
-IGxpbmVbal0gPT0gJygnKSBycG9zID0gajsKICAgICAgICB9CiAgICB9CiAgICBpZiAocnBvcyA8
-IDApIHJldHVybiAwOwogICAgaW50IGkgPSBycG9zICsgMTsKICAgIHdoaWxlIChpIDwgY3ggJiYg
-KGxpbmVbaV09PScgJ3x8bGluZVtpXT09J1x0JykpIGkrKzsKICAgIGlmIChpID49IGN4KSByZXR1
-cm4gMDsKICAgIGNoYXIgcSA9IGxpbmVbaV07CiAgICBpZiAocSAhPSAnIicgJiYgcSAhPSAnXCcn
-KSByZXR1cm4gMDsKICAgIGkrKzsKICAgIGlmIChpID4gY3gpIHJldHVybiAwOwogICAgaW50IHBs
-ZW4gPSBjeCAtIGk7CiAgICBpZiAocGxlbiA8IDApIHBsZW4gPSAwOwogICAgaWYgKHBsZW4gPj0g
-YnVmc3opIHBsZW4gPSBidWZzeiAtIDE7CiAgICBtZW1jcHkocHJlZml4LCBsaW5lICsgaSwgcGxl
-bik7CiAgICBwcmVmaXhbcGxlbl0gPSAnXDAnOwogICAgcmV0dXJuIDE7Cn0KCi8qIEFkaWNpb25h
-IGl0ZW0gw6AgY29tcCBzZSBiYXRlIGNvbSBwcmVmaXggZSBuw6NvIMOpIGR1cGxpY2FkbyAqLwpz
-dGF0aWMgdm9pZCBjb21wX2FkZChjb25zdCBjaGFyICppdGVtLCBjb25zdCBjaGFyICpwcmVmaXgs
-IGludCBwbGVuKSB7CiAgICBpZiAoRS5jb21wLmNvdW50ID49IENPTVBMRVRJT05fTUFYKSByZXR1
-cm47CiAgICBpZiAocGxlbiA+IDAgJiYgc3RybmNtcChpdGVtLCBwcmVmaXgsIHBsZW4pICE9IDAp
-IHJldHVybjsKICAgIGZvciAoaW50IGsgPSAwOyBrIDwgRS5jb21wLmNvdW50OyBrKyspCiAgICAg
-ICAgaWYgKCFzdHJjbXAoRS5jb21wLml0ZW1zW2tdLCBpdGVtKSkgcmV0dXJuOwogICAgRS5jb21w
-Lml0ZW1zW0UuY29tcC5jb3VudCsrXSA9IHN0cmR1cChpdGVtKTsKfQoKLyogVmFycmUgL2RhdGEv
-ZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzci9pbmNsdWRlIGUgc3ViZGlycyAqLwpzdGF0aWMgdm9p
-ZCBzY2FuX2NfaGVhZGVycyhjb25zdCBjaGFyICpwcmVmaXgsIGludCBwbGVuKSB7CiAgICBjb25z
-dCBjaGFyICpiYXNlID0gIi9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy91c3IvaW5jbHVkZSI7
-CiAgICBjb25zdCBjaGFyICpzdWJkaXJzW10gPSB7CiAgICAgICAgIiIsICJzeXMiLCAibmV0Iiwg
-Im5ldGluZXQiLCAiYXJwYSIsICJuZXRwYWNrZXQiLAogICAgICAgICJsaW51eCIsICJhc20iLCAi
-Yml0cyIsIE5VTEwKICAgIH07CiAgICBmb3IgKGludCBzID0gMDsgc3ViZGlyc1tzXTsgcysrKSB7
-CiAgICAgICAgY2hhciBwYXRoWzI1Nl07CiAgICAgICAgaWYgKHN1YmRpcnNbc11bMF0pCiAgICAg
-ICAgICAgIHNucHJpbnRmKHBhdGgsIHNpemVvZihwYXRoKSwgIiVzLyVzIiwgYmFzZSwgc3ViZGly
-c1tzXSk7CiAgICAgICAgZWxzZQogICAgICAgICAgICBzbnByaW50ZihwYXRoLCBzaXplb2YocGF0
-aCksICIlcyIsIGJhc2UpOwogICAgICAgIERJUiAqZCA9IG9wZW5kaXIocGF0aCk7CiAgICAgICAg
-aWYgKCFkKSBjb250aW51ZTsKICAgICAgICBzdHJ1Y3QgZGlyZW50ICplbnQ7CiAgICAgICAgd2hp
-bGUgKChlbnQgPSByZWFkZGlyKGQpKSAmJiBFLmNvbXAuY291bnQgPCBDT01QTEVUSU9OX01BWCkg
-ewogICAgICAgICAgICBjaGFyICpkb3QgPSBzdHJyY2hyKGVudC0+ZF9uYW1lLCAnLicpOwogICAg
-ICAgICAgICBpZiAoIWRvdCB8fCBzdHJjbXAoZG90LCAiLmgiKSAhPSAwKSBjb250aW51ZTsKICAg
-ICAgICAgICAgY2hhciBpdGVtWzEyOF07CiAgICAgICAgICAgIGlmIChzdWJkaXJzW3NdWzBdKQog
-ICAgICAgICAgICAgICAgc25wcmludGYoaXRlbSwgc2l6ZW9mKGl0ZW0pLCAiJXMvJXMiLCBzdWJk
-aXJzW3NdLCBlbnQtPmRfbmFtZSk7CiAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIHNu
-cHJpbnRmKGl0ZW0sIHNpemVvZihpdGVtKSwgIiVzIiwgZW50LT5kX25hbWUpOwogICAgICAgICAg
-ICBjb21wX2FkZChpdGVtLCBwcmVmaXgsIHBsZW4pOwogICAgICAgIH0KICAgICAgICBjbG9zZWRp
-cihkKTsKICAgIH0KfQoKLyogVmFycmUgdW0gZGlyZXTDs3JpbyBlbSBidXNjYSBkZSBtw7NkdWxv
-cyBMdWEgKC5sdWEgZSBkaXJldMOzcmlvcyBjb20gaW5pdCkgKi8Kc3RhdGljIHZvaWQgc2Nhbl9s
-dWFfZGlyKGNvbnN0IGNoYXIgKnBhdGgsIGNvbnN0IGNoYXIgKnByZWZpeCwgaW50IHBsZW4pIHsK
-ICAgIERJUiAqZCA9IG9wZW5kaXIocGF0aCk7CiAgICBpZiAoIWQpIHJldHVybjsKICAgIHN0cnVj
-dCBkaXJlbnQgKmVudDsKICAgIHdoaWxlICgoZW50ID0gcmVhZGRpcihkKSkgJiYgRS5jb21wLmNv
-dW50IDwgQ09NUExFVElPTl9NQVgpIHsKICAgICAgICBpZiAoZW50LT5kX25hbWVbMF0gPT0gJy4n
-KSBjb250aW51ZTsKICAgICAgICBjaGFyICpkb3QgPSBzdHJyY2hyKGVudC0+ZF9uYW1lLCAnLicp
-OwogICAgICAgIGlmIChkb3QgJiYgc3RyY21wKGRvdCwgIi5sdWEiKSA9PSAwKSB7CiAgICAgICAg
-ICAgIC8qIGFycXVpdm8gLmx1YSDigJQgZXh0cmFpIG5vbWUgc2VtIGV4dGVuc8OjbyAqLwogICAg
-ICAgICAgICBjaGFyIG1vZFsxMjhdOwogICAgICAgICAgICBpbnQgbWxlbiA9IChpbnQpKGRvdCAt
-IGVudC0+ZF9uYW1lKTsKICAgICAgICAgICAgaWYgKG1sZW4gPD0gMCB8fCBtbGVuID49IChpbnQp
-c2l6ZW9mKG1vZCkpIGNvbnRpbnVlOwogICAgICAgICAgICBtZW1jcHkobW9kLCBlbnQtPmRfbmFt
-ZSwgbWxlbik7IG1vZFttbGVuXSA9ICdcMCc7CiAgICAgICAgICAgIGNvbXBfYWRkKG1vZCwgcHJl
-Zml4LCBwbGVuKTsKICAgICAgICB9IGVsc2UgaWYgKCFkb3QpIHsKICAgICAgICAgICAgLyogcG9z
-c8OtdmVsIGRpcmV0w7NyaW8gKG3Ds2R1bG8gY29tIGluaXQubHVhKSAqLwogICAgICAgICAgICBj
-aGFyIGZ1bGxbNTEyXTsKICAgICAgICAgICAgc25wcmludGYoZnVsbCwgc2l6ZW9mKGZ1bGwpLCAi
-JXMvJXMvaW5pdC5sdWEiLCBwYXRoLCBlbnQtPmRfbmFtZSk7CiAgICAgICAgICAgIHN0cnVjdCBz
-dGF0IHN0OwogICAgICAgICAgICBpZiAoc3RhdChmdWxsLCAmc3QpID09IDApCiAgICAgICAgICAg
-ICAgICBjb21wX2FkZChlbnQtPmRfbmFtZSwgcHJlZml4LCBwbGVuKTsKICAgICAgICB9CiAgICB9
-CiAgICBjbG9zZWRpcihkKTsKfQoKLyogVmFycmUgfi8ubHVhLW1vZHVsZXMvIGUgcGF0aHMgZG8g
-bHVhcm9ja3MgKi8Kc3RhdGljIHZvaWQgc2Nhbl9sdWFfbW9kdWxlcyhjb25zdCBjaGFyICpwcmVm
-aXgsIGludCBwbGVuKSB7CiAgICBjb25zdCBjaGFyICpob21lID0gZ2V0ZW52KCJIT01FIik7CiAg
-ICBpZiAoIWhvbWUpIGhvbWUgPSAiL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL2hvbWUiOwoK
-ICAgIC8qIDEuIH4vLmx1YS1tb2R1bGVzLyAobG1vZCkgKi8KICAgIGNoYXIgcGF0aFs1MTJdOwog
-ICAgc25wcmludGYocGF0aCwgc2l6ZW9mKHBhdGgpLCAiJXMvLmx1YS1tb2R1bGVzIiwgaG9tZSk7
-CiAgICBzY2FuX2x1YV9kaXIocGF0aCwgcHJlZml4LCBwbGVuKTsKCiAgICAvKiAyLiB+Ly5sdWFy
-b2Nrcy9zaGFyZS9sdWEvNS40LyAobHVhcm9ja3MgdXNlcikgKi8KICAgIHNucHJpbnRmKHBhdGgs
-IHNpemVvZihwYXRoKSwgIiVzLy5sdWFyb2Nrcy9zaGFyZS9sdWEvNS40IiwgaG9tZSk7CiAgICBz
-Y2FuX2x1YV9kaXIocGF0aCwgcHJlZml4LCBwbGVuKTsKCiAgICAvKiAzLiBsdWFyb2NrcyBnbG9i
-YWwgVGVybXV4OiAkUFJFRklYL3NoYXJlL2x1YS81LjQvICovCiAgICBjb25zdCBjaGFyICpwZngg
-PSBnZXRlbnYoIlBSRUZJWCIpOwogICAgaWYgKCFwZngpIHBmeCA9ICIvZGF0YS9kYXRhL2NvbS50
-ZXJtdXgvZmlsZXMvdXNyIjsKICAgIHNucHJpbnRmKHBhdGgsIHNpemVvZihwYXRoKSwgIiVzL3No
-YXJlL2x1YS81LjQiLCBwZngpOwogICAgc2Nhbl9sdWFfZGlyKHBhdGgsIHByZWZpeCwgcGxlbik7
-CgogICAgLyogNC4gbHVhcm9ja3MgbGliOiAkUFJFRklYL2xpYi9sdWEvNS40LyAobcOzZHVsb3Mg
-QykgKi8KICAgIHNucHJpbnRmKHBhdGgsIHNpemVvZihwYXRoKSwgIiVzL2xpYi9sdWEvNS40Iiwg
-cGZ4KTsKICAgIHNjYW5fbHVhX2RpcihwYXRoLCBwcmVmaXgsIHBsZW4pOwp9CgovKiBBYnJlIGNv
-bXBsZXRpb24gcGFyYSAjaW5jbHVkZSA8Li4uPiAvICNpbmNsdWRlICIuLi4iICovCnN0YXRpYyBp
-bnQgY29tcF9vcGVuX2luY2x1ZGUodm9pZCkgewogICAgY2hhciBwcmVmaXhbMTI4XTsgaW50IHVz
-ZV9hbmdsZTsKICAgIGlmICghZGV0ZWN0X2luY2x1ZGVfY3R4KHByZWZpeCwgc2l6ZW9mKHByZWZp
-eCksICZ1c2VfYW5nbGUpKSByZXR1cm4gMDsKICAgIGNvbXBfY2xvc2UoKTsKICAgIGludCBwbGVu
-ID0gKGludClzdHJsZW4ocHJlZml4KTsKICAgIC8qIHVzYSBsaXN0YSBkZSBoZWFkZXJzIGNvbmZv
-cm1lIGxpbmd1YWdlbSBhdGl2YSAqLwogICAgY29uc3QgY2hhciAqKmhsaXN0ID0gKEUuc3ludGF4
-ID09ICZITERCWzFdKSA/IENQUF9IRUFERVJTIDogQ19IRUFERVJTOwogICAgZm9yIChpbnQgaSA9
-IDA7IGhsaXN0W2ldOyBpKyspCiAgICAgICAgY29tcF9hZGQoaGxpc3RbaV0sIHByZWZpeCwgcGxl
-bik7CiAgICAvKiBzY2FuIGRvIGZpbGVzeXN0ZW06IHBhcmEgQyBzw7MgLmgsIHBhcmEgQysrIHRh
-bWLDqW0gc2VtIGV4dGVuc8OjbyAqLwogICAgaWYgKEUuc3ludGF4ID09ICZITERCWzFdKSB7CiAg
-ICAgICAgLyogQysrOiBzY2FuIG5vcm1hbCBkZSAuaCArIGhlYWRlcnMgc2VtIGV4dGVuc8OjbyBk
-byBTVEwgKi8KICAgICAgICBzY2FuX2NfaGVhZGVycyhwcmVmaXgsIHBsZW4pOwogICAgfSBlbHNl
-IHsKICAgICAgICBzY2FuX2NfaGVhZGVycyhwcmVmaXgsIHBsZW4pOwogICAgfQogICAgaWYgKEUu
-Y29tcC5jb3VudCA9PSAwKSByZXR1cm4gMDsKICAgIEUuY29tcC5zZWxlY3RlZCA9IDA7CiAgICBF
-LmNvbXAuYWN0aXZlICAgPSAxOwogICAgLyogdHJpZ2dlcl9jeCA9IHBvc2nDp8OjbyBsb2dvIGFw
-w7NzICc8JyBvdSAnIicgKi8KICAgIFJvdyAqcm93ID0gJkUucm93W0UuY3ldOwogICAgY2hhciAq
-bGluZSA9IHJvdy0+Y2hhcnM7CiAgICBpbnQgaSA9IDA7CiAgICB3aGlsZSAoaSA8IHJvdy0+c2l6
-ZSAmJiAobGluZVtpXT09JyAnfHxsaW5lW2ldPT0nXHQnKSkgaSsrOwogICAgaSArPSA4OyAvKiBz
-YWx0YSAiI2luY2x1ZGUiICovCiAgICB3aGlsZSAoaSA8IHJvdy0+c2l6ZSAmJiAobGluZVtpXT09
-JyAnfHxsaW5lW2ldPT0nXHQnKSkgaSsrOwogICAgaSsrOyAvKiBzYWx0YSAnPCcgb3UgJyInICov
-CiAgICBFLmNvbXAudHJpZ2dlcl9jeCA9IGk7CiAgICByZXR1cm4gMTsKfQoKLyogQWJyZSBjb21w
-bGV0aW9uIHBhcmEgcmVxdWlyZSgiLi4uIikgLyByZXF1aXJlKCcuLi4nKSAqLwpzdGF0aWMgaW50
-IGNvbXBfb3Blbl9yZXF1aXJlKHZvaWQpIHsKICAgIGNoYXIgcHJlZml4WzEyOF07CiAgICBpZiAo
-IWRldGVjdF9yZXF1aXJlX2N0eChwcmVmaXgsIHNpemVvZihwcmVmaXgpKSkgcmV0dXJuIDA7CiAg
-ICBjb21wX2Nsb3NlKCk7CiAgICBpbnQgcGxlbiA9IChpbnQpc3RybGVuKHByZWZpeCk7CiAgICBm
-b3IgKGludCBpID0gMDsgTFVBX1NURF9NT0RTW2ldOyBpKyspCiAgICAgICAgY29tcF9hZGQoTFVB
-X1NURF9NT0RTW2ldLCBwcmVmaXgsIHBsZW4pOwogICAgc2Nhbl9sdWFfbW9kdWxlcyhwcmVmaXgs
-IHBsZW4pOwogICAgaWYgKEUuY29tcC5jb3VudCA9PSAwKSByZXR1cm4gMDsKICAgIEUuY29tcC5z
-ZWxlY3RlZCA9IDA7CiAgICBFLmNvbXAuYWN0aXZlICAgPSAxOwogICAgLyogdHJpZ2dlcl9jeCA9
-IHBvc2nDp8OjbyBsb2dvIGFww7NzIGFzIGFzcGFzIGRlIGFiZXJ0dXJhICovCiAgICBSb3cgKnJv
-dyA9ICZFLnJvd1tFLmN5XTsKICAgIGNoYXIgKmxpbmUgPSByb3ctPmNoYXJzOwogICAgaW50IGN4
-ID0gRS5jeDsKICAgIGludCBycG9zID0gLTE7CiAgICBmb3IgKGludCBpID0gMDsgaSA8PSBjeCAt
-IDg7IGkrKykgewogICAgICAgIGlmIChzdHJuY21wKGxpbmUraSwicmVxdWlyZSIsNyk9PTApIHsK
-ICAgICAgICAgICAgaW50IGo9aSs3OwogICAgICAgICAgICB3aGlsZShqPGN4JiYobGluZVtqXT09
-JyAnfHxsaW5lW2pdPT0nXHQnKSlqKys7CiAgICAgICAgICAgIGlmKGo8Y3gmJmxpbmVbal09PSco
-JykgcnBvcz1qOwogICAgICAgIH0KICAgIH0KICAgIGludCBpMiA9IHJwb3MgKyAxOwogICAgd2hp
-bGUgKGkyIDwgY3ggJiYgKGxpbmVbaTJdPT0nICd8fGxpbmVbaTJdPT0nXHQnKSkgaTIrKzsKICAg
-IGkyKys7IC8qIHNhbHRhIGFzcGFzICovCiAgICBFLmNvbXAudHJpZ2dlcl9jeCA9IGkyOwogICAg
-cmV0dXJuIDE7Cn0KCgoKc3RhdGljIHZvaWQgZGllKGNvbnN0IGNoYXIgKnMpIHsKICAgIHdyaXRl
-KFNURE9VVF9GSUxFTk8sICJceDFiWzJKXHgxYltIIiwgNyk7CiAgICBwZXJyb3Iocyk7IGV4aXQo
-MSk7Cn0Kc3RhdGljIHZvaWQgcmF3X29mZih2b2lkKSB7CiAgICB3cml0ZShTVERPVVRfRklMRU5P
-LCAiXDAzM1s/MTAwMGwiLCA5KTsgLyogZGVzYXRpdmEgbW91c2UgKi8KICAgIC8qIHNhaSBkbyBi
-dWZmZXIgYWx0ZXJuYXRpdm8gZSByZXN0YXVyYSBvIHRlcm1pbmFsICovCiAgICB3cml0ZShTVERP
-VVRfRklMRU5PLCAiXHgxYls/MTA0OWwiLCA4KTsKICAgIHRjc2V0YXR0cihTVERJTl9GSUxFTk8s
-IFRDU0FGTFVTSCwgJkUub3JpZ190ZXJtaW9zKTsKfQpzdGF0aWMgdm9pZCByYXdfb24odm9pZCkg
-ewogICAgaWYgKHRjZ2V0YXR0cihTVERJTl9GSUxFTk8sICZFLm9yaWdfdGVybWlvcykgPT0gLTEp
-IGRpZSgidGNnZXRhdHRyIik7CiAgICBhdGV4aXQocmF3X29mZik7CiAgICBzdHJ1Y3QgdGVybWlv
-cyByID0gRS5vcmlnX3Rlcm1pb3M7CiAgICByLmNfaWZsYWcgJj0gfihCUktJTlR8SUNSTkx8SU5Q
-Q0t8SVNUUklQfElYT04pOwogICAgci5jX29mbGFnICY9IH5PUE9TVDsgci5jX2NmbGFnIHw9IENT
-ODsKICAgIHIuY19sZmxhZyAmPSB+KEVDSE98SUNBTk9OfElFWFRFTnxJU0lHKTsKICAgIHIuY19j
-Y1tWTUlOXSA9IDA7IHIuY19jY1tWVElNRV0gPSAxOwogICAgaWYgKHRjc2V0YXR0cihTVERJTl9G
-SUxFTk8sIFRDU0FGTFVTSCwgJnIpID09IC0xKSBkaWUoInRjc2V0YXR0ciIpOwogICAgd3JpdGUo
-U1RET1VUX0ZJTEVOTywgIlwwMzNbPzEwMDBoIiwgOSk7IC8qIGF0aXZhIG1vdXNlOiBjbGlxdWUg
-KyBzY3JvbGwgKi8KfQoKc3RhdGljIGludCBnZXRfd2luc3ooaW50ICpyb3dzLCBpbnQgKmNvbHMp
-IHsKICAgIHN0cnVjdCB3aW5zaXplIHdzOwogICAgaWYgKGlvY3RsKFNURE9VVF9GSUxFTk8sIFRJ
-T0NHV0lOU1osICZ3cykgPT0gLTEgfHwgd3Mud3NfY29sID09IDApIHJldHVybiAtMTsKICAgICpj
-b2xzID0gd3Mud3NfY29sOyAqcm93cyA9IHdzLndzX3JvdzsgcmV0dXJuIDA7Cn0KCnN0YXRpYyB2
-b2lkIGhhbmRsZV9yZXNpemUoaW50IHNpZykgewogICAgKHZvaWQpc2lnOwogICAgaWYgKGdldF93
-aW5zeigmRS5yb3dzLCAmRS5jb2xzKSAhPSAtMSkgewogICAgICAgIEUucm93cyAtPSAyOyAgLyog
-cmVzZXJ2YSBzdGF0dXMgYmFyICsgbXNnICovCiAgICAgICAgLyogR2FyYW50ZSBxdWUgbyBjdXJz
-b3IgbsOjbyBmaXF1ZSBmb3JhIGRhIMOhcmVhIHZpc8OtdmVsICovCiAgICAgICAgaWYgKEUuY3kg
-Pj0gRS5yb3dzKSBFLmN5ID0gRS5yb3dzID4gMCA/IEUucm93cyAtIDEgOiAwOwogICAgICAgIGlm
-IChFLmN4ID49IEUuY29scykgRS5jeCA9IEUuY29scyA+IDAgPyBFLmNvbHMgLSAxIDogMDsKICAg
-IH0KfQoKLyogZm9yd2FyZCBkZWNsYXJhdGlvbnMgbmVjZXNzw6FyaWFzIHBhcmEgbyBoYW5kbGVy
-IGRlIG1vdXNlIGVtIHJlYWRfa2V5ICovCnN0YXRpYyBpbnQgIHJ4X3RvX2N4KFJvdyAqcm93LCBp
-bnQgcngpOwpzdGF0aWMgdm9pZCBtb3ZlX2N1cnNvcihpbnQgayk7CnN0YXRpYyB2b2lkIHNhdmVf
-ZmlsZSh2b2lkKTsKCnN0YXRpYyBpbnQgcmVhZF9rZXkodm9pZCkgewogICAgaW50IG47IGNoYXIg
-YzsKCiAgICAvKiB0ZW50YSBsZXIgY29tIHRpbWVvdXQgZGUgMTAwbXMgcGFyYSBwZXJtaXRpciBy
-ZWRyYXcgcGVyacOzZGljbyAqLwogICAgd2hpbGUgKDEpIHsKICAgICAgICBmZF9zZXQgZmRzOyBG
-RF9aRVJPKCZmZHMpOyBGRF9TRVQoU1RESU5fRklMRU5PLCAmZmRzKTsKICAgICAgICBzdHJ1Y3Qg
-dGltZXZhbCB0diA9IHswLCAxMDAwMDB9OyAvKiAxMDBtcyAqLwogICAgICAgIGludCByZWFkeSA9
-IHNlbGVjdChTVERJTl9GSUxFTk8rMSwgJmZkcywgTlVMTCwgTlVMTCwgJnR2KTsKICAgICAgICBp
-ZiAocmVhZHkgPCAwICYmIGVycm5vICE9IEVJTlRSKSBkaWUoInNlbGVjdCIpOwogICAgICAgIGlm
-IChyZWFkeSA9PSAwKSByZXR1cm4gMDsgLyogdGltZW91dCDigJQgc2VtIGlucHV0ICovCiAgICAg
-ICAgbiA9IHJlYWQoU1RESU5fRklMRU5PLCAmYywgMSk7CiAgICAgICAgaWYgKG4gPT0gMSkgYnJl
-YWs7CiAgICAgICAgaWYgKG4gPT0gLTEgJiYgZXJybm8gIT0gRUFHQUlOKSBkaWUoInJlYWQiKTsK
-ICAgIH0KCiAgICBpZiAoYyAhPSAnXHgxYicpIHJldHVybiBjOwoKICAgIGNoYXIgc1s4XSA9IHsw
-fTsKICAgIGlmIChyZWFkKFNURElOX0ZJTEVOTywgJnNbMF0sIDEpICE9IDEpIHJldHVybiAnXHgx
-Yic7CiAgICBpZiAocmVhZChTVERJTl9GSUxFTk8sICZzWzFdLCAxKSAhPSAxKSByZXR1cm4gJ1x4
-MWInOwoKICAgIC8qIEVTQyBbIHNlcXVlbmNlcyAqLwogICAgaWYgKHNbMF0gPT0gJ1snKSB7CiAg
-ICAgICAgaWYgKHNbMV0gPj0gJzAnICYmIHNbMV0gPD0gJzknKSB7CiAgICAgICAgICAgIHJlYWQo
-U1RESU5fRklMRU5PLCAmc1syXSwgMSk7CiAgICAgICAgICAgIGlmIChzWzJdID09ICd+Jykgewog
-ICAgICAgICAgICAgICAgc3dpdGNoIChzWzFdKSB7CiAgICAgICAgICAgICAgICAgICAgY2FzZSAn
-MSc6IHJldHVybiBIT01FX0tFWTsKICAgICAgICAgICAgICAgICAgICBjYXNlICczJzogcmV0dXJu
-IERFTF9LRVk7CiAgICAgICAgICAgICAgICAgICAgY2FzZSAnNCc6IHJldHVybiBFTkRfS0VZOwog
-ICAgICAgICAgICAgICAgICAgIGNhc2UgJzUnOiByZXR1cm4gUEFHRV9VUDsKICAgICAgICAgICAg
-ICAgICAgICBjYXNlICc2JzogcmV0dXJuIFBBR0VfRE9XTjsKICAgICAgICAgICAgICAgICAgICBj
-YXNlICc3JzogcmV0dXJuIEhPTUVfS0VZOwogICAgICAgICAgICAgICAgICAgIGNhc2UgJzgnOiBy
-ZXR1cm4gRU5EX0tFWTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgICAg
-ICAvKiBFU0MgWyAxIDsgbW9kIEEvQiDigJQgQWx0K0Fycm93ICovCiAgICAgICAgICAgIGlmIChz
-WzFdID09ICcxJyAmJiBzWzJdID09ICc7JykgewogICAgICAgICAgICAgICAgcmVhZChTVERJTl9G
-SUxFTk8sICZzWzNdLCAxKTsgLyogbW9kICovCiAgICAgICAgICAgICAgICByZWFkKFNURElOX0ZJ
-TEVOTywgJnNbNF0sIDEpOyAvKiBsZXR0ZXIgKi8KICAgICAgICAgICAgICAgIGlmIChzWzNdID09
-ICczJykgeyAvKiBBbHQgKi8KICAgICAgICAgICAgICAgICAgICBpZiAoc1s0XSA9PSAnQScpIHJl
-dHVybiBBTFRfVVA7CiAgICAgICAgICAgICAgICAgICAgaWYgKHNbNF0gPT0gJ0InKSByZXR1cm4g
-QUxUX0RPV047CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBpZiAoc1szXSA9PSAn
-MicpIHsgLyogU2hpZnQgKi8KICAgICAgICAgICAgICAgICAgICBpZiAoc1s0XSA9PSAnQScpIHJl
-dHVybiBTSElGVF9VUDsKICAgICAgICAgICAgICAgICAgICBpZiAoc1s0XSA9PSAnQicpIHJldHVy
-biBTSElGVF9ET1dOOwogICAgICAgICAgICAgICAgICAgIGlmIChzWzRdID09ICdDJykgcmV0dXJu
-IFNISUZUX1JJR0hUOwogICAgICAgICAgICAgICAgICAgIGlmIChzWzRdID09ICdEJykgcmV0dXJu
-IFNISUZUX0xFRlQ7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAg
-LyogRjIgLyBGMyAqLwogICAgICAgICAgICBpZiAoc1sxXSA9PSAnMScgJiYgc1syXSA9PSAnMicg
-KSB7IHJlYWQoU1RESU5fRklMRU5PLCZzWzNdLDEpOyBpZihzWzNdPT0nficpIHJldHVybiBGMjsg
-fQogICAgICAgICAgICBpZiAoc1sxXSA9PSAnMScgJiYgc1syXSA9PSAnMycgKSB7IHJlYWQoU1RE
-SU5fRklMRU5PLCZzWzNdLDEpOyBpZihzWzNdPT0nficpIHJldHVybiBGMzsgfQogICAgICAgIH0g
-ZWxzZSB7CiAgICAgICAgICAgIHN3aXRjaCAoc1sxXSkgewogICAgICAgICAgICAgICAgY2FzZSAn
-QSc6IHJldHVybiBBUlJPV19VUDsKICAgICAgICAgICAgICAgIGNhc2UgJ0InOiByZXR1cm4gQVJS
-T1dfRE9XTjsKICAgICAgICAgICAgICAgIGNhc2UgJ0MnOiByZXR1cm4gQVJST1dfUklHSFQ7CiAg
-ICAgICAgICAgICAgICBjYXNlICdEJzogcmV0dXJuIEFSUk9XX0xFRlQ7CiAgICAgICAgICAgICAg
-ICBjYXNlICdIJzogcmV0dXJuIEhPTUVfS0VZOwogICAgICAgICAgICAgICAgY2FzZSAnRic6IHJl
-dHVybiBFTkRfS0VZOwogICAgICAgICAgICAgICAgY2FzZSAnWic6IHJldHVybiBTSElGVF9UQUI7
-ICAvKiBTaGlmdCtUYWIgKi8KICAgICAgICAgICAgICAgIGNhc2UgJ00nOiB7IC8qIG1vdXNlOiBF
-U0MgWyBNIDxidG4+IDxjeD4gPGN5PiAqLwogICAgICAgICAgICAgICAgICAgIGNoYXIgbWJbM107
-CiAgICAgICAgICAgICAgICAgICAgaWYgKHJlYWQoU1RESU5fRklMRU5PLCBtYiwgMykgPT0gMykg
-ewogICAgICAgICAgICAgICAgICAgICAgICBpbnQgYnRuID0gKHVuc2lnbmVkIGNoYXIpbWJbMF0g
-LSAzMjsKICAgICAgICAgICAgICAgICAgICAgICAgaW50IG14ICA9ICh1bnNpZ25lZCBjaGFyKW1i
-WzFdIC0gMzM7IC8qIDAtaW5kZXhlZCBjb2wgKi8KICAgICAgICAgICAgICAgICAgICAgICAgaW50
-IG15ICA9ICh1bnNpZ25lZCBjaGFyKW1iWzJdIC0gMzM7IC8qIDAtaW5kZXhlZCByb3cgKi8KICAg
-ICAgICAgICAgICAgICAgICAgICAgaWYgKGJ0biA9PSAwICYmIG14ID49IEdVVFRFUikgewogICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgLyogY2xpcXVlIGVzcXVlcmRvOiBtb3ZlIGN1cnNvciAq
-LwogICAgICAgICAgICAgICAgICAgICAgICAgICAgaW50IGZyID0gbXkgKyBFLnJvd29mZjsKICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgIGlmIChmciA+PSAwICYmIGZyIDwgRS5udW1yb3dzKSB7
-CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgRS5jeSA9IGZyOwogICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgIGludCByeCA9IG14IC0gR1VUVEVSICsgRS5jb2xvZmY7CiAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgRS5jeCA9IHJ4X3RvX2N4KCZFLnJvd1tFLmN5XSwg
-cngpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIEUuc2VsX2FjdGl2ZSA9IDA7CiAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgICAgIH0gZWxz
-ZSBpZiAoYnRuID09IDY0KSB7IC8qIHNjcm9sbCB1cCAqLwogICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgZm9yIChpbnQgaT0wO2k8MztpKyspIG1vdmVfY3Vyc29yKEFSUk9XX1VQKTsKICAgICAg
-ICAgICAgICAgICAgICAgICAgfSBlbHNlIGlmIChidG4gPT0gNjUpIHsgLyogc2Nyb2xsIGRvd24g
-Ki8KICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZvciAoaW50IGk9MDtpPDM7aSsrKSBtb3Zl
-X2N1cnNvcihBUlJPV19ET1dOKTsKICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAg
-ICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICByZXR1cm4gMDsgLyogcmVkZXNlbmhhIHNl
-bSB0ZWNsYSAqLwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfQogICAg
-fQogICAgLyogRVNDIE8gc2VxdWVuY2VzICovCiAgICBpZiAoc1swXSA9PSAnTycpIHsKICAgICAg
-ICBzd2l0Y2ggKHNbMV0pIHsKICAgICAgICAgICAgY2FzZSAnQSc6IHJldHVybiBBUlJPV19VUDsK
-ICAgICAgICAgICAgY2FzZSAnQic6IHJldHVybiBBUlJPV19ET1dOOwogICAgICAgICAgICBjYXNl
-ICdDJzogcmV0dXJuIEFSUk9XX1JJR0hUOwogICAgICAgICAgICBjYXNlICdEJzogcmV0dXJuIEFS
-Uk9XX0xFRlQ7CiAgICAgICAgICAgIGNhc2UgJ0gnOiByZXR1cm4gSE9NRV9LRVk7CiAgICAgICAg
-ICAgIGNhc2UgJ0YnOiByZXR1cm4gRU5EX0tFWTsKICAgICAgICAgICAgY2FzZSAnUCc6IHJldHVy
-biBGMTsKICAgICAgICAgICAgY2FzZSAnUSc6IHJldHVybiBGMjsKICAgICAgICAgICAgY2FzZSAn
-Uic6IHJldHVybiBGMzsKICAgICAgICAgICAgY2FzZSAnUyc6IHJldHVybiBGNDsKICAgICAgICB9
-CiAgICB9CiAgICByZXR1cm4gJ1x4MWInOwp9CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogQVBQRU5EIEJVRkZFUgogKiDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCnR5cGVk
-ZWYgc3RydWN0IHsgY2hhciAqYjsgaW50IGxlbjsgfSBBYnVmOwojZGVmaW5lIEFCVUZfSU5JVCB7
-TlVMTCwwfQoKc3RhdGljIHZvaWQgZHJhd19zbmlwX3BhbmVsKEFidWYgKmFiKTsKc3RhdGljIHZv
-aWQgZHJhd19mZXhwX3BhbmVsKEFidWYgKmFiKTsKc3RhdGljIHZvaWQgZHJhd19jaGVja19wYW5l
-bChBYnVmICphYik7CnN0YXRpYyB2b2lkIGRyYXdfZ290b19wYW5lbChBYnVmICphYik7CnN0YXRp
-YyB2b2lkIGRyYXdfc3ltX3BhbmVsKEFidWYgKmFiKTsKc3RhdGljIGludCBoYXNfd29yZChjb25z
-dCBjaGFyICpzLCBjb25zdCBjaGFyICp0b2spOwpzdGF0aWMgdm9pZCBpbnNlcnRfbmV3bGluZSh2
-b2lkKTsKc3RhdGljIHZvaWQgb3Blbl9maWxlKGNvbnN0IGNoYXIgKmZuYW1lKTsKCnN0YXRpYyB2
-b2lkIGFiX2FwcGVuZChBYnVmICphYiwgY29uc3QgY2hhciAqcywgaW50IGxlbikgewogICAgY2hh
-ciAqcCA9IHJlYWxsb2MoYWItPmIsIGFiLT5sZW4gKyBsZW4pOwogICAgaWYgKCFwKSByZXR1cm47
-CiAgICBtZW1jcHkoJnBbYWItPmxlbl0sIHMsIGxlbik7CiAgICBhYi0+YiA9IHA7IGFiLT5sZW4g
-Kz0gbGVuOwp9CnN0YXRpYyB2b2lkIGFiX2ZyZWUoQWJ1ZiAqYWIpIHsgZnJlZShhYi0+Yik7IH0K
-Ci8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kAogKiBTWU5UQVggSElHSExJR0hUCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKc3RhdGljIGludCBpc19zZXAoaW50IGMpIHsKICAg
-IHJldHVybiBpc3NwYWNlKGMpIHx8IGMgPT0gJ1wwJyB8fCBzdHJjaHIoIiwuKCkrLS8qPX4lPD5b
-XTt7fTomfF4hP0AjIiwgYyk7Cn0KCnN0YXRpYyB2b2lkIHVwZGF0ZV9zeW50YXgoUm93ICpyb3cp
-IHsKICAgIHJvdy0+aGwgPSByZWFsbG9jKHJvdy0+aGwsIHJvdy0+cnNpemUpOwogICAgbWVtc2V0
-KHJvdy0+aGwsIEhMX05PUk1BTCwgcm93LT5yc2l6ZSk7CiAgICBpZiAoIUUuc3ludGF4KSByZXR1
-cm47CgogICAgY29uc3QgY2hhciAqKmZsICA9IEUuc3ludGF4LT5rd19mbG93OwogICAgY29uc3Qg
-Y2hhciAqKmJpICA9IEUuc3ludGF4LT5rd19idWlsdGluOwogICAgY29uc3QgY2hhciAqKnR5ICA9
-IEUuc3ludGF4LT5rd190eXBlczsKICAgIGNvbnN0IGNoYXIgKipwcCAgPSBFLnN5bnRheC0+a3df
-cHJlcHJvYzsKICAgIGNvbnN0IGNoYXIgICpzYyAgPSBFLnN5bnRheC0+c2NvbW1lbnQ7CiAgICBj
-b25zdCBjaGFyICAqbWNzID0gRS5zeW50YXgtPm1jczsKICAgIGNvbnN0IGNoYXIgICptY2UgPSBF
-LnN5bnRheC0+bWNlOwogICAgaW50IHNsZW4gPSBzYyAgPyAoaW50KXN0cmxlbihzYykgIDogMDsK
-ICAgIGludCBtc2wgID0gbWNzID8gKGludClzdHJsZW4obWNzKSA6IDA7CiAgICBpbnQgbWVsICA9
-IG1jZSA/IChpbnQpc3RybGVuKG1jZSkgOiAwOwoKICAgIGludCBpc19jICAgID0gKEUuc3ludGF4
-ID09ICZITERCWzBdIHx8IEUuc3ludGF4ID09ICZITERCWzFdKTsKICAgIGludCBpc19sdWEgID0g
-KEUuc3ludGF4ID09ICZITERCWzJdKTsKICAgIGludCBpc19iYXNoID0gKEUuc3ludGF4ID09ICZI
-TERCWzNdKTsKICAgIGludCBpc19odG1sID0gKEUuc3ludGF4ID09ICZITERCWzRdKTsKCiAgICBp
-bnQgcHJldl9zZXAgICAgPSAxOwogICAgaW50IGluX3N0cmluZyAgID0gMDsKICAgIGludCBpbl9j
-b21tZW50ICA9IHJvdy0+aGxfb3Blbl9jb21tZW50OwogICAgaW50IGluX2xvbmdfc3RyID0gMDsK
-ICAgIGludCBpID0gMDsKCiAgICAvKiDilIDilIAgSFRNTDogaGlnaGxpZ2h0IGVzcGVjaWFsIGRl
-IHRhZ3MsIGF0cmlidXRvcyBlIGVudGlkYWRlcyDilIDilIAgKi8KICAgIGlmIChpc19odG1sKSB7
-CiAgICAgICAgaW50IGluX3RhZyA9IDA7ICAgICAgIC8qIGRlbnRybyBkZSA8IC4uLiA+ICovCiAg
-ICAgICAgaW50IGluX2F0dHJfdmFsID0gMDsgIC8qIGRlbnRybyBkZSBhdHJpYnV0byAidmFsb3Ii
-IG91ICd2YWxvcicgKi8KICAgICAgICBpbnQgdGFnX25hbWVfZG9uZSA9IDA7LyogasOhIGxlbW9z
-IG8gbm9tZSBkYSB0YWcgKi8KICAgICAgICBjaGFyIGF0dHJfcSA9IDA7CiAgICAgICAgLyogUmVp
-bmljaWEgbyBoaWdobGlnaHQg4oCUIGNvbWVudMOhcmlvcyBIVE1MIGrDoSB0cmF0YWRvcyBwZWxv
-IGxvb3AgZ2VyYWwgKi8KICAgICAgICBtZW1zZXQocm93LT5obCwgSExfTk9STUFMLCByb3ctPnJz
-aXplKTsKICAgICAgICAvKiBTZSBsaW5oYSBlc3TDoSBkZW50cm8gZGUgY29tZW50w6FyaW8gSFRN
-TCBhYmVydG8gKDwhLS0gLi4uIC0tPikgKi8KICAgICAgICBpZiAocm93LT5obF9vcGVuX2NvbW1l
-bnQpIHsKICAgICAgICAgICAgZm9yIChpbnQgaiA9IDA7IGogPCByb3ctPnJzaXplOyBqKyspIHsK
-ICAgICAgICAgICAgICAgIHJvdy0+aGxbal0gPSBITF9DT01NRU5UOwogICAgICAgICAgICAgICAg
-aWYgKGorMiA8IHJvdy0+cnNpemUgJiYKICAgICAgICAgICAgICAgICAgICByb3ctPnJlbmRlcltq
-XT09Jy0nICYmIHJvdy0+cmVuZGVyW2orMV09PSctJyAmJiByb3ctPnJlbmRlcltqKzJdPT0nPicp
-IHsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2pdPXJvdy0+aGxbaisxXT1yb3ctPmhsW2or
-Ml09SExfQ09NTUVOVDsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsX29wZW5fY29tbWVudCA9
-IDA7IGorPTI7IGluX2NvbW1lbnQ9MDsgYnJlYWs7CiAgICAgICAgICAgICAgICB9CiAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgaWYgKHJvdy0+aGxfb3Blbl9jb21tZW50KSB7CiAgICAgICAgICAg
-ICAgICBSb3cgKm5leHQgPSAocm93IC0gRS5yb3cgKyAxIDwgRS5udW1yb3dzKSA/IHJvdysxIDog
-TlVMTDsKICAgICAgICAgICAgICAgIGlmIChuZXh0ICYmICFuZXh0LT5obF9vcGVuX2NvbW1lbnQp
-IHsKICAgICAgICAgICAgICAgICAgICBuZXh0LT5obF9vcGVuX2NvbW1lbnQgPSAxOyB1cGRhdGVf
-c3ludGF4KG5leHQpOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgcmV0dXJuOwog
-ICAgICAgICAgICB9CiAgICAgICAgfQogICAgICAgIGZvciAoaW50IGogPSAwOyBqIDwgcm93LT5y
-c2l6ZTsgKSB7CiAgICAgICAgICAgIGNoYXIgYyA9IHJvdy0+cmVuZGVyW2pdOwogICAgICAgICAg
-ICAvKiBDb21lbnTDoXJpbyBIVE1MOiA8IS0tIC4uLiAtLT4gKi8KICAgICAgICAgICAgaWYgKCFp
-bl90YWcgJiYgIWluX2F0dHJfdmFsICYmIGorMyA8IHJvdy0+cnNpemUgJiYKICAgICAgICAgICAg
-ICAgIGM9PSc8JyAmJiByb3ctPnJlbmRlcltqKzFdPT0nIScgJiYKICAgICAgICAgICAgICAgIHJv
-dy0+cmVuZGVyW2orMl09PSctJyAmJiByb3ctPnJlbmRlcltqKzNdPT0nLScpIHsKICAgICAgICAg
-ICAgICAgIC8qIHByb2N1cmEgLS0+ICovCiAgICAgICAgICAgICAgICBpbnQgayA9IGo7CiAgICAg
-ICAgICAgICAgICByb3ctPmhsW2srK109SExfQ09NTUVOVDsgcm93LT5obFtrKytdPUhMX0NPTU1F
-TlQ7CiAgICAgICAgICAgICAgICByb3ctPmhsW2srK109SExfQ09NTUVOVDsgcm93LT5obFtrKytd
-PUhMX0NPTU1FTlQ7CiAgICAgICAgICAgICAgICBpbnQgZm91bmQ9MDsKICAgICAgICAgICAgICAg
-IHdoaWxlKGsgPCByb3ctPnJzaXplKSB7CiAgICAgICAgICAgICAgICAgICAgcm93LT5obFtrXT1I
-TF9DT01NRU5UOwogICAgICAgICAgICAgICAgICAgIGlmKGsrMjxyb3ctPnJzaXplJiZyb3ctPnJl
-bmRlcltrXT09Jy0nJiZyb3ctPnJlbmRlcltrKzFdPT0nLScmJnJvdy0+cmVuZGVyW2srMl09PSc+
-Jyl7CiAgICAgICAgICAgICAgICAgICAgICAgIHJvdy0+aGxba109cm93LT5obFtrKzFdPXJvdy0+
-aGxbaysyXT1ITF9DT01NRU5UOwogICAgICAgICAgICAgICAgICAgICAgICBrKz0zOyBmb3VuZD0x
-OyBicmVhazsKICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgaysrOwog
-ICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgaWYoIWZvdW5kKXsKICAgICAgICAgICAg
-ICAgICAgICAvKiBjb21lbnTDoXJpbyBtdWx0aS1saW5oYSAqLwogICAgICAgICAgICAgICAgICAg
-IHJvdy0+aGxfb3Blbl9jb21tZW50PTE7CiAgICAgICAgICAgICAgICAgICAgUm93ICpuZXh0PShy
-b3ctRS5yb3crMTxFLm51bXJvd3MpP3JvdysxOk5VTEw7CiAgICAgICAgICAgICAgICAgICAgaWYo
-bmV4dCl7bmV4dC0+aGxfb3Blbl9jb21tZW50PTE7dXBkYXRlX3N5bnRheChuZXh0KTt9CiAgICAg
-ICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBqPWs7IGNvbnRpbnVlOwogICAgICAgICAgICB9
-CiAgICAgICAgICAgIC8qIEVudGlkYWRlIEhUTUw6ICZub21lOyAqLwogICAgICAgICAgICBpZiAo
-IWluX3RhZyAmJiAhaW5fYXR0cl92YWwgJiYgYz09JyYnKSB7CiAgICAgICAgICAgICAgICBpbnQg
-az1qOyByb3ctPmhsW2srK109SExfUFJFUFJPQzsKICAgICAgICAgICAgICAgIHdoaWxlKGs8cm93
-LT5yc2l6ZSAmJiByb3ctPnJlbmRlcltrXSE9JzsnICYmIHJvdy0+cmVuZGVyW2tdIT0nICcgJiYg
-ay1qPDEyKXsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2srK109SExfUFJFUFJPQzsKICAg
-ICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGlmKGs8cm93LT5yc2l6ZSAmJiByb3ctPnJl
-bmRlcltrXT09JzsnKSByb3ctPmhsW2srK109SExfUFJFUFJPQzsKICAgICAgICAgICAgICAgIGo9
-azsgY29udGludWU7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgLyogQWJlcnR1cmEgZGUgdGFn
-ICovCiAgICAgICAgICAgIGlmICghaW5fdGFnICYmICFpbl9hdHRyX3ZhbCAmJiBjPT0nPCcpIHsK
-ICAgICAgICAgICAgICAgIGluX3RhZz0xOyB0YWdfbmFtZV9kb25lPTA7CiAgICAgICAgICAgICAg
-ICByb3ctPmhsW2orK109SExfU1lNQk9MOyAvKiA8IGVtIGNpbnphL2JyYW5jbyAqLwogICAgICAg
-ICAgICAgICAgLyogLyBkZSBmZWNoYW1lbnRvICovCiAgICAgICAgICAgICAgICBpZihqPHJvdy0+
-cnNpemUgJiYgcm93LT5yZW5kZXJbal09PScvJyl7cm93LT5obFtqKytdPUhMX1NZTUJPTDt9CiAg
-ICAgICAgICAgICAgICAvKiAhIGRlIERPQ1RZUEUgKi8KICAgICAgICAgICAgICAgIGlmKGo8cm93
-LT5yc2l6ZSAmJiByb3ctPnJlbmRlcltqXT09JyEnKXtyb3ctPmhsW2orK109SExfUFJFUFJPQzt9
-CiAgICAgICAgICAgICAgICAvKiBOb21lIGRhIHRhZyAqLwogICAgICAgICAgICAgICAgaW50IGtz
-PWo7CiAgICAgICAgICAgICAgICB3aGlsZShqPHJvdy0+cnNpemUgJiYgKGlzYWxudW0oKHVuc2ln
-bmVkIGNoYXIpcm93LT5yZW5kZXJbal0pfHxyb3ctPnJlbmRlcltqXT09Jy0nKSkKICAgICAgICAg
-ICAgICAgICAgICBqKys7CiAgICAgICAgICAgICAgICBpbnQga2w9ai1rczsKICAgICAgICAgICAg
-ICAgIGlmKGtsPjApewogICAgICAgICAgICAgICAgICAgIC8qIGNsYXNzaWZpY2E6IGZsb3c9S0VZ
-V09SRDEsIGJ1aWx0aW49S0VZV09SRDIgKi8KICAgICAgICAgICAgICAgICAgICBjaGFyIHRuYW1l
-WzMyXT17MH07CiAgICAgICAgICAgICAgICAgICAgaWYoa2w8KGludClzaXplb2YodG5hbWUpKXtt
-ZW1jcHkodG5hbWUscm93LT5yZW5kZXIra3Msa2wpO3RuYW1lW2tsXT0wO30KICAgICAgICAgICAg
-ICAgICAgICBpbnQgdGtpbmQ9SExfVFlQRTsgLyogZGVmYXVsdDogYXRyaWJ1dG8tbGlrZSAqLwog
-ICAgICAgICAgICAgICAgICAgIGZvcihpbnQgcT0wO2h0bWxfZmxvd1txXTtxKyspIGlmKCFzdHJj
-YXNlY21wKHRuYW1lLGh0bWxfZmxvd1txXSkpe3RraW5kPUhMX0tFWVdPUkQxO2JyZWFrO30KICAg
-ICAgICAgICAgICAgICAgICBmb3IoaW50IHE9MDtodG1sX2JpW3FdO3ErKykgICBpZighc3RyY2Fz
-ZWNtcCh0bmFtZSxodG1sX2JpW3FdKSl7dGtpbmQ9SExfS0VZV09SRDI7YnJlYWs7fQogICAgICAg
-ICAgICAgICAgICAgIGZvcihpbnQgcT1rcztxPGo7cSsrKSByb3ctPmhsW3FdPXRraW5kOwogICAg
-ICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgdGFnX25hbWVfZG9uZT0xOwogICAgICAgICAg
-ICAgICAgY29udGludWU7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgLyogRGVudHJvIGRlIHRh
-ZzogYXRyaWJ1dG9zIGUgZmVjaGFtZW50byAqLwogICAgICAgICAgICBpZiAoaW5fdGFnKSB7CiAg
-ICAgICAgICAgICAgICBpZiAoaW5fYXR0cl92YWwpIHsKICAgICAgICAgICAgICAgICAgICByb3ct
-PmhsW2pdPUhMX1NUUklORzsKICAgICAgICAgICAgICAgICAgICBpZihjPT1hdHRyX3Epe2luX2F0
-dHJfdmFsPTA7fSBqKys7IGNvbnRpbnVlOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAg
-ICAgaWYoYz09Jz4nfHxjPT0nLycpeyByb3ctPmhsW2orK109SExfU1lNQk9MOyBpZihjPT0nPicp
-IGluX3RhZz0wOyBjb250aW51ZTsgfQogICAgICAgICAgICAgICAgaWYoYz09JyInfHxjPT0nXCcn
-KXsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2orK109SExfU1RSSU5HOyBpbl9hdHRyX3Zh
-bD0xOyBhdHRyX3E9YzsgY29udGludWU7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAg
-ICBpZihjPT0nPScpeyByb3ctPmhsW2orK109SExfT1BFUkFUT1I7IGNvbnRpbnVlOyB9CiAgICAg
-ICAgICAgICAgICAvKiBub21lIGRlIGF0cmlidXRvICovCiAgICAgICAgICAgICAgICBpZihpc2Fs
-cGhhKCh1bnNpZ25lZCBjaGFyKWMpfHxjPT0nLSd8fGM9PSdfJykgewogICAgICAgICAgICAgICAg
-ICAgIGludCBrcz1qOwogICAgICAgICAgICAgICAgICAgIHdoaWxlKGo8cm93LT5yc2l6ZSYmKGlz
-YWxudW0oKHVuc2lnbmVkIGNoYXIpcm93LT5yZW5kZXJbal0pfHxyb3ctPnJlbmRlcltqXT09Jy0n
-fHxyb3ctPnJlbmRlcltqXT09J18nfHxyb3ctPnJlbmRlcltqXT09JzonKSkKICAgICAgICAgICAg
-ICAgICAgICAgICAgaisrOwogICAgICAgICAgICAgICAgICAgIGZvcihpbnQgcT1rcztxPGo7cSsr
-KSByb3ctPmhsW3FdPUhMX1RZUEU7CiAgICAgICAgICAgICAgICAgICAgY29udGludWU7CiAgICAg
-ICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBqKys7IGNvbnRpbnVlOwogICAgICAgICAgICB9
-CiAgICAgICAgICAgIC8qIEZvcmEgZGUgdGFnOiB0ZXh0byBub3JtYWwgKi8KICAgICAgICAgICAg
-aisrOwogICAgICAgIH0KICAgICAgICAodm9pZClpc19jOyAodm9pZClpc19sdWE7ICh2b2lkKWlz
-X2Jhc2g7CiAgICAgICAgKHZvaWQpcHJldl9zZXA7ICh2b2lkKWluX3N0cmluZzsgKHZvaWQpaW5f
-bG9uZ19zdHI7CiAgICAgICAgcmV0dXJuOwogICAgfQoKICAgIC8qIOKUgOKUgCBCYXNoIHNoZWJh
-bmc6IGxpbmhhIDAgY29tZcOnYW5kbyBjb20gIyEg4pSA4pSAICovCiAgICBpZiAoaXNfYmFzaCAm
-JiByb3cgPT0gJkUucm93WzBdICYmIHJvdy0+cnNpemUgPj0gMgogICAgICAgICYmIHJvdy0+cmVu
-ZGVyWzBdID09ICcjJyAmJiByb3ctPnJlbmRlclsxXSA9PSAnIScpIHsKICAgICAgICBtZW1zZXQo
-cm93LT5obCwgSExfQ09NTUVOVCwgcm93LT5yc2l6ZSk7CiAgICAgICAgZ290byBmaW5pc2g7CiAg
-ICB9CgogICAgLyog4pSA4pSAIEMgcHJlcHJvYzogbGluaGEgY29tZcOnYSBjb20gIyAoaWdub3Jh
-bmRvIGVzcGHDp29zKSDilIDilIAgKi8KICAgIGlmIChpc19jICYmICFpbl9jb21tZW50KSB7CiAg
-ICAgICAgaW50IHAgPSAwOwogICAgICAgIHdoaWxlIChwIDwgcm93LT5yc2l6ZSAmJiAocm93LT5y
-ZW5kZXJbcF09PScgJ3x8cm93LT5yZW5kZXJbcF09PSdcdCcpKSBwKys7CiAgICAgICAgaWYgKHAg
-PCByb3ctPnJzaXplICYmIHJvdy0+cmVuZGVyW3BdID09ICcjJykgewogICAgICAgICAgICAvKiBj
-b2xvcmlyIG8gIyAqLwogICAgICAgICAgICBtZW1zZXQoJnJvdy0+aGxbcF0sIEhMX1BSRVBST0Ms
-IDEpOwogICAgICAgICAgICBwKys7CiAgICAgICAgICAgIC8qIHByb2N1cmEgcXVhbCBkaXJldGl2
-YSAqLwogICAgICAgICAgICBmb3IgKGludCBqID0gMDsgcHAgJiYgcHBbal07IGorKykgewogICAg
-ICAgICAgICAgICAgY29uc3QgY2hhciAqa3cgPSBwcFtqXTsKICAgICAgICAgICAgICAgIC8qIHB1
-bGFyIG8gIyBubyBpbsOtY2lvIGRhIGtleXdvcmQgZGEgbGlzdGEgKi8KICAgICAgICAgICAgICAg
-IGlmIChrd1swXSA9PSAnIycpIGt3Kys7CiAgICAgICAgICAgICAgICBpbnQga2wgPSAoaW50KXN0
-cmxlbihrdyk7CiAgICAgICAgICAgICAgICBpZiAocCArIGtsIDw9IHJvdy0+cnNpemUKICAgICAg
-ICAgICAgICAgICAgICAmJiAhc3RybmNtcCgmcm93LT5yZW5kZXJbcF0sIGt3LCBrbCkKICAgICAg
-ICAgICAgICAgICAgICAmJiAocCtrbCA+PSByb3ctPnJzaXplIHx8IGlzX3NlcChyb3ctPnJlbmRl
-cltwK2tsXSkKICAgICAgICAgICAgICAgICAgICAgICAgfHwgcm93LT5yZW5kZXJbcCtrbF0gPT0g
-JyAnKSkgewogICAgICAgICAgICAgICAgICAgIG1lbXNldCgmcm93LT5obFtwXSwgSExfUFJFUFJP
-Qywga2wpOwogICAgICAgICAgICAgICAgICAgIHAgKz0ga2w7IGJyZWFrOwogICAgICAgICAgICAg
-ICAgfQogICAgICAgICAgICB9CiAgICAgICAgICAgIC8qIHJlc3RvIGRhIGxpbmhhOiBzdHJpbmcg
-ZG8gaW5jbHVkZSBlbSBITF9TVFJJTkcsIHJlc3RvIG5vcm1hbCAqLwogICAgICAgICAgICB3aGls
-ZSAocCA8IHJvdy0+cnNpemUpIHsKICAgICAgICAgICAgICAgIGNoYXIgYzIgPSByb3ctPnJlbmRl
-cltwXTsKICAgICAgICAgICAgICAgIGlmIChjMiA9PSAnIicgfHwgYzIgPT0gJzwnKSB7CiAgICAg
-ICAgICAgICAgICAgICAgY2hhciBjbCA9IChjMiA9PSAnPCcpID8gJz4nIDogJyInOwogICAgICAg
-ICAgICAgICAgICAgIHJvdy0+aGxbcCsrXSA9IEhMX1NUUklORzsKICAgICAgICAgICAgICAgICAg
-ICB3aGlsZSAocCA8IHJvdy0+cnNpemUgJiYgcm93LT5yZW5kZXJbcF0gIT0gY2wpCiAgICAgICAg
-ICAgICAgICAgICAgICAgIHJvdy0+aGxbcCsrXSA9IEhMX1NUUklORzsKICAgICAgICAgICAgICAg
-ICAgICBpZiAocCA8IHJvdy0+cnNpemUpIHJvdy0+aGxbcCsrXSA9IEhMX1NUUklORzsKICAgICAg
-ICAgICAgICAgIH0gZWxzZSBpZiAoYzIgPT0gJy8nICYmIHArMSA8IHJvdy0+cnNpemUgJiYgcm93
-LT5yZW5kZXJbcCsxXSA9PSAnLycpIHsKICAgICAgICAgICAgICAgICAgICBtZW1zZXQoJnJvdy0+
-aGxbcF0sIEhMX0NPTU1FTlQsIHJvdy0+cnNpemUgLSBwKTsgYnJlYWs7CiAgICAgICAgICAgICAg
-ICB9IGVsc2UgcCsrOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGdvdG8gZmluaXNoOwogICAg
-ICAgIH0KICAgIH0KCiAgICB3aGlsZSAoaSA8IHJvdy0+cnNpemUpIHsKICAgICAgICBjaGFyIGMg
-ID0gcm93LT5yZW5kZXJbaV07CiAgICAgICAgdW5zaWduZWQgY2hhciBwcmV2X2hsID0gKGkgPiAw
-KSA/IHJvdy0+aGxbaS0xXSA6IEhMX05PUk1BTDsKCiAgICAgICAgLyog4pSA4pSAIG11bHRpLWxp
-bmUgY29tbWVudCDilIDilIAgKi8KICAgICAgICBpZiAobWNzICYmIG1jZSAmJiAhaW5fc3RyaW5n
-ICYmICFpbl9sb25nX3N0cikgewogICAgICAgICAgICBpZiAoaW5fY29tbWVudCkgewogICAgICAg
-ICAgICAgICAgcm93LT5obFtpXSA9IEhMX0NPTU1FTlQ7CiAgICAgICAgICAgICAgICBpZiAoIXN0
-cm5jbXAoJnJvdy0+cmVuZGVyW2ldLCBtY2UsIG1lbCkpIHsKICAgICAgICAgICAgICAgICAgICBt
-ZW1zZXQoJnJvdy0+aGxbaV0sIEhMX0NPTU1FTlQsIG1lbCk7CiAgICAgICAgICAgICAgICAgICAg
-aSArPSBtZWw7IGluX2NvbW1lbnQgPSAwOwogICAgICAgICAgICAgICAgfSBlbHNlIGkrKzsKICAg
-ICAgICAgICAgICAgIGNvbnRpbnVlOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGlmICghc3Ry
-bmNtcCgmcm93LT5yZW5kZXJbaV0sIG1jcywgbXNsKSkgewogICAgICAgICAgICAgICAgbWVtc2V0
-KCZyb3ctPmhsW2ldLCBITF9DT01NRU5ULCBtc2wpOwogICAgICAgICAgICAgICAgaSArPSBtc2w7
-IGluX2NvbW1lbnQgPSAxOyBjb250aW51ZTsKICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAg
-ICAgLyog4pSA4pSAIEx1YSBsb25nIHN0cmluZyBbWy4uLl1dIOKUgOKUgCAqLwogICAgICAgIGlm
-IChpc19sdWEgJiYgIWluX3N0cmluZyAmJiAhaW5fY29tbWVudCkgewogICAgICAgICAgICBpZiAo
-IWluX2xvbmdfc3RyICYmIGkrMSA8IHJvdy0+cnNpemUKICAgICAgICAgICAgICAgICYmIGMgPT0g
-J1snICYmIHJvdy0+cmVuZGVyW2krMV0gPT0gJ1snKSB7CiAgICAgICAgICAgICAgICBpbl9sb25n
-X3N0ciA9IDE7CiAgICAgICAgICAgICAgICByb3ctPmhsW2ldID0gcm93LT5obFtpKzFdID0gSExf
-U1RSSU5HOwogICAgICAgICAgICAgICAgaSArPSAyOyBjb250aW51ZTsKICAgICAgICAgICAgfQog
-ICAgICAgICAgICBpZiAoaW5fbG9uZ19zdHIpIHsKICAgICAgICAgICAgICAgIHJvdy0+aGxbaV0g
-PSBITF9TVFJJTkc7CiAgICAgICAgICAgICAgICBpZiAoaSsxIDwgcm93LT5yc2l6ZSAmJiBjID09
-ICddJyAmJiByb3ctPnJlbmRlcltpKzFdID09ICddJykgewogICAgICAgICAgICAgICAgICAgIHJv
-dy0+aGxbaSsxXSA9IEhMX1NUUklORzsgaSArPSAyOyBpbl9sb25nX3N0ciA9IDA7CiAgICAgICAg
-ICAgICAgICB9IGVsc2UgaSsrOwogICAgICAgICAgICAgICAgY29udGludWU7CiAgICAgICAgICAg
-IH0KICAgICAgICB9CgogICAgICAgIC8qIOKUgOKUgCBzaW5nbGUtbGluZSBjb21tZW50IOKUgOKU
-gCAqLwogICAgICAgIGlmIChzYyAmJiAhaW5fc3RyaW5nICYmICFpbl9jb21tZW50ICYmICFpbl9s
-b25nX3N0cikgewogICAgICAgICAgICBpZiAoIXN0cm5jbXAoJnJvdy0+cmVuZGVyW2ldLCBzYywg
-c2xlbikpIHsKICAgICAgICAgICAgICAgIG1lbXNldCgmcm93LT5obFtpXSwgSExfQ09NTUVOVCwg
-cm93LT5yc2l6ZSAtIGkpOwogICAgICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgICAgIH0KICAg
-ICAgICB9CgogICAgICAgIC8qIOKUgOKUgCBzdHJpbmdzIGUgY2hhciBsaXRlcmFscyDilIDilIAg
-Ki8KICAgICAgICBpZiAoKEUuc3ludGF4LT5mbGFncyAmIEhMX0ZMQUdfU1RSSU5HUykgJiYgIWlu
-X2NvbW1lbnQgJiYgIWluX2xvbmdfc3RyKSB7CiAgICAgICAgICAgIGlmIChpbl9zdHJpbmcpIHsK
-ICAgICAgICAgICAgICAgIHJvdy0+aGxbaV0gPSBITF9TVFJJTkc7CiAgICAgICAgICAgICAgICBp
-ZiAoYyA9PSAnXFwnICYmIGkrMSA8IHJvdy0+cnNpemUpIHsKICAgICAgICAgICAgICAgICAgICBy
-b3ctPmhsW2krMV0gPSBITF9TVFJJTkc7IGkgKz0gMjsgY29udGludWU7CiAgICAgICAgICAgICAg
-ICB9CiAgICAgICAgICAgICAgICBpZiAoYyA9PSAoY2hhcilpbl9zdHJpbmcpIGluX3N0cmluZyA9
-IDA7CiAgICAgICAgICAgICAgICBpKys7IHByZXZfc2VwID0gMTsgY29udGludWU7CiAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgLyogY2hhciBsaXRlcmFsIEM6ICd4JyAnXG4nICdcMCcgKi8KICAg
-ICAgICAgICAgaWYgKGlzX2MgJiYgYyA9PSAnXCcnICYmIHByZXZfc2VwKSB7CiAgICAgICAgICAg
-ICAgICBpbnQgaiA9IGk7CiAgICAgICAgICAgICAgICByb3ctPmhsW2orK10gPSBITF9TVFJJTkc7
-CiAgICAgICAgICAgICAgICBpZiAoaiA8IHJvdy0+cnNpemUgJiYgcm93LT5yZW5kZXJbal0gPT0g
-J1xcJykgcm93LT5obFtqKytdID0gSExfU1RSSU5HOwogICAgICAgICAgICAgICAgaWYgKGogPCBy
-b3ctPnJzaXplKSByb3ctPmhsW2orK10gPSBITF9TVFJJTkc7CiAgICAgICAgICAgICAgICBpZiAo
-aiA8IHJvdy0+cnNpemUgJiYgcm93LT5yZW5kZXJbal0gPT0gJ1wnJykgewogICAgICAgICAgICAg
-ICAgICAgIHJvdy0+aGxbaisrXSA9IEhMX1NUUklORzsgaSA9IGo7IHByZXZfc2VwID0gMDsgY29u
-dGludWU7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAvKiBuw6NvIGVyYSBjaGFy
-IGxpdGVyYWwg4oCUIGNhaSBubyBkZWZhdWx0ICovCiAgICAgICAgICAgIH0KICAgICAgICAgICAg
-LyogQmFzaDogYXNwYXMgc2ltcGxlcyBzZW0gZXNjYXBlICovCiAgICAgICAgICAgIGlmIChpc19i
-YXNoICYmIGMgPT0gJ1wnJykgewogICAgICAgICAgICAgICAgcm93LT5obFtpKytdID0gSExfU1RS
-SU5HOwogICAgICAgICAgICAgICAgd2hpbGUgKGkgPCByb3ctPnJzaXplICYmIHJvdy0+cmVuZGVy
-W2ldICE9ICdcJycpCiAgICAgICAgICAgICAgICAgICAgcm93LT5obFtpKytdID0gSExfU1RSSU5H
-OwogICAgICAgICAgICAgICAgaWYgKGkgPCByb3ctPnJzaXplKSByb3ctPmhsW2krK10gPSBITF9T
-VFJJTkc7CiAgICAgICAgICAgICAgICBwcmV2X3NlcCA9IDE7IGNvbnRpbnVlOwogICAgICAgICAg
-ICB9CiAgICAgICAgICAgIGlmIChjID09ICciJyB8fCAoIWlzX2MgJiYgYyA9PSAnXCcnKSB8fCBj
-ID09ICdgJykgewogICAgICAgICAgICAgICAgaW5fc3RyaW5nID0gYzsgcm93LT5obFtpKytdID0g
-SExfU1RSSU5HOyBjb250aW51ZTsKICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgLyog
-4pSA4pSAIEJhc2g6ICRWQVIgJHtWQVJ9ICQxICRAIGV0YyDilIDilIAgKi8KICAgICAgICBpZiAo
-aXNfYmFzaCAmJiAhaW5fY29tbWVudCAmJiAhaW5fc3RyaW5nICYmIGMgPT0gJyQnKSB7CiAgICAg
-ICAgICAgIHJvdy0+aGxbaSsrXSA9IEhMX1ZBUjsKICAgICAgICAgICAgaWYgKGkgPCByb3ctPnJz
-aXplICYmIHJvdy0+cmVuZGVyW2ldID09ICd7JykgewogICAgICAgICAgICAgICAgcm93LT5obFtp
-KytdID0gSExfVkFSOwogICAgICAgICAgICAgICAgd2hpbGUgKGkgPCByb3ctPnJzaXplICYmIHJv
-dy0+cmVuZGVyW2ldICE9ICd9JykKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2krK10gPSBI
-TF9WQVI7CiAgICAgICAgICAgICAgICBpZiAoaSA8IHJvdy0+cnNpemUpIHJvdy0+aGxbaSsrXSA9
-IEhMX1ZBUjsKICAgICAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgIHdoaWxlIChpIDwg
-cm93LT5yc2l6ZQogICAgICAgICAgICAgICAgICAgICYmIChpc2FsbnVtKCh1bnNpZ25lZCBjaGFy
-KXJvdy0+cmVuZGVyW2ldKQogICAgICAgICAgICAgICAgICAgICAgICB8fCByb3ctPnJlbmRlcltp
-XT09J18nCiAgICAgICAgICAgICAgICAgICAgICAgIHx8IHN0cmNocigiQCojPyEkLSIsIHJvdy0+
-cmVuZGVyW2ldKSkpCiAgICAgICAgICAgICAgICAgICAgcm93LT5obFtpKytdID0gSExfVkFSOwog
-ICAgICAgICAgICB9CiAgICAgICAgICAgIHByZXZfc2VwID0gMDsgY29udGludWU7CiAgICAgICAg
-fQoKICAgICAgICAvKiDilIDilIAgQzogb3BlcmFkb3JlcyBlc3BlY2lhaXMgLT4gOjogPT0gIT0g
-PD0gPj0gJiYgfHwgKysgLS0g4pSA4pSAICovCiAgICAgICAgaWYgKGlzX2MgJiYgIWluX3N0cmlu
-ZyAmJiAhaW5fY29tbWVudCkgewogICAgICAgICAgICBpZiAoaSsxIDwgcm93LT5yc2l6ZSkgewog
-ICAgICAgICAgICAgICAgY2hhciBuID0gcm93LT5yZW5kZXJbaSsxXTsKICAgICAgICAgICAgICAg
-IGlmICgoYz09Jy0nJiZuPT0nPicpIHx8IChjPT0nOicmJm49PSc6JykgfHwKICAgICAgICAgICAg
-ICAgICAgICAoYz09Jz0nJiZuPT0nPScpIHx8IChjPT0nIScmJm49PSc9JykgfHwKICAgICAgICAg
-ICAgICAgICAgICAoYz09JzwnJiZuPT0nPScpIHx8IChjPT0nPicmJm49PSc9JykgfHwKICAgICAg
-ICAgICAgICAgICAgICAoYz09JyYnJiZuPT0nJicpIHx8IChjPT0nfCcmJm49PSd8JykgfHwKICAg
-ICAgICAgICAgICAgICAgICAoYz09JysnJiZuPT0nKycpIHx8IChjPT0nLScmJm49PSctJykgfHwK
-ICAgICAgICAgICAgICAgICAgICAoYz09JzwnJiZuPT0nPCcpIHx8IChjPT0nPicmJm49PSc+Jykp
-IHsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2ldID0gcm93LT5obFtpKzFdID0gSExfT1BF
-UkFUT1I7CiAgICAgICAgICAgICAgICAgICAgaSArPSAyOyBwcmV2X3NlcCA9IDE7IGNvbnRpbnVl
-OwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICAvKiDi
-lIDilIAgTHVhOiBvcGVyYWRvcmVzIC4uIH49IOKUgOKUgCAqLwogICAgICAgIGlmIChpc19sdWEg
-JiYgIWluX3N0cmluZyAmJiAhaW5fY29tbWVudCkgewogICAgICAgICAgICBpZiAoaSsxIDwgcm93
-LT5yc2l6ZSkgewogICAgICAgICAgICAgICAgY2hhciBuID0gcm93LT5yZW5kZXJbaSsxXTsKICAg
-ICAgICAgICAgICAgIGlmICgoYz09Jy4nJiZuPT0nLicpIHx8IChjPT0nficmJm49PSc9JykgfHwK
-ICAgICAgICAgICAgICAgICAgICAoYz09Jz0nJiZuPT0nPScpIHx8IChjPT0nPCcmJm49PSc9Jykg
-fHwKICAgICAgICAgICAgICAgICAgICAoYz09Jz4nJiZuPT0nPScpIHx8IChjPT0nficmJm49PSc9
-JykpIHsKICAgICAgICAgICAgICAgICAgICByb3ctPmhsW2ldID0gcm93LT5obFtpKzFdID0gSExf
-T1BFUkFUT1I7CiAgICAgICAgICAgICAgICAgICAgaSArPSAyOyBwcmV2X3NlcCA9IDE7IGNvbnRp
-bnVlOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgLyogLi4uICh2YXJhcmdzKSAq
-LwogICAgICAgICAgICAgICAgaWYgKGM9PScuJyYmbj09Jy4nJiZpKzI8cm93LT5yc2l6ZSYmcm93
-LT5yZW5kZXJbaSsyXT09Jy4nKSB7CiAgICAgICAgICAgICAgICAgICAgcm93LT5obFtpXT1yb3ct
-PmhsW2krMV09cm93LT5obFtpKzJdPUhMX09QRVJBVE9SOwogICAgICAgICAgICAgICAgICAgIGkg
-Kz0gMzsgcHJldl9zZXAgPSAwOyBjb250aW51ZTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAg
-ICAgfQogICAgICAgIH0KCiAgICAgICAgLyog4pSA4pSAIG7Dum1lcm9zOiBoZXggMHgsIGZsb2F0
-LCBkZWNpbWFsIGNvbSBzdWZpeG9zIOKUgOKUgCAqLwogICAgICAgIGlmICgoRS5zeW50YXgtPmZs
-YWdzICYgSExfRkxBR19OVU1CRVJTKSAmJiAhaW5fc3RyaW5nICYmICFpbl9jb21tZW50KSB7CiAg
-ICAgICAgICAgIGlmIChwcmV2X3NlcCAmJiBjID09ICcwJyAmJiBpKzEgPCByb3ctPnJzaXplCiAg
-ICAgICAgICAgICAgICAmJiAocm93LT5yZW5kZXJbaSsxXT09J3gnIHx8IHJvdy0+cmVuZGVyW2kr
-MV09PSdYJykpIHsKICAgICAgICAgICAgICAgIHJvdy0+aGxbaV0gPSByb3ctPmhsW2krMV0gPSBI
-TF9OVU1CRVI7IGkgKz0gMjsKICAgICAgICAgICAgICAgIHdoaWxlIChpIDwgcm93LT5yc2l6ZSAm
-JiAoaXN4ZGlnaXQoKHVuc2lnbmVkIGNoYXIpcm93LT5yZW5kZXJbaV0pCiAgICAgICAgICAgICAg
-ICAgICAgICAgfHwgcm93LT5yZW5kZXJbaV09PSd1J3x8cm93LT5yZW5kZXJbaV09PSdVJwogICAg
-ICAgICAgICAgICAgICAgICAgIHx8IHJvdy0+cmVuZGVyW2ldPT0nbCd8fHJvdy0+cmVuZGVyW2ld
-PT0nTCcpKQogICAgICAgICAgICAgICAgICAgIHJvdy0+aGxbaSsrXSA9IEhMX05VTUJFUjsKICAg
-ICAgICAgICAgICAgIHByZXZfc2VwID0gMDsgY29udGludWU7CiAgICAgICAgICAgIH0KICAgICAg
-ICAgICAgaWYgKChpc2RpZ2l0KCh1bnNpZ25lZCBjaGFyKWMpICYmIChwcmV2X3NlcCB8fCBwcmV2
-X2hsID09IEhMX05VTUJFUikpIHx8CiAgICAgICAgICAgICAgICAoYyA9PSAnLicgJiYgcHJldl9o
-bCA9PSBITF9OVU1CRVIpKSB7CiAgICAgICAgICAgICAgICByb3ctPmhsW2krK10gPSBITF9OVU1C
-RVI7IHByZXZfc2VwID0gMDsKICAgICAgICAgICAgICAgIHdoaWxlIChpIDwgcm93LT5yc2l6ZSAm
-JiAoaXNkaWdpdCgodW5zaWduZWQgY2hhcilyb3ctPnJlbmRlcltpXSkKICAgICAgICAgICAgICAg
-ICAgICAgICB8fCByb3ctPnJlbmRlcltpXT09Jy4nfHxyb3ctPnJlbmRlcltpXT09J2UnCiAgICAg
-ICAgICAgICAgICAgICAgICAgfHwgcm93LT5yZW5kZXJbaV09PSdFJ3x8cm93LT5yZW5kZXJbaV09
-PSdmJwogICAgICAgICAgICAgICAgICAgICAgIHx8IHJvdy0+cmVuZGVyW2ldPT0nRid8fHJvdy0+
-cmVuZGVyW2ldPT0ndScKICAgICAgICAgICAgICAgICAgICAgICB8fCByb3ctPnJlbmRlcltpXT09
-J1UnfHxyb3ctPnJlbmRlcltpXT09J2wnCiAgICAgICAgICAgICAgICAgICAgICAgfHwgcm93LT5y
-ZW5kZXJbaV09PSdMJ3x8cm93LT5yZW5kZXJbaV09PSdfJykpCiAgICAgICAgICAgICAgICAgICAg
-cm93LT5obFtpKytdID0gSExfTlVNQkVSOwogICAgICAgICAgICAgICAgY29udGludWU7CiAgICAg
-ICAgICAgIH0KICAgICAgICB9CgogICAgICAgIC8qIOKUgOKUgCBzw61tYm9sb3MgKHNlbSAjIHF1
-ZSBqw6EgZm9pIHRyYXRhZG8pIOKUgOKUgCAqLwogICAgICAgIGlmICghaW5fc3RyaW5nICYmICFp
-bl9jb21tZW50CiAgICAgICAgICAgICYmIHN0cmNocigiKCl7fVtdPD49KyomfCF+XiU7OixAP1xc
-Ly0uIiwgYykpIHsKICAgICAgICAgICAgcm93LT5obFtpXSA9IEhMX1NZTUJPTDsgaSsrOyBwcmV2
-X3NlcCA9IDE7IGNvbnRpbnVlOwogICAgICAgIH0KCiAgICAgICAgLyog4pSA4pSAIEVsbGlvdE9T
-OiBtw6l0b2RvIGFww7NzIHBvbnRvIChMdWEpIOKUgOKUgCAqLwogICAgICAgIGlmIChjID09ICcu
-JyAmJiAhaW5fc3RyaW5nICYmICFpbl9jb21tZW50ICYmIGlzX2x1YSAmJiBwcCkgewogICAgICAg
-ICAgICBpbnQgbmkgPSBpICsgMTsKICAgICAgICAgICAgZm9yIChpbnQgaiA9IDA7IHBwW2pdOyBq
-KyspIHsKICAgICAgICAgICAgICAgIGludCBrbCA9IChpbnQpc3RybGVuKHBwW2pdKTsKICAgICAg
-ICAgICAgICAgIGlmIChuaSArIGtsIDw9IHJvdy0+cnNpemUKICAgICAgICAgICAgICAgICAgICAm
-JiAhc3RybmNtcCgmcm93LT5yZW5kZXJbbmldLCBwcFtqXSwga2wpCiAgICAgICAgICAgICAgICAg
-ICAgJiYgKGlzX3NlcChyb3ctPnJlbmRlcltuaStrbF0pIHx8IHJvdy0+cmVuZGVyW25pK2tsXT09
-JygnKSkgewogICAgICAgICAgICAgICAgICAgIG1lbXNldCgmcm93LT5obFtuaV0sIEhMX01FVEhP
-RCwga2wpOwogICAgICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAg
-ICAgICAgICB9CiAgICAgICAgICAgIHByZXZfc2VwID0gMTsgaSsrOyBjb250aW51ZTsKICAgICAg
-ICB9CgogICAgICAgIC8qIOKUgOKUgCBrZXl3b3JkcyAoc8OzIHF1YW5kbyBwcmV2X3NlcCkg4pSA
-4pSAICovCiAgICAgICAgaWYgKHByZXZfc2VwICYmICFpbl9zdHJpbmcgJiYgIWluX2NvbW1lbnQp
-IHsKICAgICAgICAgICAgaW50IG1hdGNoZWQgPSAwOwoKICAgICAgICAgICAgLyogdGlwb3MgLyBu
-YW1lc3BhY2VzIOKAlCBwcmlvcmlkYWRlIGFsdGEgKi8KICAgICAgICAgICAgaWYgKHR5ICYmICFt
-YXRjaGVkKSB7CiAgICAgICAgICAgICAgICBmb3IgKGludCBqID0gMDsgdHlbal0gJiYgIW1hdGNo
-ZWQ7IGorKykgewogICAgICAgICAgICAgICAgICAgIGludCBrbCA9IChpbnQpc3RybGVuKHR5W2pd
-KTsKICAgICAgICAgICAgICAgICAgICBpZiAoaSArIGtsIDw9IHJvdy0+cnNpemUKICAgICAgICAg
-ICAgICAgICAgICAgICAgJiYgIXN0cm5jbXAoJnJvdy0+cmVuZGVyW2ldLCB0eVtqXSwga2wpCiAg
-ICAgICAgICAgICAgICAgICAgICAgICYmIGlzX3NlcChyb3ctPnJlbmRlcltpK2tsXSkpIHsKICAg
-ICAgICAgICAgICAgICAgICAgICAgbWVtc2V0KCZyb3ctPmhsW2ldLCBITF9UWVBFLCBrbCk7CiAg
-ICAgICAgICAgICAgICAgICAgICAgIGkgKz0ga2w7IG1hdGNoZWQgPSAxOwogICAgICAgICAgICAg
-ICAgICAgIH0KICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGlmIChtYXRjaGVkKSB7
-IHByZXZfc2VwID0gMDsgY29udGludWU7IH0KICAgICAgICAgICAgfQoKICAgICAgICAgICAgLyog
-Y29udHJvbGUgZGUgZmx1eG8gKi8KICAgICAgICAgICAgaWYgKGZsICYmICFtYXRjaGVkKSB7CiAg
-ICAgICAgICAgICAgICBmb3IgKGludCBqID0gMDsgZmxbal0gJiYgIW1hdGNoZWQ7IGorKykgewog
-ICAgICAgICAgICAgICAgICAgIGludCBrbCA9IChpbnQpc3RybGVuKGZsW2pdKTsKICAgICAgICAg
-ICAgICAgICAgICBpZiAoaSArIGtsIDw9IHJvdy0+cnNpemUKICAgICAgICAgICAgICAgICAgICAg
-ICAgJiYgIXN0cm5jbXAoJnJvdy0+cmVuZGVyW2ldLCBmbFtqXSwga2wpCiAgICAgICAgICAgICAg
-ICAgICAgICAgICYmIGlzX3NlcChyb3ctPnJlbmRlcltpK2tsXSkpIHsKICAgICAgICAgICAgICAg
-ICAgICAgICAgbWVtc2V0KCZyb3ctPmhsW2ldLCBITF9LRVlXT1JEMSwga2wpOwogICAgICAgICAg
-ICAgICAgICAgICAgICBpICs9IGtsOyBtYXRjaGVkID0gMTsKICAgICAgICAgICAgICAgICAgICB9
-CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBpZiAobWF0Y2hlZCkgeyBwcmV2X3Nl
-cCA9IDA7IGNvbnRpbnVlOyB9CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIC8qIGJ1aWx0aW5z
-ICovCiAgICAgICAgICAgIGlmIChiaSAmJiAhbWF0Y2hlZCkgewogICAgICAgICAgICAgICAgZm9y
-IChpbnQgaiA9IDA7IGJpW2pdICYmICFtYXRjaGVkOyBqKyspIHsKICAgICAgICAgICAgICAgICAg
-ICBpbnQga2wgPSAoaW50KXN0cmxlbihiaVtqXSk7CiAgICAgICAgICAgICAgICAgICAgaWYgKGkg
-KyBrbCA8PSByb3ctPnJzaXplCiAgICAgICAgICAgICAgICAgICAgICAgICYmICFzdHJuY21wKCZy
-b3ctPnJlbmRlcltpXSwgYmlbal0sIGtsKQogICAgICAgICAgICAgICAgICAgICAgICAmJiBpc19z
-ZXAocm93LT5yZW5kZXJbaStrbF0pKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIG1lbXNldCgm
-cm93LT5obFtpXSwgSExfS0VZV09SRDIsIGtsKTsKICAgICAgICAgICAgICAgICAgICAgICAgaSAr
-PSBrbDsgbWF0Y2hlZCA9IDE7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAg
-fQogICAgICAgICAgICAgICAgaWYgKG1hdGNoZWQpIHsgcHJldl9zZXAgPSAwOyBjb250aW51ZTsg
-fQogICAgICAgICAgICB9CgogICAgICAgICAgICAvKiBjaGFtYWRhcyBkZSBmdW7Dp8OjbzogaWRl
-bnRpZmllciBzZWd1aWRvIGRlICcoJyAqLwogICAgICAgICAgICBpZiAoIW1hdGNoZWQgJiYgIWlu
-X3N0cmluZyAmJiAhaW5fY29tbWVudCkgewogICAgICAgICAgICAgICAgaWYgKGlzYWxwaGEoKHVu
-c2lnbmVkIGNoYXIpYykgfHwgYyA9PSAnXycpIHsKICAgICAgICAgICAgICAgICAgICBpbnQgaiA9
-IGk7CiAgICAgICAgICAgICAgICAgICAgd2hpbGUgKGogPCByb3ctPnJzaXplICYmIChpc2FsbnVt
-KCh1bnNpZ25lZCBjaGFyKXJvdy0+cmVuZGVyW2pdKQogICAgICAgICAgICAgICAgICAgICAgICAg
-ICB8fCByb3ctPnJlbmRlcltqXSA9PSAnXycpKSBqKys7CiAgICAgICAgICAgICAgICAgICAgaWYg
-KGogPCByb3ctPnJzaXplICYmIHJvdy0+cmVuZGVyW2pdID09ICcoJykgewogICAgICAgICAgICAg
-ICAgICAgICAgICBtZW1zZXQoJnJvdy0+aGxbaV0sIEhMX01FVEhPRCwgaiAtIGkpOwogICAgICAg
-ICAgICAgICAgICAgICAgICBpID0gajsgbWF0Y2hlZCA9IDE7CiAgICAgICAgICAgICAgICAgICAg
-fQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgaWYgKG1hdGNoZWQpIHsgcHJldl9z
-ZXAgPSAwOyBjb250aW51ZTsgfQogICAgICAgICAgICB9CiAgICAgICAgfQoKICAgICAgICBwcmV2
-X3NlcCA9IGlzX3NlcChjKTsKICAgICAgICBpKys7CiAgICB9CgpmaW5pc2g6OwogICAgaW50IGNo
-YW5nZWQgPSAocm93LT5obF9vcGVuX2NvbW1lbnQgIT0gaW5fY29tbWVudCk7CiAgICByb3ctPmhs
-X29wZW5fY29tbWVudCA9IGluX2NvbW1lbnQ7CiAgICBpZiAoY2hhbmdlZCAmJiAocm93IC0gRS5y
-b3cpICsgMSA8IEUubnVtcm93cykKICAgICAgICB1cGRhdGVfc3ludGF4KHJvdyArIDEpOwp9Cgpz
-dGF0aWMgaW50IGhsX3RvX2NvbG9yKGludCBobCkgewogICAgc3dpdGNoIChobCkgewogICAgICAg
-IGNhc2UgSExfQ09NTUVOVDogIHJldHVybiAtOTA7ICAvKiBuZWdhdGl2byA9IEFOU0kgZGlyZXRv
-OiBceDFiWzkwbSAqLwogICAgICAgIGNhc2UgSExfS0VZV09SRDE6IHJldHVybiAxMzU7ICAvKiBs
-aWzDoXMgICAgICAg4oCUIGZsb3cgKi8KICAgICAgICBjYXNlIEhMX0tFWVdPUkQyOiByZXR1cm4g
-MTQxOyAgLyogbGlsw6FzIGNsYXJvIOKAlCBidWlsdGlucyAqLwogICAgICAgIGNhc2UgSExfVFlQ
-RTogICAgIHJldHVybiAxNDc7ICAvKiBsYXZhbmRhICAgICDigJQgdGlwb3MgKi8KICAgICAgICBj
-YXNlIEhMX1BSRVBST0M6ICByZXR1cm4gMTI5OyAgLyogcm94byB2aXZvICAg4oCUICNkaXJldGl2
-YXMgKi8KICAgICAgICBjYXNlIEhMX01FVEhPRDogICByZXR1cm4gMTgzOyAgLyogbGlsw6FzIHDD
-oWxpZG8g4oCUIG3DqXRvZG9zIEVsbGlvdE9TICovCiAgICAgICAgY2FzZSBITF9TVFJJTkc6ICAg
-cmV0dXJuIDExNDsgIC8qIHZlcmRlLW1lbnRhIOKAlCBzdHJpbmdzICovCiAgICAgICAgY2FzZSBI
-TF9OVU1CRVI6ICAgcmV0dXJuIDIxMDsgIC8qIHNhbG3Do28gICAgICDigJQgbsO6bWVyb3MgKi8K
-ICAgICAgICBjYXNlIEhMX01BVENIOiAgICByZXR1cm4gOTk7ICAgLyogcm94by1henVsICAg4oCU
-IGJ1c2NhICovCiAgICAgICAgY2FzZSBITF9TWU1CT0w6ICAgcmV0dXJuIC05MDsgIC8qIGNpbnph
-IEFOU0kgIOKAlCBzw61tYm9sb3MgKi8KICAgICAgICBjYXNlIEhMX1ZBUjogICAgICByZXR1cm4g
-MjIyOyAgLyogYW1hcmVsbyBww6FsaWRvIOKAlCAkVkFSIGJhc2ggKi8KICAgICAgICBjYXNlIEhM
-X09QRVJBVE9SOiByZXR1cm4gMjE5OyAgLyogcm9zYSAgICAgICAg4oCUIC0+IDo6ICovCiAgICAg
-ICAgY2FzZSBITF9UQUc6ICAgICAgcmV0dXJuICA3NTsgIC8qIGF6dWwtY8OpdSAgICDigJQgbm9t
-ZSBkZSB0YWcgSFRNTCAqLwogICAgICAgIGNhc2UgSExfQVRUUjogICAgIHJldHVybiAyMjI7ICAv
-KiBhbWFyZWxvICAgICAg4oCUIGF0cmlidXRvcyBIVE1MICovCiAgICAgICAgZGVmYXVsdDogICAg
-ICAgICAgcmV0dXJuIDM5OwogICAgfQp9CgpzdGF0aWMgdm9pZCBzZWxlY3Rfc3ludGF4KHZvaWQp
-IHsKICAgIEUuc3ludGF4ID0gTlVMTDsKICAgIGlmICghRS5maWxlbmFtZSkgcmV0dXJuOwogICAg
-Y2hhciAqZG90ID0gc3RycmNocihFLmZpbGVuYW1lLCAnLicpOwogICAgY29uc3QgY2hhciAqZXh0
-ID0gZG90ID8gZG90IDogIiI7CgogICAgLyogc2hlYmFuZyBuYSBwcmltZWlyYSBsaW5oYSAqLwog
-ICAgaWYgKEUubnVtcm93cyA+IDAgJiYgRS5yb3dbMF0uc2l6ZSA+IDEKICAgICAgICAmJiBFLnJv
-d1swXS5jaGFyc1swXSA9PSAnIycgJiYgRS5yb3dbMF0uY2hhcnNbMV0gPT0gJyEnKSB7CiAgICAg
-ICAgaWYgKHN0cnN0cihFLnJvd1swXS5jaGFycywgImJhc2giKSB8fCBzdHJzdHIoRS5yb3dbMF0u
-Y2hhcnMsICIvc2giKSkKICAgICAgICAgICAgeyBFLnN5bnRheCA9ICZITERCWzNdOyBnb3RvIHJl
-c2NhbjsgfQogICAgICAgIGlmIChzdHJzdHIoRS5yb3dbMF0uY2hhcnMsICJsdWEiKSB8fCBzdHJz
-dHIoRS5yb3dbMF0uY2hhcnMsICIvbXMiKSkKICAgICAgICAgICAgeyBFLnN5bnRheCA9ICZITERC
-WzJdOyBnb3RvIHJlc2NhbjsgfQogICAgfQoKICAgIGZvciAoaW50IGkgPSAwOyBpIDwgSExEQl9T
-SVpFOyBpKyspCiAgICAgICAgZm9yIChpbnQgaiA9IDA7IEhMREJbaV0uZXh0ZW5zaW9uc1tqXTsg
-aisrKQogICAgICAgICAgICBpZiAoIXN0cmNtcChleHQsIEhMREJbaV0uZXh0ZW5zaW9uc1tqXSkp
-CiAgICAgICAgICAgICAgICB7IEUuc3ludGF4ID0gJkhMREJbaV07IGdvdG8gcmVzY2FuOyB9Cgog
-ICAgLyogRGV0ZWPDp8OjbyBoZXVyw61zdGljYSBwb3IgY29udGXDumRvOiBjb250YSBrZXl3b3Jk
-cyBMdWEgZW0gYXTDqSA2MCBsaW5oYXMgKi8KICAgIHsKICAgICAgICBzdGF0aWMgY29uc3QgY2hh
-ciAqbHVhX2hpbnRzW10gPSB7CiAgICAgICAgICAgICJ0aGVuIiwiZW5kIiwibG9jYWwiLCJmdW5j
-dGlvbiIsImVsc2VpZiIsInJlcGVhdCIsInVudGlsIiwKICAgICAgICAgICAgImRvIiwiaXBhaXJz
-IiwicGFpcnMiLCJyZXF1aXJlIiwicGNhbGwiLCJ4cGNhbGwiLCBOVUxMCiAgICAgICAgfTsKICAg
-ICAgICBpbnQgc2NvcmUgPSAwOwogICAgICAgIGludCBsaW1pdCA9IEUubnVtcm93cyA8IDYwID8g
-RS5udW1yb3dzIDogNjA7CiAgICAgICAgZm9yIChpbnQgeSA9IDA7IHkgPCBsaW1pdDsgeSsrKSB7
-CiAgICAgICAgICAgIGNoYXIgKnMgPSBFLnJvd1t5XS5jaGFyczsKICAgICAgICAgICAgZm9yIChp
-bnQgayA9IDA7IGx1YV9oaW50c1trXTsgaysrKSB7CiAgICAgICAgICAgICAgICBpbnQgdGxlbiA9
-IChpbnQpc3RybGVuKGx1YV9oaW50c1trXSk7CiAgICAgICAgICAgICAgICBjaGFyICpwID0gczsK
-ICAgICAgICAgICAgICAgIHdoaWxlICgocCA9IHN0cnN0cihwLCBsdWFfaGludHNba10pKSAhPSBO
-VUxMKSB7CiAgICAgICAgICAgICAgICAgICAgaW50IHByZSA9IChwPT1zfHwoIWlzYWxudW0oKHVu
-c2lnbmVkIGNoYXIpcFstMV0pJiZwWy0xXSE9J18nKSk7CiAgICAgICAgICAgICAgICAgICAgaW50
-IHBvcyA9ICghaXNhbG51bSgodW5zaWduZWQgY2hhcilwW3RsZW5dKSYmcFt0bGVuXSE9J18nKTsK
-ICAgICAgICAgICAgICAgICAgICBpZiAocHJlICYmIHBvcykgeyBzY29yZSsrOyBicmVhazsgfQog
-ICAgICAgICAgICAgICAgICAgIHArKzsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQog
-ICAgICAgIH0KICAgICAgICBpZiAoc2NvcmUgPj0gMikgeyBFLnN5bnRheCA9ICZITERCWzJdOyBn
-b3RvIHJlc2NhbjsgfQogICAgfQoKICAgIC8qIERldGVjw6fDo28gaGV1csOtc3RpY2EgSFRNTDog
-cHJvY3VyYSBET0NUWVBFIG91IDxodG1sIG5vcyBwcmltZWlyb3MgNSBsaW5oYXMgKi8KICAgIHsK
-ICAgICAgICBpbnQgbGltaXQgPSBFLm51bXJvd3MgPCA1ID8gRS5udW1yb3dzIDogNTsKICAgICAg
-ICBmb3IgKGludCB5ID0gMDsgeSA8IGxpbWl0OyB5KyspIHsKICAgICAgICAgICAgY2hhciAqcyA9
-IEUucm93W3ldLmNoYXJzOwogICAgICAgICAgICBpZiAoc3Ryc3RyKHMsICI8IURPQ1RZUEUiKSB8
-fCBzdHJzdHIocywgIjxodG1sIikgfHwgc3Ryc3RyKHMsICI8SFRNTCIpKSB7CiAgICAgICAgICAg
-ICAgICBFLnN5bnRheCA9ICZITERCWzRdOyBnb3RvIHJlc2NhbjsKICAgICAgICAgICAgfQogICAg
-ICAgIH0KICAgIH0KICAgIHJldHVybjsKcmVzY2FuOgogICAgZm9yIChpbnQgciA9IDA7IHIgPCBF
-Lm51bXJvd3M7IHIrKykgdXBkYXRlX3N5bnRheCgmRS5yb3dbcl0pOwp9CgovKiDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogTElOSEFTCiAq
-IOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAq
-LwoKc3RhdGljIGludCBjeF90b19yeChSb3cgKnJvdywgaW50IGN4KSB7CiAgICBpbnQgcnggPSAw
-OwogICAgZm9yIChpbnQgaiA9IDA7IGogPCBjeDsgaisrKSB7CiAgICAgICAgaWYgKHJvdy0+Y2hh
-cnNbal0gPT0gJ1x0JykgcnggKz0gKFRBQl9TSVpFLTEpIC0gKHJ4ICUgVEFCX1NJWkUpOwogICAg
-ICAgIHJ4Kys7CiAgICB9CiAgICByZXR1cm4gcng7Cn0KCnN0YXRpYyBpbnQgcnhfdG9fY3goUm93
-ICpyb3csIGludCByeCkgewogICAgaW50IGN1ciA9IDAsIGN4OwogICAgZm9yIChjeCA9IDA7IGN4
-IDwgcm93LT5zaXplOyBjeCsrKSB7CiAgICAgICAgaWYgKHJvdy0+Y2hhcnNbY3hdID09ICdcdCcp
-IGN1ciArPSAoVEFCX1NJWkUtMSkgLSAoY3VyICUgVEFCX1NJWkUpOwogICAgICAgIGN1cisrOwog
-ICAgICAgIGlmIChjdXIgPiByeCkgcmV0dXJuIGN4OwogICAgfQogICAgcmV0dXJuIGN4Owp9Cgpz
-dGF0aWMgdm9pZCB1cGRhdGVfcm93KFJvdyAqcm93KSB7CiAgICBpbnQgdGFicyA9IDA7CiAgICBm
-b3IgKGludCBqID0gMDsgaiA8IHJvdy0+c2l6ZTsgaisrKSBpZiAocm93LT5jaGFyc1tqXSA9PSAn
-XHQnKSB0YWJzKys7CiAgICBmcmVlKHJvdy0+cmVuZGVyKTsKICAgIHJvdy0+cmVuZGVyID0gbWFs
-bG9jKHJvdy0+c2l6ZSArIHRhYnMqKFRBQl9TSVpFLTEpICsgMSk7CiAgICBpbnQgaWR4ID0gMDsK
-ICAgIGZvciAoaW50IGogPSAwOyBqIDwgcm93LT5zaXplOyBqKyspIHsKICAgICAgICBpZiAocm93
-LT5jaGFyc1tqXSA9PSAnXHQnKSB7CiAgICAgICAgICAgIHJvdy0+cmVuZGVyW2lkeCsrXSA9ICcg
-JzsKICAgICAgICAgICAgd2hpbGUgKGlkeCAlIFRBQl9TSVpFKSByb3ctPnJlbmRlcltpZHgrK10g
-PSAnICc7CiAgICAgICAgfSBlbHNlIHJvdy0+cmVuZGVyW2lkeCsrXSA9IHJvdy0+Y2hhcnNbal07
-CiAgICB9CiAgICByb3ctPnJlbmRlcltpZHhdID0gJ1wwJzsgcm93LT5yc2l6ZSA9IGlkeDsKICAg
-IHVwZGF0ZV9zeW50YXgocm93KTsKfQoKc3RhdGljIHZvaWQgaW5zZXJ0X3JvdyhpbnQgYXQsIGNv
-bnN0IGNoYXIgKnMsIGludCBsZW4pIHsKICAgIGlmIChhdCA8IDAgfHwgYXQgPiBFLm51bXJvd3Mp
-IHJldHVybjsKICAgIEUucm93ID0gcmVhbGxvYyhFLnJvdywgc2l6ZW9mKFJvdykgKiAoRS5udW1y
-b3dzKzEpKTsKICAgIG1lbW1vdmUoJkUucm93W2F0KzFdLCAmRS5yb3dbYXRdLCBzaXplb2YoUm93
-KSooRS5udW1yb3dzLWF0KSk7CiAgICBFLnJvd1thdF0uc2l6ZSAgPSBsZW47CiAgICBFLnJvd1th
-dF0uY2hhcnMgPSBtYWxsb2MobGVuKzEpOwogICAgbWVtY3B5KEUucm93W2F0XS5jaGFycywgcywg
-bGVuKTsKICAgIEUucm93W2F0XS5jaGFyc1tsZW5dID0gJ1wwJzsKICAgIEUucm93W2F0XS5yc2l6
-ZSA9IDA7IEUucm93W2F0XS5yZW5kZXIgPSBOVUxMOwogICAgRS5yb3dbYXRdLmhsID0gTlVMTDsg
-RS5yb3dbYXRdLmhsX29wZW5fY29tbWVudCA9IDA7CiAgICB1cGRhdGVfcm93KCZFLnJvd1thdF0p
-OwogICAgRS5udW1yb3dzKys7IEUuZGlydHkrKzsKfQoKc3RhdGljIHZvaWQgZnJlZV9yb3coUm93
-ICpyb3cpIHsgZnJlZShyb3ctPnJlbmRlcik7IGZyZWUocm93LT5jaGFycyk7IGZyZWUocm93LT5o
-bCk7IH0KCnN0YXRpYyB2b2lkIGRlbF9yb3coaW50IGF0KSB7CiAgICBpZiAoYXQgPCAwIHx8IGF0
-ID49IEUubnVtcm93cykgcmV0dXJuOwogICAgZnJlZV9yb3coJkUucm93W2F0XSk7CiAgICBtZW1t
-b3ZlKCZFLnJvd1thdF0sICZFLnJvd1thdCsxXSwgc2l6ZW9mKFJvdykqKEUubnVtcm93cy1hdC0x
-KSk7CiAgICBFLm51bXJvd3MtLTsgRS5kaXJ0eSsrOwp9CgpzdGF0aWMgdm9pZCByb3dfaW5zZXJ0
-X2NoYXIoUm93ICpyb3csIGludCBhdCwgaW50IGMpIHsKICAgIHJvdy0+aXNfZGlydHkgPSAxOwog
-ICAgaWYgKGF0IDwgMCB8fCBhdCA+IHJvdy0+c2l6ZSkgYXQgPSByb3ctPnNpemU7CiAgICByb3ct
-PmNoYXJzID0gcmVhbGxvYyhyb3ctPmNoYXJzLCByb3ctPnNpemUrMik7CiAgICBtZW1tb3ZlKCZy
-b3ctPmNoYXJzW2F0KzFdLCAmcm93LT5jaGFyc1thdF0sIHJvdy0+c2l6ZS1hdCsxKTsKICAgIHJv
-dy0+Y2hhcnNbYXRdID0gKGNoYXIpYzsgcm93LT5zaXplKys7CiAgICB1cGRhdGVfcm93KHJvdyk7
-IEUuZGlydHkrKzsKfQoKc3RhdGljIHZvaWQgcm93X2RlbF9jaGFyKFJvdyAqcm93LCBpbnQgYXQp
-IHsKICAgIHJvdy0+aXNfZGlydHkgPSAxOwogICAgaWYgKGF0IDwgMCB8fCBhdCA+PSByb3ctPnNp
-emUpIHJldHVybjsKICAgIG1lbW1vdmUoJnJvdy0+Y2hhcnNbYXRdLCAmcm93LT5jaGFyc1thdCsx
-XSwgcm93LT5zaXplLWF0KTsKICAgIHJvdy0+c2l6ZS0tOyB1cGRhdGVfcm93KHJvdyk7IEUuZGly
-dHkrKzsKfQoKc3RhdGljIHZvaWQgcm93X2FwcGVuZF9zdHJpbmcoUm93ICpyb3csIGNvbnN0IGNo
-YXIgKnMsIGludCBsZW4pIHsKICAgIHJvdy0+Y2hhcnMgPSByZWFsbG9jKHJvdy0+Y2hhcnMsIHJv
-dy0+c2l6ZStsZW4rMSk7CiAgICBtZW1jcHkoJnJvdy0+Y2hhcnNbcm93LT5zaXplXSwgcywgbGVu
-KTsKICAgIHJvdy0+c2l6ZSArPSBsZW47IHJvdy0+Y2hhcnNbcm93LT5zaXplXSA9ICdcMCc7CiAg
-ICB1cGRhdGVfcm93KHJvdyk7IEUuZGlydHkrKzsKfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIEFVVE8tUEFJUiAvIEFVVE8tQ0xP
-U0UKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQICovCgpzdGF0aWMgY2hhciBwYWlyX2Nsb3NlX2NoYXIoY2hhciBjKSB7CiAgICBzd2l0Y2gg
-KGMpIHsKICAgICAgICBjYXNlICcoJzogcmV0dXJuICcpJzsKICAgICAgICBjYXNlICdbJzogcmV0
-dXJuICddJzsKICAgICAgICBjYXNlICd7JzogcmV0dXJuICd9JzsKICAgICAgICBjYXNlICc8Jzog
-cmV0dXJuICc+JzsKICAgICAgICBjYXNlICciJzogcmV0dXJuICciJzsKICAgICAgICBjYXNlICdc
-Jyc6IHJldHVybiAnXCcnOwogICAgICAgIGNhc2UgJ2AnOiByZXR1cm4gJ2AnOwogICAgfQogICAg
-cmV0dXJuIDA7Cn0KCi8qIFJldG9ybmEgMSBzZSBhdXRvLXBhaXIgZm9pIGFwbGljYWRvIChuw6Nv
-IGNoYW1hIGluc2VydF9jaGFyIGRlcG9pcykgKi8Kc3RhdGljIGludCB0cnlfYXV0b19wYWlyKGlu
-dCBjKSB7CiAgICBjaGFyIGNsb3NlID0gcGFpcl9jbG9zZV9jaGFyKChjaGFyKWMpOwogICAgaWYg
-KCFjbG9zZSkgcmV0dXJuIDA7CgogICAgaWYgKEUuY3kgPT0gRS5udW1yb3dzKSBpbnNlcnRfcm93
-KEUubnVtcm93cywgIiIsIDApOwogICAgUm93ICpyb3cgPSAmRS5yb3dbRS5jeV07CgogICAgLyog
-UGFyYSBhc3Bhczogc2tpcCBzw7Mgc2UgbyBjaGFyIGltZWRpYXRhbWVudGUgw6AgZGlyZWl0YSDD
-qSBpZ3VhbCBFCiAgICAgKiBvIGNoYXIgZGVwb2lzIGRlbGUgTsODTyDDqSB0YW1iw6ltIGlndWFs
-IChldml0YSBza2lwIGZhbHNvIGVtIGluw61jaW8gZGUgcGFsYXZyYSkuCiAgICAgKiBFeGVtcGxv
-OiBjdXJzb3IgZW0gfCIgIOKGkiBza2lwIHBhcmEgInwgbWFzCiAgICAgKiAgICAgICAgICBjdXJz
-b3IgZW0gfCIgdGV4dG8g4oaSIGluc2VyZSBub3ZvIHBhciBub3JtYWxtZW50ZSAqLwogICAgaWYg
-KChjID09ICciJyB8fCBjID09ICdcJycgfHwgYyA9PSAnYCcpCiAgICAgICAgJiYgRS5jeCA8IHJv
-dy0+c2l6ZSAmJiByb3ctPmNoYXJzW0UuY3hdID09IChjaGFyKWMpIHsKICAgICAgICAvKiBzw7Mg
-c2tpcGEgc2UgdmVpbyBkZSB1bSBhdXRvLXBhaXI6IGNoYXIgYW50ZXJpb3Igw6kgbyBvcGVuIGUK
-ICAgICAgICAgKiBvIHF1ZSBlc3TDoSDDoCBkaXJlaXRhIMOpIG8gY2xvc2Ugc29saXTDoXJpbyAo
-bsOjbyDDqSBpbsOtY2lvIGRlIHN0cmluZykgKi8KICAgICAgICBpbnQgcHJldl9pc19vcGVuID0g
-KEUuY3ggPiAwICYmIHJvdy0+Y2hhcnNbRS5jeCAtIDFdID09IChjaGFyKWMpOwogICAgICAgIGlm
-IChwcmV2X2lzX29wZW4pIHsKICAgICAgICAgICAgRS5jeCsrOwogICAgICAgICAgICByZXR1cm4g
-MTsKICAgICAgICB9CiAgICB9CgogICAgLyogSW5zZXJlIGFiZXJ0dXJhICovCiAgICByb3dfaW5z
-ZXJ0X2NoYXIocm93LCBFLmN4LCBjKTsKICAgIEUuY3grKzsKICAgIC8qIEluc2VyZSBmZWNoYW1l
-bnRvIChjdXJzb3IgZmljYSBlbnRyZSBvcyBkb2lzKSAqLwogICAgcm93X2luc2VydF9jaGFyKHJv
-dywgRS5jeCwgY2xvc2UpOwogICAgcmV0dXJuIDE7Cn0KCi8qIEJhY2tzcGFjZSBpbnRlbGlnZW50
-ZTogYXBhZ2EgcGFyIHZhemlvICgpIFtdIHt9ICIiICcnIGBgICovCnN0YXRpYyBpbnQgdHJ5X3Nt
-YXJ0X2JhY2tzcGFjZSh2b2lkKSB7CiAgICBpZiAoRS5jeSA+PSBFLm51bXJvd3MgfHwgRS5jeCA9
-PSAwKSByZXR1cm4gMDsKICAgIFJvdyAqcm93ID0gJkUucm93W0UuY3ldOwogICAgY2hhciBwcmV2
-ICA9IHJvdy0+Y2hhcnNbRS5jeCAtIDFdOwogICAgY2hhciBjbG9zZSA9IHBhaXJfY2xvc2VfY2hh
-cihwcmV2KTsKICAgIGlmIChjbG9zZSAmJiBFLmN4IDwgcm93LT5zaXplICYmIHJvdy0+Y2hhcnNb
-RS5jeF0gPT0gY2xvc2UpIHsKICAgICAgICByb3dfZGVsX2NoYXIocm93LCBFLmN4KTsgICAgICAg
-LyogYXBhZ2EgZmVjaGFtZW50byAqLwogICAgICAgIHJvd19kZWxfY2hhcihyb3csIEUuY3ggLSAx
-KTsgICAvKiBhcGFnYSBhYmVydHVyYSAqLwogICAgICAgIEUuY3gtLTsKICAgICAgICByZXR1cm4g
-MTsKICAgIH0KICAgIHJldHVybiAwOwp9CgovKiBQdWxhIG8gY2hhciBkZSBmZWNoYW1lbnRvIHNl
-IG8gY3Vyc29yIGrDoSBlc3TDoSBhbnRlcyBkZWxlICovCnN0YXRpYyBpbnQgdHJ5X3NraXBfY2xv
-c2UoaW50IGMpIHsKICAgIGlmIChjICE9ICcpJyAmJiBjICE9ICddJyAmJiBjICE9ICd9JykgcmV0
-dXJuIDA7CiAgICBpZiAoRS5jeSA+PSBFLm51bXJvd3MpIHJldHVybiAwOwogICAgUm93ICpyb3cg
-PSAmRS5yb3dbRS5jeV07CiAgICBpZiAoRS5jeCA8IHJvdy0+c2l6ZSAmJiByb3ctPmNoYXJzW0Uu
-Y3hdID09IChjaGFyKWMpIHsKICAgICAgICBFLmN4Kys7CiAgICAgICAgcmV0dXJuIDE7CiAgICB9
-CiAgICByZXR1cm4gMDsKfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIEFVVE8tQ09NUExFVEUKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgpzdGF0aWMgdm9pZCBjb21w
-X2Nsb3NlKHZvaWQpIHsKICAgIGZvciAoaW50IGkgPSAwOyBpIDwgRS5jb21wLmNvdW50OyBpKysp
-IHsgZnJlZShFLmNvbXAuaXRlbXNbaV0pOyBFLmNvbXAuaXRlbXNbaV0gPSBOVUxMOyB9CiAgICBF
-LmNvbXAuY291bnQgPSAwOyBFLmNvbXAuYWN0aXZlID0gMDsKfQoKLyogRXh0cmFpIG8gcHJlZml4
-byBkZSBpZGVudGlmaWNhZG9yIGFudGVzIGRvIGN1cnNvciAqLwpzdGF0aWMgaW50IGdldF9wcmVm
-aXgoY2hhciAqYnVmLCBpbnQgYnVmc3opIHsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cykgcmV0
-dXJuIDA7CiAgICBSb3cgKnJvdyA9ICZFLnJvd1tFLmN5XTsKICAgIGludCBlbmQgPSBFLmN4LCBz
-dGFydCA9IGVuZDsKICAgIHdoaWxlIChzdGFydCA+IDAgJiYgKGlzYWxudW0oKHVuc2lnbmVkIGNo
-YXIpcm93LT5jaGFyc1tzdGFydC0xXSkKICAgICAgICAgICB8fCByb3ctPmNoYXJzW3N0YXJ0LTFd
-ID09ICcuJyB8fCByb3ctPmNoYXJzW3N0YXJ0LTFdID09ICdfJwogICAgICAgICAgIHx8IHJvdy0+
-Y2hhcnNbc3RhcnQtMV0gPT0gJzonKSkKICAgICAgICBzdGFydC0tOwogICAgaW50IGxlbiA9IGVu
-ZCAtIHN0YXJ0OwogICAgaWYgKGxlbiA8PSAwIHx8IGxlbiA+PSBidWZzeikgcmV0dXJuIDA7CiAg
-ICBtZW1jcHkoYnVmLCAmcm93LT5jaGFyc1tzdGFydF0sIGxlbik7CiAgICBidWZbbGVuXSA9ICdc
-MCc7CiAgICByZXR1cm4gbGVuOwp9CgpzdGF0aWMgdm9pZCBjb21wX29wZW4odm9pZCkgewogICAg
-Lyog4pSA4pSAIENvbnRleHRvcyBlc3BlY2lhaXMgdMOqbSBwcmlvcmlkYWRlIOKUgOKUgCAqLwog
-ICAgaWYgKEUuc3ludGF4ICYmIChFLnN5bnRheCA9PSAmSExEQlswXSB8fCBFLnN5bnRheCA9PSAm
-SExEQlsxXSkpIHsgICAvKiBDIC8gQysrICovCiAgICAgICAgaWYgKGNvbXBfb3Blbl9pbmNsdWRl
-KCkpIHJldHVybjsKICAgIH0KICAgIGlmIChFLnN5bnRheCAmJiBFLnN5bnRheCA9PSAmSExEQlsy
-XSkgeyAgIC8qIEx1YSAqLwogICAgICAgIGlmIChjb21wX29wZW5fcmVxdWlyZSgpKSByZXR1cm47
-CiAgICB9CgogICAgY2hhciBwcmVmaXhbMTI4XTsKICAgIGludCBwbGVuID0gZ2V0X3ByZWZpeChw
-cmVmaXgsIHNpemVvZihwcmVmaXgpKTsKICAgIGNvbXBfY2xvc2UoKTsKICAgIGlmIChwbGVuIDwg
-MikgcmV0dXJuOwoKICAgIC8qIFZhcnJlZHVyYSBuYXMgY29tcGxldGlvbnMgZml4YXMgKi8KICAg
-IGZvciAoaW50IGkgPSAwOyBDT01QTEVUSU9OU1tpXSAmJiBFLmNvbXAuY291bnQgPCBDT01QTEVU
-SU9OX01BWDsgaSsrKSB7CiAgICAgICAgaWYgKCFzdHJuY21wKENPTVBMRVRJT05TW2ldLCBwcmVm
-aXgsIHBsZW4pKQogICAgICAgICAgICBFLmNvbXAuaXRlbXNbRS5jb21wLmNvdW50KytdID0gc3Ry
-ZHVwKENPTVBMRVRJT05TW2ldKTsKICAgIH0KCiAgICAvKiBWYXJyZWR1cmEgbmFzIGtleXdvcmRz
-IGRhIHNpbnRheGUgYXR1YWwgKi8KICAgIGlmIChFLnN5bnRheCkgewogICAgICAgIGNvbnN0IGNo
-YXIgKipsaXN0c1tdID0gewogICAgICAgICAgICBFLnN5bnRheC0+a3dfZmxvdywgRS5zeW50YXgt
-Pmt3X2J1aWx0aW4sCiAgICAgICAgICAgIEUuc3ludGF4LT5rd190eXBlcywgRS5zeW50YXgtPmt3
-X3ByZXByb2MsIE5VTEwKICAgICAgICB9OwogICAgICAgIGZvciAoaW50IGwgPSAwOyBsaXN0c1ts
-XSAmJiBFLmNvbXAuY291bnQgPCBDT01QTEVUSU9OX01BWDsgbCsrKSB7CiAgICAgICAgICAgIGZv
-ciAoaW50IGogPSAwOyBsaXN0c1tsXVtqXSAmJiBFLmNvbXAuY291bnQgPCBDT01QTEVUSU9OX01B
-WDsgaisrKSB7CiAgICAgICAgICAgICAgICBpZiAoIXN0cm5jbXAobGlzdHNbbF1bal0sIHByZWZp
-eCwgcGxlbikpIHsKICAgICAgICAgICAgICAgICAgICBpbnQgZHVwID0gMDsKICAgICAgICAgICAg
-ICAgICAgICBmb3IgKGludCBrID0gMDsgayA8IEUuY29tcC5jb3VudDsgaysrKQogICAgICAgICAg
-ICAgICAgICAgICAgICBpZiAoIXN0cmNtcChFLmNvbXAuaXRlbXNba10sIGxpc3RzW2xdW2pdKSkg
-eyBkdXA9MTsgYnJlYWs7IH0KICAgICAgICAgICAgICAgICAgICBpZiAoIWR1cCkgRS5jb21wLml0
-ZW1zW0UuY29tcC5jb3VudCsrXSA9IHN0cmR1cChsaXN0c1tsXVtqXSk7CiAgICAgICAgICAgICAg
-ICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9CgogICAgaWYgKEUuY29tcC5jb3VudCA9
-PSAwKSByZXR1cm47CiAgICBFLmNvbXAuc2VsZWN0ZWQgID0gMDsKICAgIEUuY29tcC5hY3RpdmUg
-ICAgPSAxOwogICAgRS5jb21wLnRyaWdnZXJfY3ggPSBFLmN4IC0gcGxlbjsKfQoKc3RhdGljIHZv
-aWQgY29tcF9hcHBseSh2b2lkKSB7CiAgICBpZiAoIUUuY29tcC5hY3RpdmUgfHwgRS5jb21wLmNv
-dW50ID09IDApIHJldHVybjsKICAgIGNvbnN0IGNoYXIgKml0ZW0gPSBFLmNvbXAuaXRlbXNbRS5j
-b21wLnNlbGVjdGVkXTsKICAgIGludCBpbGVuID0gKGludClzdHJsZW4oaXRlbSk7CgogICAgLyog
-cGxlbiByZWFsID0gZGlzdMOibmNpYSBkbyB0cmlnZ2VyIGFvIGN1cnNvciBhdHVhbCAqLwogICAg
-aW50IHBsZW4gPSBFLmN4IC0gRS5jb21wLnRyaWdnZXJfY3g7CiAgICBpZiAocGxlbiA8IDApIHBs
-ZW4gPSAwOwoKICAgIC8qIEFwYWdhIG8gcHJlZml4byBkaWdpdGFkbyBkZXNkZSB0cmlnZ2VyX2N4
-ICovCiAgICBmb3IgKGludCBpID0gMDsgaSA8IHBsZW47IGkrKykgcm93X2RlbF9jaGFyKCZFLnJv
-d1tFLmN5XSwgRS5jb21wLnRyaWdnZXJfY3gpOwogICAgRS5jeCA9IEUuY29tcC50cmlnZ2VyX2N4
-OwoKICAgIC8qIEluc2VyZSBvIGl0ZW0gY29tcGxldG8gKi8KICAgIGZvciAoaW50IGkgPSAwOyBp
-IDwgaWxlbjsgaSsrKSB7IHJvd19pbnNlcnRfY2hhcigmRS5yb3dbRS5jeV0sIEUuY3gsIGl0ZW1b
-aV0pOyBFLmN4Kys7IH0KICAgIGNvbXBfY2xvc2UoKTsKfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIFVORE8KICog4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgpzdGF0aWMg
-Y2hhciAqcm93c190b19zdHJpbmcoaW50ICpsZW4pIHsKICAgIGludCB0b3RhbCA9IDA7CiAgICBm
-b3IgKGludCBqID0gMDsgaiA8IEUubnVtcm93czsgaisrKSB0b3RhbCArPSBFLnJvd1tqXS5zaXpl
-ICsgMTsKICAgICpsZW4gPSB0b3RhbDsKICAgIGNoYXIgKmJ1ZiA9IG1hbGxvYyh0b3RhbCArIDEp
-LCAqcCA9IGJ1ZjsKICAgIGZvciAoaW50IGogPSAwOyBqIDwgRS5udW1yb3dzOyBqKyspIHsKICAg
-ICAgICBtZW1jcHkocCwgRS5yb3dbal0uY2hhcnMsIEUucm93W2pdLnNpemUpOwogICAgICAgIHAg
-Kz0gRS5yb3dbal0uc2l6ZTsgKnArKyA9ICdcbic7CiAgICB9CiAgICAqcCA9ICdcMCc7CiAgICBy
-ZXR1cm4gYnVmOwp9CgpzdGF0aWMgdm9pZCB1bmRvX3B1c2godm9pZCkgewogICAgLyogbm92YSBl
-ZGnDp8OjbyBsaW1wYSBhIHBpbGhhIGRlIHJlZG8gKi8KICAgIGZvciAoaW50IGkgPSAwOyBpIDwg
-RS5yZWRvX3RvcCAmJiBpIDwgVU5ET19MSU1JVDsgaSsrKSB7CiAgICAgICAgZnJlZShFLnJlZG9f
-c3RhY2tbaSAlIFVORE9fTElNSVRdLmRhdGEpOwogICAgICAgIEUucmVkb19zdGFja1tpICUgVU5E
-T19MSU1JVF0uZGF0YSA9IE5VTEw7CiAgICB9CiAgICBFLnJlZG9fdG9wID0gMDsKICAgIGludCBp
-ZHggPSBFLnVuZG9fdG9wICUgVU5ET19MSU1JVDsKICAgIGZyZWUoRS51bmRvW2lkeF0uZGF0YSk7
-CiAgICBFLnVuZG9baWR4XS5kYXRhID0gcm93c190b19zdHJpbmcoJkUudW5kb1tpZHhdLmxlbik7
-CiAgICBFLnVuZG9baWR4XS5jeCA9IEUuY3g7IEUudW5kb1tpZHhdLmN5ID0gRS5jeTsKICAgIEUu
-dW5kb190b3ArKzsKfQoKc3RhdGljIHZvaWQgYXBwbHlfc25hcHNob3QoY2hhciAqZGF0YSwgaW50
-IGxlbiwgaW50IGN4LCBpbnQgY3kpIHsKICAgIGZvciAoaW50IGkgPSAwOyBpIDwgRS5udW1yb3dz
-OyBpKyspIGZyZWVfcm93KCZFLnJvd1tpXSk7CiAgICBmcmVlKEUucm93KTsgRS5yb3cgPSBOVUxM
-OyBFLm51bXJvd3MgPSAwOwogICAgY2hhciAqcCA9IGRhdGEsICplbmQgPSBkYXRhICsgbGVuOwog
-ICAgd2hpbGUgKHAgPCBlbmQpIHsKICAgICAgICBjaGFyICpubCA9IG1lbWNocihwLCAnXG4nLCBl
-bmQtcCk7CiAgICAgICAgaW50IGxsID0gbmwgPyAoaW50KShubC1wKSA6IChpbnQpKGVuZC1wKTsK
-ICAgICAgICBpbnNlcnRfcm93KEUubnVtcm93cywgcCwgbGwpOwogICAgICAgIHAgPSBubCA/IG5s
-KzEgOiBlbmQ7CiAgICB9CiAgICBFLmN4ID0gY3g7IEUuY3kgPSBjeTsgRS5kaXJ0eSsrOwp9Cgpz
-dGF0aWMgdm9pZCB1bmRvX3BvcCh2b2lkKSB7CiAgICBpZiAoRS51bmRvX3RvcCA8PSAwKSB7IHNl
-dF9zdGF0dXMoIk5hZGEgcGFyYSBkZXNmYXplci4iKTsgcmV0dXJuOyB9CiAgICAvKiBzYWx2YSBl
-c3RhZG8gYXR1YWwgbm8gcmVkbyBhbnRlcyBkZSBkZXNmYXplciAqLwogICAgaW50IHJpID0gRS5y
-ZWRvX3RvcCAlIFVORE9fTElNSVQ7CiAgICBmcmVlKEUucmVkb19zdGFja1tyaV0uZGF0YSk7CiAg
-ICBFLnJlZG9fc3RhY2tbcmldLmRhdGEgPSByb3dzX3RvX3N0cmluZygmRS5yZWRvX3N0YWNrW3Jp
-XS5sZW4pOwogICAgRS5yZWRvX3N0YWNrW3JpXS5jeCA9IEUuY3g7IEUucmVkb19zdGFja1tyaV0u
-Y3kgPSBFLmN5OwogICAgRS5yZWRvX3RvcCsrOwogICAgRS51bmRvX3RvcC0tOwogICAgaW50IGlk
-eCA9IEUudW5kb190b3AgJSBVTkRPX0xJTUlUOwogICAgaWYgKCFFLnVuZG9baWR4XS5kYXRhKSBy
-ZXR1cm47CiAgICBhcHBseV9zbmFwc2hvdChFLnVuZG9baWR4XS5kYXRhLCBFLnVuZG9baWR4XS5s
-ZW4sIEUudW5kb1tpZHhdLmN4LCBFLnVuZG9baWR4XS5jeSk7Cn0KCnN0YXRpYyB2b2lkIHJlZG9f
-cG9wKHZvaWQpIHsKICAgIGlmIChFLnJlZG9fdG9wIDw9IDApIHsgc2V0X3N0YXR1cygiTmFkYSBw
-YXJhIHJlZmF6ZXIuIik7IHJldHVybjsgfQogICAgLyogc2FsdmEgbm8gdW5kbyAqLwogICAgaW50
-IHVpID0gRS51bmRvX3RvcCAlIFVORE9fTElNSVQ7CiAgICBmcmVlKEUudW5kb1t1aV0uZGF0YSk7
-CiAgICBFLnVuZG9bdWldLmRhdGEgPSByb3dzX3RvX3N0cmluZygmRS51bmRvW3VpXS5sZW4pOwog
-ICAgRS51bmRvW3VpXS5jeCA9IEUuY3g7IEUudW5kb1t1aV0uY3kgPSBFLmN5OwogICAgRS51bmRv
-X3RvcCsrOwogICAgRS5yZWRvX3RvcC0tOwogICAgaW50IGlkeCA9IEUucmVkb190b3AgJSBVTkRP
-X0xJTUlUOwogICAgaWYgKCFFLnJlZG9fc3RhY2tbaWR4XS5kYXRhKSByZXR1cm47CiAgICBhcHBs
-eV9zbmFwc2hvdChFLnJlZG9fc3RhY2tbaWR4XS5kYXRhLCBFLnJlZG9fc3RhY2tbaWR4XS5sZW4s
-CiAgICAgICAgICAgICAgICAgICBFLnJlZG9fc3RhY2tbaWR4XS5jeCwgRS5yZWRvX3N0YWNrW2lk
-eF0uY3kpOwp9CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZAKICogRURJw4fDg08KICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgpzdGF0aWMgdm9pZCBpbnNlcnRfY2hhcihpbnQg
-YykgewogICAgaWYgKEUuY3kgPT0gRS5udW1yb3dzKSBpbnNlcnRfcm93KEUubnVtcm93cywgIiIs
-IDApOwogICAgcm93X2luc2VydF9jaGFyKCZFLnJvd1tFLmN5XSwgRS5jeCwgYyk7CiAgICBFLmN4
-Kys7Cn0KCnN0YXRpYyB2b2lkIGluc2VydF9uZXdsaW5lKHZvaWQpIHsKICAgIGlmIChFLmN4ID09
-IDApIHsKICAgICAgICBpbnNlcnRfcm93KEUuY3ksICIiLCAwKTsKICAgIH0gZWxzZSB7CiAgICAg
-ICAgUm93ICpyb3cgPSAmRS5yb3dbRS5jeV07CiAgICAgICAgLyogY2FsY3VsYSBpbmRlbnQgZGEg
-bGluaGEgYXR1YWwgKi8KICAgICAgICBpbnQgaW5kZW50ID0gMDsKICAgICAgICB3aGlsZSAoaW5k
-ZW50IDwgcm93LT5zaXplCiAgICAgICAgICAgICAgICYmIChyb3ctPmNoYXJzW2luZGVudF0gPT0g
-JyAnIHx8IHJvdy0+Y2hhcnNbaW5kZW50XSA9PSAnXHQnKSkKICAgICAgICAgICAgaW5kZW50Kys7
-CgogICAgICAgIGluc2VydF9yb3coRS5jeSsxLCAmcm93LT5jaGFyc1tFLmN4XSwgcm93LT5zaXpl
-IC0gRS5jeCk7CiAgICAgICAgLyogdHJ1bmNhIGxpbmhhIGF0dWFsICovCiAgICAgICAgcm93ID0g
-JkUucm93W0UuY3ldOwogICAgICAgIHJvdy0+c2l6ZSA9IEUuY3g7IHJvdy0+Y2hhcnNbcm93LT5z
-aXplXSA9ICdcMCc7CiAgICAgICAgdXBkYXRlX3Jvdyhyb3cpOwoKICAgICAgICAvKiBhcGxpY2Eg
-aW5kZW50IG5hIG5vdmEgbGluaGEgKi8KICAgICAgICBpZiAoaW5kZW50ID4gMCkgewogICAgICAg
-ICAgICBSb3cgKm5yID0gJkUucm93W0UuY3krMV07CiAgICAgICAgICAgIGNoYXIgKnRtcCA9IG1h
-bGxvYyhpbmRlbnQgKyBuci0+c2l6ZSArIDEpOwogICAgICAgICAgICBtZW1zZXQodG1wLCAnICcs
-IGluZGVudCk7CiAgICAgICAgICAgIG1lbWNweSh0bXAgKyBpbmRlbnQsIG5yLT5jaGFycywgbnIt
-PnNpemUpOwogICAgICAgICAgICBmcmVlKG5yLT5jaGFycyk7IG5yLT5jaGFycyA9IHRtcDsKICAg
-ICAgICAgICAgbnItPnNpemUgKz0gaW5kZW50OyBuci0+Y2hhcnNbbnItPnNpemVdID0gJ1wwJzsK
-ICAgICAgICAgICAgdXBkYXRlX3Jvdyhucik7IEUuZGlydHkrKzsKICAgICAgICB9CiAgICB9CiAg
-ICBFLmN5Kys7IAogICAgLyogcG9zaWNpb25hIGFww7NzIG8gaW5kZW50ICovCiAgICBpZiAoRS5j
-eSA8IEUubnVtcm93cykgewogICAgICAgIFJvdyAqbnIgPSAmRS5yb3dbRS5jeV07CiAgICAgICAg
-aW50IGkgPSAwOwogICAgICAgIHdoaWxlIChpIDwgbnItPnNpemUgJiYgKG5yLT5jaGFyc1tpXSA9
-PSAnICcgfHwgbnItPmNoYXJzW2ldID09ICdcdCcpKSBpKys7CiAgICAgICAgRS5jeCA9IGk7CiAg
-ICB9IGVsc2UgewogICAgICAgIEUuY3ggPSAwOwogICAgfQp9CgpzdGF0aWMgdm9pZCBkZWxfY2hh
-cih2b2lkKSB7CiAgICBpZiAoRS5jeSA9PSBFLm51bXJvd3MpIHJldHVybjsKICAgIGlmIChFLmN4
-ID09IDAgJiYgRS5jeSA9PSAwKSByZXR1cm47CiAgICBpZiAoRS5jeCA+IDApIHsKICAgICAgICBy
-b3dfZGVsX2NoYXIoJkUucm93W0UuY3ldLCBFLmN4LTEpOyBFLmN4LS07CiAgICB9IGVsc2Ugewog
-ICAgICAgIEUuY3ggPSBFLnJvd1tFLmN5LTFdLnNpemU7CiAgICAgICAgcm93X2FwcGVuZF9zdHJp
-bmcoJkUucm93W0UuY3ktMV0sIEUucm93W0UuY3ldLmNoYXJzLCBFLnJvd1tFLmN5XS5zaXplKTsK
-ICAgICAgICBkZWxfcm93KEUuY3kpOyBFLmN5LS07CiAgICB9Cn0KCnN0YXRpYyB2b2lkIGRlbF9s
-aW5lKHZvaWQpIHsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cykgcmV0dXJuOwogICAgZGVsX3Jv
-dyhFLmN5KTsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cyAmJiBFLmN5ID4gMCkgRS5jeS0tOwog
-ICAgRS5jeCA9IDA7Cn0KCnN0YXRpYyB2b2lkIGR1cF9saW5lKHZvaWQpIHsKICAgIGlmIChFLmN5
-ID49IEUubnVtcm93cykgcmV0dXJuOwogICAgUm93ICpyID0gJkUucm93W0UuY3ldOwogICAgaW5z
-ZXJ0X3JvdyhFLmN5KzEsIHItPmNoYXJzLCByLT5zaXplKTsKICAgIEUuY3krKzsKfQoKc3RhdGlj
-IHZvaWQgbW92ZV9saW5lX3VwKHZvaWQpIHsKICAgIGlmIChFLmN5IDw9IDAgfHwgRS5jeSA+PSBF
-Lm51bXJvd3MpIHJldHVybjsKICAgIFJvdyB0bXAgPSBFLnJvd1tFLmN5LTFdOwogICAgRS5yb3db
-RS5jeS0xXSA9IEUucm93W0UuY3ldOwogICAgRS5yb3dbRS5jeV0gICA9IHRtcDsKICAgIHVwZGF0
-ZV9zeW50YXgoJkUucm93W0UuY3ktMV0pOwogICAgdXBkYXRlX3N5bnRheCgmRS5yb3dbRS5jeV0p
-OwogICAgRS5jeS0tOyBFLmRpcnR5Kys7Cn0KCnN0YXRpYyB2b2lkIG1vdmVfbGluZV9kb3duKHZv
-aWQpIHsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cy0xKSByZXR1cm47CiAgICBSb3cgdG1wID0g
-RS5yb3dbRS5jeSsxXTsKICAgIEUucm93W0UuY3krMV0gPSBFLnJvd1tFLmN5XTsKICAgIEUucm93
-W0UuY3ldICAgPSB0bXA7CiAgICB1cGRhdGVfc3ludGF4KCZFLnJvd1tFLmN5XSk7CiAgICB1cGRh
-dGVfc3ludGF4KCZFLnJvd1tFLmN5KzFdKTsKICAgIEUuY3krKzsgRS5kaXJ0eSsrOwp9CgpzdGF0
-aWMgdm9pZCB0b2dnbGVfY29tbWVudCh2b2lkKSB7CiAgICBpZiAoRS5jeSA+PSBFLm51bXJvd3Mg
-fHwgIUUuc3ludGF4IHx8ICFFLnN5bnRheC0+c2NvbW1lbnQpIHJldHVybjsKICAgIFJvdyAqcm93
-ID0gJkUucm93W0UuY3ldOwogICAgY29uc3QgY2hhciAqc2MgID0gRS5zeW50YXgtPnNjb21tZW50
-OwogICAgaW50IHNjbGVuID0gc3RybGVuKHNjKTsKICAgIC8qIHNraXAgbGVhZGluZyB3aGl0ZXNw
-YWNlICovCiAgICBpbnQgaSA9IDA7CiAgICB3aGlsZSAoaSA8IHJvdy0+c2l6ZSAmJiByb3ctPmNo
-YXJzW2ldID09ICcgJykgaSsrOwogICAgaWYgKCFzdHJuY21wKCZyb3ctPmNoYXJzW2ldLCBzYywg
-c2NsZW4pKSB7CiAgICAgICAgLyogZGVzY29tZW50YXIgKi8KICAgICAgICBpbnQgcm0gPSBzY2xl
-bjsKICAgICAgICBpZiAoaSArIHNjbGVuIDwgcm93LT5zaXplICYmIHJvdy0+Y2hhcnNbaStzY2xl
-bl0gPT0gJyAnKSBybSsrOwogICAgICAgIGZvciAoaW50IGogPSAwOyBqIDwgcm07IGorKykgcm93
-X2RlbF9jaGFyKHJvdywgaSk7CiAgICB9IGVsc2UgewogICAgICAgIC8qIGNvbWVudGFyICovCiAg
-ICAgICAgZm9yIChpbnQgaiA9IHNjbGVuLTE7IGogPj0gMDsgai0tKSByb3dfaW5zZXJ0X2NoYXIo
-cm93LCAwLCBzY1tqXSk7CiAgICAgICAgcm93X2luc2VydF9jaGFyKHJvdywgc2NsZW4sICcgJyk7
-CiAgICB9CiAgICBFLmRpcnR5Kys7Cn0KCnN0YXRpYyB2b2lkIGluZGVudF9saW5lKHZvaWQpIHsK
-ICAgIGlmIChFLmN5ID49IEUubnVtcm93cykgcmV0dXJuOwogICAgZm9yIChpbnQgaSA9IDA7IGkg
-PCBUQUJfU0laRTsgaSsrKSByb3dfaW5zZXJ0X2NoYXIoJkUucm93W0UuY3ldLCAwLCAnICcpOwog
-ICAgRS5jeCArPSBUQUJfU0laRTsgRS5kaXJ0eSsrOwp9CgpzdGF0aWMgdm9pZCBkZWluZGVudF9s
-aW5lKHZvaWQpIHsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cykgcmV0dXJuOwogICAgUm93ICpy
-b3cgPSAmRS5yb3dbRS5jeV07CiAgICBpbnQgc3AgPSAwOwogICAgd2hpbGUgKHNwIDwgcm93LT5z
-aXplICYmIHNwIDwgVEFCX1NJWkUgJiYgcm93LT5jaGFyc1tzcF0gPT0gJyAnKSBzcCsrOwogICAg
-Zm9yIChpbnQgaSA9IDA7IGkgPCBzcDsgaSsrKSByb3dfZGVsX2NoYXIocm93LCAwKTsKICAgIEUu
-Y3ggLT0gc3A7IGlmIChFLmN4IDwgMCkgRS5jeCA9IDA7CiAgICBFLmRpcnR5Kys7Cn0KCi8qIOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAogKiBG
-T1JNQVRBRE9SIERFIEPDk0RJR08gKEN0cmwrTSkKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgovKiDilIDilIAgVXRpbGl0w6FyaW9z
-IGludGVybm9zIGRvIGZvcm1hdGFkb3Ig4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-4pSA4pSA4pSA4pSAICovCgovKiBDb250YSBlc3Bhw6dvcyBpbmljaWFpcyBkZSB1bWEgc3RyaW5n
-ICovCnN0YXRpYyBpbnQgY291bnRfaW5kZW50KGNvbnN0IGNoYXIgKnMsIGludCBsZW4pIHsKICAg
-IGludCBuID0gMDsKICAgIHdoaWxlIChuIDwgbGVuICYmIHNbbl0gPT0gJyAnKSBuKys7CiAgICBy
-ZXR1cm4gbjsKfQoKLyogUmVtb3ZlIHRyYWlsaW5nIHdoaXRlc3BhY2UgZGUgdW1hIFJvdyAqLwpz
-dGF0aWMgdm9pZCByb3dfdHJpbV90cmFpbGluZyhSb3cgKnJvdykgewogICAgd2hpbGUgKHJvdy0+
-c2l6ZSA+IDAgJiYgKHJvdy0+Y2hhcnNbcm93LT5zaXplLTFdID09ICcgJwogICAgICAgICAgICAg
-ICAgICAgICAgICAgICB8fCByb3ctPmNoYXJzW3Jvdy0+c2l6ZS0xXSA9PSAnXHQnKSkKICAgICAg
-ICByb3ctPnNpemUtLTsKICAgIHJvdy0+Y2hhcnNbcm93LT5zaXplXSA9ICdcMCc7Cn0KCi8qIFN1
-YnN0aXR1aSB0b2RhIGEgbGluaGEgcG9yIHVtYSBub3ZhIHN0cmluZyAqLwpzdGF0aWMgdm9pZCBy
-b3dfcmVwbGFjZShpbnQgeSwgY29uc3QgY2hhciAqcywgaW50IHNsZW4pIHsKICAgIFJvdyAqcm93
-ID0gJkUucm93W3ldOwogICAgZnJlZShyb3ctPmNoYXJzKTsKICAgIHJvdy0+Y2hhcnMgPSBtYWxs
-b2Moc2xlbiArIDEpOwogICAgbWVtY3B5KHJvdy0+Y2hhcnMsIHMsIHNsZW4pOwogICAgcm93LT5j
-aGFyc1tzbGVuXSA9ICdcMCc7CiAgICByb3ctPnNpemUgPSBzbGVuOwogICAgdXBkYXRlX3Jvdyhy
-b3cpOwogICAgaWYgKEUuc3ludGF4KSB1cGRhdGVfc3ludGF4KHJvdyk7Cn0KCi8qIOKUgOKUgCBG
-b3JtYXRhZG9yIEMvQysrIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCAqLwov
-KgogKiBSZWdyYXMgYXBsaWNhZGFzIGxpbmhhIHBvciBsaW5oYToKICogICAtIFJlbW92ZSB0cmFp
-bGluZyBzcGFjZXMKICogICAtIE5vcm1hbGl6YSBlc3Bhw6dvIGFww7NzIGtleXdvcmRzIChpZi9m
-b3Ivd2hpbGUvc3dpdGNoKQogKiAgIC0gRXNwYcOnbyBhbyByZWRvciBkZSBvcGVyYWRvcmVzIGJp
-bsOhcmlvcyA9ICs9IC09IGV0Yy4KICogICAtIFNlbSBlc3Bhw6dvIGFudGVzIGRlICggZW0gY2hh
-bWFkYXMgZGUgZnVuw6fDo28KICogICAtIHsgbmEgbWVzbWEgbGluaGEgZG8gYmxvY28gKEsmUikK
-ICogICAtIFJlY3VvIGF1dG9tw6F0aWNvIGJhc2VhZG8gZW0gY2hhdmVzIHt9CiAqLwpzdGF0aWMg
-dm9pZCBmb3JtYXRfYyh2b2lkKSB7CiAgICAvKiBQYXNzbyAxOiB0cmFpbGluZyB3aGl0ZXNwYWNl
-IGUgdGFicyDihpIgZXNwYcOnb3MgKi8KICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1yb3dz
-OyB5KyspIHsKICAgICAgICBSb3cgKnJvdyA9ICZFLnJvd1t5XTsKICAgICAgICAvKiBleHBhbmRl
-IHRhYnMgKi8KICAgICAgICBjaGFyICpleHBhbmRlZCA9IG1hbGxvYyhyb3ctPnNpemUgKiBUQUJf
-U0laRSArIDEpOwogICAgICAgIGludCBlbGVuID0gMDsKICAgICAgICBmb3IgKGludCBpID0gMDsg
-aSA8IHJvdy0+c2l6ZTsgaSsrKSB7CiAgICAgICAgICAgIGlmIChyb3ctPmNoYXJzW2ldID09ICdc
-dCcpIHsKICAgICAgICAgICAgICAgIGludCBzcCA9IFRBQl9TSVpFIC0gKGVsZW4gJSBUQUJfU0la
-RSk7CiAgICAgICAgICAgICAgICBmb3IgKGludCBrID0gMDsgayA8IHNwOyBrKyspIGV4cGFuZGVk
-W2VsZW4rK10gPSAnICc7CiAgICAgICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgICAgICBleHBh
-bmRlZFtlbGVuKytdID0gcm93LT5jaGFyc1tpXTsKICAgICAgICAgICAgfQogICAgICAgIH0KICAg
-ICAgICBleHBhbmRlZFtlbGVuXSA9ICdcMCc7CiAgICAgICAgLyogdHJhaWxpbmcgKi8KICAgICAg
-ICB3aGlsZSAoZWxlbiA+IDAgJiYgZXhwYW5kZWRbZWxlbi0xXSA9PSAnICcpIGVsZW4tLTsKICAg
-ICAgICBleHBhbmRlZFtlbGVuXSA9ICdcMCc7CiAgICAgICAgcm93X3JlcGxhY2UoeSwgZXhwYW5k
-ZWQsIGVsZW4pOwogICAgICAgIGZyZWUoZXhwYW5kZWQpOwogICAgfQoKICAgIC8qIFBhc3NvIDI6
-IGVzcGHDp28gYW8gcmVkb3IgZGUgPSBtYXMgbsOjbyA9PSwgIT0sIDw9LCA+PSAqLwogICAgZm9y
-IChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIFJvdyAqcm93ID0gJkUu
-cm93W3ldOwogICAgICAgIGNoYXIgKnMgPSByb3ctPmNoYXJzOwogICAgICAgIGludCBuID0gcm93
-LT5zaXplOwoKICAgICAgICAvKiBEZXRlY3RhIGxpbmhhcyBhIGlnbm9yYXI6IGNvbWVudMOhcmlv
-cywgc3RyaW5ncywgcHJlcHJvY2Vzc29yICovCiAgICAgICAgaW50IGxlYWQgPSBjb3VudF9pbmRl
-bnQocywgbik7CiAgICAgICAgaWYgKGxlYWQgPCBuICYmIHNbbGVhZF0gPT0gJyMnKSBjb250aW51
-ZTsgIC8qIHByZXByb2Nlc3NvciAqLwogICAgICAgIGlmIChsZWFkKzEgPCBuICYmIHNbbGVhZF09
-PScvJyAmJiBzW2xlYWQrMV09PScvJykgY29udGludWU7IC8qIC8vICovCgogICAgICAgIGNoYXIg
-b3V0WzQwOTZdOyBpbnQgb2kgPSAwOwogICAgICAgIGludCBpbl9zdHIgPSAwLCBzdHJfY2ggPSAw
-LCBpbl9jaGFyID0gMDsKCiAgICAgICAgZm9yIChpbnQgaSA9IDA7IGkgPCBuICYmIG9pIDwgKGlu
-dClzaXplb2Yob3V0KS00OyBpKyspIHsKICAgICAgICAgICAgY2hhciBjID0gc1tpXTsKICAgICAg
-ICAgICAgLyogdHJhY2tpbmcgc3RyaW5ncyBzaW1wbGVzICovCiAgICAgICAgICAgIGlmICghaW5f
-c3RyICYmICFpbl9jaGFyICYmIChjID09ICciJyB8fCBjID09ICdcJycpKSB7CiAgICAgICAgICAg
-ICAgICBpbl9zdHIgPSAxOyBzdHJfY2ggPSBjOwogICAgICAgICAgICAgICAgb3V0W29pKytdID0g
-YzsgY29udGludWU7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgaWYgKGluX3N0cikgewogICAg
-ICAgICAgICAgICAgaWYgKGMgPT0gJ1xcJykgeyBvdXRbb2krK10gPSBjOyBpZiAoaSsxPG4pIG91
-dFtvaSsrXSA9IHNbKytpXTsgY29udGludWU7IH0KICAgICAgICAgICAgICAgIGlmIChjID09IHN0
-cl9jaCkgaW5fc3RyID0gMDsKICAgICAgICAgICAgICAgIG91dFtvaSsrXSA9IGM7IGNvbnRpbnVl
-OwogICAgICAgICAgICB9CgogICAgICAgICAgICAvKiBvcGVyYWRvcmVzIGJpbsOhcmlvczogPSAr
-PSAtPSAqPSAvPSAlPSAmPSB8PSBePSAqLwogICAgICAgICAgICBpZiAoKGM9PSc9J3x8Yz09Jysn
-fHxjPT0nLSd8fGM9PScqJ3x8Yz09Jy8nfHxjPT0nJSd8fGM9PScmJ3x8Yz09J3wnfHxjPT0nXicp
-CiAgICAgICAgICAgICAgICAmJiBpKzEgPCBuICYmIHNbaSsxXSA9PSAnPScgJiYgYyAhPSAnIScg
-JiYgYyAhPSAnPCcgJiYgYyAhPSAnPicpIHsKICAgICAgICAgICAgICAgIC8qIGdhcmFudGUgZXNw
-YcOnbyBhbnRlcyAqLwogICAgICAgICAgICAgICAgaWYgKG9pID4gMCAmJiBvdXRbb2ktMV0gIT0g
-JyAnKSBvdXRbb2krK10gPSAnICc7CiAgICAgICAgICAgICAgICBvdXRbb2krK10gPSBjOyBvdXRb
-b2krK10gPSAnPSc7IGkrKzsKICAgICAgICAgICAgICAgIC8qIGdhcmFudGUgZXNwYcOnbyBkZXBv
-aXMgKi8KICAgICAgICAgICAgICAgIGlmIChpKzEgPCBuICYmIHNbaSsxXSAhPSAnICcpIG91dFtv
-aSsrXSA9ICcgJzsKICAgICAgICAgICAgICAgIGNvbnRpbnVlOwogICAgICAgICAgICB9CiAgICAg
-ICAgICAgIC8qID0gc296aW5obyAobsOjbyA9PSkgKi8KICAgICAgICAgICAgaWYgKGMgPT0gJz0n
-ICYmIChpKzEgPj0gbiB8fCBzW2krMV0gIT0gJz0nKQogICAgICAgICAgICAgICAgICAgICAgICAg
-JiYgKGkgICA9PSAwIHx8IHNbaS0xXSAhPSAnIScpCiAgICAgICAgICAgICAgICAgICAgICAgICAm
-JiAoaSAgID09IDAgfHwgc1tpLTFdICE9ICc8JykKICAgICAgICAgICAgICAgICAgICAgICAgICYm
-IChpICAgPT0gMCB8fCBzW2ktMV0gIT0gJz4nKQogICAgICAgICAgICAgICAgICAgICAgICAgJiYg
-KGkgICA9PSAwIHx8IHNbaS0xXSAhPSAnPScpKSB7CiAgICAgICAgICAgICAgICBpZiAob2kgPiAw
-ICYmIG91dFtvaS0xXSAhPSAnICcpIG91dFtvaSsrXSA9ICcgJzsKICAgICAgICAgICAgICAgIG91
-dFtvaSsrXSA9ICc9JzsKICAgICAgICAgICAgICAgIGlmIChpKzEgPCBuICYmIHNbaSsxXSAhPSAn
-ICcgJiYgc1tpKzFdICE9ICc9Jykgb3V0W29pKytdID0gJyAnOwogICAgICAgICAgICAgICAgY29u
-dGludWU7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgb3V0W29pKytdID0gYzsKICAgICAgICB9
-CiAgICAgICAgb3V0W29pXSA9ICdcMCc7CiAgICAgICAgcm93X3JlcGxhY2UoeSwgb3V0LCBvaSk7
-CiAgICB9CgogICAgLyogUGFzc28gMzogZXNwYcOnbyBhcMOzcyBrZXl3b3JkcyBpZi9mb3Ivd2hp
-bGUvc3dpdGNoL3JldHVybiBhbnRlcyBkZSAnKCcgKi8KICAgIGNvbnN0IGNoYXIgKmt3c1tdID0g
-eyJpZiIsImZvciIsIndoaWxlIiwic3dpdGNoIiwicmV0dXJuIiwiZWxzZSIsImRvIixOVUxMfTsK
-ICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1yb3dzOyB5KyspIHsKICAgICAgICBSb3cgKnJv
-dyA9ICZFLnJvd1t5XTsKICAgICAgICBjaGFyICpzID0gcm93LT5jaGFyczsKICAgICAgICBpbnQg
-biA9IHJvdy0+c2l6ZTsKICAgICAgICBpbnQgbGVhZCA9IGNvdW50X2luZGVudChzLCBuKTsKICAg
-ICAgICBpZiAobGVhZCA8IG4gJiYgc1tsZWFkXSA9PSAnIycpIGNvbnRpbnVlOwoKICAgICAgICBj
-aGFyIG91dFs0MDk2XTsgaW50IG9pID0gMDsKICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8IG4g
-JiYgb2kgPCAoaW50KXNpemVvZihvdXQpLTQ7IGkrKykgewogICAgICAgICAgICAvKiB0ZW50YSBj
-YWRhIGtleXdvcmQgKi8KICAgICAgICAgICAgaW50IG1hdGNoZWQgPSAwOwogICAgICAgICAgICBm
-b3IgKGludCBrID0gMDsga3dzW2tdOyBrKyspIHsKICAgICAgICAgICAgICAgIGludCBrbGVuID0g
-KGludClzdHJsZW4oa3dzW2tdKTsKICAgICAgICAgICAgICAgIGlmIChpICsga2xlbiA8PSBuICYm
-IHN0cm5jbXAocytpLCBrd3Nba10sIGtsZW4pID09IDApIHsKICAgICAgICAgICAgICAgICAgICAv
-KiBkZXZlIHNlciBzZWd1aWRvIGRlICcoJyBvdSBlc3Bhw6dvKycoJyAqLwogICAgICAgICAgICAg
-ICAgICAgIGludCBqID0gaSArIGtsZW47CiAgICAgICAgICAgICAgICAgICAgaWYgKGogPCBuICYm
-IChzW2pdID09ICcoJyB8fCBzW2pdID09ICcgJyB8fCBzW2pdID09ICdcdCcpKSB7CiAgICAgICAg
-ICAgICAgICAgICAgICAgIC8qIGNvcGlhIGtleXdvcmQgKi8KICAgICAgICAgICAgICAgICAgICAg
-ICAgbWVtY3B5KG91dCtvaSwga3dzW2tdLCBrbGVuKTsgb2kgKz0ga2xlbjsKICAgICAgICAgICAg
-ICAgICAgICAgICAgLyogcHVsYSB3aGl0ZXNwYWNlIGV4aXN0ZW50ZSAqLwogICAgICAgICAgICAg
-ICAgICAgICAgICB3aGlsZSAoaiA8IG4gJiYgKHNbal09PScgJ3x8c1tqXT09J1x0JykpIGorKzsK
-ICAgICAgICAgICAgICAgICAgICAgICAgLyogYWRpY2lvbmEgZXhhdGFtZW50ZSB1bSBlc3Bhw6dv
-IChleGNldG8gcmV0dXJuIHNlbSAnKCcpICovCiAgICAgICAgICAgICAgICAgICAgICAgIGlmIChq
-IDwgbiAmJiBzW2pdID09ICcoJykgb3V0W29pKytdID0gJyAnOwogICAgICAgICAgICAgICAgICAg
-ICAgICBlbHNlIGlmIChqIDwgbikgb3V0W29pKytdID0gJyAnOwogICAgICAgICAgICAgICAgICAg
-ICAgICBpID0gaiAtIDE7IG1hdGNoZWQgPSAxOyBicmVhazsKICAgICAgICAgICAgICAgICAgICB9
-CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgaWYgKCFtYXRjaGVk
-KSBvdXRbb2krK10gPSBzW2ldOwogICAgICAgIH0KICAgICAgICBvdXRbb2ldID0gJ1wwJzsKICAg
-ICAgICByb3dfcmVwbGFjZSh5LCBvdXQsIG9pKTsKICAgIH0KCiAgICAvKiBQYXNzbyA0OiByZWPD
-oWxjdWxvIGRlIGluZGVudCBiYXNlYWRvIGVtIHt9ICovCiAgICBpbnQgZGVwdGggPSAwOwogICAg
-Zm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIFJvdyAqcm93ID0g
-JkUucm93W3ldOwogICAgICAgIGNoYXIgKnMgPSByb3ctPmNoYXJzOwogICAgICAgIGludCBuID0g
-cm93LT5zaXplOwogICAgICAgIGludCBsZWFkID0gY291bnRfaW5kZW50KHMsIG4pOwogICAgICAg
-IC8qIGNvbnRlw7pkbyBzZW0gaW5kZW50IGF0dWFsICovCiAgICAgICAgY2hhciAqY29udGVudCA9
-IHMgKyBsZWFkOwogICAgICAgIGludCBjbGVuID0gbiAtIGxlYWQ7CgogICAgICAgIC8qIHNlIGxp
-bmhhIGNvbWXDp2EgY29tIH0sIHJlZHV6IGFudGVzIGRlIGluZGVudGFyICovCiAgICAgICAgaWYg
-KGNsZW4gPiAwICYmIGNvbnRlbnRbMF0gPT0gJ30nKSB7IGRlcHRoLS07IGlmIChkZXB0aCA8IDAp
-IGRlcHRoID0gMDsgfQoKICAgICAgICAvKiBtb250YSBub3ZhIGxpbmhhIGNvbSBpbmRlbnQgY29y
-cmV0byAqLwogICAgICAgIGNoYXIgb3V0WzQwOTZdOwogICAgICAgIGludCBpbmRlbnQgPSBkZXB0
-aCAqIFRBQl9TSVpFOwogICAgICAgIGlmIChpbmRlbnQgPj0gKGludClzaXplb2Yob3V0KSkgaW5k
-ZW50ID0gKGludClzaXplb2Yob3V0KSAtIDE7CiAgICAgICAgbWVtc2V0KG91dCwgJyAnLCBpbmRl
-bnQpOwogICAgICAgIGlmIChjbGVuID4gMCAmJiBpbmRlbnQgKyBjbGVuIDwgKGludClzaXplb2Yo
-b3V0KSkgewogICAgICAgICAgICBtZW1jcHkob3V0ICsgaW5kZW50LCBjb250ZW50LCBjbGVuKTsK
-ICAgICAgICB9CiAgICAgICAgaW50IG9sZW4gPSBpbmRlbnQgKyBjbGVuOwogICAgICAgIG91dFtv
-bGVuXSA9ICdcMCc7CiAgICAgICAgcm93X3JlcGxhY2UoeSwgb3V0LCBvbGVuKTsKCiAgICAgICAg
-LyogY29udGEgeyBlIH0gbmEgbGluaGEgcGFyYSBwcsOzeGltYSAqLwogICAgICAgIGludCBpbl9z
-dHIyID0gMDsgY2hhciBzcSA9IDA7CiAgICAgICAgZm9yIChpbnQgaSA9IDA7IGkgPCBjbGVuOyBp
-KyspIHsKICAgICAgICAgICAgY2hhciBjID0gY29udGVudFtpXTsKICAgICAgICAgICAgaWYgKCFp
-bl9zdHIyICYmIChjPT0nIid8fGM9PSdcJycpKSB7IGluX3N0cjI9MTsgc3E9YzsgY29udGludWU7
-IH0KICAgICAgICAgICAgaWYgKGluX3N0cjIpIHsgaWYoYz09J1xcJyl7aSsrO2NvbnRpbnVlO30g
-aWYoYz09c3EpIGluX3N0cjI9MDsgY29udGludWU7IH0KICAgICAgICAgICAgLyogaWdub3JhciBj
-b250ZcO6ZG8gZGUgY29tZW50w6FyaW8gLy8gKi8KICAgICAgICAgICAgaWYgKGM9PScvJyAmJiBp
-KzE8Y2xlbiAmJiBjb250ZW50W2krMV09PScvJykgYnJlYWs7CiAgICAgICAgICAgIGlmIChjID09
-ICd7JykgZGVwdGgrKzsKICAgICAgICAgICAgZWxzZSBpZiAoYyA9PSAnfScgJiYgY29udGVudFsw
-XSAhPSAnfScpIHsgZGVwdGgtLTsgaWYgKGRlcHRoPDApIGRlcHRoPTA7IH0KICAgICAgICB9CiAg
-ICB9CgogICAgRS5kaXJ0eSsrOwogICAgRS5jeCA9IDA7CiAgICBzZXRfc3RhdHVzKCJceDFiWzMy
-beKck1x4MWJbbSBDw7NkaWdvIEMvQysrIGZvcm1hdGFkbyIpOwp9CgovKiDilIDilIAgRm9ybWF0
-YWRvciBMdWEg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-ICovCi8qCiAqIFJlZ3JhczoKICogICAtIFJlbW92ZSB0cmFpbGluZyBzcGFjZXMKICogICAtIEVz
-cGHDp28gYW8gcmVkb3IgZGUgPSAobsOjbyA9PSwgfj0sIDw9LCA+PSkKICogICAtIEVzcGHDp28g
-YXDDs3MgLCBlIDsKICogICAtIFJlY3VvIGJhc2VhZG8gZW0gYmxvY29zOiBmdW5jdGlvbi9pZi9m
-b3Ivd2hpbGUvZG8vcmVwZWF0IOKGkiArMQogKiAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
-IGVuZC91bnRpbC9lbHNlL2Vsc2VpZiDihpIgLTEgKGFudGVzKSBvdSAwCiAqLwpzdGF0aWMgdm9p
-ZCBmb3JtYXRfbHVhKHZvaWQpIHsKICAgIC8qIFBhc3NvIDE6IHRyYWlsaW5nIHdoaXRlc3BhY2Ug
-Ki8KICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1yb3dzOyB5KyspCiAgICAgICAgcm93X3Ry
-aW1fdHJhaWxpbmcoJkUucm93W3ldKTsKCiAgICAvKiBQYXNzbyAyOiBlc3Bhw6dvIGFvIHJlZG9y
-IGRlID0gc2ltcGxlcyBlIGFww7NzICwgKi8KICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1y
-b3dzOyB5KyspIHsKICAgICAgICBSb3cgKnJvdyA9ICZFLnJvd1t5XTsKICAgICAgICBjaGFyICpz
-ID0gcm93LT5jaGFyczsKICAgICAgICBpbnQgbiA9IHJvdy0+c2l6ZTsKICAgICAgICAvKiBpZ25v
-cmEgY29tZW50w6FyaW9zICovCiAgICAgICAgaW50IGxlYWQgPSBjb3VudF9pbmRlbnQocywgbik7
-CiAgICAgICAgaWYgKGxlYWQrMSA8IG4gJiYgc1tsZWFkXT09Jy0nICYmIHNbbGVhZCsxXT09Jy0n
-KSBjb250aW51ZTsKCiAgICAgICAgY2hhciBvdXRbNDA5Nl07IGludCBvaSA9IDA7CiAgICAgICAg
-aW50IGluX3N0ciA9IDA7IGNoYXIgc3EgPSAwOwoKICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8
-IG4gJiYgb2kgPCAoaW50KXNpemVvZihvdXQpLTQ7IGkrKykgewogICAgICAgICAgICBjaGFyIGMg
-PSBzW2ldOwogICAgICAgICAgICBpZiAoIWluX3N0ciAmJiAoYz09JyInfHxjPT0nXCcnKSkgeyBp
-bl9zdHI9MTsgc3E9Yzsgb3V0W29pKytdPWM7IGNvbnRpbnVlOyB9CiAgICAgICAgICAgIGlmIChp
-bl9zdHIpIHsKICAgICAgICAgICAgICAgIGlmIChjPT0nXFwnKXtvdXRbb2krK109YzsgaWYoaSsx
-PG4pIG91dFtvaSsrXT1zWysraV07IGNvbnRpbnVlO30KICAgICAgICAgICAgICAgIGlmIChjPT1z
-cSkgaW5fc3RyPTA7CiAgICAgICAgICAgICAgICBvdXRbb2krK109YzsgY29udGludWU7CiAgICAg
-ICAgICAgIH0KICAgICAgICAgICAgLyogdsOtcmd1bGE6IGdhcmFudGUgZXNwYcOnbyBkZXBvaXMg
-Ki8KICAgICAgICAgICAgaWYgKGMgPT0gJywnKSB7CiAgICAgICAgICAgICAgICBvdXRbb2krK10g
-PSAnLCc7CiAgICAgICAgICAgICAgICBpZiAoaSsxPG4gJiYgc1tpKzFdICE9ICcgJykgb3V0W29p
-KytdID0gJyAnOwogICAgICAgICAgICAgICAgY29udGludWU7CiAgICAgICAgICAgIH0KICAgICAg
-ICAgICAgLyogPSBzaW1wbGVzIChuw6NvID09LCB+PSwgPD0sID49KSAqLwogICAgICAgICAgICBp
-ZiAoYyA9PSAnPScgJiYgKGkrMT49biB8fCBzW2krMV0hPSc9JykKICAgICAgICAgICAgICAgICAg
-ICAgICAgICYmIChpPT0wIHx8IChzW2ktMV0hPSd+JyAmJiBzW2ktMV0hPSc8JwogICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICYmIHNbaS0xXSE9Jz4nICYmIHNbaS0xXSE9Jz0nKSkp
-IHsKICAgICAgICAgICAgICAgIGlmIChvaSA+IDAgJiYgb3V0W29pLTFdICE9ICcgJykgb3V0W29p
-KytdID0gJyAnOwogICAgICAgICAgICAgICAgb3V0W29pKytdID0gJz0nOwogICAgICAgICAgICAg
-ICAgaWYgKGkrMTxuICYmIHNbaSsxXSE9JyAnICYmIHNbaSsxXSE9Jz0nKSBvdXRbb2krK10gPSAn
-ICc7CiAgICAgICAgICAgICAgICBjb250aW51ZTsKICAgICAgICAgICAgfQogICAgICAgICAgICAv
-KiB+PSAobm90IGVxdWFsKSDigJQgY29waWEganVudG8gc2VtIG1vZGlmaWNhciAqLwogICAgICAg
-ICAgICBpZiAoYyA9PSAnficgJiYgaSsxPG4gJiYgc1tpKzFdPT0nPScpIHsKICAgICAgICAgICAg
-ICAgIGlmIChvaT4wICYmIG91dFtvaS0xXSE9JyAnKSBvdXRbb2krK109JyAnOwogICAgICAgICAg
-ICAgICAgb3V0W29pKytdPSd+Jzsgb3V0W29pKytdPSc9JzsgaSsrOwogICAgICAgICAgICAgICAg
-aWYgKGkrMTxuICYmIHNbaSsxXSE9JyAnKSBvdXRbb2krK109JyAnOwogICAgICAgICAgICAgICAg
-Y29udGludWU7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgb3V0W29pKytdID0gYzsKICAgICAg
-ICB9CiAgICAgICAgb3V0W29pXSA9ICdcMCc7CiAgICAgICAgcm93X3JlcGxhY2UoeSwgb3V0LCBv
-aSk7CiAgICB9CgogICAgLyogUGFzc28gMzogcmVjdW8gYmFzZWFkbyBlbSBwYWxhdnJhcy1jaGF2
-ZSBkZSBibG9jbyBFIGVtIGNoYXZlcyB7fSBkZSB0YWJlbGEgKi8KICAgIGNvbnN0IGNoYXIgKm9w
-ZW5fa3dbXSAgPSB7ImZ1bmN0aW9uIiwiaWYiLCJmb3IiLCJ3aGlsZSIsImRvIiwicmVwZWF0IixO
-VUxMfTsKICAgIGNvbnN0IGNoYXIgKmNsb3NlX2t3W10gPSB7ImVuZCIsInVudGlsIixOVUxMfTsK
-ICAgIGNvbnN0IGNoYXIgKm1pZF9rd1tdICAgPSB7ImVsc2UiLCJlbHNlaWYiLE5VTEx9OwoKICAg
-IGludCBkZXB0aCA9IDA7CiAgICBmb3IgKGludCB5ID0gMDsgeSA8IEUubnVtcm93czsgeSsrKSB7
-CiAgICAgICAgUm93ICpyb3cgPSAmRS5yb3dbeV07CiAgICAgICAgY2hhciAqcyAgID0gcm93LT5j
-aGFyczsKICAgICAgICBpbnQgbiAgICAgPSByb3ctPnNpemU7CiAgICAgICAgaW50IGxlYWQgID0g
-Y291bnRfaW5kZW50KHMsIG4pOwogICAgICAgIGNoYXIgKmNvbnRlbnQgPSBzICsgbGVhZDsKICAg
-ICAgICBpbnQgY2xlbiAgPSBuIC0gbGVhZDsKICAgICAgICBpZiAoY2xlbiA8PSAwKSB7IGNvbnRp
-bnVlOyB9CgogICAgICAgIC8qIGlnbm9yYSBjb21lbnTDoXJpb3MgKi8KICAgICAgICBpZiAoY2xl
-biA+PSAyICYmIGNvbnRlbnRbMF09PSctJyAmJiBjb250ZW50WzFdPT0nLScpIGNvbnRpbnVlOwoK
-ICAgICAgICAvKiBEZXRlY3RhIHNlIGxpbmhhIGluaWNpYSBjb20gY2xvc2UvbWlkIGtleXdvcmQg
-b3UgJ30nICovCiAgICAgICAgaW50IGlzX2Nsb3NlID0gMCwgaXNfbWlkID0gMDsKCiAgICAgICAg
-LyogfSBkZSB0YWJlbGEgZmVjaGEgYW50ZXMgZGUgaW5kZW50YXIgKi8KICAgICAgICBpZiAoY29u
-dGVudFswXSA9PSAnfScpIHsgaXNfY2xvc2UgPSAxOyB9CgogICAgICAgIGlmICghaXNfY2xvc2Up
-CiAgICAgICAgZm9yIChpbnQgayA9IDA7IGNsb3NlX2t3W2tdOyBrKyspIHsKICAgICAgICAgICAg
-aW50IGtsID0gKGludClzdHJsZW4oY2xvc2Vfa3dba10pOwogICAgICAgICAgICBpZiAoY2xlbiA+
-PSBrbCAmJiBzdHJuY21wKGNvbnRlbnQsIGNsb3NlX2t3W2tdLCBrbCkgPT0gMAogICAgICAgICAg
-ICAgICAgJiYgKGNsZW4gPT0ga2wgfHwgIWlzYWxudW0oKHVuc2lnbmVkIGNoYXIpY29udGVudFtr
-bF0pKSkKICAgICAgICAgICAgICAgIHsgaXNfY2xvc2UgPSAxOyBicmVhazsgfQogICAgICAgIH0K
-ICAgICAgICBpZiAoIWlzX2Nsb3NlKQogICAgICAgIGZvciAoaW50IGsgPSAwOyBtaWRfa3dba107
-IGsrKykgewogICAgICAgICAgICBpbnQga2wgPSAoaW50KXN0cmxlbihtaWRfa3dba10pOwogICAg
-ICAgICAgICBpZiAoY2xlbiA+PSBrbCAmJiBzdHJuY21wKGNvbnRlbnQsIG1pZF9rd1trXSwga2wp
-ID09IDAKICAgICAgICAgICAgICAgICYmIChjbGVuID09IGtsIHx8ICFpc2FsbnVtKCh1bnNpZ25l
-ZCBjaGFyKWNvbnRlbnRba2xdKSkpCiAgICAgICAgICAgICAgICB7IGlzX21pZCA9IDE7IGJyZWFr
-OyB9CiAgICAgICAgfQoKICAgICAgICBpZiAoaXNfY2xvc2UgfHwgaXNfbWlkKSB7IGRlcHRoLS07
-IGlmIChkZXB0aCA8IDApIGRlcHRoID0gMDsgfQoKICAgICAgICAvKiBhcGxpY2EgaW5kZW50ICov
-CiAgICAgICAgY2hhciBvdXRbNDA5Nl07CiAgICAgICAgaW50IGluZGVudCA9IGRlcHRoICogVEFC
-X1NJWkU7CiAgICAgICAgaWYgKGluZGVudCA+PSAoaW50KXNpemVvZihvdXQpKSBpbmRlbnQgPSAo
-aW50KXNpemVvZihvdXQpLTE7CiAgICAgICAgbWVtc2V0KG91dCwgJyAnLCBpbmRlbnQpOwogICAg
-ICAgIGlmIChjbGVuID4gMCAmJiBpbmRlbnQgKyBjbGVuIDwgKGludClzaXplb2Yob3V0KSkKICAg
-ICAgICAgICAgbWVtY3B5KG91dCArIGluZGVudCwgY29udGVudCwgY2xlbik7CiAgICAgICAgaW50
-IG9sZW4gPSBpbmRlbnQgKyBjbGVuOwogICAgICAgIG91dFtvbGVuXSA9ICdcMCc7CiAgICAgICAg
-cm93X3JlcGxhY2UoeSwgb3V0LCBvbGVuKTsKCiAgICAgICAgaWYgKGlzX21pZCkgeyBkZXB0aCsr
-OyBjb250aW51ZTsgfQoKICAgICAgICAvKiByZS1sw6ogY29udGVudCBhcMOzcyByb3dfcmVwbGFj
-ZSAqLwogICAgICAgIGNvbnRlbnQgPSBFLnJvd1t5XS5jaGFycyArIGluZGVudDsKICAgICAgICBj
-bGVuICAgID0gRS5yb3dbeV0uc2l6ZSAgLSBpbmRlbnQ7CgogICAgICAgIC8qIENvbnRhIGFiZXJ0
-dXJhIGRlIGJsb2NvcyBuYSBsaW5oYToKICAgICAgICAgKiAtIHsgZGUgdGFiZWxhL2Z1bmN0aW9u
-IGJvZHkg4oaSICsxIHBvciBjYWRhIHsKICAgICAgICAgKiAtIGtleXdvcmRzIGRlIGJsb2NvIChz
-ZW0gZW5kIG5hIG1lc21hIGxpbmhhKSDihpIgKzEKICAgICAgICAgKiBJZ25vcmEgc3RyaW5ncyBl
-IGNvbWVudMOhcmlvcyAqLwogICAgICAgIGludCBpbl9zdHIyID0gMDsgY2hhciBzcTIgPSAwOwog
-ICAgICAgIGludCBrd19vcGVucyA9IDA7CiAgICAgICAgZm9yIChpbnQgaSA9IDA7IGkgPCBjbGVu
-OyBpKyspIHsKICAgICAgICAgICAgY2hhciBjID0gY29udGVudFtpXTsKICAgICAgICAgICAgLyog
-Y29tZW50w6FyaW8gZGUgbGluaGEgKi8KICAgICAgICAgICAgaWYgKCFpbl9zdHIyICYmIGM9PSct
-JyAmJiBpKzE8Y2xlbiAmJiBjb250ZW50W2krMV09PSctJykgYnJlYWs7CiAgICAgICAgICAgIC8q
-IHN0cmluZ3MgKi8KICAgICAgICAgICAgaWYgKCFpbl9zdHIyICYmIChjPT0nIid8fGM9PSdcJycp
-KSB7IGluX3N0cjI9MTsgc3EyPWM7IGNvbnRpbnVlOyB9CiAgICAgICAgICAgIGlmIChpbl9zdHIy
-KSB7CiAgICAgICAgICAgICAgICBpZiAoYz09J1xcJykgeyBpKys7IGNvbnRpbnVlOyB9CiAgICAg
-ICAgICAgICAgICBpZiAoYz09c3EyKSBpbl9zdHIyPTA7CiAgICAgICAgICAgICAgICBjb250aW51
-ZTsKICAgICAgICAgICAgfQogICAgICAgICAgICAvKiB7IGFicmUsIH0gZmVjaGEgKGrDoSB0cmF0
-YWRvIGNvbW8gaXNfY2xvc2UgYWNpbWEgYXBlbmFzIHNlIGluw61jaW8pICovCiAgICAgICAgICAg
-IGlmIChjID09ICd7JykgeyBkZXB0aCsrOyB9CiAgICAgICAgICAgIGVsc2UgaWYgKGMgPT0gJ30n
-ICYmIGkgPiAwKSB7IGRlcHRoLS07IGlmIChkZXB0aDwwKSBkZXB0aD0wOyB9CiAgICAgICAgfQoK
-ICAgICAgICAvKiBrZXl3b3JkcyBkZSBibG9jbyBxdWUgbsOjbyB1c2FtIHsgKi8KICAgICAgICBp
-ZiAoIWlzX2Nsb3NlKSB7CiAgICAgICAgICAgIGZvciAoaW50IGsgPSAwOyBvcGVuX2t3W2tdOyBr
-KyspIHsKICAgICAgICAgICAgICAgIGludCBrbCA9IChpbnQpc3RybGVuKG9wZW5fa3dba10pOwog
-ICAgICAgICAgICAgICAgZm9yIChpbnQgaSA9IDA7IGkgPD0gY2xlbiAtIGtsOyBpKyspIHsKICAg
-ICAgICAgICAgICAgICAgICBpZiAoIWluX3N0cjIKICAgICAgICAgICAgICAgICAgICAgICAgJiYg
-c3RybmNtcChjb250ZW50K2ksIG9wZW5fa3dba10sIGtsKSA9PSAwCiAgICAgICAgICAgICAgICAg
-ICAgICAgICYmIChpPT0wIHx8ICFpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKWNvbnRlbnRbaS0xXSkp
-CiAgICAgICAgICAgICAgICAgICAgICAgICYmIChpK2tsID49IGNsZW4gfHwgIWlzYWxudW0oKHVu
-c2lnbmVkIGNoYXIpY29udGVudFtpK2tsXSkpKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIC8q
-IHZlcmlmaWNhIHNlIGVuZCBhcGFyZWNlIGRlcG9pcyBuYSBtZXNtYSBsaW5oYSAqLwogICAgICAg
-ICAgICAgICAgICAgICAgICBpbnQgaGFzX2VuZCA9IDA7CiAgICAgICAgICAgICAgICAgICAgICAg
-IGZvciAoaW50IGogPSBpK2tsOyBqIDw9IGNsZW4tMzsgaisrKQogICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgaWYgKHN0cm5jbXAoY29udGVudCtqLCJlbmQiLDMpPT0wCiAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgJiYgKGo9PTB8fCFpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKWNvbnRl
-bnRbai0xXSkpCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgJiYgKGorMz49Y2xlbnx8
-IWlzYWxudW0oKHVuc2lnbmVkIGNoYXIpY29udGVudFtqKzNdKSkpCiAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgeyBoYXNfZW5kPTE7IGJyZWFrOyB9CiAgICAgICAgICAgICAgICAgICAg
-ICAgIC8qIGUgc2UgdGVtIHsgbmEgbWVzbWEgbGluaGEgKGrDoSBjb250YWRvIGFjaW1hKSAqLwog
-ICAgICAgICAgICAgICAgICAgICAgICBpbnQgaGFzX2JyYWNlID0gMDsKICAgICAgICAgICAgICAg
-ICAgICAgICAgZm9yIChpbnQgaiA9IGkra2w7IGogPCBjbGVuOyBqKyspCiAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICBpZiAoY29udGVudFtqXT09J3snKSB7IGhhc19icmFjZT0xOyBicmVhazsg
-fQogICAgICAgICAgICAgICAgICAgICAgICBpZiAoIWhhc19lbmQgJiYgIWhhc19icmFjZSkgeyBk
-ZXB0aCsrOyB9CiAgICAgICAgICAgICAgICAgICAgICAgIGt3X29wZW5zKys7CiAgICAgICAgICAg
-ICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAg
-IH0KICAgICAgICAgICAgICAgIGlmIChrd19vcGVucykgYnJlYWs7CiAgICAgICAgICAgIH0KICAg
-ICAgICB9CiAgICB9CgogICAgRS5kaXJ0eSsrOwogICAgRS5jeCA9IDA7CiAgICBzZXRfc3RhdHVz
-KCJceDFiWzMybeKck1x4MWJbbSBDw7NkaWdvIEx1YSBmb3JtYXRhZG8iKTsKfQoKLyog4pSA4pSA
-IEZvcm1hdGFkb3IgQmFzaCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIAgKi8KLyoKICogUmVncmFzOgogKiAgIC0gUmVtb3ZlIHRyYWlsaW5nIHNwYWNlcwogKiAg
-IC0gRXhwYW5kZSB0YWJzIOKGkiBlc3Bhw6dvcwogKiAgIC0gUmVjdW8gYmFzZWFkbyBlbTogaWYv
-dGhlbi9mb3Ivd2hpbGUvZG8vY2FzZS9mdW5jdGlvbiDihpIgKzEKICogICAgICAgICAgICAgICAg
-ICAgICAgIGZpL2RvbmUvZXNhYy99IOKGkiAtMSAoYW50ZXMpCiAqICAgICAgICAgICAgICAgICAg
-ICAgICBlbHNlL2VsaWYg4oaSIG1hbnRlciBuw612ZWwgZG8gaWYKICovCnN0YXRpYyB2b2lkIGZv
-cm1hdF9iYXNoKHZvaWQpIHsKICAgIC8qIFBhc3NvIDE6IHRyYWlsaW5nICsgdGFiIGV4cGFuZCAq
-LwogICAgZm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIFJvdyAq
-cm93ID0gJkUucm93W3ldOwogICAgICAgIGNoYXIgKmV4cGFuZGVkID0gbWFsbG9jKHJvdy0+c2l6
-ZSAqIFRBQl9TSVpFICsgMSk7CiAgICAgICAgaW50IGVsZW4gPSAwOwogICAgICAgIGZvciAoaW50
-IGkgPSAwOyBpIDwgcm93LT5zaXplOyBpKyspIHsKICAgICAgICAgICAgaWYgKHJvdy0+Y2hhcnNb
-aV0gPT0gJ1x0JykgewogICAgICAgICAgICAgICAgaW50IHNwID0gVEFCX1NJWkUgLSAoZWxlbiAl
-IFRBQl9TSVpFKTsKICAgICAgICAgICAgICAgIGZvciAoaW50IGsgPSAwOyBrIDwgc3A7IGsrKykg
-ZXhwYW5kZWRbZWxlbisrXSA9ICcgJzsKICAgICAgICAgICAgfSBlbHNlIGV4cGFuZGVkW2VsZW4r
-K10gPSByb3ctPmNoYXJzW2ldOwogICAgICAgIH0KICAgICAgICB3aGlsZSAoZWxlbiA+IDAgJiYg
-ZXhwYW5kZWRbZWxlbi0xXT09JyAnKSBlbGVuLS07CiAgICAgICAgZXhwYW5kZWRbZWxlbl0gPSAn
-XDAnOwogICAgICAgIHJvd19yZXBsYWNlKHksIGV4cGFuZGVkLCBlbGVuKTsKICAgICAgICBmcmVl
-KGV4cGFuZGVkKTsKICAgIH0KCiAgICAvKiBQYXNzbyAyOiByZWN1byAqLwogICAgY29uc3QgY2hh
-ciAqYmFzaF9vcGVuW10gID0geyJ0aGVuIiwiZG8iLCJmdW5jdGlvbiIsInsiLE5VTEx9OwogICAg
-Y29uc3QgY2hhciAqYmFzaF9jbG9zZVtdID0geyJmaSIsImRvbmUiLCJlc2FjIiwifSIsTlVMTH07
-CiAgICBjb25zdCBjaGFyICpiYXNoX21pZFtdICAgPSB7ImVsc2UiLCJlbGlmIixOVUxMfTsKCiAg
-ICBpbnQgZGVwdGggPSAwOwogICAgZm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykg
-ewogICAgICAgIFJvdyAqcm93ID0gJkUucm93W3ldOwogICAgICAgIGNoYXIgKnMgICA9IHJvdy0+
-Y2hhcnM7CiAgICAgICAgaW50IG4gICAgID0gcm93LT5zaXplOwogICAgICAgIGludCBsZWFkICA9
-IGNvdW50X2luZGVudChzLCBuKTsKICAgICAgICBjaGFyICpjb250ZW50ID0gcyArIGxlYWQ7CiAg
-ICAgICAgaW50IGNsZW4gID0gbiAtIGxlYWQ7CiAgICAgICAgaWYgKGNsZW4gPD0gMCkgY29udGlu
-dWU7CgogICAgICAgIC8qIGlnbm9yYSBjb21lbnTDoXJpb3MgZSBzaGViYW5ncyAqLwogICAgICAg
-IGlmIChjb250ZW50WzBdID09ICcjJykgewogICAgICAgICAgICAvKiBtYW50w6ltIGluZGVudCB6
-ZXJvIHBhcmEgc2hlYmFuZ3MsIHNlbsOjbyBhcGxpY2EgZGVwdGggKi8KICAgICAgICAgICAgaWYg
-KGxlYWQgPT0gMCkgY29udGludWU7CiAgICAgICAgfQoKICAgICAgICBpbnQgaXNfY2xvc2UgPSAw
-LCBpc19taWQgPSAwOwogICAgICAgIGZvciAoaW50IGsgPSAwOyBiYXNoX2Nsb3NlW2tdOyBrKysp
-IHsKICAgICAgICAgICAgaW50IGtsID0gKGludClzdHJsZW4oYmFzaF9jbG9zZVtrXSk7CiAgICAg
-ICAgICAgIGlmIChjbGVuID49IGtsICYmIHN0cm5jbXAoY29udGVudCwgYmFzaF9jbG9zZVtrXSwg
-a2wpPT0wCiAgICAgICAgICAgICAgICAmJiAoY2xlbj09a2wgfHwgIWlzYWxudW0oKHVuc2lnbmVk
-IGNoYXIpY29udGVudFtrbF0pKSkKICAgICAgICAgICAgICAgIHsgaXNfY2xvc2U9MTsgYnJlYWs7
-IH0KICAgICAgICB9CiAgICAgICAgaWYgKCFpc19jbG9zZSkKICAgICAgICBmb3IgKGludCBrID0g
-MDsgYmFzaF9taWRba107IGsrKykgewogICAgICAgICAgICBpbnQga2wgPSAoaW50KXN0cmxlbihi
-YXNoX21pZFtrXSk7CiAgICAgICAgICAgIGlmIChjbGVuID49IGtsICYmIHN0cm5jbXAoY29udGVu
-dCwgYmFzaF9taWRba10sIGtsKT09MAogICAgICAgICAgICAgICAgJiYgKGNsZW49PWtsIHx8ICFp
-c2FsbnVtKCh1bnNpZ25lZCBjaGFyKWNvbnRlbnRba2xdKSkpCiAgICAgICAgICAgICAgICB7IGlz
-X21pZD0xOyBicmVhazsgfQogICAgICAgIH0KCiAgICAgICAgaWYgKGlzX2Nsb3NlIHx8IGlzX21p
-ZCkgeyBkZXB0aC0tOyBpZiAoZGVwdGg8MCkgZGVwdGg9MDsgfQoKICAgICAgICBjaGFyIG91dFs0
-MDk2XTsKICAgICAgICBpbnQgaW5kZW50ID0gZGVwdGggKiBUQUJfU0laRTsKICAgICAgICBpZiAo
-aW5kZW50ID49IChpbnQpc2l6ZW9mKG91dCkpIGluZGVudCA9IChpbnQpc2l6ZW9mKG91dCktMTsK
-ICAgICAgICBtZW1zZXQob3V0LCAnICcsIGluZGVudCk7CiAgICAgICAgaWYgKGNsZW4+MCAmJiBp
-bmRlbnQrY2xlbiA8IChpbnQpc2l6ZW9mKG91dCkpCiAgICAgICAgICAgIG1lbWNweShvdXQraW5k
-ZW50LCBjb250ZW50LCBjbGVuKTsKICAgICAgICBpbnQgb2xlbiA9IGluZGVudCArIGNsZW47CiAg
-ICAgICAgb3V0W29sZW5dID0gJ1wwJzsKICAgICAgICByb3dfcmVwbGFjZSh5LCBvdXQsIG9sZW4p
-OwoKICAgICAgICBpZiAoaXNfbWlkKSB7IGRlcHRoKys7IGNvbnRpbnVlOyB9CgogICAgICAgIC8q
-IHZlcmlmaWNhIGFiZXJ0dXJhIGRlIGJsb2NvICovCiAgICAgICAgY29udGVudCA9IEUucm93W3ld
-LmNoYXJzICsgaW5kZW50OwogICAgICAgIGNsZW4gICAgPSBFLnJvd1t5XS5zaXplICAtIGluZGVu
-dDsKICAgICAgICBmb3IgKGludCBrID0gMDsgYmFzaF9vcGVuW2tdOyBrKyspIHsKICAgICAgICAg
-ICAgaW50IGtsID0gKGludClzdHJsZW4oYmFzaF9vcGVuW2tdKTsKICAgICAgICAgICAgLyogcHJv
-Y3VyYSB0b2tlbiBlbSBxdWFscXVlciBwb3Npw6fDo28gZGEgbGluaGEgKi8KICAgICAgICAgICAg
-Zm9yIChpbnQgaSA9IDA7IGkgPD0gY2xlbi1rbDsgaSsrKSB7CiAgICAgICAgICAgICAgICBpZiAo
-c3RybmNtcChjb250ZW50K2ksIGJhc2hfb3BlbltrXSwga2wpPT0wCiAgICAgICAgICAgICAgICAg
-ICAgJiYgKGk9PTB8fCFpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKWNvbnRlbnRbaS0xXSkpCiAgICAg
-ICAgICAgICAgICAgICAgJiYgKGkra2w+PWNsZW58fCFpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKWNv
-bnRlbnRbaStrbF0pCiAgICAgICAgICAgICAgICAgICAgICAgIHx8YmFzaF9vcGVuW2tdWzBdPT0n
-eycpKSB7CiAgICAgICAgICAgICAgICAgICAgZGVwdGgrKzsgYnJlYWs7CiAgICAgICAgICAgICAg
-ICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgfQogICAgfQoKICAg
-IEUuZGlydHkrKzsKICAgIEUuY3ggPSAwOwogICAgc2V0X3N0YXR1cygiXHgxYlszMm3inJNceDFi
-W20gQ8OzZGlnbyBCYXNoIGZvcm1hdGFkbyIpOwp9CgovKiBEaXNwYXRjaGVyOiBlc2NvbGhlIG8g
-Zm9ybWF0YWRvciBwZWxhIHNpbnRheGUgYXRpdmEgKi8Kc3RhdGljIHZvaWQgZm9ybWF0X2NvZGUo
-dm9pZCkgewogICAgaWYgKCFFLnN5bnRheCkgewogICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzNt
-4pqgIExpbmd1YWdlbSBuw6NvIGRlZmluaWRhIOKAlCB1c2UgQ3RybCtMIHBhcmEgZXNjb2xoZXJc
-eDFiW20iKTsKICAgICAgICByZXR1cm47CiAgICB9CiAgICB1bmRvX3B1c2goKTsKICAgIGlmICAg
-ICAgKEUuc3ludGF4ID09ICZITERCWzBdIHx8IEUuc3ludGF4ID09ICZITERCWzFdKSBmb3JtYXRf
-YygpOwogICAgZWxzZSBpZiAoRS5zeW50YXggPT0gJkhMREJbMl0pIGZvcm1hdF9sdWEoKTsKICAg
-IGVsc2UgaWYgKEUuc3ludGF4ID09ICZITERCWzNdKSBmb3JtYXRfYmFzaCgpOwogICAgZWxzZSBz
-ZXRfc3RhdHVzKCJGb3JtYXRhZG9yIG7Do28gZGlzcG9uw612ZWwgcGFyYSBlc3RhIGxpbmd1YWdl
-bSIpOwp9CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZAKICogVkVSSUZJQ0FET1IgREUgQ8OTRElHTyAoQ3RybCtFKQogKiDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogUmVncmEgZGUg
-b3VybyBkZXN0ZSByZWN1cnNvLCBkZXBvaXMgZGUgdHLDqnMgcmVlc2NyaXRhczogZWxlCiAqIE5V
-TkNBIHBvZGUgYmxvcXVlYXIgbyBlZGl0b3IsIGN1c3RlIG8gcXVlIGN1c3RhciBlbQogKiBjb21w
-bGV0dWRlLgogKgogKiAgIC0gUHJvaWJpZG8gY2hhbWFyIHByb2Nlc3NvIGV4dGVybm8gKHNlbSBw
-b3Blbi9mb3JrL2V4ZWMvCiAqICAgICBzeXN0ZW0pLiBVbWEgdmVyc8OjbyBhbnRpZ2EgY2hhbWF2
-YSBgY2xhbmdgIHZpYSBwb3BlbigpCiAqICAgICBzZW0gdGltZW91dDsgc2UgbyBzdWJwcm9jZXNz
-byB0cmF2YXNzZSwgbyBlZGl0b3IgdHJhdmF2YQogKiAgICAganVudG8sIGUgY29tbyBvIHRlcm1p
-bmFsIGrDoSBlc3TDoSBlbSBtb2RvIHJhdywgbmVtIEN0cmwrQwogKiAgICAgYWp1ZGF2YSDigJQg
-c8OzIG1hdGFuZG8gYSBzZXNzw6NvIGRvIFRlcm11eC4KICogICAtIFRvZGEgZXN0cnV0dXJhIGRl
-IGRhZG9zIMOpIHVtIGFycmF5IGRlIHRhbWFuaG8gRklYTywKICogICAgIGFsb2NhZG8gZXN0YXRp
-Y2FtZW50ZSAoc2VtIG1hbGxvYy9yZWFsbG9jKS4KICogICAtIFRvZG8gbGHDp28gw6kgbGltaXRh
-ZG8gcG9yIEUubnVtcm93cyAvIHJvdy0+c2l6ZSAvIHVtIHRldG8KICogICAgIGZpeG8g4oCUIG9z
-IG1lc21vcyBsaW1pdGVzIHF1ZSBvIGVkaXRvciBqw6EgcmVzcGVpdGEgcHJhCiAqICAgICBzYWx2
-YXIgb3UgY29sb3JpciBzaW50YXhlLgogKiAgIC0gTmVuaHVtYSBkYXMgY2hlY2FnZW5zIGFiYWl4
-byDDqSB1bSBwYXJzZXIgZGUgdmVyZGFkZSDigJQgc8OjbwogKiAgICAgaGV1csOtc3RpY2FzIGRl
-IHRleHRvIChjb21vIHVtIGxpbnRlciBsZXZlKS4gRXJyb3MgcmVhaXMKICogICAgIGRlIHNpbnRh
-eGUgZGEgbGluZ3VhZ2VtIGFpbmRhIHPDsyBhcGFyZWNlbSBxdWFuZG8gdm9jw6oKICogICAgIHJv
-ZGEgbyBjw7NkaWdvIGRlIGZhdG87IGlzdG8gYXF1aSBwZWdhIG9zIGRlc2xpemVzIG1haXMKICog
-ICAgIGNvbXVucyBBTlRFUyBkaXNzby4KICoKICogQ3RybCtFIGRldGVjdGEgYSBsaW5ndWFnZW0g
-YXR1YWwgKGEgbWVzbWEgcXVlIEN0cmwrTCBlc2NvbGhlKQogKiBlIHJvZGEgdW0gY29uanVudG8g
-ZGUgY2hlY2FnZW5zIGRpZmVyZW50ZSBwcmEgY2FkYSB1bWE6CiAqICAgLSBVbml2ZXJzYWwgKHRv
-ZGFzIGFzIGxpbmd1YWdlbnMpOiBjaGF2ZXMvcGFyw6pudGVzZXMsCiAqICAgICBlc3Bhw6dvIHNv
-YnJhbmRvIG5vIGZpbSBkYSBsaW5oYSwgbGluaGEgbXVpdG8gY29tcHJpZGEsCiAqICAgICBpbmRl
-bnRhw6fDo28gbWlzdHVyYWRhLCBtYXJjYWRvcmVzIFRPRE8vRklYTUUvWFhYL0hBQ0suCiAqICAg
-LSBMdWEvRWxsaW90T1M6IHZhcmnDoXZlbCBsb2NhbCBkZWNsYXJhZGEgbWFzIG51bmNhIHVzYWRh
-CiAqICAgICAocHVsYWRvIHNlIG8gYXJxdWl2byB1c2Egc2ludGF4ZSBJdmFyLCB0aXBvICExLyEh
-MiDigJQgbsOjbwogKiAgICAgZMOhIHByYSByYXN0cmVhciB1c28gZGUgZm9ybWEgY29uZmnDoXZl
-bCBuZXNzZSBjYXNvKSwKICogICAgIGF0cmlidWnDp8OjbyBlbmNhZGVhZGEgKGBhID0gYiA9IDFg
-LCBpbnbDoWxpZG8gZW0gTHVhKSBlCiAqICAgICBleHByZXNzw6NvIHNvbHRhIHNlbSBlZmVpdG8g
-KGBhICsgYmAsIHNlbSAnPScg4oCUIDk5JSBkYXMKICogICAgIHZlemVzIMOpIHVtICc9JyBlc3F1
-ZWNpZG8pLgogKiAgIC0gQy9DKys6IGF0cmlidWnDp8OjbyBkZW50cm8gZGUgY29uZGnDp8OjbyAo
-YGlmICh4ID0geSlgKSwKICogICAgIHVtIGRvcyBidWdzIG1haXMgY2zDoXNzaWNvcyBkYSBsaW5n
-dWFnZW0uCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkCAqLwoKI2RlZmluZSBFSVNTVUVfTUFYICAgICAyMDAKI2RlZmluZSBFSVNTVUVfTVNH
-X0xFTiAxMTAKCnR5cGVkZWYgc3RydWN0IHsKICAgIGludCAgbGluZTsgICAgICAgIC8qIDEtYmFz
-ZWQ7IDAgPSBzZW0gbGluaGEgZXNwZWPDrWZpY2EgKi8KICAgIGNoYXIgc2V2OyAgICAgICAgICAv
-KiAnRScgZXJybywgJ1cnIGF2aXNvLCAnSScgaW5mb3JtYXRpdm8gKi8KICAgIGNoYXIgbXNnW0VJ
-U1NVRV9NU0dfTEVOXTsKfSBFSXNzdWU7CgpzdGF0aWMgRUlzc3VlIGdfZWlzc3Vlc1tFSVNTVUVf
-TUFYXTsKc3RhdGljIGludCAgICBnX2Vpc3N1ZV9jb3VudCAgPSAwOwpzdGF0aWMgaW50ICAgIGdf
-ZWlzc3VlX3NlbCAgICA9IDA7CnN0YXRpYyBpbnQgICAgZ19laXNzdWVfc2Nyb2xsID0gMDsKc3Rh
-dGljIGludCAgICBnX2Vpc3N1ZV9hY3RpdmUgPSAwOwpzdGF0aWMgY2hhciAgIGdfZWlzc3VlX2xh
-bmdbMTZdID0gIkdlbsOpcmljbyI7CgovKiBBZGljaW9uYSB1bSBwcm9ibGVtYSDDoCBsaXN0YSAo
-c2UgYWluZGEgaG91dmVyIGVzcGHDp28pLgogKiBOdW5jYSBhbG9jYSBtZW3Ds3JpYSwgbnVuY2Eg
-ZmFsaGEgZGUgdW0gamVpdG8gcXVlIHRyYXZlIOKAlAogKiBzZSBhIGxpc3RhIGrDoSBlc3TDoSBj
-aGVpYSwgc2ltcGxlc21lbnRlIHBhcmEgZGUgYWRpY2lvbmFyLiAqLwpzdGF0aWMgdm9pZCBlaXNz
-dWVfYWRkKGludCBsaW5lLCBjaGFyIHNldiwgY29uc3QgY2hhciAqZm10LCAuLi4pIHsKICAgIGlm
-IChnX2Vpc3N1ZV9jb3VudCA+PSBFSVNTVUVfTUFYKSByZXR1cm47CiAgICBFSXNzdWUgKmlzID0g
-JmdfZWlzc3Vlc1tnX2Vpc3N1ZV9jb3VudCsrXTsKICAgIGlzLT5saW5lID0gbGluZTsKICAgIGlz
-LT5zZXYgID0gc2V2OwogICAgdmFfbGlzdCBhcDsgdmFfc3RhcnQoYXAsIGZtdCk7CiAgICB2c25w
-cmludGYoaXMtPm1zZywgRUlTU1VFX01TR19MRU4sIGZtdCwgYXApOwogICAgdmFfZW5kKGFwKTsK
-fQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQCiAqIENIRUNBR0VOUyBVTklWRVJTQUlTICh0b2RhcyBhcyBsaW5ndWFnZW5zKQogKiDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCiNk
-ZWZpbmUgQlJBQ0tFVF9TVEFDS19NQVggNTEyCgovKiDilIDilIAgQ2hhdmVzL3BhcsOqbnRlc2Vz
-L2NvbGNoZXRlcyBiYWxhbmNlYWRvcyDilIDilIAKICogSWdub3JhIG8gcXVlIGVzdMOhIGRlbnRy
-byBkZSBzdHJpbmdzIGUgY29tZW50w6FyaW9zICgvLyAtLSBlCiAqIGJsb2NvLCBlc3RpbG8gQyBv
-dSBMdWEgLS1bWyBdXSkuICcjJyBzw7MgY29udGEgY29tbwogKiBjb21lbnTDoXJpbyBzZSBmb3Ig
-byBwcmltZWlybyBjYXJhY3RlcmUgbsOjby1icmFuY28gZGEgbGluaGEsCiAqIHByYSBuw6NvIGNv
-bmZ1bmRpciBjb20gbyBvcGVyYWRvciBkZSB0YW1hbmhvICcjdCcgZG8gTHVhLiAqLwpzdGF0aWMg
-dm9pZCBjaGVja19ydW5fYnJhY2tldHModm9pZCkgewogICAgdHlwZWRlZiBzdHJ1Y3QgeyBjaGFy
-IGNoOyBpbnQgbGluZTsgfSBCSXRlbTsKICAgIHN0YXRpYyBCSXRlbSBzdGFja1tCUkFDS0VUX1NU
-QUNLX01BWF07CiAgICBpbnQgc3AgPSAwOwogICAgaW50IGJsb2NrX2tpbmQgPSAwOyAvKiAwPW5l
-bmh1bSAxPUMgMj1MdWEgLS1bWyBdXSAqLwoKICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1y
-b3dzOyB5KyspIHsKICAgICAgICBSb3cgKnJvdyA9ICZFLnJvd1t5XTsKICAgICAgICBpbnQgaW5f
-c3RyID0gMDsKICAgICAgICBjaGFyIHN0cl9xID0gMDsKCiAgICAgICAgaWYgKCFibG9ja19raW5k
-KSB7CiAgICAgICAgICAgIGludCB4MCA9IDA7CiAgICAgICAgICAgIHdoaWxlICh4MCA8IHJvdy0+
-c2l6ZSAmJiAocm93LT5jaGFyc1t4MF09PScgJyB8fCByb3ctPmNoYXJzW3gwXT09J1x0JykpIHgw
-Kys7CiAgICAgICAgICAgIGlmICh4MCA8IHJvdy0+c2l6ZSAmJiByb3ctPmNoYXJzW3gwXSA9PSAn
-IycpIGNvbnRpbnVlOwogICAgICAgIH0KCiAgICAgICAgZm9yIChpbnQgeCA9IDA7IHggPCByb3ct
-PnNpemU7IHgrKykgewogICAgICAgICAgICBjaGFyIGMgPSByb3ctPmNoYXJzW3hdOwogICAgICAg
-ICAgICBjaGFyIGMyID0gKHggKyAxIDwgcm93LT5zaXplKSA/IHJvdy0+Y2hhcnNbeCsxXSA6IDA7
-CgogICAgICAgICAgICBpZiAoYmxvY2tfa2luZCA9PSAxKSB7CiAgICAgICAgICAgICAgICBpZiAo
-YyA9PSAnKicgJiYgYzIgPT0gJy8nKSB7IGJsb2NrX2tpbmQgPSAwOyB4Kys7IH0KICAgICAgICAg
-ICAgICAgIGNvbnRpbnVlOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGlmIChibG9ja19raW5k
-ID09IDIpIHsKICAgICAgICAgICAgICAgIGlmIChjID09ICddJyAmJiBjMiA9PSAnXScpIHsgYmxv
-Y2tfa2luZCA9IDA7IHgrKzsgfQogICAgICAgICAgICAgICAgY29udGludWU7CiAgICAgICAgICAg
-IH0KCiAgICAgICAgICAgIGlmIChpbl9zdHIpIHsKICAgICAgICAgICAgICAgIGlmIChjID09ICdc
-XCcgJiYgeCArIDEgPCByb3ctPnNpemUpIHsgeCsrOyBjb250aW51ZTsgfQogICAgICAgICAgICAg
-ICAgaWYgKGMgPT0gc3RyX3EpIGluX3N0ciA9IDA7CiAgICAgICAgICAgICAgICBjb250aW51ZTsK
-ICAgICAgICAgICAgfQoKICAgICAgICAgICAgaWYgKGMgPT0gJy8nICYmIGMyID09ICcqJykgeyBi
-bG9ja19raW5kID0gMTsgeCsrOyBjb250aW51ZTsgfQogICAgICAgICAgICBpZiAoYyA9PSAnLScg
-JiYgYzIgPT0gJy0nKSB7CiAgICAgICAgICAgICAgICBpZiAoeCArIDMgPCByb3ctPnNpemUgJiYg
-cm93LT5jaGFyc1t4KzJdPT0nWycgJiYgcm93LT5jaGFyc1t4KzNdPT0nWycpIHsKICAgICAgICAg
-ICAgICAgICAgICBibG9ja19raW5kID0gMjsgeCArPSAzOyBjb250aW51ZTsKICAgICAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGlm
-IChjID09ICcvJyAmJiBjMiA9PSAnLycpIGJyZWFrOwoKICAgICAgICAgICAgaWYgKGMgPT0gJyIn
-IHx8IGMgPT0gJ1wnJykgeyBpbl9zdHIgPSAxOyBzdHJfcSA9IGM7IGNvbnRpbnVlOyB9CgogICAg
-ICAgICAgICBpZiAoYz09JygnfHxjPT0nWyd8fGM9PSd7JykgewogICAgICAgICAgICAgICAgaWYg
-KHNwIDwgQlJBQ0tFVF9TVEFDS19NQVgpIHsKICAgICAgICAgICAgICAgICAgICBzdGFja1tzcF0u
-Y2ggPSBjOyBzdGFja1tzcF0ubGluZSA9IHkrMTsgc3ArKzsKICAgICAgICAgICAgICAgIH0gZWxz
-ZSB7CiAgICAgICAgICAgICAgICAgICAgZWlzc3VlX2FkZCh5KzEsICdXJywgImFuaW5oYW1lbnRv
-IHBhc3NvdSBkZSAlZCBuw612ZWlzIOKAlCBwYXJlaSBkZSBjaGVjYXIgY2hhdmVzIGFxdWkiLCBC
-UkFDS0VUX1NUQUNLX01BWCk7CiAgICAgICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAg
-ICAgICAgfQogICAgICAgICAgICB9IGVsc2UgaWYgKGM9PScpJ3x8Yz09J10nfHxjPT0nfScpIHsK
-ICAgICAgICAgICAgICAgIGNoYXIgd2FudCA9IChjPT0nKScpID8gJygnIDogKGM9PSddJykgPyAn
-WycgOiAneyc7CiAgICAgICAgICAgICAgICBpZiAoc3AgPT0gMCkgewogICAgICAgICAgICAgICAg
-ICAgIGVpc3N1ZV9hZGQoeSsxLCAnRScsICInJWMnIHNlbSBhYmVydHVyYSBjb3JyZXNwb25kZW50
-ZSIsIGMpOwogICAgICAgICAgICAgICAgfSBlbHNlIGlmIChzdGFja1tzcC0xXS5jaCAhPSB3YW50
-KSB7CiAgICAgICAgICAgICAgICAgICAgZWlzc3VlX2FkZCh5KzEsICdFJywgIiclYycgbsOjbyBj
-b21iaW5hIGNvbSAnJWMnIGFiZXJ0byBuYSBsaW5oYSAlZCIsCiAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgYywgc3RhY2tbc3AtMV0uY2gsIHN0YWNrW3NwLTFdLmxpbmUpOwogICAgICAg
-ICAgICAgICAgICAgIHNwLS07CiAgICAgICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAg
-ICAgICAgIHNwLS07CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CiAg
-ICB9CgogICAgZm9yIChpbnQgaSA9IDA7IGkgPCBzcDsgaSsrKQogICAgICAgIGVpc3N1ZV9hZGQo
-c3RhY2tbaV0ubGluZSwgJ0UnLCAiJyVjJyBhYmVydG8gYXF1aSBudW5jYSBmb2kgZmVjaGFkbyIs
-IHN0YWNrW2ldLmNoKTsKfQoKLyog4pSA4pSAIEVzcGHDp29zL3RhYnMgc29icmFuZG8gbm8gZmlu
-YWwgZGEgbGluaGEg4pSA4pSAICovCnN0YXRpYyB2b2lkIGNoZWNrX3J1bl90cmFpbGluZyh2b2lk
-KSB7CiAgICBmb3IgKGludCB5ID0gMDsgeSA8IEUubnVtcm93czsgeSsrKSB7CiAgICAgICAgUm93
-ICpyb3cgPSAmRS5yb3dbeV07CiAgICAgICAgaWYgKHJvdy0+c2l6ZSA+IDAgJiYKICAgICAgICAg
-ICAgKHJvdy0+Y2hhcnNbcm93LT5zaXplLTFdPT0nICcgfHwgcm93LT5jaGFyc1tyb3ctPnNpemUt
-MV09PSdcdCcpKSB7CiAgICAgICAgICAgIGVpc3N1ZV9hZGQoeSsxLCAnSScsICJlc3Bhw6dvKHMp
-L3RhYihzKSBzb2JyYW5kbyBubyBmaW5hbCBkYSBsaW5oYSIpOwogICAgICAgIH0KICAgIH0KfQoK
-Lyog4pSA4pSAIExpbmhhcyBtdWl0byBjb21wcmlkYXMg4pSA4pSAICovCiNkZWZpbmUgQ0hFQ0tf
-TUFYX0xJTkVfTEVOIDEyMApzdGF0aWMgdm9pZCBjaGVja19ydW5fbGluZV9sZW5ndGgodm9pZCkg
-ewogICAgZm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIGlmIChF
-LnJvd1t5XS5zaXplID4gQ0hFQ0tfTUFYX0xJTkVfTEVOKSB7CiAgICAgICAgICAgIGVpc3N1ZV9h
-ZGQoeSsxLCAnSScsICJsaW5oYSBjb20gJWQgY29sdW5hcyAoYWNpbWEgZGUgJWQpIiwKICAgICAg
-ICAgICAgICAgICAgICAgICBFLnJvd1t5XS5zaXplLCBDSEVDS19NQVhfTElORV9MRU4pOwogICAg
-ICAgIH0KICAgIH0KfQoKLyog4pSA4pSAIEluZGVudGHDp8OjbyBtaXN0dXJhbmRvIHRhYiBlIGVz
-cGHDp28g4pSA4pSAICovCnN0YXRpYyB2b2lkIGNoZWNrX3J1bl9taXhlZF9pbmRlbnQodm9pZCkg
-ewogICAgZm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIFJvdyAq
-cm93ID0gJkUucm93W3ldOwogICAgICAgIGludCBzYXdfc3BhY2UgPSAwLCBzYXdfdGFiX2FmdGVy
-X3NwYWNlID0gMDsKICAgICAgICBmb3IgKGludCB4ID0gMDsgeCA8IHJvdy0+c2l6ZTsgeCsrKSB7
-CiAgICAgICAgICAgIGNoYXIgYyA9IHJvdy0+Y2hhcnNbeF07CiAgICAgICAgICAgIGlmIChjID09
-ICcgJykgc2F3X3NwYWNlID0gMTsKICAgICAgICAgICAgZWxzZSBpZiAoYyA9PSAnXHQnKSB7CiAg
-ICAgICAgICAgICAgICBpZiAoc2F3X3NwYWNlKSB7IHNhd190YWJfYWZ0ZXJfc3BhY2UgPSAxOyBi
-cmVhazsgfQogICAgICAgICAgICB9IGVsc2UgYnJlYWs7CiAgICAgICAgfQogICAgICAgIGlmIChz
-YXdfdGFiX2FmdGVyX3NwYWNlKQogICAgICAgICAgICBlaXNzdWVfYWRkKHkrMSwgJ1cnLCAiaW5k
-ZW50YcOnw6NvIG1pc3R1cmEgZXNwYcOnbyBhbnRlcyBkZSB0YWIiKTsKICAgIH0KfQoKLyog4pSA
-4pSAIE1hcmNhZG9yZXMgVE9ETy9GSVhNRS9YWFgvSEFDSyDilIDilIAgKi8Kc3RhdGljIHZvaWQg
-Y2hlY2tfcnVuX21hcmtlcnModm9pZCkgewogICAgc3RhdGljIGNvbnN0IGNoYXIgKm1hcmtlcnNb
-XSA9IHsgIlRPRE8iLCAiRklYTUUiLCAiWFhYIiwgIkhBQ0siLCBOVUxMIH07CiAgICBmb3IgKGlu
-dCB5ID0gMDsgeSA8IEUubnVtcm93czsgeSsrKSB7CiAgICAgICAgUm93ICpyb3cgPSAmRS5yb3db
-eV07CiAgICAgICAgZm9yIChpbnQgbSA9IDA7IG1hcmtlcnNbbV07IG0rKykgewogICAgICAgICAg
-ICAvKiBidXNjYSBwb3Igc3Vic3RyaW5nIHNpbXBsZXMgKHJvdy0+Y2hhcnMgw6kgbnVsbC10ZXJt
-aW5hdGVkKSAqLwogICAgICAgICAgICBpZiAoc3Ryc3RyKHJvdy0+Y2hhcnMsIG1hcmtlcnNbbV0p
-KSB7CiAgICAgICAgICAgICAgICBlaXNzdWVfYWRkKHkrMSwgJ0knLCAibWFyY2Fkb3IgJXMgZW5j
-b250cmFkbyIsIG1hcmtlcnNbbV0pOwogICAgICAgICAgICAgICAgYnJlYWs7IC8qIHVtIHBvciBs
-aW5oYSBiYXN0YSAqLwogICAgICAgICAgICB9CiAgICAgICAgfQogICAgfQp9CgovKiDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKICogQ0hFQ0FH
-RU5TIEVTUEVDw41GSUNBUyBERSBMVUEvRUxMSU9UT1MKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgpzdGF0aWMgaW50IGVpc19pc19p
-ZGVudF9zdGFydChjaGFyIGMpIHsgcmV0dXJuIGlzYWxwaGEoKHVuc2lnbmVkIGNoYXIpYykgfHwg
-Yz09J18nOyB9CnN0YXRpYyBpbnQgZWlzX2lzX2lkZW50X2NoYXIoY2hhciBjKSAgeyByZXR1cm4g
-aXNhbG51bSgodW5zaWduZWQgY2hhciljKSB8fCBjPT0nXyc7IH0KCi8qIFByb2R1eiB1bWEgY8Oz
-cGlhICJzw7MgY8OzZGlnbyIgZGEgbGluaGE6IGNvbWVudMOhcmlvICgtLSBvdQogKiBibG9jbyAt
-LVtbIF1dKSBjb3J0YWRvL3plcmFkbyBlIGNvbnRlw7pkbyBkZSBzdHJpbmdzIHRyb2NhZG8KICog
-cG9yIGVzcGHDp29zIOKAlCBwcmEgcm9kYXIgaGV1csOtc3RpY2FzIGRlIHRleHRvIHNlbSBjb25m
-dW5kaXIKICogY29tIG8gcXVlIGVzdMOhIGRlbnRybyBkZSBhc3BhcyBvdSBjb21lbnRhZG8uIGJs
-b2NrX2tpbmQKICogcGVyc2lzdGUgZW50cmUgY2hhbWFkYXMgKGVzdGFkbyBkbyBibG9jbyAtLVtb
-IF1dIGVudHJlCiAqIGxpbmhhcykuIExpbmhhcyBtYWlvcmVzIHF1ZSBvdXRzei0xIHPDo28gdHJ1
-bmNhZGFzIChzZWd1cm8sCiAqIHPDsyBsaW1pdGEgbyBhbGNhbmNlIGRhIGhldXLDrXN0aWNhLCBu
-dW5jYSBlc3RvdXJhIGJ1ZmZlcikuICovCnN0YXRpYyB2b2lkIGVpc19zdHJpcF9sdWFfbGluZShS
-b3cgKnJvdywgY2hhciAqb3V0LCBpbnQgb3V0c3osIGludCAqYmxvY2tfa2luZCkgewogICAgaW50
-IG4gPSByb3ctPnNpemU7IGlmIChuID49IG91dHN6KSBuID0gb3V0c3ogLSAxOwogICAgaW50IG9p
-ID0gMDsKICAgIGludCBpbl9zdHIgPSAwOyBjaGFyIHN0cl9xID0gMDsKCiAgICBmb3IgKGludCB4
-ID0gMDsgeCA8IG47IHgrKykgewogICAgICAgIGNoYXIgYyA9IHJvdy0+Y2hhcnNbeF07CiAgICAg
-ICAgY2hhciBjMiA9ICh4ICsgMSA8IG4pID8gcm93LT5jaGFyc1t4KzFdIDogMDsKCiAgICAgICAg
-aWYgKCpibG9ja19raW5kKSB7CiAgICAgICAgICAgIGlmIChjID09ICddJyAmJiBjMiA9PSAnXScp
-IHsgKmJsb2NrX2tpbmQgPSAwOyB4Kys7IH0KICAgICAgICAgICAgY29udGludWU7CiAgICAgICAg
-fQogICAgICAgIGlmIChpbl9zdHIpIHsKICAgICAgICAgICAgaWYgKGMgPT0gJ1xcJyAmJiB4ICsg
-MSA8IG4pIHsgeCsrOyBjb250aW51ZTsgfQogICAgICAgICAgICBpZiAoYyA9PSBzdHJfcSkgaW5f
-c3RyID0gMDsKICAgICAgICAgICAgY29udGludWU7CiAgICAgICAgfQogICAgICAgIGlmIChjID09
-ICctJyAmJiBjMiA9PSAnLScpIHsKICAgICAgICAgICAgaWYgKHggKyAzIDwgbiAmJiByb3ctPmNo
-YXJzW3grMl09PSdbJyAmJiByb3ctPmNoYXJzW3grM109PSdbJykgewogICAgICAgICAgICAgICAg
-KmJsb2NrX2tpbmQgPSAxOyB4ICs9IDM7IGNvbnRpbnVlOwogICAgICAgICAgICB9CiAgICAgICAg
-ICAgIGJyZWFrOyAvKiAtLSBhdMOpIG8gZmltIGRhIGxpbmhhICovCiAgICAgICAgfQogICAgICAg
-IGlmIChjID09ICciJyB8fCBjID09ICdcJycpIHsgaW5fc3RyID0gMTsgc3RyX3EgPSBjOyBjb250
-aW51ZTsgfQoKICAgICAgICBvdXRbb2krK10gPSBjOwogICAgfQogICAgb3V0W29pXSA9ICdcMCc7
-Cn0KCnN0YXRpYyB2b2lkIGVpc190cmltKGNoYXIgKnMpIHsKICAgIGludCBsZW4gPSAoaW50KXN0
-cmxlbihzKTsKICAgIGludCBlbmQgPSBsZW4gLSAxOwogICAgd2hpbGUgKGVuZCA+PSAwICYmIChz
-W2VuZF09PScgJ3x8c1tlbmRdPT0nXHQnKSkgc1tlbmQtLV0gPSAnXDAnOwogICAgaW50IHN0YXJ0
-ID0gMDsKICAgIHdoaWxlIChzW3N0YXJ0XT09JyAnfHxzW3N0YXJ0XT09J1x0Jykgc3RhcnQrKzsK
-ICAgIGlmIChzdGFydCA+IDApIG1lbW1vdmUocywgcytzdGFydCwgc3RybGVuKHMrc3RhcnQpKzEp
-Owp9CgovKiBMw6ogdW0gaWRlbnRpZmljYWRvciBhIHBhcnRpciBkZSBzWypwXTsgZGV2b2x2ZSBl
-bSBidWYgKGF0w6kKICogYnVmc3otMSBjaGFycykgZSBhdmFuw6dhICpwLiBSZXRvcm5hIDAgc2Ug
-bsOjbyBow6EgaWRlbnRpZmljYWRvcgogKiBuYSBwb3Npw6fDo28uICovCnN0YXRpYyBpbnQgZWlz
-X3JlYWRfaWRlbnQoY29uc3QgY2hhciAqcywgaW50ICpwLCBjaGFyICpidWYsIGludCBidWZzeikg
-ewogICAgaWYgKCFlaXNfaXNfaWRlbnRfc3RhcnQoc1sqcF0pKSByZXR1cm4gMDsKICAgIGludCBp
-ID0gMDsKICAgIHdoaWxlIChlaXNfaXNfaWRlbnRfY2hhcihzWypwXSkgJiYgaSA8IGJ1ZnN6LTEp
-IHsgYnVmW2krK10gPSBzWygqcCkrK107IH0KICAgIGJ1ZltpXSA9ICdcMCc7CiAgICByZXR1cm4g
-MTsKfQoKc3RhdGljIGludCBlaXNfaXNfbHVhX2tleXdvcmQoY29uc3QgY2hhciAqdykgewogICAg
-c3RhdGljIGNvbnN0IGNoYXIgKmt3W10gPSB7CiAgICAgICAgImlmIiwidGhlbiIsImVsc2UiLCJl
-bHNlaWYiLCJlbmQiLCJ3aGlsZSIsImRvIiwiZm9yIiwiaW4iLAogICAgICAgICJmdW5jdGlvbiIs
-ImxvY2FsIiwicmV0dXJuIiwiYnJlYWsiLCJyZXBlYXQiLCJ1bnRpbCIsCiAgICAgICAgImFuZCIs
-Im9yIiwibm90IiwibmlsIiwidHJ1ZSIsImZhbHNlIiwiZ290byIsIE5VTEwKICAgIH07CiAgICBm
-b3IgKGludCBpID0gMDsga3dbaV07IGkrKykgaWYgKCFzdHJjbXAodyxrd1tpXSkpIHJldHVybiAx
-OwogICAgcmV0dXJuIDA7Cn0KCiNkZWZpbmUgRUlTX0RFQ0xfTUFYIDIwMAp0eXBlZGVmIHN0cnVj
-dCB7IGNoYXIgbmFtZVs0MF07IGludCBsaW5lOyBjaGFyIGtpbmQ7IH0gRWlzRGVjbDsgLyoga2lu
-ZDogJ0wnIGxvY2FsLCAnRycgZ2xvYmFsICovCnN0YXRpYyBFaXNEZWNsIGVpc19kZWNsc1tFSVNf
-REVDTF9NQVhdOwpzdGF0aWMgaW50ICAgICBlaXNfZGVjbF9jb3VudCA9IDA7CgovKiBDb25qdW50
-byBkZSBub21lcyAiY29uaGVjaWRvcyIgKGRlY2xhcmFkb3Mgbm8gYXJxdWl2bzogbG9jYWxzLAog
-KiBnbG9iYWlzLCBmdW7Dp8O1ZXMsIHBhcsOibWV0cm9zLCB2YXJpw6F2ZWlzIGRlIGxvb3ApLiBV
-c2FkbyBwZWxhCiAqIGNoZWNhZ2VtIGRlICJpZGVudGlmaWNhZG9yIGRlc2NvbmhlY2lkbyBjaGFt
-YWRvIGNvbW8gZnVuw6fDo28iCiAqIG1haXMgYWJhaXhvIOKAlCBqdW50byBjb20gYSBsaXN0YSBk
-ZSBtw7NkdWxvcyBuYXRpdm9zIGhhcmRjb2RlZAogKiBlbSBlaXNfa25vd25fY29udGFpbnMoKS4g
-Ki8KI2RlZmluZSBFSVNfS05PV05fTUFYIDQwMApzdGF0aWMgY2hhciBlaXNfa25vd25bRUlTX0tO
-T1dOX01BWF1bNDBdOwpzdGF0aWMgaW50ICBlaXNfa25vd25fY291bnQgPSAwOwoKc3RhdGljIHZv
-aWQgZWlzX2tub3duX2FkZChjb25zdCBjaGFyICpuYW1lKSB7CiAgICBpZiAoIW5hbWVbMF0gfHwg
-bmFtZVswXT09J18nKSByZXR1cm47CiAgICBmb3IgKGludCBpID0gMDsgaSA8IGVpc19rbm93bl9j
-b3VudDsgaSsrKQogICAgICAgIGlmICghc3RyY21wKGVpc19rbm93bltpXSwgbmFtZSkpIHJldHVy
-bjsKICAgIGlmIChlaXNfa25vd25fY291bnQgPCBFSVNfS05PV05fTUFYKQogICAgICAgIHNucHJp
-bnRmKGVpc19rbm93bltlaXNfa25vd25fY291bnQrK10sIHNpemVvZihlaXNfa25vd25bMF0pLCAi
-JXMiLCBuYW1lKTsKfQoKLyogTGlzdGEgZGUgbcOzZHVsb3MvZnVuw6fDtWVzIG5hdGl2YXMgZG8g
-THVhIHBhZHLDo28gKyBFbGxpb3RPUy4KICogSGV1csOtc3RpY2EsIG7Do28gZXhhdXN0aXZhIGRl
-IHByb3DDs3NpdG86IMOpIG1lbGhvciBlc3NhIGxpc3RhCiAqIGRlaXhhciBwYXNzYXIgdW0gbm9t
-ZSBuYXRpdm8gcmFybyBkbyBxdWUgZ2VyYXIgYWxhcm1lIGZhbHNvCiAqIHRvZGEgaG9yYSDigJQg
-cG9yIGlzc28gYSBjaGVjYWdlbSBxdWUgdXNhIGlzdG8gw6kgc2VtcHJlICdJJwogKiAoaW5mb3Jt
-YXRpdm8pLCBudW5jYSBlcnJvLiAqLwpzdGF0aWMgaW50IGVpc19rbm93bl9jb250YWlucyhjb25z
-dCBjaGFyICpuYW1lKSB7CiAgICBzdGF0aWMgY29uc3QgY2hhciAqYnVpbHRpbnNbXSA9IHsKICAg
-ICAgICAvKiBMdWEgcGFkcsOjbyAqLwogICAgICAgICJwcmludCIsInBhaXJzIiwiaXBhaXJzIiwi
-bmV4dCIsInR5cGUiLCJ0b3N0cmluZyIsInRvbnVtYmVyIiwKICAgICAgICAicGNhbGwiLCJ4cGNh
-bGwiLCJlcnJvciIsImFzc2VydCIsInNlbGVjdCIsInVucGFjayIsInNldG1ldGF0YWJsZSIsCiAg
-ICAgICAgImdldG1ldGF0YWJsZSIsInJhd2dldCIsInJhd3NldCIsInJhd2VxdWFsIiwicmF3bGVu
-IiwicmVxdWlyZSIsCiAgICAgICAgImxvYWQiLCJsb2Fkc3RyaW5nIiwiZG9maWxlIiwiY29sbGVj
-dGdhcmJhZ2UiLCJfRyIsIl9WRVJTSU9OIiwiYXJnIiwKICAgICAgICAidGFibGUiLCJzdHJpbmci
-LCJtYXRoIiwib3MiLCJpbyIsImNvcm91dGluZSIsImRlYnVnIiwidXRmOCIsCiAgICAgICAgLyog
-bcOzZHVsb3MgbmF0aXZvcyBkbyBFbGxpb3RPUyAqLwogICAgICAgICJsZyIsInVpIiwibmV0Iiwi
-ZnMiLCJzeXMiLCJtcyIsImFpIiwibW9kIiwid2ViIiwic3RyIiwidXRpbCIsCiAgICAgICAgImRh
-dGUiLCJwYXRoIiwicmUiLCJ0cnkiLCJ0ZXN0IiwiY29sb3IiLCJqc29uIiwiY3N2IiwibG9nIiwK
-ICAgICAgICAiUXVldWUiLCJTdGFjayIsIml2YXIiLCJiYWNrIiwibWFpbiIsCiAgICAgICAgTlVM
-TAogICAgfTsKICAgIGZvciAoaW50IGkgPSAwOyBidWlsdGluc1tpXTsgaSsrKSBpZiAoIXN0cmNt
-cChidWlsdGluc1tpXSwgbmFtZSkpIHJldHVybiAxOwogICAgZm9yIChpbnQgaSA9IDA7IGkgPCBl
-aXNfa25vd25fY291bnQ7IGkrKykgaWYgKCFzdHJjbXAoZWlzX2tub3duW2ldLCBuYW1lKSkgcmV0
-dXJuIDE7CiAgICByZXR1cm4gMDsKfQoKLyogUGFzc2FnZW0gw7puaWNhIHNvYnJlIG8gYXJxdWl2
-bzogZXh0cmFpIGRlY2xhcmHDp8O1ZXMgYGxvY2FsYCBlCiAqIHJvZGEgYXMgaGV1csOtc3RpY2Fz
-IGRlICJhdHJpYnVpw6fDo28gZW5jYWRlYWRhIiBlICJleHByZXNzw6NvCiAqIHNlbSBlZmVpdG8i
-IGxpbmhhIGEgbGluaGEuICovCnN0YXRpYyB2b2lkIGNoZWNrX3J1bl9sdWFfcGFzczEodm9pZCkg
-ewogICAgZWlzX2RlY2xfY291bnQgPSAwOwogICAgZWlzX2tub3duX2NvdW50ID0gMDsKICAgIGlu
-dCBibG9ja19raW5kID0gMDsKCiAgICBmb3IgKGludCB5ID0gMDsgeSA8IEUubnVtcm93czsgeSsr
-KSB7CiAgICAgICAgY2hhciBjb2RlWzMyMF07CiAgICAgICAgZWlzX3N0cmlwX2x1YV9saW5lKCZF
-LnJvd1t5XSwgY29kZSwgc2l6ZW9mKGNvZGUpLCAmYmxvY2tfa2luZCk7CiAgICAgICAgZWlzX3Ry
-aW0oY29kZSk7CiAgICAgICAgaWYgKCFjb2RlWzBdKSBjb250aW51ZTsKCiAgICAgICAgLyog4pSA
-4pSAIGV4dHJhaSBgbG9jYWwgTkFNRSBbLCBOQU1FMi4uLl0gWz0gLi4uXWAg4pSA4pSAICovCiAg
-ICAgICAgaWYgKCFzdHJuY21wKGNvZGUsICJsb2NhbCAiLCA2KSB8fCAhc3RyY21wKGNvZGUsICJs
-b2NhbCIpKSB7CiAgICAgICAgICAgIGludCBwID0gNTsKICAgICAgICAgICAgd2hpbGUgKGNvZGVb
-cF09PScgJykgcCsrOwogICAgICAgICAgICAvKiBgbG9jYWwgZnVuY3Rpb24gTk9NRWAg4oCUIG7D
-o28gw6kgbyBhbHZvIGRlc3RhIGNoZWNhZ2VtCiAgICAgICAgICAgICAgIChmdW7Dp8O1ZXMgcmFy
-YW1lbnRlICJuw6NvLXVzYWRhcyIgcG9yIGVuZ2FubyBkYSBtZXNtYQogICAgICAgICAgICAgICBm
-b3JtYSBxdWUgdmFyacOhdmVpcywgZSAnKCcgbG9nbyBkZXBvaXMgY29tcGxpY2FyaWEKICAgICAg
-ICAgICAgICAgYSBoZXVyw61zdGljYSksIGVudMOjbyBwdWxhLiAqLwogICAgICAgICAgICBpZiAo
-c3RybmNtcChjb2RlK3AsICJmdW5jdGlvbiIsIDgpICE9IDAgfHwgZWlzX2lzX2lkZW50X2NoYXIo
-Y29kZVtwKzhdKSkgewogICAgICAgICAgICAgICAgd2hpbGUgKDEpIHsKICAgICAgICAgICAgICAg
-ICAgICBjaGFyIG5hbWVbNDBdOwogICAgICAgICAgICAgICAgICAgIGlmICghZWlzX3JlYWRfaWRl
-bnQoY29kZSwgJnAsIG5hbWUsIHNpemVvZihuYW1lKSkpIGJyZWFrOwogICAgICAgICAgICAgICAg
-ICAgIHdoaWxlIChjb2RlW3BdPT0nICcpIHArKzsKICAgICAgICAgICAgICAgICAgICAvKiBhdHJp
-YnV0byA8Y29uc3Q+LzxjbG9zZT4gZG8gTHVhIDUuNCDigJQgcHVsYSAqLwogICAgICAgICAgICAg
-ICAgICAgIGlmIChjb2RlW3BdPT0nPCcpIHsKICAgICAgICAgICAgICAgICAgICAgICAgd2hpbGUg
-KGNvZGVbcF0gJiYgY29kZVtwXSE9Jz4nKSBwKys7CiAgICAgICAgICAgICAgICAgICAgICAgIGlm
-IChjb2RlW3BdPT0nPicpIHArKzsKICAgICAgICAgICAgICAgICAgICAgICAgd2hpbGUgKGNvZGVb
-cF09PScgJykgcCsrOwogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBl
-aXNfa25vd25fYWRkKG5hbWUpOwogICAgICAgICAgICAgICAgICAgIGlmIChuYW1lWzBdIT0nXycg
-JiYgZWlzX2RlY2xfY291bnQgPCBFSVNfREVDTF9NQVgpIHsKICAgICAgICAgICAgICAgICAgICAg
-ICAgRWlzRGVjbCAqZCA9ICZlaXNfZGVjbHNbZWlzX2RlY2xfY291bnQrK107CiAgICAgICAgICAg
-ICAgICAgICAgICAgIHNucHJpbnRmKGQtPm5hbWUsIHNpemVvZihkLT5uYW1lKSwgIiVzIiwgbmFt
-ZSk7CiAgICAgICAgICAgICAgICAgICAgICAgIGQtPmxpbmUgPSB5KzE7CiAgICAgICAgICAgICAg
-ICAgICAgICAgIGQtPmtpbmQgPSAnTCc7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAg
-ICAgICAgICAgIGlmIChjb2RlW3BdPT0nLCcpIHsgcCsrOyB3aGlsZSAoY29kZVtwXT09JyAnKSBw
-Kys7IGNvbnRpbnVlOyB9CiAgICAgICAgICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgICAgICAg
-ICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICAgICAgLyog4pSA4pSAIGV4dHJhaSBnbG9i
-YWlzIG5vIG7DrXZlbCBzdXBlcmlvcjogYE5PTUUgPSB2YWxvcmAgc2VtCiAgICAgICAgICAgJ2xv
-Y2FsJyBuYSBmcmVudGUgZSBzZW0gaW5kZW50YcOnw6NvIChoZXVyw61zdGljYSBkZSAiaXN0bwog
-ICAgICAgICAgIMOpIHVtYSBhdHJpYnVpw6fDo28gZGUgdG9wbywgbsOjbyBjb250ZcO6ZG8gZGUg
-ZnVuw6fDo28vYmxvY28iKS4KICAgICAgICAgICBDb252ZW7Dp8OjbyBjb211bSBlbSBzY3JpcHRz
-IEVsbGlvdE9TIChhcmdbMV0sIGZsYWdzLCBldGMKICAgICAgICAgICBlbSBNQUlVU0NVTEFTIGRp
-cmV0bywgc2VtICdsb2NhbCcpLiBGaWNhIGRlIGZvcmE6CiAgICAgICAgICAgYGEuYiA9IHhgIChj
-YW1wbyBkZSB0YWJlbGEpLCBgYVtpXSA9IHhgICjDrW5kaWNlKSwgYGEgPT0geGAKICAgICAgICAg
-ICAoY29tcGFyYcOnw6NvKSwgYGZ1bmN0aW9uIE5PTUUoLi4uKWAgKGlzc28gw6kgb3V0cmEgY29p
-c2EpLAogICAgICAgICAgIGUgcXVhbHF1ZXIgbGluaGEgaW5kZW50YWRhIChhc3N1bWUtc2UgZGVu
-dHJvIGRlIGJsb2NvKS4gKi8KICAgICAgICBlbHNlIGlmIChFLnJvd1t5XS5zaXplID4gMCAmJiBF
-LnJvd1t5XS5jaGFyc1swXSAhPSAnICcgJiYgRS5yb3dbeV0uY2hhcnNbMF0gIT0gJ1x0Jykgewog
-ICAgICAgICAgICBpbnQgcCA9IDA7CiAgICAgICAgICAgIGNoYXIgbmFtZVs0MF07CiAgICAgICAg
-ICAgIGlmIChlaXNfcmVhZF9pZGVudChjb2RlLCAmcCwgbmFtZSwgc2l6ZW9mKG5hbWUpKSAmJiAh
-ZWlzX2lzX2x1YV9rZXl3b3JkKG5hbWUpKSB7CiAgICAgICAgICAgICAgICBpbnQgcDIgPSBwOwog
-ICAgICAgICAgICAgICAgd2hpbGUgKGNvZGVbcDJdPT0nICcpIHAyKys7CiAgICAgICAgICAgICAg
-ICBpZiAoY29kZVtwMl09PSc9JyAmJiBjb2RlW3AyKzFdIT0nPScgKSB7CiAgICAgICAgICAgICAg
-ICAgICAgZWlzX2tub3duX2FkZChuYW1lKTsKICAgICAgICAgICAgICAgICAgICBpZiAobmFtZVsw
-XSE9J18nICYmIGVpc19kZWNsX2NvdW50IDwgRUlTX0RFQ0xfTUFYKSB7CiAgICAgICAgICAgICAg
-ICAgICAgICAgIEVpc0RlY2wgKmQgPSAmZWlzX2RlY2xzW2Vpc19kZWNsX2NvdW50KytdOwogICAg
-ICAgICAgICAgICAgICAgICAgICBzbnByaW50ZihkLT5uYW1lLCBzaXplb2YoZC0+bmFtZSksICIl
-cyIsIG5hbWUpOwogICAgICAgICAgICAgICAgICAgICAgICBkLT5saW5lID0geSsxOwogICAgICAg
-ICAgICAgICAgICAgICAgICBkLT5raW5kID0gJ0cnOwogICAgICAgICAgICAgICAgICAgIH0KICAg
-ICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgLyog4pSA4pSA
-IGV4dHJhaSBgZnVuY3Rpb24gTk9NRSguLi4pYCwgYGxvY2FsIGZ1bmN0aW9uIE5PTUUoLi4uKWAs
-CiAgICAgICAgICAgYGZ1bmN0aW9uIG9iai5ub21lKC4uLilgIC8gYGZ1bmN0aW9uIG9iajpub21l
-KC4uLilgLCBlIG9zCiAgICAgICAgICAgcGFyw6JtZXRyb3Mg4oCUIHR1ZG8gdmlyYSBzw61tYm9s
-byAiY29uaGVjaWRvIiAobsOjbyBlbnRyYSBuYQogICAgICAgICAgIGNoZWNhZ2VtIGRlIG7Do28t
-dXNhZGE7IHPDsyBldml0YSBmYWxzbyBwb3NpdGl2byBuYSBjaGVjYWdlbQogICAgICAgICAgIGRl
-ICJpZGVudGlmaWNhZG9yIGRlc2NvbmhlY2lkbyIgbG9nbyBtYWlzIGFiYWl4bykuIOKUgOKUgCAq
-LwogICAgICAgIHsKICAgICAgICAgICAgaW50IGZwID0gLTE7CiAgICAgICAgICAgIGlmICghc3Ry
-bmNtcChjb2RlLCAiZnVuY3Rpb24gIiwgOSkpIGZwID0gOTsKICAgICAgICAgICAgZWxzZSBpZiAo
-IXN0cm5jbXAoY29kZSwgImxvY2FsIGZ1bmN0aW9uICIsIDE1KSkgZnAgPSAxNTsKICAgICAgICAg
-ICAgaWYgKGZwID49IDApIHsKICAgICAgICAgICAgICAgIHdoaWxlIChjb2RlW2ZwXT09JyAnKSBm
-cCsrOwogICAgICAgICAgICAgICAgY2hhciBmbmFtZVs0MF07CiAgICAgICAgICAgICAgICBpZiAo
-ZWlzX3JlYWRfaWRlbnQoY29kZSwgJmZwLCBmbmFtZSwgc2l6ZW9mKGZuYW1lKSkpIHsKICAgICAg
-ICAgICAgICAgICAgICBlaXNfa25vd25fYWRkKGZuYW1lKTsKICAgICAgICAgICAgICAgICAgICAv
-KiBvYmoubm9tZSAvIG9iajpub21lIOKAlCBvIG9iaiBqw6EgZm9pIHJlZ2lzdHJhZG8KICAgICAg
-ICAgICAgICAgICAgICAgICBhY2ltYTsgbyBub21lIGRvIG3DqXRvZG8gbsOjbyBwcmVjaXNhIHZp
-cmFyCiAgICAgICAgICAgICAgICAgICAgICAgc8OtbWJvbG8gw6AgcGFydGUgKG51bmNhIMOpIGNo
-YW1hZG8gc296aW5obykgKi8KICAgICAgICAgICAgICAgICAgICB3aGlsZSAoY29kZVtmcF09PScu
-JyB8fCBjb2RlW2ZwXT09JzonKSB7CiAgICAgICAgICAgICAgICAgICAgICAgIGZwKys7CiAgICAg
-ICAgICAgICAgICAgICAgICAgIGNoYXIgc3ViWzQwXTsKICAgICAgICAgICAgICAgICAgICAgICAg
-aWYgKCFlaXNfcmVhZF9pZGVudChjb2RlLCAmZnAsIHN1Yiwgc2l6ZW9mKHN1YikpKSBicmVhazsK
-ICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgd2hpbGUgKGNvZGVbZnBd
-PT0nICcpIGZwKys7CiAgICAgICAgICAgICAgICAgICAgaWYgKGNvZGVbZnBdPT0nKCcpIHsKICAg
-ICAgICAgICAgICAgICAgICAgICAgZnArKzsKICAgICAgICAgICAgICAgICAgICAgICAgd2hpbGUg
-KGNvZGVbZnBdICYmIGNvZGVbZnBdIT0nKScpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAg
-IHdoaWxlIChjb2RlW2ZwXT09JyAnfHxjb2RlW2ZwXT09JywnKSBmcCsrOwogICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgY2hhciBwbmFtZVs0MF07CiAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICBpZiAoZWlzX3JlYWRfaWRlbnQoY29kZSwgJmZwLCBwbmFtZSwgc2l6ZW9mKHBuYW1lKSkpIHsK
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBlaXNfa25vd25fYWRkKHBuYW1lKTsKICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgIH0gZWxzZSBicmVhazsKICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgIHdoaWxlIChjb2RlW2ZwXT09JyAnKSBmcCsrOwogICAgICAgICAgICAgICAgICAg
-ICAgICB9CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAg
-ICB9CiAgICAgICAgfQoKICAgICAgICAvKiDilIDilIAgZXh0cmFpIHZhcmnDoXZlaXMgZGUgbG9v
-cDogYGZvciBOT01FWyxOT01FMl0gaW4gLi4uYCBlCiAgICAgICAgICAgYGZvciBOT01FID0gYSxi
-WyxjXSBkb2Ag4pSA4pSAICovCiAgICAgICAgaWYgKCFzdHJuY21wKGNvZGUsICJmb3IgIiwgNCkp
-IHsKICAgICAgICAgICAgaW50IHAgPSA0OwogICAgICAgICAgICB3aGlsZSAoY29kZVtwXT09JyAn
-KSBwKys7CiAgICAgICAgICAgIHdoaWxlICgxKSB7CiAgICAgICAgICAgICAgICBjaGFyIG5hbWVb
-NDBdOwogICAgICAgICAgICAgICAgaWYgKCFlaXNfcmVhZF9pZGVudChjb2RlLCAmcCwgbmFtZSwg
-c2l6ZW9mKG5hbWUpKSkgYnJlYWs7CiAgICAgICAgICAgICAgICBlaXNfa25vd25fYWRkKG5hbWUp
-OwogICAgICAgICAgICAgICAgd2hpbGUgKGNvZGVbcF09PScgJykgcCsrOwogICAgICAgICAgICAg
-ICAgaWYgKGNvZGVbcF09PScsJykgeyBwKys7IHdoaWxlIChjb2RlW3BdPT0nICcpIHArKzsgY29u
-dGludWU7IH0KICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICB9CiAgICAgICAgfQoK
-ICAgICAgICAvKiDilIDilIAgYXRyaWJ1acOnw6NvIGVuY2FkZWFkYTogSURFTlQgPSBJREVOVCA9
-IC4uLiDilIDilIAgKi8KICAgICAgICB7CiAgICAgICAgICAgIGludCBwID0gMDsKICAgICAgICAg
-ICAgY2hhciBsaHNbNDBdOwogICAgICAgICAgICBpZiAoZWlzX3JlYWRfaWRlbnQoY29kZSwgJnAs
-IGxocywgc2l6ZW9mKGxocykpICYmICFlaXNfaXNfbHVhX2tleXdvcmQobGhzKSkgewogICAgICAg
-ICAgICAgICAgd2hpbGUgKGNvZGVbcF09PScgJykgcCsrOwogICAgICAgICAgICAgICAgaWYgKGNv
-ZGVbcF09PSc9JyAmJiBjb2RlW3ArMV0hPSc9JykgewogICAgICAgICAgICAgICAgICAgIHArKzsg
-d2hpbGUgKGNvZGVbcF09PScgJykgcCsrOwogICAgICAgICAgICAgICAgICAgIGNoYXIgbWlkWzQw
-XTsKICAgICAgICAgICAgICAgICAgICBpbnQgcDIgPSBwOwogICAgICAgICAgICAgICAgICAgIGlm
-IChlaXNfcmVhZF9pZGVudChjb2RlLCAmcDIsIG1pZCwgc2l6ZW9mKG1pZCkpICYmICFlaXNfaXNf
-bHVhX2tleXdvcmQobWlkKSkgewogICAgICAgICAgICAgICAgICAgICAgICBpbnQgcDMgPSBwMjsK
-ICAgICAgICAgICAgICAgICAgICAgICAgd2hpbGUgKGNvZGVbcDNdPT0nICcpIHAzKys7CiAgICAg
-ICAgICAgICAgICAgICAgICAgIGlmIChjb2RlW3AzXT09Jz0nICYmIGNvZGVbcDMrMV0hPSc9Jykg
-ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgZWlzc3VlX2FkZCh5KzEsICdFJywKICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAiYXRyaWJ1acOnw6NvIGVuY2FkZWFkYSAnJXMgPSAl
-cyA9IC4uLicgbsOjbyDDqSB2w6FsaWRhIGVtIEx1YSDigJQgdm9jw6ogcXVpcyBkaXplciAnJXMg
-PSAuLi4nPyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgbGhzLCBtaWQsIGxocyk7
-CiAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAg
-ICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CgogICAgICAgIC8qIOKUgOKUgCBleHBy
-ZXNzw6NvIHNvbHRhIHNlbSBlZmVpdG86IElERU5UIChvcCBJREVOVHxOVU0pKyAsIHNlbSAnPScg
-4pSA4pSAICovCiAgICAgICAgaWYgKCFzdHJjaHIoY29kZSwgJz0nKSkgewogICAgICAgICAgICBp
-bnQgcCA9IDA7CiAgICAgICAgICAgIGNoYXIgdG9rWzQwXTsKICAgICAgICAgICAgaW50IG9rID0g
-MDsKICAgICAgICAgICAgaW50IGNvbnN1bWVkX29wID0gMDsKCiAgICAgICAgICAgIGlmIChlaXNf
-cmVhZF9pZGVudChjb2RlLCAmcCwgdG9rLCBzaXplb2YodG9rKSkpIHsKICAgICAgICAgICAgICAg
-IG9rID0gIWVpc19pc19sdWFfa2V5d29yZCh0b2spOwogICAgICAgICAgICB9IGVsc2UgaWYgKGlz
-ZGlnaXQoKHVuc2lnbmVkIGNoYXIpY29kZVtwXSkpIHsKICAgICAgICAgICAgICAgIHdoaWxlIChp
-c2RpZ2l0KCh1bnNpZ25lZCBjaGFyKWNvZGVbcF0pIHx8IGNvZGVbcF09PScuJykgcCsrOwogICAg
-ICAgICAgICAgICAgb2sgPSAxOwogICAgICAgICAgICB9CgogICAgICAgICAgICBpZiAob2spIHsK
-ICAgICAgICAgICAgICAgIHdoaWxlIChjb2RlW3BdPT0nICcpIHArKzsKICAgICAgICAgICAgICAg
-IC8qIHNlIGxvZ28gZGVwb2lzIGRvIDHCuiB0b2tlbiB2ZW0gJygnIG91ICcuJyBvdSAnOicgb3Ug
-J1snCiAgICAgICAgICAgICAgICAgICDDqSBjaGFtYWRhL2luZGV4YcOnw6NvIOKAlCBuw6NvIMOp
-IG8gcGFkcsOjbyBxdWUgcHJvY3VyYW1vcyAqLwogICAgICAgICAgICAgICAgaWYgKGNvZGVbcF09
-PScoJyB8fCBjb2RlW3BdPT0nLicgfHwgY29kZVtwXT09JzonIHx8IGNvZGVbcF09PSdbJykgewog
-ICAgICAgICAgICAgICAgICAgIG9rID0gMDsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAg
-fQoKICAgICAgICAgICAgd2hpbGUgKG9rICYmIGNvZGVbcF0pIHsKICAgICAgICAgICAgICAgIHdo
-aWxlIChjb2RlW3BdPT0nICcpIHArKzsKICAgICAgICAgICAgICAgIGlmICghY29kZVtwXSkgYnJl
-YWs7CiAgICAgICAgICAgICAgICBpbnQgaXNfb3AgPSAwOwogICAgICAgICAgICAgICAgaWYgKGNv
-ZGVbcF09PScrJ3x8Y29kZVtwXT09JyonfHxjb2RlW3BdPT0nLyd8fGNvZGVbcF09PSclJykgeyBw
-Kys7IGlzX29wPTE7IH0KICAgICAgICAgICAgICAgIGVsc2UgaWYgKGNvZGVbcF09PSctJyAmJiBj
-b2RlW3ArMV0hPSctJykgeyBwKys7IGlzX29wPTE7IH0KICAgICAgICAgICAgICAgIGVsc2UgaWYg
-KGNvZGVbcF09PScuJyAmJiBjb2RlW3ArMV09PScuJykgeyBwKz0yOyBpc19vcD0xOyB9CiAgICAg
-ICAgICAgICAgICBpZiAoIWlzX29wKSB7IG9rID0gMDsgYnJlYWs7IH0KICAgICAgICAgICAgICAg
-IGNvbnN1bWVkX29wID0gMTsKICAgICAgICAgICAgICAgIHdoaWxlIChjb2RlW3BdPT0nICcpIHAr
-KzsKICAgICAgICAgICAgICAgIGNoYXIgdG9rMls0MF07CiAgICAgICAgICAgICAgICBpZiAoZWlz
-X3JlYWRfaWRlbnQoY29kZSwgJnAsIHRvazIsIHNpemVvZih0b2syKSkpIHsKICAgICAgICAgICAg
-ICAgICAgICBpZiAoZWlzX2lzX2x1YV9rZXl3b3JkKHRvazIpKSB7IG9rID0gMDsgYnJlYWs7IH0K
-ICAgICAgICAgICAgICAgIH0gZWxzZSBpZiAoaXNkaWdpdCgodW5zaWduZWQgY2hhciljb2RlW3Bd
-KSB8fCBjb2RlW3BdPT0nIicgfHwgY29kZVtwXT09J1wnJykgewogICAgICAgICAgICAgICAgICAg
-IGlmIChjb2RlW3BdPT0nIid8fGNvZGVbcF09PSdcJycpIHsgb2sgPSAwOyBicmVhazsgfSAvKiBz
-dHJpbmcgasOhIGZvaSB6ZXJhZGEsIHNpbmFsIGRlIGFsZ28gZXN0cmFuaG8gKi8KICAgICAgICAg
-ICAgICAgICAgICB3aGlsZSAoaXNkaWdpdCgodW5zaWduZWQgY2hhciljb2RlW3BdKSB8fCBjb2Rl
-W3BdPT0nLicpIHArKzsKICAgICAgICAgICAgICAgIH0gZWxzZSB7IG9rID0gMDsgYnJlYWs7IH0K
-ICAgICAgICAgICAgICAgIHdoaWxlIChjb2RlW3BdPT0nICcpIHArKzsKICAgICAgICAgICAgICAg
-IGlmIChjb2RlW3BdPT0nKCcgfHwgY29kZVtwXT09Jy4nIHx8IGNvZGVbcF09PSc6JyB8fCBjb2Rl
-W3BdPT0nWycpIHsgb2sgPSAwOyBicmVhazsgfQogICAgICAgICAgICB9CgogICAgICAgICAgICBp
-ZiAob2sgJiYgY29uc3VtZWRfb3AgJiYgIWNvZGVbcF0pIHsKICAgICAgICAgICAgICAgIGVpc3N1
-ZV9hZGQoeSsxLCAnVycsCiAgICAgICAgICAgICAgICAgICAgImV4cHJlc3PDo28gJyVzJyBzZW0g
-YXRyaWJ1acOnw6NvIG5lbSBjaGFtYWRhIOKAlCBMdWEgbsOjbyBleGVjdXRhIGlzc287IGZhbHRv
-dSB1bSAnPSc/IiwKICAgICAgICAgICAgICAgICAgICBjb2RlKTsKICAgICAgICAgICAgfQogICAg
-ICAgIH0KICAgIH0KfQoKLyogU2VndW5kYSBwYXNzYWdlbTogcHJhIGNhZGEgZGVjbGFyYcOnw6Nv
-IGNvbGV0YWRhIChsb2NhbCBvdQogKiBnbG9iYWwgZGUgdG9wbyksIHByb2N1cmEgdXNvIGVtIHF1
-YWxxdWVyIG91dHJhIGxpbmhhIGRvCiAqIGFycXVpdm8gKGNvbXBhcmHDp8OjbyBzaW1wbGVzIGRl
-IHBhbGF2cmEgaW50ZWlyYSkuIFNlIG7Do28gYWNoYXIKICogZW0gbmVuaHVtIGx1Z2FyLCDDqSAi
-bsOjbyB1c2FkYSIuIExvY2FpcyB0w6ptIG1haXMgY29uZmlhbsOnYSAoc8OzCiAqIHBvZGVtIHNl
-ciB1c2FkYXMgbmVzdGUgYXJxdWl2byBtZXNtbyk7IGdsb2JhaXMgdMOqbSBtZW5vcyAodW0KICog
-b3V0cm8gc2NyaXB0IHBvZGUgZGFyIGByZXF1aXJlYCBuaXN0byksIHBvciBpc3NvIHNldmVyaWRh
-ZGVzCiAqIGRpZmVyZW50ZXMuIExpbWl0YWRvIHBvciBFSVNfREVDTF9NQVggZGVjbGFyYcOnw7Vl
-cyDDlyBFLm51bXJvd3MKICogbGluaGFzIOKAlCBzZW1wcmUgYm91bmRlZCwgc2VtcHJlIHRlcm1p
-bmEuICovCnN0YXRpYyB2b2lkIGNoZWNrX3J1bl9sdWFfdW51c2VkKHZvaWQpIHsKICAgIC8qIFNl
-IG8gYXJxdWl2byB1c2Egc2ludGF4ZSBJdmFyICghMSAvICEhMiAvIGV0Yy4pLCBhcyB2YXJpw6F2
-ZWlzCiAgICAgKiBnbG9iYWlzIGRlIHRvcG8gZ2VyYWxtZW50ZSBzw6NvIG1hcGVhZGFzIHBhcmEg
-aXZhcnMgZSBhY2Vzc2FkYXMKICAgICAqIHZpYSAhTiAvICEhTiDigJQgaW1wb3Nzw612ZWwgcmFz
-dHJlYXIgdXNvIHBvciBub21lIG5lc3NlIGNhc28uCiAgICAgKiBQdWxhIG8gYXZpc28gZGUgImds
-b2JhbCBuw6NvIGxpZGEiIHBhcmEgbsOjbyBnZXJhciBmYWxzb3MgcG9zaXRpdm9zLiAqLwogICAg
-aW50IGhhc19pdmFyID0gMDsKICAgIGZvciAoaW50IHkgPSAwOyB5IDwgRS5udW1yb3dzICYmICFo
-YXNfaXZhcjsgeSsrKSB7CiAgICAgICAgY29uc3QgY2hhciAqcCA9IEUucm93W3ldLmNoYXJzOwog
-ICAgICAgIHdoaWxlICgqcCkgewogICAgICAgICAgICBpZiAoKnAgPT0gJyEnICYmICgqKHArMSkg
-PT0gJyEnIHx8ICgqKHArMSkgPj0gJzEnICYmICoocCsxKSA8PSAnOScpKSkgewogICAgICAgICAg
-ICAgICAgaGFzX2l2YXIgPSAxOwogICAgICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgICAgIH0K
-ICAgICAgICAgICAgcCsrOwogICAgICAgIH0KICAgIH0KCiAgICBmb3IgKGludCBpID0gMDsgaSA8
-IGVpc19kZWNsX2NvdW50OyBpKyspIHsKICAgICAgICBjb25zdCBjaGFyICpuYW1lID0gZWlzX2Rl
-Y2xzW2ldLm5hbWU7CiAgICAgICAgaW50IHVzZWQgPSAwOwogICAgICAgIGZvciAoaW50IHkgPSAw
-OyB5IDwgRS5udW1yb3dzICYmICF1c2VkOyB5KyspIHsKICAgICAgICAgICAgaWYgKHkrMSA9PSBl
-aXNfZGVjbHNbaV0ubGluZSkgewogICAgICAgICAgICAgICAgLyogbmEgcHLDs3ByaWEgbGluaGEg
-ZGUgZGVjbGFyYcOnw6NvLCBzw7MgY29udGEgdXNvIHNlIG8KICAgICAgICAgICAgICAgICAgIG5v
-bWUgYXBhcmVjZXIgTUFJUyBkZSB1bWEgdmV6IChleDogYGxvY2FsIHggPSB4ICsgMWAKICAgICAg
-ICAgICAgICAgICAgIOKAlCBpbmNvbXVtLCBtYXMgc2UgYWNvbnRlY2VyIG8gYHhgIGRvIGxhZG8g
-ZGlyZWl0bwogICAgICAgICAgICAgICAgICAgasOhIMOpICJ1c28iKS4gU2ltcGxpZmljYTogY29u
-dGEgb2NvcnLDqm5jaWFzLiAqLwogICAgICAgICAgICAgICAgaW50IGNvdW50ID0gMDsKICAgICAg
-ICAgICAgICAgIGNvbnN0IGNoYXIgKnAgPSBFLnJvd1t5XS5jaGFyczsKICAgICAgICAgICAgICAg
-IHdoaWxlICgocCA9IHN0cnN0cihwLCBuYW1lKSkgIT0gTlVMTCkgewogICAgICAgICAgICAgICAg
-ICAgIGludCBwcmUgPSAocCA9PSBFLnJvd1t5XS5jaGFycyB8fCAhZWlzX2lzX2lkZW50X2NoYXIo
-cFstMV0pKTsKICAgICAgICAgICAgICAgICAgICBpbnQgcG9zID0gIWVpc19pc19pZGVudF9jaGFy
-KHBbKGludClzdHJsZW4obmFtZSldKTsKICAgICAgICAgICAgICAgICAgICBpZiAocHJlICYmIHBv
-cykgY291bnQrKzsKICAgICAgICAgICAgICAgICAgICBwKys7CiAgICAgICAgICAgICAgICB9CiAg
-ICAgICAgICAgICAgICBpZiAoY291bnQgPiAxKSB1c2VkID0gMTsKICAgICAgICAgICAgICAgIGNv
-bnRpbnVlOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGlmIChoYXNfd29yZChFLnJvd1t5XS5j
-aGFycywgbmFtZSkpIHVzZWQgPSAxOwogICAgICAgIH0KICAgICAgICBpZiAoIXVzZWQpIHsKICAg
-ICAgICAgICAgaWYgKGVpc19kZWNsc1tpXS5raW5kID09ICdMJykgewogICAgICAgICAgICAgICAg
-ZWlzc3VlX2FkZChlaXNfZGVjbHNbaV0ubGluZSwgJ1cnLAogICAgICAgICAgICAgICAgICAgICJ2
-YXJpw6F2ZWwgbG9jYWwgJyVzJyDDqSBkZWNsYXJhZGEgbWFzIG51bmNhIHVzYWRhIiwgbmFtZSk7
-CiAgICAgICAgICAgIH0gZWxzZSBpZiAoIWhhc19pdmFyKSB7CiAgICAgICAgICAgICAgICAvKiBT
-w7MgYXZpc2Egc29icmUgZ2xvYmFpcyBuw6NvLWxpZGFzIHNlIG8gYXJxdWl2byBOw4NPIHVzYQog
-ICAgICAgICAgICAgICAgICogc2ludGF4ZSBJdmFyIOKAlCBjYXNvIGNvbnRyw6FyaW8gbyBhY2Vz
-c28gw6kgdmlhICFOLyEhTgogICAgICAgICAgICAgICAgICogZSBuw6NvIGFwYXJlY2UgY29tbyBv
-IG5vbWUgZGEgdmFyacOhdmVsIG5vIGPDs2RpZ28uICovCiAgICAgICAgICAgICAgICBlaXNzdWVf
-YWRkKGVpc19kZWNsc1tpXS5saW5lLCAnSScsCiAgICAgICAgICAgICAgICAgICAgIiclcycgw6kg
-YXRyaWJ1w61kYSBtYXMgbsOjbyBwYXJlY2Ugc2VyIGxpZGEgbmVzdGUgYXJxdWl2byAoZ2xvYmFs
-IOKAlCBjb25maXJhIHNlIG91dHJvIHNjcmlwdCB1c2EpIiwgbmFtZSk7CiAgICAgICAgICAgIH0K
-ICAgICAgICB9CiAgICB9Cn0KCi8qIOKUgOKUgCBDaGFtYWRhIGEgaWRlbnRpZmljYWRvciBkZXNj
-b25oZWNpZG8g4pSA4pSACiAqIFByb2N1cmEgcGFkcsO1ZXMgIklERU5UKCIgb3UgIklERU5ULmNh
-bXBvKCIgb3UgIklERU5UOm1ldG9kbygiCiAqIG9uZGUgSURFTlQgKGEgcmFpeiBkYSBjYWRlaWEp
-IG7Do28gw6k6IHVtYSBwYWxhdnJhLWNoYXZlLCB1bQogKiBtw7NkdWxvIG5hdGl2byBjb25oZWNp
-ZG8gKGVpc19rbm93bl9jb250YWlucyDigJQgTHVhIHBhZHLDo28gKwogKiBFbGxpb3RPUyksIG5l
-bSBhbGdvIGRlY2xhcmFkbyBuZXN0ZSBhcnF1aXZvIChsb2NhbCwgZ2xvYmFsLAogKiBmdW7Dp8Oj
-bywgcGFyw6JtZXRybywgdmFyacOhdmVsIGRlIGxvb3Ag4oCUIHR1ZG8gY29sZXRhZG8gbmEKICog
-cGFzc2FnZW0gYW50ZXJpb3IpLiDDiSB1bWEgaGV1csOtc3RpY2EgZGUgdGV4dG8sIG7Do28gc2Fi
-ZSB0dWRvCiAqIHF1ZSBleGlzdGUgKHBvciBpc3NvIMOpIHNlbXByZSAnSScsIG51bmNhIGVycm8p
-IOKAlCBtYXMgcGVnYQogKiBleGF0YW1lbnRlIG8gY2FzbyBkZSAiZGlnaXRlaSB1bSBub21lIGRl
-IGZ1bsOnw6NvIHF1ZSBuw6NvIGV4aXN0ZSIuCiAqIENhZGEgcmFpeiBzw7Mgw6kgcmVwb3J0YWRh
-IHVtYSB2ZXogcG9yIGFycXVpdm8gKGV2aXRhIHJlcGV0aXIgYQogKiBtZXNtYSBtZW5zYWdlbSBz
-ZSBvIGVycm8gZGUgZGlnaXRhw6fDo28gYXBhcmVjZSB2w6FyaWFzIHZlemVzKS4gKi8KI2RlZmlu
-ZSBFSVNfRkxBR0dFRF9NQVggMTAwCnN0YXRpYyB2b2lkIGNoZWNrX3J1bl9sdWFfdW5kZWZpbmVk
-X2NhbGxzKHZvaWQpIHsKICAgIHN0YXRpYyBjaGFyIGZsYWdnZWRbRUlTX0ZMQUdHRURfTUFYXVs0
-MF07CiAgICBpbnQgZmxhZ2dlZF9jb3VudCA9IDA7CiAgICBpbnQgYmxvY2tfa2luZCA9IDA7Cgog
-ICAgZm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIGNoYXIgY29k
-ZVszMjBdOwogICAgICAgIGVpc19zdHJpcF9sdWFfbGluZSgmRS5yb3dbeV0sIGNvZGUsIHNpemVv
-Zihjb2RlKSwgJmJsb2NrX2tpbmQpOwogICAgICAgIHsKICAgICAgICAgICAgY2hhciB0cmltbWVk
-WzMyMF07IHNucHJpbnRmKHRyaW1tZWQsc2l6ZW9mKHRyaW1tZWQpLCIlcyIsY29kZSk7CiAgICAg
-ICAgICAgIGVpc190cmltKHRyaW1tZWQpOwogICAgICAgICAgICBpZiAoIXN0cm5jbXAodHJpbW1l
-ZCwgImZ1bmN0aW9uICIsIDkpIHx8ICFzdHJuY21wKHRyaW1tZWQsICJsb2NhbCBmdW5jdGlvbiAi
-LCAxNSkpCiAgICAgICAgICAgICAgICBjb250aW51ZTsgLyogbGluaGEgZGUgZGVmaW5pw6fDo28s
-IG7Do28gZGUgY2hhbWFkYSAqLwogICAgICAgIH0KCiAgICAgICAgaW50IHAgPSAwOwogICAgICAg
-IHdoaWxlIChjb2RlW3BdKSB7CiAgICAgICAgICAgIGlmICghZWlzX2lzX2lkZW50X3N0YXJ0KGNv
-ZGVbcF0pKSB7IHArKzsgY29udGludWU7IH0KCiAgICAgICAgICAgIGludCBzdGFydCA9IHA7CiAg
-ICAgICAgICAgIGNoYXIgcm9vdFs0MF07CiAgICAgICAgICAgIGVpc19yZWFkX2lkZW50KGNvZGUs
-ICZwLCByb290LCBzaXplb2Yocm9vdCkpOwoKICAgICAgICAgICAgLyogc2UgdmllciBsb2dvIGFu
-dGVzIHVtICcuJyBvdSAnOicsIGlzdG8gbsOjbyDDqSBhIHJhaXogZGEKICAgICAgICAgICAgICAg
-Y2FkZWlhICjDqSB1bSBjYW1wby9tw6l0b2RvIG5vIG1laW8pIOKAlCBuw6NvIMOpIGNhbmRpZGF0
-byAqLwogICAgICAgICAgICBpZiAoc3RhcnQgPiAwICYmIChjb2RlW3N0YXJ0LTFdPT0nLicgfHwg
-Y29kZVtzdGFydC0xXT09JzonKSkgY29udGludWU7CgogICAgICAgICAgICBpbnQgcSA9IHA7CiAg
-ICAgICAgICAgIHdoaWxlIChjb2RlW3FdPT0nLicgfHwgY29kZVtxXT09JzonKSB7CiAgICAgICAg
-ICAgICAgICBxKys7CiAgICAgICAgICAgICAgICBjaGFyIHN1Yls0MF07CiAgICAgICAgICAgICAg
-ICBpZiAoIWVpc19yZWFkX2lkZW50KGNvZGUsICZxLCBzdWIsIHNpemVvZihzdWIpKSkgYnJlYWs7
-CiAgICAgICAgICAgIH0KICAgICAgICAgICAgd2hpbGUgKGNvZGVbcV09PScgJykgcSsrOwoKICAg
-ICAgICAgICAgaWYgKGNvZGVbcV0gIT0gJygnKSBjb250aW51ZTsgLyogbsOjbyDDqSB1bWEgY2hh
-bWFkYSwgc8OzIHVtIGlkZW50aWZpY2Fkb3Igc29sdG8gKi8KICAgICAgICAgICAgaWYgKGVpc19p
-c19sdWFfa2V5d29yZChyb290KSkgY29udGludWU7CiAgICAgICAgICAgIGlmIChlaXNfa25vd25f
-Y29udGFpbnMocm9vdCkpIGNvbnRpbnVlOwoKICAgICAgICAgICAgaW50IGFscmVhZHkgPSAwOwog
-ICAgICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8IGZsYWdnZWRfY291bnQ7IGkrKykKICAgICAg
-ICAgICAgICAgIGlmICghc3RyY21wKGZsYWdnZWRbaV0sIHJvb3QpKSB7IGFscmVhZHkgPSAxOyBi
-cmVhazsgfQogICAgICAgICAgICBpZiAoYWxyZWFkeSkgY29udGludWU7CiAgICAgICAgICAgIGlm
-IChmbGFnZ2VkX2NvdW50IDwgRUlTX0ZMQUdHRURfTUFYKSB7CiAgICAgICAgICAgICAgICBzbnBy
-aW50ZihmbGFnZ2VkW2ZsYWdnZWRfY291bnQrK10sIHNpemVvZihmbGFnZ2VkWzBdKSwgIiVzIiwg
-cm9vdCk7CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIGVpc3N1ZV9hZGQoeSsxLCAnSScsCiAg
-ICAgICAgICAgICAgICAiJyVzJyBuw6NvIMOpIHVtIG3Ds2R1bG8gY29uaGVjaWRvIG5lbSBmb2kg
-ZGVjbGFyYWRvIG5lc3RlIGFycXVpdm8g4oCUIG5vbWUgZGUgZnVuw6fDo28gZGlnaXRhZG8gZXJy
-YWRvPyIsCiAgICAgICAgICAgICAgICByb290KTsKICAgICAgICB9CiAgICB9Cn0KCi8qIOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAogKiBDSEVD
-QUdFTlMgRVNQRUPDjUZJQ0FTIERFIEMvQysrCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKLyog4pSA4pSAIEF0cmlidWnDp8OjbyBk
-ZW50cm8gZGUgY29uZGnDp8OjbzogaWYoeCA9IHkpIC8gd2hpbGUoeCA9IHkpIOKUgOKUgAogKiBV
-bSBkb3MgYnVncyBtYWlzIGNsw6Fzc2ljb3MgZGUgQzogJz0nIG5vIGx1Z2FyIGRlICc9PScuIFPD
-swogKiBkaXNwYXJhIHByYSBhdHJpYnVpw6fDtWVzIHNpbXBsZXMgKElERU5UID0gSURFTlQvTlVN
-KSwgcHJhIG7Do28KICogY29uZnVuZGlyIGNvbSBvIGlkaW9tYSB2w6FsaWRvIGUgY29tdW0gYHdo
-aWxlICgobiA9IHJlYWQoKSkgPiAwKWAKICogKGHDrSBvICc9JyBqw6EgdmVtIGRlbnRybyBkZSBv
-dXRybyBwYXLDqm50ZXNlIGFuaW5oYWRvKS4gKi8Kc3RhdGljIHZvaWQgY2hlY2tfcnVuX2NfYXNz
-aWduX2luX2NvbmQodm9pZCkgewogICAgaW50IGJsb2NrX2NvbW1lbnQgPSAwOwogICAgZm9yIChp
-bnQgeSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgIFJvdyAqcm93ID0gJkUucm93
-W3ldOwogICAgICAgIGludCBpbl9zdHIgPSAwOyBjaGFyIHN0cl9xID0gMDsKICAgICAgICBmb3Ig
-KGludCB4ID0gMDsgeCA8IHJvdy0+c2l6ZTsgeCsrKSB7CiAgICAgICAgICAgIGNoYXIgYyA9IHJv
-dy0+Y2hhcnNbeF07CiAgICAgICAgICAgIGNoYXIgYzIgPSAoeCsxIDwgcm93LT5zaXplKSA/IHJv
-dy0+Y2hhcnNbeCsxXSA6IDA7CgogICAgICAgICAgICBpZiAoYmxvY2tfY29tbWVudCkgewogICAg
-ICAgICAgICAgICAgaWYgKGM9PScqJyAmJiBjMj09Jy8nKSB7IGJsb2NrX2NvbW1lbnQ9MDsgeCsr
-OyB9CiAgICAgICAgICAgICAgICBjb250aW51ZTsKICAgICAgICAgICAgfQogICAgICAgICAgICBp
-ZiAoaW5fc3RyKSB7CiAgICAgICAgICAgICAgICBpZiAoYz09J1xcJyAmJiB4KzE8cm93LT5zaXpl
-KSB7IHgrKzsgY29udGludWU7IH0KICAgICAgICAgICAgICAgIGlmIChjPT1zdHJfcSkgaW5fc3Ry
-PTA7CiAgICAgICAgICAgICAgICBjb250aW51ZTsKICAgICAgICAgICAgfQogICAgICAgICAgICBp
-ZiAoYz09Jy8nICYmIGMyPT0nKicpIHsgYmxvY2tfY29tbWVudD0xOyB4Kys7IGNvbnRpbnVlOyB9
-CiAgICAgICAgICAgIGlmIChjPT0nLycgJiYgYzI9PScvJykgYnJlYWs7CiAgICAgICAgICAgIGlm
-IChjPT0nIicgfHwgYz09J1wnJykgeyBpbl9zdHI9MTsgc3RyX3E9YzsgY29udGludWU7IH0KCiAg
-ICAgICAgICAgIGlmICgoYz09J2knJiZjMj09J2YnKSB8fCAoYz09J3cnJiZjMj09J2gnKSkgewog
-ICAgICAgICAgICAgICAgaW50IGt3bGVuID0gKGM9PSdpJykgPyAyIDogNTsgLyogImlmIiBvdSAi
-d2hpbGUiICovCiAgICAgICAgICAgICAgICBpZiAoeCtrd2xlbjw9cm93LT5zaXplICYmCiAgICAg
-ICAgICAgICAgICAgICAgIXN0cm5jbXAocm93LT5jaGFycyt4LCAoYz09J2knKT8iaWYiOiJ3aGls
-ZSIsIGt3bGVuKSAmJgogICAgICAgICAgICAgICAgICAgICh4PT0wIHx8ICFlaXNfaXNfaWRlbnRf
-Y2hhcihyb3ctPmNoYXJzW3gtMV0pKSAmJgogICAgICAgICAgICAgICAgICAgICh4K2t3bGVuPj1y
-b3ctPnNpemUgfHwgIWVpc19pc19pZGVudF9jaGFyKHJvdy0+Y2hhcnNbeCtrd2xlbl0pKSkgewoK
-ICAgICAgICAgICAgICAgICAgICBpbnQgcCA9IHggKyBrd2xlbjsKICAgICAgICAgICAgICAgICAg
-ICB3aGlsZSAocDxyb3ctPnNpemUgJiYgcm93LT5jaGFyc1twXT09JyAnKSBwKys7CiAgICAgICAg
-ICAgICAgICAgICAgaWYgKHA8cm93LT5zaXplICYmIHJvdy0+Y2hhcnNbcF09PScoJykgewogICAg
-ICAgICAgICAgICAgICAgICAgICBwKys7CiAgICAgICAgICAgICAgICAgICAgICAgIC8qIHPDsyBv
-bGhhIHBybyBjb250ZcO6ZG8gaW1lZGlhdGFtZW50ZSBkZW50cm8gZG8KICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgcHJpbWVpcm8gbsOtdmVsIGRlIHBhcsOqbnRlc2VzIChzZW0gcGFyw6pudGVz
-ZXMKICAgICAgICAgICAgICAgICAgICAgICAgICAgYW5pbmhhZG9zIG5vIG1laW8pICovCiAgICAg
-ICAgICAgICAgICAgICAgICAgIGludCBkZXB0aCA9IDE7CiAgICAgICAgICAgICAgICAgICAgICAg
-IGludCBzdGFydCA9IHA7CiAgICAgICAgICAgICAgICAgICAgICAgIHdoaWxlIChwPHJvdy0+c2l6
-ZSAmJiBkZXB0aD4wKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiAocm93LT5jaGFy
-c1twXT09JygnKSBkZXB0aCsrOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgZWxzZSBpZiAo
-cm93LT5jaGFyc1twXT09JyknKSB7IGRlcHRoLS07IGlmKGRlcHRoPT0wKSBicmVhazsgfQogICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgcCsrOwogICAgICAgICAgICAgICAgICAgICAgICB9CiAg
-ICAgICAgICAgICAgICAgICAgICAgIGlmIChkZXB0aD09MCkgewogICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgLyogdmVyaWZpY2Egc2UgZGVudHJvIGRlIFtzdGFydCxwKSBleGlzdGUgdW0KICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICcoJyDigJQgc2UgZXhpc3Rpciwgw6kgYW5pbmhh
-ZG8sIGFib3J0YW1vcwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgKGV2aXRhIGZhbHNv
-IHBvc2l0aXZvIGVtIGB3aGlsZSgobj1yZWFkKCkpPjApYCkgKi8KICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgIGludCBoYXNfbmVzdGVkID0gMDsKICAgICAgICAgICAgICAgICAgICAgICAgICAg
-IGZvciAoaW50IHE9c3RhcnQ7IHE8cDsgcSsrKSBpZiAocm93LT5jaGFyc1txXT09JygnKSB7IGhh
-c19uZXN0ZWQ9MTsgYnJlYWs7IH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlmICghaGFz
-X25lc3RlZCkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8qIHByb2N1cmEgSURF
-TlQgW2VzcGHDp29dICc9JyBbZXNwYcOnb10gSURFTlQvTlVNLCBzZW0gPT0gKi8KICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICBpbnQgcSA9IHN0YXJ0OwogICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgIHdoaWxlIChxPHN0YXJ0KzQwICYmIHE8cCAmJiByb3ctPmNoYXJzW3FdPT0n
-ICcpIHErKzsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjaGFyIGxoc1s0MF07IGlu
-dCBxaT1xOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlmIChlaXNfaXNfaWRlbnRf
-c3RhcnQocm93LT5jaGFyc1txaV0pKSB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgIGludCBsaT0wOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aGlsZSAo
-cWk8cCAmJiBlaXNfaXNfaWRlbnRfY2hhcihyb3ctPmNoYXJzW3FpXSkgJiYgbGk8MzkpIGxoc1ts
-aSsrXT1yb3ctPmNoYXJzW3FpKytdOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICBsaHNbbGldPSdcMCc7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdoaWxl
-IChxaTxwICYmIHJvdy0+Y2hhcnNbcWldPT0nICcpIHFpKys7CiAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgIGlmIChxaTxwICYmIHJvdy0+Y2hhcnNbcWldPT0nPScgJiYKICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICEocWkrMTxwICYmIHJvdy0+Y2hhcnNb
-cWkrMV09PSc9JykgJiYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIChx
-aT09c3RhcnQgfHwgcm93LT5jaGFyc1txaS0xXSE9JyEnICkgJiYKICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgIChxaT09c3RhcnQgfHwgcm93LT5jaGFyc1txaS0xXSE9Jzwn
-ICkgJiYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIChxaT09c3RhcnQg
-fHwgcm93LT5jaGFyc1txaS0xXSE9Jz4nICkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgIGVpc3N1ZV9hZGQoeSsxLCAnVycsCiAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgImF0cmlidWnDp8OjbyAnJXMgPScgZGVudHJvIGRlICVzKC4u
-Likg4oCUIHZvY8OqIHF1aXMgZGl6ZXIgJz09Jz8iLAogICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgIGxocywgKGM9PSdpJyk/ImlmIjoid2hpbGUiKTsKICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICAg
-ICAgfQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAg
-fQogICAgICAgIH0KICAgIH0KfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIERFU1BBQ0hPIFBPUiBMSU5HVUFHRU0gKyBFTlRSQURB
-IChDdHJsK0UpCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkCAqLwoKc3RhdGljIHZvaWQgY2hlY2tfcnVuX2FsbCh2b2lkKSB7CiAgICBnX2Vp
-c3N1ZV9jb3VudCA9IDA7CgogICAgY2hlY2tfcnVuX2JyYWNrZXRzKCk7CiAgICBjaGVja19ydW5f
-dHJhaWxpbmcoKTsKICAgIGNoZWNrX3J1bl9saW5lX2xlbmd0aCgpOwogICAgY2hlY2tfcnVuX21p
-eGVkX2luZGVudCgpOwogICAgY2hlY2tfcnVuX21hcmtlcnMoKTsKCiAgICBpbnQgaXNfYyAgID0g
-KEUuc3ludGF4ID09ICZITERCWzBdIHx8IEUuc3ludGF4ID09ICZITERCWzFdKTsKICAgIGludCBp
-c19sdWEgPSAoRS5zeW50YXggPT0gJkhMREJbMl0pOwoKICAgIGlmIChpc19sdWEpIHsKICAgICAg
-ICBzbnByaW50ZihnX2Vpc3N1ZV9sYW5nLCBzaXplb2YoZ19laXNzdWVfbGFuZyksICJMdWEvRWxs
-aW90T1MiKTsKICAgICAgICBjaGVja19ydW5fbHVhX3Bhc3MxKCk7CiAgICAgICAgY2hlY2tfcnVu
-X2x1YV91bnVzZWQoKTsKICAgICAgICBjaGVja19ydW5fbHVhX3VuZGVmaW5lZF9jYWxscygpOwog
-ICAgfSBlbHNlIGlmIChpc19jKSB7CiAgICAgICAgc25wcmludGYoZ19laXNzdWVfbGFuZywgc2l6
-ZW9mKGdfZWlzc3VlX2xhbmcpLCAiJXMiLAogICAgICAgICAgICAgICAgIChFLnN5bnRheCA9PSAm
-SExEQlsxXSkgPyAiQysrIiA6ICJDIik7CiAgICAgICAgY2hlY2tfcnVuX2NfYXNzaWduX2luX2Nv
-bmQoKTsKICAgIH0gZWxzZSBpZiAoRS5zeW50YXggPT0gJkhMREJbM10pIHsKICAgICAgICBzbnBy
-aW50ZihnX2Vpc3N1ZV9sYW5nLCBzaXplb2YoZ19laXNzdWVfbGFuZyksICJCYXNoIik7CiAgICB9
-IGVsc2UgewogICAgICAgIHNucHJpbnRmKGdfZWlzc3VlX2xhbmcsIHNpemVvZihnX2Vpc3N1ZV9s
-YW5nKSwgIkdlbsOpcmljbyIpOwogICAgfQp9CgovKiBQdWxhIG8gY3Vyc29yIHBhcmEgYSBsaW5o
-YSBkbyBpc3N1ZSBzZWxlY2lvbmFkbywgY2VudHJhbGl6YW5kbyBhIHZpZXcgKi8Kc3RhdGljIHZv
-aWQgZWlzc3VlX2p1bXAoaW50IGlkeCkgewogICAgaWYgKGlkeCA8IDAgfHwgaWR4ID49IGdfZWlz
-c3VlX2NvdW50KSByZXR1cm47CiAgICBpbnQgbGluZSA9IGdfZWlzc3Vlc1tpZHhdLmxpbmU7CiAg
-ICBpZiAobGluZSA8IDEpIHJldHVybjsKICAgIEUuY3kgPSBsaW5lIC0gMTsKICAgIGlmIChFLmN5
-ID49IEUubnVtcm93cykgRS5jeSA9IEUubnVtcm93cyAtIDE7CiAgICBFLmN4ID0gMDsKICAgIEUu
-cm93b2ZmID0gRS5jeSAtIEUucm93cy8yOwogICAgaWYgKEUucm93b2ZmIDwgMCkgRS5yb3dvZmYg
-PSAwOwp9CgovKiBFbnRyYWRhOiBDdHJsK0UgKi8Kc3RhdGljIHZvaWQgY2hlY2tfY29kZSh2b2lk
-KSB7CiAgICBjaGVja19ydW5fYWxsKCk7CgogICAgaWYgKGdfZWlzc3VlX2NvdW50ID09IDApIHsK
-ICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMybeKckyBuZW5odW0gcHJvYmxlbWEgZW5jb250cmFk
-byAoJXMpXHgxYlttIiwgZ19laXNzdWVfbGFuZyk7CiAgICAgICAgcmV0dXJuOwogICAgfQoKICAg
-IGdfZWlzc3VlX3NlbCA9IDA7CiAgICBnX2Vpc3N1ZV9zY3JvbGwgPSAwOwogICAgZ19laXNzdWVf
-YWN0aXZlID0gMTsKICAgIGVpc3N1ZV9qdW1wKDApOwoKICAgIGludCBlcnJzID0gMCwgd2FybnMg
-PSAwLCBpbmZvcyA9IDA7CiAgICBmb3IgKGludCBpID0gMDsgaSA8IGdfZWlzc3VlX2NvdW50OyBp
-KyspIHsKICAgICAgICBpZiAoZ19laXNzdWVzW2ldLnNldiA9PSAnRScpIGVycnMrKzsKICAgICAg
-ICBlbHNlIGlmIChnX2Vpc3N1ZXNbaV0uc2V2ID09ICdXJykgd2FybnMrKzsKICAgICAgICBlbHNl
-IGluZm9zKys7CiAgICB9CiAgICBzZXRfc3RhdHVzKCJDdHJsK0UgWyVzXTog4oaR4oaTIG5hdmVn
-YXIgIEVudGVyIGlyICBFc2MgZmVjaGFyICBbJWQgZXJybyhzKSwgJWQgYXZpc28ocyksICVkIGlu
-Zm9dIiwKICAgICAgICAgICAgICAgZ19laXNzdWVfbGFuZywgZXJycywgd2FybnMsIGluZm9zKTsK
-fQoKLyogRGVzZW5oYSBvIHBhaW5lbCBkZSByZXN1bHRhZG9zIOKAlCBtZXNtbyBlc3RpbG8gdmlz
-dWFsIGRvCiAqIHBhaW5lbCBkZSBzbmlwcGV0cyAoQ3RybCtJKTogdMOtdHVsbywgbGlzdGEgY29t
-IGJhZGdlIGNvbG9yaWRvCiAqIHBvciBzZXZlcmlkYWRlLCBzZXBhcmFkb3IsIHByZXZpZXcgZGEg
-bGluaGEgZGUgY8OzZGlnbwogKiBhcG9udGFkYSwgZSByb2RhcMOpIGNvbSBkaWNhcyBkZSBuYXZl
-Z2HDp8Ojby4gKi8Kc3RhdGljIHZvaWQgZHJhd19jaGVja19wYW5lbChBYnVmICphYikgewogICAg
-aWYgKCFnX2Vpc3N1ZV9hY3RpdmUgfHwgZ19laXNzdWVfY291bnQgPT0gMCkgcmV0dXJuOwoKICAg
-IGludCBwYW5lbF93ICA9IDU4OwogICAgaW50IGxpc3RfaCAgID0gZ19laXNzdWVfY291bnQgPCAx
-MCA/IGdfZWlzc3VlX2NvdW50IDogMTA7CiAgICBpbnQgcHJldl9oICAgPSAzOwogICAgaW50IHRv
-dGFsX2ggID0gMSArIGxpc3RfaCArIDEgKyBwcmV2X2ggKyAxOwoKICAgIGludCBwYW5lbF9jb2wg
-PSAoRS5jb2xzIC0gcGFuZWxfdykgLyAyOwogICAgaWYgKHBhbmVsX2NvbCA8IDEpIHBhbmVsX2Nv
-bCA9IDE7CiAgICBpbnQgcGFuZWxfcm93ID0gKEUucm93cyAtIHRvdGFsX2gpIC8gMjsKICAgIGlm
-IChwYW5lbF9yb3cgPCAxKSBwYW5lbF9yb3cgPSAxOwoKICAgIGNvbnN0IGNoYXIgKkNfVElUTEVf
-QkcgID0gIlx4MWJbNDg7NTs1M20iOyAgIC8qIHJveG8gZXNjdXJvICovCiAgICBjb25zdCBjaGFy
-ICpDX1RJVExFX0ZHICA9ICJceDFiWzM4OzU7MjE1bSI7ICAvKiBkb3VyYWRvICovCiAgICBjb25z
-dCBjaGFyICpDX1NFTF9CRyAgICA9ICJceDFiWzQ4OzU7ODhtIjsgICAvKiB2aW5obyAqLwogICAg
-Y29uc3QgY2hhciAqQ19TRUxfRkcgICAgPSAiXHgxYlszODs1OzI1NW0iOwogICAgY29uc3QgY2hh
-ciAqQ19ST1dfQkcgICAgPSAiXHgxYls0ODs1OzIzNW0iOwogICAgY29uc3QgY2hhciAqQ19ST1df
-RkcgICAgPSAiXHgxYlszODs1OzI1MG0iOwogICAgY29uc3QgY2hhciAqQ19TRVAgICAgICAgPSAi
-XHgxYlszODs1OzI0MG0iOwogICAgY29uc3QgY2hhciAqQ19QUkVWX0JHICAgPSAiXHgxYls0ODs1
-OzIzM20iOwogICAgY29uc3QgY2hhciAqQ19QUkVWX0ZHICAgPSAiXHgxYlszODs1OzI0M20iOwog
-ICAgY29uc3QgY2hhciAqQ19QUkVWX0NPREUgPSAiXHgxYlszODs1OzE1MG0iOwogICAgY29uc3Qg
-Y2hhciAqQ19GT09UX0JHICAgPSAiXHgxYls0ODs1OzUzbSI7CiAgICBjb25zdCBjaGFyICpDX0ZP
-T1RfRkcgICA9ICJceDFiWzM4OzU7MjE3bSI7CiAgICBjb25zdCBjaGFyICpDX0JPTEQgICAgICA9
-ICJceDFiWzFtIjsKICAgIGNvbnN0IGNoYXIgKkNfUlNUICAgICAgID0gIlx4MWJbbSI7CgogICAg
-LyogdMOtdHVsbyAqLwogICAgewogICAgICAgIGNoYXIgcG9zWzMyXTsgc25wcmludGYocG9zLHNp
-emVvZihwb3MpLCJceDFiWyVkOyVkSCIscGFuZWxfcm93LHBhbmVsX2NvbCk7CiAgICAgICAgYWJf
-YXBwZW5kKGFiLHBvcyxzdHJsZW4ocG9zKSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLENfVElUTEVf
-Qkcsc3RybGVuKENfVElUTEVfQkcpKTsKICAgICAgICBhYl9hcHBlbmQoYWIsQ19USVRMRV9GRyxz
-dHJsZW4oQ19USVRMRV9GRykpOwogICAgICAgIGFiX2FwcGVuZChhYixDX0JPTEQsc3RybGVuKENf
-Qk9MRCkpOwogICAgICAgIGNoYXIgdGl0bGVbOTZdOwogICAgICAgIGludCB0bCA9IHNucHJpbnRm
-KHRpdGxlLHNpemVvZih0aXRsZSksIiDimpEgVmVyaWZpY2HDp8OjbyAoJXMpIMK3ICVkIHByb2Js
-ZW1hKHMpICIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgIGdfZWlzc3VlX2xhbmcsIGdfZWlz
-c3VlX2NvdW50KTsKICAgICAgICBpZiAodGw+cGFuZWxfdykgdGw9cGFuZWxfdzsKICAgICAgICBh
-Yl9hcHBlbmQoYWIsdGl0bGUsdGwpOwogICAgICAgIGZvcihpbnQgcz10bDtzPHBhbmVsX3c7cysr
-KSBhYl9hcHBlbmQoYWIsIiAiLDEpOwogICAgICAgIGFiX2FwcGVuZChhYixDX1JTVCxzdHJsZW4o
-Q19SU1QpKTsKICAgIH0KCiAgICBpZiAoZ19laXNzdWVfc2VsIDwgZ19laXNzdWVfc2Nyb2xsKSBn
-X2Vpc3N1ZV9zY3JvbGwgPSBnX2Vpc3N1ZV9zZWw7CiAgICBpZiAoZ19laXNzdWVfc2VsID49IGdf
-ZWlzc3VlX3Njcm9sbCArIGxpc3RfaCkgZ19laXNzdWVfc2Nyb2xsID0gZ19laXNzdWVfc2VsIC0g
-bGlzdF9oICsgMTsKCiAgICBmb3IgKGludCBpID0gMDsgaSA8IGxpc3RfaDsgaSsrKSB7CiAgICAg
-ICAgaW50IGlkeCA9IGdfZWlzc3VlX3Njcm9sbCArIGk7CiAgICAgICAgaWYgKGlkeCA+PSBnX2Vp
-c3N1ZV9jb3VudCkgYnJlYWs7CiAgICAgICAgaW50IHJvdyA9IHBhbmVsX3JvdyArIDEgKyBpOwog
-ICAgICAgIGludCBzZWwgPSAoaWR4ID09IGdfZWlzc3VlX3NlbCk7CgogICAgICAgIGNoYXIgcG9z
-WzMyXTsgc25wcmludGYocG9zLHNpemVvZihwb3MpLCJceDFiWyVkOyVkSCIscm93LHBhbmVsX2Nv
-bCk7CiAgICAgICAgYWJfYXBwZW5kKGFiLHBvcyxzdHJsZW4ocG9zKSk7CgogICAgICAgIGFiX2Fw
-cGVuZChhYiwgc2VsP0NfU0VMX0JHOkNfUk9XX0JHLCBzZWw/c3RybGVuKENfU0VMX0JHKTpzdHJs
-ZW4oQ19ST1dfQkcpKTsKCiAgICAgICAgY2hhciBzZXYgPSBnX2Vpc3N1ZXNbaWR4XS5zZXY7CiAg
-ICAgICAgY29uc3QgY2hhciAqYmFkZ2UgPSAoc2V2PT0nRScpID8gIkVSUiIgOiAoc2V2PT0nVycp
-ID8gIkFWSVNPIiA6ICJJTkZPIjsKICAgICAgICBjb25zdCBjaGFyICpiYWRnZWNvbG9yID0gc2Vs
-ID8gIlx4MWJbMzg7NTsyNTVtIiA6CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAo
-c2V2PT0nRScpID8gIlx4MWJbMzg7NTsyMDNtIiA6CiAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAoc2V2PT0nVycpID8gIlx4MWJbMzg7NTsyMjFtIiA6ICJceDFiWzM4OzU7MTEwbSI7
-CgogICAgICAgIGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLGJhZGdl
-Y29sb3Isc3RybGVuKGJhZGdlY29sb3IpKTsKICAgICAgICBhYl9hcHBlbmQoYWIsQ19CT0xELHN0
-cmxlbihDX0JPTEQpKTsKICAgICAgICBjaGFyIGJhZGdlX2ZpZWxkWzhdOyBzbnByaW50ZihiYWRn
-ZV9maWVsZCxzaXplb2YoYmFkZ2VfZmllbGQpLCIlLTVzIixiYWRnZSk7CiAgICAgICAgYWJfYXBw
-ZW5kKGFiLGJhZGdlX2ZpZWxkLDUpOwogICAgICAgIGFiX2FwcGVuZChhYixDX1JTVCxzdHJsZW4o
-Q19SU1QpKTsKCiAgICAgICAgYWJfYXBwZW5kKGFiLCBzZWw/Q19TRUxfQkc6Q19ST1dfQkcsIHNl
-bD9zdHJsZW4oQ19TRUxfQkcpOnN0cmxlbihDX1JPV19CRykpOwogICAgICAgIGFiX2FwcGVuZChh
-Yiwgc2VsID8gIlx4MWJbMzg7NTsyMTdtIiA6IENfU0VQLCBzZWwgPyAxNCA6IHN0cmxlbihDX1NF
-UCkpOwogICAgICAgIGFiX2FwcGVuZChhYiwi4pSCIiwzKTsKCiAgICAgICAgYWJfYXBwZW5kKGFi
-LCBzZWw/Q19TRUxfRkc6Q19ST1dfRkcsIHNlbD9zdHJsZW4oQ19TRUxfRkcpOnN0cmxlbihDX1JP
-V19GRykpOwogICAgICAgIGlmIChzZWwpIGFiX2FwcGVuZChhYixDX0JPTEQsc3RybGVuKENfQk9M
-RCkpOwogICAgICAgIGNoYXIgbXNnX2ZpZWxkWzQ0XTsKICAgICAgICBzbnByaW50Zihtc2dfZmll
-bGQsc2l6ZW9mKG1zZ19maWVsZCksIiAlLTQycyIsZ19laXNzdWVzW2lkeF0ubXNnKTsKICAgICAg
-ICBtc2dfZmllbGRbNDNdPSdcMCc7CiAgICAgICAgYWJfYXBwZW5kKGFiLG1zZ19maWVsZCxzdHJs
-ZW4obXNnX2ZpZWxkKSk7CgogICAgICAgIGFiX2FwcGVuZChhYiwgc2VsID8gIlx4MWJbMzg7NTsy
-NDVtIiA6ICJceDFiWzJtIiwgc2VsPzE0OjQpOwogICAgICAgIGNoYXIgbGluZV9maWVsZFsxMF07
-CiAgICAgICAgaWYgKGdfZWlzc3Vlc1tpZHhdLmxpbmUgPiAwKQogICAgICAgICAgICBzbnByaW50
-ZihsaW5lX2ZpZWxkLHNpemVvZihsaW5lX2ZpZWxkKSwiTCUtNGQiLGdfZWlzc3Vlc1tpZHhdLmxp
-bmUpOwogICAgICAgIGVsc2UKICAgICAgICAgICAgc25wcmludGYobGluZV9maWVsZCxzaXplb2Yo
-bGluZV9maWVsZCksIiAgICAgIik7CiAgICAgICAgYWJfYXBwZW5kKGFiLGxpbmVfZmllbGQsc3Ry
-bGVuKGxpbmVfZmllbGQpKTsKCiAgICAgICAgYWJfYXBwZW5kKGFiLENfUlNULHN0cmxlbihDX1JT
-VCkpOwogICAgfQoKICAgIC8qIHNlcGFyYWRvciBhbnRlcyBkbyBwcmV2aWV3ICovCiAgICB7CiAg
-ICAgICAgaW50IHJvdyA9IHBhbmVsX3JvdyArIDEgKyBsaXN0X2g7CiAgICAgICAgY2hhciBwb3Nb
-MzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJbJWQ7JWRIIixyb3cscGFuZWxfY29s
-KTsKICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICBhYl9hcHBl
-bmQoYWIsQ19QUkVWX0JHLHN0cmxlbihDX1BSRVZfQkcpKTsKICAgICAgICBhYl9hcHBlbmQoYWIs
-Q19TRVAsc3RybGVuKENfU0VQKSk7CiAgICAgICAgY29uc3QgY2hhciAqc2VwX2xhYmVsID0gIiBs
-aW5oYSBhcG9udGFkYSAiOwogICAgICAgIGludCBzbCA9IChpbnQpc3RybGVuKHNlcF9sYWJlbCk7
-CiAgICAgICAgaW50IGRhc2hlc19sID0gKHBhbmVsX3cgLSBzbCkgLyAyOwogICAgICAgIGludCBk
-YXNoZXNfciA9IHBhbmVsX3cgLSBzbCAtIGRhc2hlc19sOwogICAgICAgIGZvciAoaW50IHM9MDtz
-PGRhc2hlc19sO3MrKykgYWJfYXBwZW5kKGFiLCLilIAiLDMpOwogICAgICAgIGFiX2FwcGVuZChh
-YixzZXBfbGFiZWwsc2wpOwogICAgICAgIGZvciAoaW50IHM9MDtzPGRhc2hlc19yO3MrKykgYWJf
-YXBwZW5kKGFiLCLilIAiLDMpOwogICAgICAgIGFiX2FwcGVuZChhYixDX1JTVCxzdHJsZW4oQ19S
-U1QpKTsKICAgIH0KCiAgICAvKiBwcmV2aWV3OiBhIGxpbmhhIGRlIGPDs2RpZ28gYXBvbnRhZGEg
-cGVsbyBpc3N1ZSBzZWxlY2lvbmFkbyAqLwogICAgewogICAgICAgIGludCBsaW5lID0gZ19laXNz
-dWVzW2dfZWlzc3VlX3NlbF0ubGluZTsKICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8IHByZXZf
-aDsgaSsrKSB7CiAgICAgICAgICAgIGludCByb3cgPSBwYW5lbF9yb3cgKyAyICsgbGlzdF9oICsg
-aTsKICAgICAgICAgICAgaWYgKHJvdyA+PSBFLnJvd3MpIGJyZWFrOwogICAgICAgICAgICBjaGFy
-IHBvc1szMl07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5l
-bF9jb2wpOwogICAgICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAg
-ICAgICAgYWJfYXBwZW5kKGFiLENfUFJFVl9CRyxzdHJsZW4oQ19QUkVWX0JHKSk7CgogICAgICAg
-ICAgICBpZiAoaSA9PSAwICYmIGxpbmUgPj0gMSAmJiBsaW5lIDw9IEUubnVtcm93cykgewogICAg
-ICAgICAgICAgICAgUm93ICpyID0gJkUucm93W2xpbmUtMV07CiAgICAgICAgICAgICAgICBjaGFy
-IGNsZWFuWzY0XTsKICAgICAgICAgICAgICAgIGludCBjbCA9IHItPnNpemU7IGlmIChjbCA+PSAo
-aW50KXNpemVvZihjbGVhbikpIGNsID0gc2l6ZW9mKGNsZWFuKS0xOwogICAgICAgICAgICAgICAg
-bWVtY3B5KGNsZWFuLCByLT5jaGFycywgY2wpOyBjbGVhbltjbF09J1wwJzsKICAgICAgICAgICAg
-ICAgIGFiX2FwcGVuZChhYixDX1BSRVZfQ09ERSxzdHJsZW4oQ19QUkVWX0NPREUpKTsKICAgICAg
-ICAgICAgICAgIGNoYXIgcGxpbmVbODBdOwogICAgICAgICAgICAgICAgaW50IHBsID0gc25wcmlu
-dGYocGxpbmUsc2l6ZW9mKHBsaW5lKSwiICUtKnMiLHBhbmVsX3ctMSxjbGVhbik7CiAgICAgICAg
-ICAgICAgICBpZiAocGw+cGFuZWxfdykgcGw9cGFuZWxfdzsKICAgICAgICAgICAgICAgIGFiX2Fw
-cGVuZChhYixwbGluZSxwbCk7CiAgICAgICAgICAgIH0gZWxzZSBpZiAoaSA9PSAxKSB7CiAgICAg
-ICAgICAgICAgICBhYl9hcHBlbmQoYWIsQ19QUkVWX0ZHLHN0cmxlbihDX1BSRVZfRkcpKTsKICAg
-ICAgICAgICAgICAgIGNoYXIgaGludFs4MF07CiAgICAgICAgICAgICAgICBpbnQgaGwgPSBzbnBy
-aW50ZihoaW50LHNpemVvZihoaW50KSwiICUtKnMiLHBhbmVsX3ctMSxnX2Vpc3N1ZXNbZ19laXNz
-dWVfc2VsXS5tc2cpOwogICAgICAgICAgICAgICAgaWYgKGhsPnBhbmVsX3cpIGhsPXBhbmVsX3c7
-CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIsaGludCxobCk7CiAgICAgICAgICAgIH0gZWxz
-ZSB7CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIsQ19QUkVWX0ZHLHN0cmxlbihDX1BSRVZf
-RkcpKTsKICAgICAgICAgICAgICAgIGZvcihpbnQgcz0wO3M8cGFuZWxfdztzKyspIGFiX2FwcGVu
-ZChhYiwiICIsMSk7CiAgICAgICAgICAgIH0KICAgICAgICAgICAgYWJfYXBwZW5kKGFiLENfUlNU
-LHN0cmxlbihDX1JTVCkpOwogICAgICAgIH0KICAgIH0KCiAgICAvKiByb2RhcMOpICovCiAgICB7
-CiAgICAgICAgaW50IHJvdyA9IHBhbmVsX3JvdyArIDIgKyBsaXN0X2ggKyBwcmV2X2g7CiAgICAg
-ICAgaWYgKHJvdyA8IEUucm93cykgewogICAgICAgICAgICBjaGFyIHBvc1szMl07IHNucHJpbnRm
-KHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5lbF9jb2wpOwogICAgICAgICAg
-ICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFi
-LENfRk9PVF9CRyxzdHJsZW4oQ19GT09UX0JHKSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixD
-X0ZPT1RfRkcsc3RybGVuKENfRk9PVF9GRykpOwogICAgICAgICAgICBjaGFyIGZvb3RbODBdOwog
-ICAgICAgICAgICBpbnQgZmw9c25wcmludGYoZm9vdCxzaXplb2YoZm9vdCksCiAgICAgICAgICAg
-ICAgICAiIOKGkeKGkyBuYXZlZ2FyICAgRW50ZXIgaXIgICBFc2MgZmVjaGFyICAgJWQvJWQgIiwK
-ICAgICAgICAgICAgICAgIGdfZWlzc3VlX3NlbCsxLCBnX2Vpc3N1ZV9jb3VudCk7CiAgICAgICAg
-ICAgIGlmKGZsPnBhbmVsX3cpZmw9cGFuZWxfdzsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLGZv
-b3QsZmwpOwogICAgICAgICAgICBmb3IoaW50IHM9Zmw7czxwYW5lbF93O3MrKykgYWJfYXBwZW5k
-KGFiLCIgIiwxKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLENfUlNULHN0cmxlbihDX1JTVCkp
-OwogICAgICAgIH0KICAgIH0KfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIFNOSVBQRVRTIChDdHJsK0kpCiAqIOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKLyoKICogQ2Fk
-YSBzbmlwcGV0IHRlbToKICogICBuYW1lICAgIOKAlCBub21lIGV4aWJpZG8gbm8gcGFpbmVsCiAq
-ICAgbGFuZyAgICDigJQgMD1DL0MrKyAgMT1MdWEgIDI9QmFzaCAgMz1xdWFscXVlcgogKiAgIGxp
-bmVzW10g4oCUIGxpbmhhcyBkbyB0ZW1wbGF0ZQogKiAgIGN1cnNvcl9saW5lIC8gY3Vyc29yX2Nv
-bCDigJQgb25kZSBwb3NpY2lvbmFyIG8gY3Vyc29yICgwLWJhc2VkLCByZWxhdGl2byBhbyBpbnNl
-cnQpCiAqCiAqIE1hcmNhZG9yIGVzcGVjaWFsIG5hcyBsaW5oYXM6ICLilogiIChVKzI1ODgpIGlu
-ZGljYSBhIHBvc2nDp8OjbyBleGF0YSBkbyBjdXJzb3IuCiAqIFN1YnN0aXR1w61tb3MgcG9yIHN0
-cmluZyB2YXppYSBlIHBvc2ljaW9uYW1vcyBvIGN1cnNvciBsw6EuCiAqLwoKI2RlZmluZSBTTklQ
-X01BWF9MSU5FUyAyNAojZGVmaW5lIFNOSVBfQ09VTlQgICAgIDQ4Cgp0eXBlZGVmIHN0cnVjdCB7
-CiAgICBjb25zdCBjaGFyICpuYW1lOwogICAgaW50ICAgICAgICAgbGFuZzsgICAgICAgLyogMD1D
-IDE9THVhIDI9QmFzaCAzPWFsbCAqLwogICAgY29uc3QgY2hhciAqbGluZXNbU05JUF9NQVhfTElO
-RVNdOwogICAgaW50ICAgICAgICAgbmxpbmVzOwp9IFNuaXBwZXQ7CgovKiDilIDilIDilIAgQ2F0
-w6Fsb2dvIGRlIHNuaXBwZXRzIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCAq
-LwpzdGF0aWMgU25pcHBldCBnX3NuaXBzW10gPSB7CgovKiDilIDilIAgTFVBIOKUgOKUgCAqLwp7
-ICJpZiAvIHRoZW4gLyBlbmQiLCAgICAgICAgICAgMSwgewogICAgImlmIOKWiCB0aGVuIiwKICAg
-ICIgICAgIiwKICAgICJlbmQiLAp9LCAzIH0sCgp7ICJpZiAvIGVsc2VpZiAvIGVsc2UgLyBlbmQi
-LCAgMSwgewogICAgImlmIOKWiCB0aGVuIiwKICAgICIgICAgIiwKICAgICJlbHNlaWYgIHRoZW4i
-LAogICAgIiAgICAiLAogICAgImVsc2UiLAogICAgIiAgICAiLAogICAgImVuZCIsCn0sIDcgfSwK
-CnsgIndoaWxlIC8gZG8gLyBlbmQiLCAgICAgICAgICAxLCB7CiAgICAid2hpbGUg4paIIGRvIiwK
-ICAgICIgICAgIiwKICAgICJlbmQiLAp9LCAzIH0sCgp7ICJmb3IgbnVtw6lyaWNvIiwgICAgICAg
-ICAgICAgIDEsIHsKICAgICJmb3IgaSA9IOKWiDEsIDEwIGRvIiwKICAgICIgICAgIiwKICAgICJl
-bmQiLAp9LCAzIH0sCgp7ICJmb3IgZ2Vuw6lyaWNvIChpcGFpcnMpIiwgICAgIDEsIHsKICAgICJm
-b3IgaSwgdiBpbiBpcGFpcnMo4paIKSBkbyIsCiAgICAiICAgICIsCiAgICAiZW5kIiwKfSwgMyB9
-LAoKeyAiZm9yIGdlbsOpcmljbyAocGFpcnMpIiwgICAgICAxLCB7CiAgICAiZm9yIGssIHYgaW4g
-cGFpcnMo4paIKSBkbyIsCiAgICAiICAgICIsCiAgICAiZW5kIiwKfSwgMyB9LAoKeyAiZnVuY3Rp
-b24iLCAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCBmdW5jdGlvbiDilogoKSIsCiAg
-ICAiICAgICIsCiAgICAiZW5kIiwKfSwgMyB9LAoKeyAiZnVuY3Rpb24gY29tIHJldHVybiIsICAg
-ICAgIDEsIHsKICAgICJsb2NhbCBmdW5jdGlvbiDilogoKSIsCiAgICAiICAgIHJldHVybiAiLAog
-ICAgImVuZCIsCn0sIDMgfSwKCnsgInJlcGVhdCAvIHVudGlsIiwgICAgICAgICAgICAxLCB7CiAg
-ICAicmVwZWF0IiwKICAgICIgICAg4paIIiwKICAgICJ1bnRpbCAiLAp9LCAzIH0sCgp7ICJwY2Fs
-bCAodHJhdGFtZW50byBkZSBlcnJvKSIsMSwgewogICAgImxvY2FsIG9rLCBlcnIgPSBwY2FsbChm
-dW5jdGlvbigpIiwKICAgICIgICAg4paIIiwKICAgICJlbmQpIiwKICAgICJpZiBub3Qgb2sgdGhl
-biIsCiAgICAiICAgIHByaW50KFwiZXJybzogXCIgLi4gdG9zdHJpbmcoZXJyKSkiLAogICAgImVu
-ZCIsCn0sIDYgfSwKCnsgInRhYmxlIC8gaW5zZXJpciIsICAgICAgICAgICAxLCB7CiAgICAibG9j
-YWwg4paIdCA9IHt9IiwKICAgICJ0YWJsZS5pbnNlcnQodCwgKSIsCn0sIDIgfSwKCnsgIkVsbGlv
-dE9TOiBtb2QgY29tcGxldG8iLCAgICAxLCB7CiAgICAibG9jYWwgTSA9IHt9IiwKICAgICIiLAog
-ICAgImZ1bmN0aW9uIE0ucnVuKGFyZ3MpIiwKICAgICIgICAg4paIIiwKICAgICJlbmQiLAogICAg
-IiIsCiAgICAicmV0dXJuIE0iLAp9LCA3IH0sCgp7ICJFbGxpb3RPUzogdHVpLm1haW4iLCAgICAg
-ICAgIDEsIHsKICAgICJ0dWkubWFpbihcIjV4NVwiLCBcIuKWiFTDrXR1bG9cIikiLAogICAgInR1
-aS5mdW5jKHsiLAogICAgIiAgICB7W1wiT3BceGMzXHhhN1x4YzNceGEzbyAxXCJdID0gZnVuY3Rp
-b24oKSIsCiAgICAiICAgICAgICAiLAogICAgIiAgICBlbmR9LCIsCiAgICAiICAgIHtbXCJPcFx4
-YzNceGE3XHhjM1x4YTNvIDJcIl0gPSBmdW5jdGlvbigpIiwKICAgICIgICAgICAgICIsCiAgICAi
-ICAgIGVuZH0sIiwKICAgICJ9KSIsCn0sIDkgfSwKCnsgIkVsbGlvdE9TOiBuZXQuc2NhbiIsICAg
-ICAgICAxLCB7CiAgICAibG9jYWwgcmVzdWx0ID0gbmV0LnNjYW4oXCLilohob3N0XCIsIHBvcnRJ
-bmljaW8sIHBvcnRGaW0pIiwKICAgICJmb3IgXywgcCBpbiBpcGFpcnMocmVzdWx0KSBkbyIsCiAg
-ICAiICAgIHByaW50KFwicG9ydGEgYWJlcnRhOiBcIiAuLiBwKSIsCiAgICAiZW5kIiwKfSwgNCB9
-LAoKLyog4pSA4pSAIE1PRCDigJQgUGVudGVzdCBTY2FubmVycyDilIDilIAgKi8KeyAibW9kLnhz
-cyIsICAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9kLnhzcyhcIuKWiGh0
-dHA6Ly9hbHZvLmNvbS9zZWFyY2g/cT1cIikiLAogICAgImlmIHIgdGhlbiBwcmludChyKSBlbmQi
-LAp9LCAyIH0sCgp7ICJtb2Quc3FsaSIsICAgICAgICAgICAgICAgICAgMSwgewogICAgImxvY2Fs
-IHIgPSBtb2Quc3FsaShcIuKWiGh0dHA6Ly9hbHZvLmNvbS9wYWdlP2lkPVwiKSIsCiAgICAiaWYg
-ciB0aGVuIHByaW50KHIpIGVuZCIsCn0sIDIgfSwKCnsgIm1vZC5sZmkiLCAgICAgICAgICAgICAg
-ICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1vZC5sZmkoXCLilohodHRwOi8vYWx2by5jb20vcGFn
-ZT9maWxlPVwiKSIsCiAgICAiaWYgciB0aGVuIHByaW50KHIpIGVuZCIsCn0sIDIgfSwKCnsgIm1v
-ZC5yY2UiLCAgICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1vZC5yY2UoXCLi
-lohodHRwOi8vYWx2by5jb20vZXhlYz9jbWQ9XCIpIiwKICAgICJpZiByIHRoZW4gcHJpbnQocikg
-ZW5kIiwKfSwgMiB9LAoKeyAibW9kLnNzcmYiLCAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJs
-b2NhbCByID0gbW9kLnNzcmYoXCLilohodHRwOi8vYWx2by5jb20vZmV0Y2g/dXJsPVwiKSIsCiAg
-ICAiaWYgciB0aGVuIHByaW50KHIpIGVuZCIsCn0sIDIgfSwKCnsgIm1vZC5zc3RpIiwgICAgICAg
-ICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1vZC5zc3RpKFwi4paIaHR0cDovL2Fsdm8u
-Y29tL3JlbmRlcj90cGw9XCIpIiwKICAgICJpZiByIHRoZW4gcHJpbnQocikgZW5kIiwKfSwgMiB9
-LAoKeyAibW9kLmhlYWRlcnMiLCAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9k
-LmhlYWRlcnMoXCLilohodHRwOi8vYWx2by5jb21cIikiLAogICAgImlmIHIgdGhlbiBwcmludChy
-KSBlbmQiLAp9LCAyIH0sCgp7ICJtb2Qud2FmIiwgICAgICAgICAgICAgICAgICAgMSwgewogICAg
-ImxvY2FsIHIgPSBtb2Qud2FmKFwi4paIaHR0cDovL2Fsdm8uY29tXCIpIiwKICAgICJpZiByIHRo
-ZW4gcHJpbnQocikgZW5kIiwKfSwgMiB9LAoKeyAibW9kLmNvcnMiLCAgICAgICAgICAgICAgICAg
-IDEsIHsKICAgICJsb2NhbCByID0gbW9kLmNvcnMoXCLilohodHRwOi8vYWx2by5jb21cIikiLAog
-ICAgImlmIHIgdGhlbiBwcmludChyKSBlbmQiLAp9LCAyIH0sCgp7ICJtb2QuY3NyZiIsICAgICAg
-ICAgICAgICAgICAgMSwgewogICAgImxvY2FsIHIgPSBtb2QuY3NyZihcIuKWiGh0dHA6Ly9hbHZv
-LmNvbS9mb3JtXCIpIiwKICAgICJpZiByIHRoZW4gcHJpbnQocikgZW5kIiwKfSwgMiB9LAoKeyAi
-bW9kLmp3dCIsICAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9kLmp3dChc
-IuKWiGV5SmhiR2NpT2lKdWIyNWxJbjAuLi5cIikiLAogICAgImlmIHIgdGhlbiBwcmludChyKSBl
-bmQiLAp9LCAyIH0sCgp7ICJtb2QuaWRvciIsICAgICAgICAgICAgICAgICAgMSwgewogICAgImxv
-Y2FsIHIgPSBtb2QuaWRvcihcIuKWiGh0dHA6Ly9hbHZvLmNvbS91c2VyXCIsIFwiaWRcIikiLAog
-ICAgImlmIHIgdGhlbiBwcmludChyKSBlbmQiLAp9LCAyIH0sCgp7ICJtb2QueHhlIiwgICAgICAg
-ICAgICAgICAgICAgMSwgewogICAgImxvY2FsIHIgPSBtb2QueHhlKFwi4paIaHR0cDovL2Fsdm8u
-Y29tL3htbFwiKSIsCiAgICAiaWYgciB0aGVuIHByaW50KHIpIGVuZCIsCn0sIDIgfSwKCnsgIm1v
-ZC5ub3NxbCIsICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1vZC5ub3NxbChc
-IuKWiGh0dHA6Ly9hbHZvLmNvbS9sb2dpblwiKSIsCiAgICAiaWYgciB0aGVuIHByaW50KHIpIGVu
-ZCIsCn0sIDIgfSwKCnsgIm1vZC5yZWRpciIsICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9j
-YWwgciA9IG1vZC5yZWRpcihcIuKWiGh0dHA6Ly9hbHZvLmNvbS9nbz91cmw9XCIpIiwKICAgICJp
-ZiByIHRoZW4gcHJpbnQocikgZW5kIiwKfSwgMiB9LAoKeyAibW9kLmRpcnMiLCAgICAgICAgICAg
-ICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9kLmRpcnMoXCLilohodHRwOi8vYWx2by5jb21c
-IikiLAogICAgImlmIHIgdGhlbiIsCiAgICAiICAgIGZvciBfLCBkIGluIGlwYWlycyhyKSBkbyBw
-cmludChkKSBlbmQiLAogICAgImVuZCIsCn0sIDQgfSwKCnsgIm1vZC5zZWNyZXRzIiwgICAgICAg
-ICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1vZC5zZWNyZXRzKFwi4paIaHR0cDovL2Fsdm8u
-Y29tXCIpIiwKICAgICJpZiByIHRoZW4gcHJpbnQocikgZW5kIiwKfSwgMiB9LAoKeyAibW9kLnN1
-YmRvbWFpbnMiLCAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9kLnN1YmRvbWFpbnMo
-XCLilohhbHZvLmNvbVwiKSIsCiAgICAiaWYgciB0aGVuIiwKICAgICIgICAgZm9yIF8sIHMgaW4g
-aXBhaXJzKHIpIGRvIHByaW50KHMpIGVuZCIsCiAgICAiZW5kIiwKfSwgNCB9LAoKeyAibW9kLnBh
-cmFtcyIsICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCByID0gbW9kLnBhcmFtcyhcIuKW
-iGh0dHA6Ly9hbHZvLmNvbVwiKSIsCiAgICAiaWYgciB0aGVuIHByaW50KHIpIGVuZCIsCn0sIDIg
-fSwKCnsgIm1vZC5iYWNrdXAiLCAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IG1v
-ZC5iYWNrdXAoXCLilohodHRwOi8vYWx2by5jb21cIikiLAogICAgImlmIHIgdGhlbiBwcmludChy
-KSBlbmQiLAp9LCAyIH0sCgp7ICJtb2Quc3BpZGVyIiwgICAgICAgICAgICAgICAgMSwgewogICAg
-ImxvY2FsIGxpbmtzID0gbW9kLnNwaWRlcihcIuKWiGh0dHA6Ly9hbHZvLmNvbVwiLCA1MCkiLAog
-ICAgImZvciBfLCBsIGluIGlwYWlycyhsaW5rcykgZG8iLAogICAgIiAgICBwcmludChsKSIsCiAg
-ICAiZW5kIiwKfSwgNCB9LAoKeyAibW9kLmNoYWluIChwaXBlbGluZSkiLCAgICAgIDEsIHsKICAg
-ICJtb2QuY2hhaW4oXCLilohodHRwOi8vYWx2by5jb21cIikiLAp9LCAxIH0sCgp7ICJtcy5zY2Fu
-LWFsbCAoc2hlbGwpIiwgICAgICAgMSwgewogICAgInN5cy5zaChcIm1zIC0tc2Nhbi1hbGwg4paI
-aHR0cDovL2Fsdm8uY29tIDUwXCIpIiwKfSwgMSB9LAoKLyog4pSA4pSAIE5FVCDigJQgUmVkZSBy
-YXcg4pSA4pSAICovCnsgIm5ldC5nZXQiLCAgICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9j
-YWwgcmVzcCA9IG5ldC5nZXQoXCLilohodHRwOi8vYWx2by5jb21cIikiLAogICAgInByaW50KHJl
-c3ApIiwKfSwgMiB9LAoKeyAibmV0LnBvc3QiLCAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJs
-b2NhbCByZXNwID0gbmV0LnBvc3QoXCLilohodHRwOi8vYWx2by5jb20vbG9naW5cIiwiLAogICAg
-IiAgICBcInVzZXI9YWRtaW4mcGFzcz0xMjM0XCIpIiwKICAgICJwcmludChyZXNwKSIsCn0sIDMg
-fSwKCnsgIm5ldC50Y3AgKHNvY2tldCByYXcpIiwgICAgICAxLCB7CiAgICAibG9jYWwgc29jayA9
-IG5ldC50Y3AoXCLilohob3N0XCIsIDgwKSIsCiAgICAibmV0LnNlbmQoc29jaywgXCJHRVQgLyBI
-VFRQLzEuMFxcclxcblxcclxcblwiKSIsCiAgICAibG9jYWwgZGF0YSA9IG5ldC5yZWN2KHNvY2sp
-IiwKICAgICJwcmludChkYXRhKSIsCiAgICAibmV0LmNsb3NlKHNvY2spIiwKfSwgNSB9LAoKeyAi
-bmV0LmRucyIsICAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCBpcCA9IG5ldC5kbnMo
-XCLilohhbHZvLmNvbVwiKSIsCiAgICAicHJpbnQoaXApIiwKfSwgMiB9LAoKeyAibmV0LnBpbmci
-LCAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJsb2NhbCBtcyA9IG5ldC5waW5nKFwi4paIaG9z
-dFwiKSIsCiAgICAicHJpbnQobXMgLi4gXCIgbXNcIikiLAp9LCAyIH0sCgp7ICJuZXQub3MgKGJh
-bm5lciBncmFiKSIsICAgICAgMSwgewogICAgImxvY2FsIGluZm8gPSBuZXQub3MoXCLilohob3N0
-XCIpIiwKICAgICJwcmludChpbmZvKSIsCn0sIDIgfSwKCnsgIm5ldC5ob3N0cyAoSVBzIGxvY2Fp
-cykiLCAgICAxLCB7CiAgICAibG9jYWwgaG9zdHMgPSBuZXQuaG9zdHMoKSIsCiAgICAiZm9yIF8s
-IGggaW4gaXBhaXJzKGhvc3RzKSBkbyIsCiAgICAiICAgIHByaW50KGgpIiwKICAgICJlbmQiLAp9
-LCA0IH0sCgovKiDilIDilIAgQ1JZUFRPIOKUgOKUgCAqLwp7ICJjcnlwdG8uc2hhMjU2IiwgICAg
-ICAgICAgICAgMSwgewogICAgImxvY2FsIGhhc2ggPSBjcnlwdG8uc2hhMjU2KFwi4paIdGV4dG9c
-IikiLAogICAgInByaW50KGhhc2gpIiwKfSwgMiB9LAoKeyAiY3J5cHRvLm1kNSIsICAgICAgICAg
-ICAgICAgIDEsIHsKICAgICJsb2NhbCBoYXNoID0gY3J5cHRvLm1kNShcIuKWiHRleHRvXCIpIiwK
-ICAgICJwcmludChoYXNoKSIsCn0sIDIgfSwKCnsgImNyeXB0by5iNjRlbmMgLyBiNjRkZWMiLCAg
-ICAxLCB7CiAgICAibG9jYWwgZW5jID0gY3J5cHRvLmI2NGVuYyhcIuKWiHRleHRvXCIpIiwKICAg
-ICJsb2NhbCBkZWMgPSBjcnlwdG8uYjY0ZGVjKGVuYykiLAogICAgInByaW50KGVuYywgZGVjKSIs
-Cn0sIDMgfSwKCnsgImNyeXB0by5hZXMgZW5jL2RlYyIsICAgICAgICAxLCB7CiAgICAibG9jYWwg
-ZW5jID0gY3J5cHRvLmFlc19lbmMoXCLilohkYWRvXCIsIFwiY2hhdmUxNmJ5dGVzISEhIVwiKSIs
-CiAgICAibG9jYWwgZGVjID0gY3J5cHRvLmFlc19kZWMoZW5jLCAgXCJjaGF2ZTE2Ynl0ZXMhISEh
-XCIpIiwKICAgICJwcmludChkZWMpIiwKfSwgMyB9LAoKeyAiY3J5cHRvLmhtYWMiLCAgICAgICAg
-ICAgICAgIDEsIHsKICAgICJsb2NhbCBoID0gY3J5cHRvLmhtYWMoXCJzaGEyNTZcIiwgXCLilohj
-aGF2ZVwiLCBcIm1lbnNhZ2VtXCIpIiwKICAgICJwcmludChoKSIsCn0sIDIgfSwKCi8qIOKUgOKU
-gCBVSSDilIDilIAgKi8KeyAidWkuYm94IiwgICAgICAgICAgICAgICAgICAgIDEsIHsKICAgICJ1
-aS5ib3goXCLilohUaXR1bG9cIiwgXCJDb250ZXVkbyBkYSBjYWl4YVwiKSIsCn0sIDEgfSwKCnsg
-InVpLmNvbG9yIiwgICAgICAgICAgICAgICAgICAxLCB7CiAgICAidWkuY29sb3IoXCLiloh0ZXh0
-b1wiLCBcImdyZWVuXCIpIiwKfSwgMSB9LAoKeyAidWkuaW5wdXQiLCAgICAgICAgICAgICAgICAg
-IDEsIHsKICAgICJsb2NhbCByZXNwID0gdWkuaW5wdXQoXCLilohQZXJndW50YTogXCIpIiwKICAg
-ICJwcmludChyZXNwKSIsCn0sIDIgfSwKCnsgInVpLmZpZyAoYmFubmVyKSIsICAgICAgICAgICAx
-LCB7CiAgICAidWkuZmlnKFwi4paIVEVYVE9cIikiLAp9LCAxIH0sCgp7ICJ1aS5zbGVlcCIsICAg
-ICAgICAgICAgICAgICAgMSwgewogICAgInVpLnNsZWVwKOKWiDEpIiwKfSwgMSB9LAoKLyog4pSA
-4pSAIFNZUyDilIDilIAgKi8KeyAic3lzLnNoIChyb2RhciBjb21hbmRvKSIsICAgIDEsIHsKICAg
-ICJsb2NhbCBvdXQgPSBzeXMuc2goXCLilohscyAtbGFcIikiLAogICAgInByaW50KG91dCkiLAp9
-LCAyIH0sCgp7ICJzeXMudGhyZWFkIiwgICAgICAgICAgICAgICAgMSwgewogICAgImxvY2FsIHRp
-ZCA9IHN5cy50aHJlYWQoZnVuY3Rpb24oKSIsCiAgICAiICAgIOKWiCIsCiAgICAiZW5kKSIsCiAg
-ICAic3lzLmpvaW4odGlkKSIsCn0sIDQgfSwKCnsgInN5cy5saXN0IChwcm9jZXNzb3MpIiwgICAg
-ICAxLCB7CiAgICAibG9jYWwgcHJvY3MgPSBzeXMubGlzdCgpIiwKICAgICJmb3IgXywgcCBpbiBp
-cGFpcnMocHJvY3MpIGRvIiwKICAgICIgICAgcHJpbnQocCkiLAogICAgImVuZCIsCn0sIDQgfSwK
-Ci8qIOKUgOKUgCBNUyDigJQgYWxpYXMgZSBhdXRvbWFjYW8g4pSA4pSAICovCnsgIm1zLmFsaWFz
-IChjcmlhcikiLCAgICAgICAgICAxLCB7CiAgICAibXMuYWxpYXMoXCLilohOT01FXCIsIFwibmV0
-LnNjYW4oJ2Fsdm8uY29tJywgMSwgOTk5OSlcIikiLAogICAgIi0tIHVzbzogTk9NRSgpIiwKfSwg
-MiB9LAoKeyAibXMuYWxpYXMgKGxpc3RhcikiLCAgICAgICAgIDEsIHsKICAgICJtcy5hbGlhcygp
-IiwKfSwgMSB9LAoKeyAibXMuYjY0LmVuYyAvIGRlYyIsICAgICAgICAgIDEsIHsKICAgICJsb2Nh
-bCBlID0gbXMuYjY0LmVuYyhcIuKWiHRleHRvXCIpIiwKICAgICJsb2NhbCBkID0gbXMuYjY0LmRl
-YyhlKSIsCiAgICAicHJpbnQoZSwgZCkiLAp9LCAzIH0sCgovKiDilIDilIAgQUkg4pSA4pSAICov
-CnsgImFpLmFzayIsICAgICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgciA9IGFpLmFz
-ayhcIuKWiHBlcmd1bnRhXCIpIiwKICAgICJwcmludChyKSIsCn0sIDIgfSwKCnsgImFpLmNvZGUi
-LCAgICAgICAgICAgICAgICAgICAxLCB7CiAgICAibG9jYWwgY29kZSA9IGFpLmNvZGUoXCLilohl
-c2NyZXZhIHVtIHNjYW5uZXIgZGUgcG9ydGFzIGVtIEx1YVwiKSIsCiAgICAicHJpbnQoY29kZSki
-LAp9LCAyIH0sCgovKiDilIDilIAgQyDilIDilIAgKi8KeyAiaWYgLyBlbHNlIiwgICAgICAgICAg
-ICAgICAgIDAsIHsKICAgICJpZiAo4paIKSB7IiwKICAgICIgICAgIiwKICAgICJ9IGVsc2UgeyIs
-CiAgICAiICAgICIsCiAgICAifSIsCn0sIDUgfSwKCnsgImlmIHNpbXBsZXMiLCAgICAgICAgICAg
-ICAgICAwLCB7CiAgICAiaWYgKOKWiCkgeyIsCiAgICAiICAgICIsCiAgICAifSIsCn0sIDMgfSwK
-CnsgImZvciBsb29wIiwgICAgICAgICAgICAgICAgICAwLCB7CiAgICAiZm9yIChpbnQgaSA9IDA7
-IGkgPCDilog7IGkrKykgeyIsCiAgICAiICAgICIsCiAgICAifSIsCn0sIDMgfSwKCnsgIndoaWxl
-IGxvb3AiLCAgICAgICAgICAgICAgICAwLCB7CiAgICAid2hpbGUgKOKWiCkgeyIsCiAgICAiICAg
-ICIsCiAgICAifSIsCn0sIDMgfSwKCnsgInN3aXRjaCAvIGNhc2UiLCAgICAgICAgICAgICAwLCB7
-CiAgICAic3dpdGNoICjilogpIHsiLAogICAgIiAgICBjYXNlIDoiLAogICAgIiAgICAgICAgYnJl
-YWs7IiwKICAgICIgICAgZGVmYXVsdDoiLAogICAgIiAgICAgICAgYnJlYWs7IiwKICAgICJ9IiwK
-fSwgNiB9LAoKeyAiZnVuw6fDo28iLCAgICAgICAgICAgICAgICAgICAgMCwgewogICAgInN0YXRp
-YyB2b2lkIOKWiCh2b2lkKSB7IiwKICAgICIgICAgIiwKICAgICJ9IiwKfSwgMyB9LAoKeyAiZnVu
-w6fDo28gY29tIHJldG9ybm8gaW50IiwgICAgMCwgewogICAgInN0YXRpYyBpbnQg4paIKHZvaWQp
-IHsiLAogICAgIiAgICByZXR1cm4gMDsiLAogICAgIn0iLAp9LCAzIH0sCgp7ICJtYWxsb2MgKyBm
-cmVlIiwgICAgICAgICAgICAgMCwgewogICAgIuKWiHR5cGUgKnB0ciA9IG1hbGxvYyhzaXplb2Yo
-dHlwZSkgKiBuKTsiLAogICAgImlmICghcHRyKSB7IC8qIGVycm8gKi8gfSIsCiAgICAiLyogdXNv
-ICovIiwKICAgICJmcmVlKHB0cik7IiwKfSwgNCB9LAoKeyAic3RydWN0IiwgICAgICAgICAgICAg
-ICAgICAgIDAsIHsKICAgICJ0eXBlZGVmIHN0cnVjdCB7IiwKICAgICIgICAg4paIIiwKICAgICJ9
-IE5vbWVTdHJ1Y3Q7IiwKfSwgMyB9LAoKeyAic25wcmludGYgc2VndXJvIiwgICAgICAgICAgIDAs
-IHsKICAgICJjaGFyIGJ1ZlvilogyNTZdOyIsCiAgICAic25wcmludGYoYnVmLCBzaXplb2YoYnVm
-KSwgXCIlc1wiLCApOyIsCn0sIDIgfSwKCnsgInBvcGVuIC8gcGNsb3NlIiwgICAgICAgICAgICAw
-LCB7CiAgICAiRklMRSAqZnAgPSBwb3BlbihcIuKWiGNvbWFuZG9cIiwgXCJyXCIpOyIsCiAgICAi
-aWYgKCFmcCkgcmV0dXJuOyIsCiAgICAiY2hhciBsaW5lWzI1Nl07IiwKICAgICJ3aGlsZSAoZmdl
-dHMobGluZSwgc2l6ZW9mKGxpbmUpLCBmcCkpIHsiLAogICAgIiAgICAvKiBwcm9jZXNzYSBsaW5l
-ICovIiwKICAgICJ9IiwKICAgICJwY2xvc2UoZnApOyIsCn0sIDcgfSwKCi8qIOKUgOKUgCBCQVNI
-IOKUgOKUgCAqLwp7ICJpZiAvIHRoZW4gLyBmaSIsICAgICAgICAgICAgMiwgewogICAgImlmIOKW
-iDsgdGhlbiIsCiAgICAiICAgICIsCiAgICAiZmkiLAp9LCAzIH0sCgp7ICJpZiAvIGVsc2UgLyBm
-aSIsICAgICAgICAgICAgMiwgewogICAgImlmIOKWiDsgdGhlbiIsCiAgICAiICAgICIsCiAgICAi
-ZWxzZSIsCiAgICAiICAgICIsCiAgICAiZmkiLAp9LCA1IH0sCgp7ICJmb3IgbG9vcCIsICAgICAg
-ICAgICAgICAgICAgMiwgewogICAgImZvciDilohpdGVtIGluIGxpc3RhOyBkbyIsCiAgICAiICAg
-ICIsCiAgICAiZG9uZSIsCn0sIDMgfSwKCnsgIndoaWxlIGxvb3AiLCAgICAgICAgICAgICAgICAy
-LCB7CiAgICAid2hpbGUg4paIOyBkbyIsCiAgICAiICAgICIsCiAgICAiZG9uZSIsCn0sIDMgfSwK
-CnsgImZ1bsOnw6NvIiwgICAgICAgICAgICAgICAgICAgIDIsIHsKICAgICLilohub21lKCkgeyIs
-CiAgICAiICAgICIsCiAgICAifSIsCn0sIDMgfSwKCnsgImNhc2UgLyBlc2FjIiwgICAgICAgICAg
-ICAgICAyLCB7CiAgICAiY2FzZSBcIiTilogxXCIgaW4iLAogICAgIiAgICBvcGNhbzEpIiwKICAg
-ICIgICAgICAgIDs7IiwKICAgICIgICAgKikiLAogICAgIiAgICAgICAgOzsiLAogICAgImVzYWMi
-LAp9LCA2IH0sCgp7ICJ2ZXJpZmljYXIgYXJndW1lbnRvIiwgICAgICAgMiwgewogICAgImlmIFsg
-JCMgLWx0IOKWiDEgXTsgdGhlbiIsCiAgICAiICAgIGVjaG8gXCJVc286ICQwIDxhcmc+XCIgPiYy
-IiwKICAgICIgICAgZXhpdCAxIiwKICAgICJmaSIsCn0sIDQgfSwKCi8qIOKUgOKUgCBIVE1MIOKU
-gOKUgCAqLwp7ICIhIOKGkiB0ZW1wbGF0ZSBIVE1MNSIsICAgICAgICA0LCB7CiAgICAiISIsCn0s
-IDEgfSwKCnsgImRpdiBjb20gY2xhc3NlIiwgICAgICAgICAgICAgNCwgewogICAgIjxkaXYgY2xh
-c3M9XCLilohcIj4iLAogICAgIiAgICAiLAogICAgIjwvZGl2PiIsCn0sIDMgfSwKCnsgImxpbmsg
-KMOibmNvcmEpIiwgICAgICAgICAgICAgNCwgewogICAgIjxhIGhyZWY9XCLilohcIj50ZXh0bzwv
-YT4iLAp9LCAxIH0sCgp7ICJpbWFnZW0iLCAgICAgICAgICAgICAgICAgICAgNCwgewogICAgIjxp
-bWcgc3JjPVwi4paIXCIgYWx0PVwiXCIgd2lkdGg9XCJcIiBoZWlnaHQ9XCJcIj4iLAp9LCAxIH0s
-Cgp7ICJmb3JtdWzDoXJpbyBQT1NUIiwgICAgICAgICAgIDQsIHsKICAgICI8Zm9ybSBhY3Rpb249
-XCLilohcIiBtZXRob2Q9XCJQT1NUXCI+IiwKICAgICIgICAgPGlucHV0IHR5cGU9XCJ0ZXh0XCIg
-bmFtZT1cIlwiIHBsYWNlaG9sZGVyPVwiXCI+IiwKICAgICIgICAgPGJ1dHRvbiB0eXBlPVwic3Vi
-bWl0XCI+RW52aWFyPC9idXR0b24+IiwKICAgICI8L2Zvcm0+IiwKfSwgNCB9LAoKeyAiaW5wdXQg
-KyBsYWJlbCIsICAgICAgICAgICAgIDQsIHsKICAgICI8bGFiZWwgZm9yPVwi4paIY2FtcG9cIj5M
-YWJlbDwvbGFiZWw+IiwKICAgICI8aW5wdXQgdHlwZT1cInRleHRcIiBpZD1cImNhbXBvXCIgbmFt
-ZT1cImNhbXBvXCIgcGxhY2Vob2xkZXI9XCJcIj4iLAp9LCAyIH0sCgp7ICJ0YWJlbGEiLCAgICAg
-ICAgICAgICAgICAgICAgNCwgewogICAgIjx0YWJsZT4iLAogICAgIiAgICA8dGhlYWQ+IiwKICAg
-ICIgICAgICAgIDx0cj48dGg+4paIQ29sIDE8L3RoPjx0aD5Db2wgMjwvdGg+PC90cj4iLAogICAg
-IiAgICA8L3RoZWFkPiIsCiAgICAiICAgIDx0Ym9keT4iLAogICAgIiAgICAgICAgPHRyPjx0ZD48
-L3RkPjx0ZD48L3RkPjwvdHI+IiwKICAgICIgICAgPC90Ym9keT4iLAogICAgIjwvdGFibGU+IiwK
-fSwgOCB9LAoKeyAibGlzdGEgbsOjby1vcmRlbmFkYSIsICAgICAgICA0LCB7CiAgICAiPHVsPiIs
-CiAgICAiICAgIDxsaT7ilohJdGVtIDE8L2xpPiIsCiAgICAiICAgIDxsaT5JdGVtIDI8L2xpPiIs
-CiAgICAiPC91bD4iLAp9LCA0IH0sCgp7ICI8c3R5bGU+IGlubGluZSIsICAgICAgICAgICAgNCwg
-ewogICAgIjxzdHlsZT4iLAogICAgIiAgICAu4paIY2xhc3NlIHsiLAogICAgIiAgICAgICAgIiwK
-ICAgICIgICAgfSIsCiAgICAiPC9zdHlsZT4iLAp9LCA1IH0sCgp7ICI8c2NyaXB0PiBpbmxpbmUi
-LCAgICAgICAgICAgNCwgewogICAgIjxzY3JpcHQ+IiwKICAgICIgICAg4paIIiwKICAgICI8L3Nj
-cmlwdD4iLAp9LCAzIH0sCgp7ICJmZXRjaCgpIGLDoXNpY28iLCAgICAgICAgICAgIDQsIHsKICAg
-ICJmZXRjaCgn4paIdXJsJykiLAogICAgIiAgICAudGhlbihyID0+IHIuanNvbigpKSIsCiAgICAi
-ICAgIC50aGVuKGRhdGEgPT4geyIsCiAgICAiICAgICAgICBjb25zb2xlLmxvZyhkYXRhKTsiLAog
-ICAgIiAgICB9KSIsCiAgICAiICAgIC5jYXRjaChlcnIgPT4gY29uc29sZS5lcnJvcihlcnIpKTsi
-LAp9LCA2IH0sCgp7ICJmZXRjaCArIGF0dWFsaXphciBET00iLCAgICAgNCwgewogICAgImZldGNo
-KCfilogvYXBpL2VuZHBvaW50JykiLAogICAgIiAgICAudGhlbihyID0+IHIuanNvbigpKSIsCiAg
-ICAiICAgIC50aGVuKGRhdGEgPT4geyIsCiAgICAiICAgICAgICBkb2N1bWVudC5nZXRFbGVtZW50
-QnlJZCgncmVzdWx0YWRvJykudGV4dENvbnRlbnQgPSBkYXRhLm1zZzsiLAogICAgIiAgICB9KTsi
-LAp9LCA1IH0sCgp7ICJ3ZWIuc2VydmUgKEx1YSDigJQgcm9kYXIgc2Vydmlkb3IpIiw0LCB7CiAg
-ICAiLS0gU2FsdmUgZXN0ZSBIVE1MIGUgcm9kZSBubyBSRVBMIGRvIEVsbGlvdE9TOiIsCiAgICAi
-d2ViLnNlcnZlKCfilohpbmRleC5odG1sJywgODA4MCkiLAogICAgIi0tIEFjZXNzZTogaHR0cDov
-L2xvY2FsaG9zdDo4MDgwIiwKfSwgMyB9LAoKfTsKCiNkZWZpbmUgU05JUF9UT1RBTCAoKGludCko
-c2l6ZW9mKGdfc25pcHMpL3NpemVvZihnX3NuaXBzWzBdKSkpCgovKiBFc3RhZG8gZG8gcGFpbmVs
-IGRlIHNuaXBwZXRzICovCnN0YXRpYyBpbnQgZ19zbmlwX2FjdGl2ZSA9IDA7CnN0YXRpYyBpbnQg
-Z19zbmlwX3NlbCAgICA9IDA7CnN0YXRpYyBpbnQgZ19zbmlwX3Njcm9sbCA9IDA7ICAgLyogcHJp
-bWVpcmEgbGluaGEgdmlzw612ZWwgZGEgbGlzdGEgKi8KCi8qIEluc2VyZSBvIHNuaXBwZXQgc2Vs
-ZWNpb25hZG8gbmEgcG9zacOnw6NvIGRvIGN1cnNvciAqLwpzdGF0aWMgdm9pZCBzbmlwX2luc2Vy
-dChpbnQgaWR4KSB7CiAgICBpZiAoaWR4IDwgMCB8fCBpZHggPj0gU05JUF9UT1RBTCkgcmV0dXJu
-OwogICAgU25pcHBldCAqc24gPSAmZ19zbmlwc1tpZHhdOwoKICAgIHVuZG9fcHVzaCgpOwoKICAg
-IC8qIEZJWDogc2UgYnVmZmVyIHZhemlvLCBjcmlhIGxpbmhhIGluaWNpYWwgYW50ZXMgZGUgcXVh
-bHF1ZXIgYWNlc3NvIGEgRS5yb3cgKi8KICAgIGlmIChFLm51bXJvd3MgPT0gMCkgewogICAgICAg
-IGluc2VydF9yb3coMCwgIiIsIDApOwogICAgICAgIEUuY3kgPSAwOyBFLmN4ID0gMDsKICAgIH0K
-CiAgICAvKiBkZXRlY3RhIGluZGVudCBkYSBsaW5oYSBhdHVhbCDigJQgbMOqIHBvciDDrW5kaWNl
-LCBuw6NvIGd1YXJkYSBwb250ZWlybwogICAgICAgKGluc2VydF9uZXdsaW5lKCkgcG9kZSByZWFs
-bG9jIEUucm93IHRvcm5hbmRvIHF1YWxxdWVyIFJvdyogaW52w6FsaWRvKSAqLwogICAgaW50IGlu
-ZCA9IDA7CiAgICB7CiAgICAgICAgUm93ICpjdXIgPSAmRS5yb3dbRS5jeV07CiAgICAgICAgd2hp
-bGUgKGluZCA8IGN1ci0+c2l6ZSAmJiAoY3VyLT5jaGFyc1tpbmRdPT0nICd8fGN1ci0+Y2hhcnNb
-aW5kXT09J1x0JykpIGluZCsrOwogICAgfQogICAgY2hhciBpbmRlbnRbNjRdID0gezB9OwogICAg
-aWYgKGluZCA+IDYzKSBpbmQgPSA2MzsKICAgIG1lbXNldChpbmRlbnQsICcgJywgaW5kKTsKCiAg
-ICBpbnQgY3Vyc29yX3JvdyA9IEUuY3k7IC8qIGxpbmhhIGFic29sdXRhIG9uZGUgZmljYXLDoSBv
-IGN1cnNvciAqLwogICAgaW50IGN1cnNvcl9jb2wgPSBpbmQ7CiAgICBpbnQgY3Vyc29yX3NldCA9
-IDA7CgogICAgLyogRklYOiByZWzDqiBvIHRhbWFuaG8gZGEgbGluaGEgcG9yIMOtbmRpY2UgYXDD
-s3MgdW5kb19wdXNoIChxdWUgdGFtYsOpbSBwb2RlCiAgICAgICByZWFsbG9jIHZpYSByb3dzX3Rv
-X3N0cmluZy9pbnNlcnRfcm93KSDigJQgbnVuY2EgdXNhIHBvbnRlaXJvIGNhY2hlYWRvICovCiAg
-ICBpZiAoRS5yb3dbRS5jeV0uc2l6ZSA+IDApIHsKICAgICAgICAvKiB2YWkgcGFyYSBvIGZpbSBk
-YSBsaW5oYSBlIGluc2VyZSBuZXdsaW5lICovCiAgICAgICAgRS5jeCA9IEUucm93W0UuY3ldLnNp
-emU7CiAgICAgICAgaW5zZXJ0X25ld2xpbmUoKTsKICAgICAgICAvKiBhcMOzcyBpbnNlcnRfbmV3
-bGluZSBFLnJvdyBwb2RlIHRlciBzaWRvIHJlYWxvY2FkbzsgRS5jeSBqw6EgZm9pCiAgICAgICAg
-ICAgaW5jcmVtZW50YWRvIHBlbGEgcHLDs3ByaWEgZnVuw6fDo28g4oCUIG7Do28gcHJlY2lzYW1v
-cyBkZSAnY3VyJyBhcXVpICovCiAgICB9CgogICAgaW50IGluc2VydF9zdGFydCA9IEUuY3k7IC8q
-IHByaW1laXJhIGxpbmhhIGRvIHNuaXBwZXQgKi8KCiAgICBmb3IgKGludCBpID0gMDsgaSA8IHNu
-LT5ubGluZXM7IGkrKykgewogICAgICAgIGNvbnN0IGNoYXIgKnRtcGwgPSBzbi0+bGluZXNbaV07
-CiAgICAgICAgaW50IHRsZW4gPSAoaW50KXN0cmxlbih0bXBsKTsKCiAgICAgICAgLyogRklYOiB0
-bGVuLTIgdW5kZXJmbG93YSBwYXJhIElOVF9NQVggcXVhbmRvIHRsZW4gPCAyIChzdHJpbmcgY3Vy
-dGEKICAgICAgICAgICBvdSB2YXppYSk7IHVzYSB0bGVuID49IDMgY29tbyBndWFyZGEgYW50ZXMg
-ZG8gbG9vcCAqLwogICAgICAgIGludCBtYXJrID0gLTE7CiAgICAgICAgaWYgKHRsZW4gPj0gMykg
-ewogICAgICAgICAgICBmb3IgKGludCBqID0gMDsgaiA8PSB0bGVuLTM7IGorKykgewogICAgICAg
-ICAgICAgICAgaWYgKCh1bnNpZ25lZCBjaGFyKXRtcGxbal09PTB4RTIgJiYKICAgICAgICAgICAg
-ICAgICAgICAodW5zaWduZWQgY2hhcil0bXBsW2orMV09PTB4OTYgJiYKICAgICAgICAgICAgICAg
-ICAgICAodW5zaWduZWQgY2hhcil0bXBsW2orMl09PTB4ODgpIHsKICAgICAgICAgICAgICAgICAg
-ICBtYXJrID0gajsgYnJlYWs7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAg
-ICB9CgogICAgICAgIC8qIG1vbnRhIGxpbmhhOiBpbmRlbnQgKyB0ZW1wbGF0ZSBzZW0gbWFyY2Fk
-b3IgKi8KICAgICAgICBjaGFyIGJ1Zls1MTJdOwogICAgICAgIGludCBibGVuID0gMDsKICAgICAg
-ICBtZW1jcHkoYnVmLCBpbmRlbnQsIGluZCk7IGJsZW4gPSBpbmQ7CiAgICAgICAgaWYgKG1hcmsg
-PCAwKSB7CiAgICAgICAgICAgIC8qIHNlbSBtYXJjYWRvciDigJQgY29waWEgdHVkbyAqLwogICAg
-ICAgICAgICBpbnQgY3AgPSB0bGVuIDwgKGludClzaXplb2YoYnVmKS1pbmQtMSA/IHRsZW4gOiAo
-aW50KXNpemVvZihidWYpLWluZC0xOwogICAgICAgICAgICBtZW1jcHkoYnVmK2JsZW4sIHRtcGws
-IGNwKTsgYmxlbiArPSBjcDsKICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAvKiBjb3BpYSBh
-bnRlcyBkbyBtYXJjYWRvciAqLwogICAgICAgICAgICBpbnQgYmVmb3JlID0gbWFyayA8IChpbnQp
-c2l6ZW9mKGJ1ZiktaW5kLTEgPyBtYXJrIDogKGludClzaXplb2YoYnVmKS1pbmQtMTsKICAgICAg
-ICAgICAgbWVtY3B5KGJ1ZitibGVuLCB0bXBsLCBiZWZvcmUpOyBibGVuICs9IGJlZm9yZTsKICAg
-ICAgICAgICAgLyogc2FsdmEgcG9zacOnw6NvIGRvIGN1cnNvciAqLwogICAgICAgICAgICBpZiAo
-IWN1cnNvcl9zZXQpIHsKICAgICAgICAgICAgICAgIGN1cnNvcl9yb3cgPSBpbnNlcnRfc3RhcnQg
-KyBpOwogICAgICAgICAgICAgICAgY3Vyc29yX2NvbCA9IGJsZW47CiAgICAgICAgICAgICAgICBj
-dXJzb3Jfc2V0ID0gMTsKICAgICAgICAgICAgfQogICAgICAgICAgICAvKiBjb3BpYSBkZXBvaXMg
-ZG8gbWFyY2Fkb3IgKHB1bGEgMyBieXRlcyBkbyDilogpICovCiAgICAgICAgICAgIGNvbnN0IGNo
-YXIgKmFmdGVyID0gdG1wbCArIG1hcmsgKyAzOwogICAgICAgICAgICBpbnQgYWxlbiA9IChpbnQp
-c3RybGVuKGFmdGVyKTsKICAgICAgICAgICAgaW50IGNwID0gYWxlbiA8IChpbnQpc2l6ZW9mKGJ1
-ZiktYmxlbi0xID8gYWxlbiA6IChpbnQpc2l6ZW9mKGJ1ZiktYmxlbi0xOwogICAgICAgICAgICBt
-ZW1jcHkoYnVmK2JsZW4sIGFmdGVyLCBjcCk7IGJsZW4gKz0gY3A7CiAgICAgICAgfQogICAgICAg
-IGJ1ZltibGVuXSA9ICdcMCc7CgogICAgICAgIGlmIChpID09IDApIHsKICAgICAgICAgICAgLyog
-RklYOiByZWzDqiBwb250ZWlybyBhcMOzcyBwb3Nzw612ZWwgcmVhbGxvYyBjYXVzYWRvIHBvciBp
-bnNlcnRfbmV3bGluZSAqLwogICAgICAgICAgICBSb3cgKnIgPSAmRS5yb3dbRS5jeV07CiAgICAg
-ICAgICAgIGZyZWUoci0+Y2hhcnMpOwogICAgICAgICAgICByLT5jaGFycyA9IG1hbGxvYyhibGVu
-KzEpOwogICAgICAgICAgICBpZiAoIXItPmNoYXJzKSB7IHItPmNoYXJzID0gbWFsbG9jKDEpOyBy
-LT5jaGFyc1swXT0nXDAnOyByLT5zaXplPTA7IGNvbnRpbnVlOyB9CiAgICAgICAgICAgIG1lbWNw
-eShyLT5jaGFycywgYnVmLCBibGVuKTsKICAgICAgICAgICAgci0+Y2hhcnNbYmxlbl0gPSAnXDAn
-OwogICAgICAgICAgICByLT5zaXplID0gYmxlbjsKICAgICAgICAgICAgdXBkYXRlX3JvdyhyKTsg
-RS5kaXJ0eSsrOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIC8qIGxpbmhhcyBzZWd1aW50
-ZXM6IGluc2VyZSBhcMOzcyBhIGxpbmhhIGF0dWFsICovCiAgICAgICAgICAgIGluc2VydF9yb3co
-aW5zZXJ0X3N0YXJ0ICsgaSwgYnVmLCBibGVuKTsKICAgICAgICB9CiAgICB9CgogICAgLyogcG9z
-aWNpb25hIGN1cnNvciAqLwogICAgRS5jeSA9IGN1cnNvcl9yb3c7CiAgICBFLmN4ID0gY3Vyc29y
-X2NvbDsKICAgIGlmIChFLmN5ID49IEUubnVtcm93cykgRS5jeSA9IEUubnVtcm93cyA+IDAgPyBF
-Lm51bXJvd3MgLSAxIDogMDsKICAgIGlmIChFLmN5IDwgMCkgRS5jeSA9IDA7CiAgICBpZiAoRS5u
-dW1yb3dzID4gMCAmJiBFLmN4ID4gRS5yb3dbRS5jeV0uc2l6ZSkgRS5jeCA9IEUucm93W0UuY3ld
-LnNpemU7Cn0KCi8qIEZpbHRyYSBzbmlwcGV0cyBwZWxhIGxpbmd1YWdlbSBhdHVhbCAqLwpzdGF0
-aWMgaW50IHNuaXBfdmlzaWJsZVtTTklQX0NPVU5UXTsKc3RhdGljIGludCBzbmlwX3Zpc19jb3Vu
-dCA9IDA7CgpzdGF0aWMgdm9pZCBzbmlwX2J1aWxkX2xpc3Qodm9pZCkgewogICAgc25pcF92aXNf
-Y291bnQgPSAwOwogICAgaW50IGxhbmcgPSAtMTsKICAgIGlmIChFLnN5bnRheCA9PSAmSExEQlsw
-XSB8fCBFLnN5bnRheCA9PSAmSExEQlsxXSkgbGFuZyA9IDA7CiAgICBlbHNlIGlmIChFLnN5bnRh
-eCA9PSAmSExEQlsyXSkgbGFuZyA9IDE7CiAgICBlbHNlIGlmIChFLnN5bnRheCA9PSAmSExEQlsz
-XSkgbGFuZyA9IDI7CiAgICBlbHNlIGlmIChFLnN5bnRheCA9PSAmSExEQls0XSkgbGFuZyA9IDQ7
-CgogICAgZm9yIChpbnQgaSA9IDA7IGkgPCBTTklQX1RPVEFMICYmIHNuaXBfdmlzX2NvdW50IDwg
-U05JUF9DT1VOVDsgaSsrKSB7CiAgICAgICAgaWYgKGdfc25pcHNbaV0ubGFuZyA9PSAzIHx8IGdf
-c25pcHNbaV0ubGFuZyA9PSBsYW5nKQogICAgICAgICAgICBzbmlwX3Zpc2libGVbc25pcF92aXNf
-Y291bnQrK10gPSBpOwogICAgfQp9CgoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIEVYUExPUkFET1IgREUgQVJRVUlWT1MgKEN0cmwr
-UCkKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQICovCgojZGVmaW5lIEZFWFBfTUFYICAgMjA0OCAgLyogbWF4IGVudHJhZGFzIHBvciBkaXJl
-dMOzcmlvICovCiNkZWZpbmUgRkVYUF9TSE9XICAxNiAgICAvKiBsaW5oYXMgdmlzw612ZWlzICov
-CiNkZWZpbmUgRkVYUF9OQU1FTEVOIDY0Cgp0eXBlZGVmIHN0cnVjdCB7CiAgICBjaGFyIG5hbWVb
-RkVYUF9OQU1FTEVOXTsKICAgIGludCAgaXNfZGlyOwp9IEZFbnRyeTsKCnN0YXRpYyBGRW50cnkg
-IGdfZmV4cF9lbnRyaWVzW0ZFWFBfTUFYXTsKc3RhdGljIGludCAgICAgZ19mZXhwX2NvdW50ICA9
-IDA7CnN0YXRpYyBpbnQgICAgIGdfZmV4cF9zZWwgICAgPSAwOwpzdGF0aWMgaW50ICAgICBnX2Zl
-eHBfc2Nyb2xsID0gMDsKc3RhdGljIGludCAgICAgZ19mZXhwX2FjdGl2ZSA9IDA7CnN0YXRpYyBj
-aGFyICAgIGdfZmV4cF9jd2RbNTEyXTsKCi8qIOKUgOKUgCBjYW1wbyBkZSB0ZXh0byBwYXJhIGRp
-Z2l0YXIgY2FtaW5obyDilIDilIAgKi8KI2RlZmluZSBGRVhQX0lOUFVUX01BWCAyNTYKc3RhdGlj
-IGNoYXIgZ19mZXhwX2lucHV0W0ZFWFBfSU5QVVRfTUFYXTsgLyogdGV4dG8gZGlnaXRhZG8gKi8K
-c3RhdGljIGludCAgZ19mZXhwX2lucHV0X2xlbiA9IDA7CnN0YXRpYyBpbnQgIGdfZmV4cF9pbnB1
-dF9tb2RlID0gMDsgICAgICAgIC8qIDEgPSB1c3XDoXJpbyBlc3TDoSBkaWdpdGFuZG8gKi8KCi8q
-IENvbXBhcmEgZW50cmFkYXM6IGRpcmV0w7NyaW9zIHByaW1laXJvLCBkZXBvaXMgYWxmYWLDqXRp
-Y28gKi8Kc3RhdGljIGludCBmZXhwX2NtcChjb25zdCB2b2lkICphLCBjb25zdCB2b2lkICpiKSB7
-CiAgICBjb25zdCBGRW50cnkgKmZhID0gKGNvbnN0IEZFbnRyeSAqKWE7CiAgICBjb25zdCBGRW50
-cnkgKmZiID0gKGNvbnN0IEZFbnRyeSAqKWI7CiAgICBpZiAoZmEtPmlzX2RpciAhPSBmYi0+aXNf
-ZGlyKSByZXR1cm4gZmItPmlzX2RpciAtIGZhLT5pc19kaXI7CiAgICByZXR1cm4gc3RyY21wKGZh
-LT5uYW1lLCBmYi0+bmFtZSk7Cn0KCi8qIENhcnJlZ2EgZW50cmFkYXMgZG8gZGlyZXTDs3JpbyBh
-dHVhbCAqLwpzdGF0aWMgdm9pZCBmZXhwX2xvYWQoY29uc3QgY2hhciAqcGF0aCkgewogICAgLyog
-cmVzb2x2ZSBjYW1pbmhvIHJlYWwg4oCUIHNlZ3VlIHN5bWxpbmtzLCByZXNvbHZlIC4uICovCiAg
-ICBjaGFyIHJlc29sdmVkWzUxMl07CiAgICBpZiAoIXJlYWxwYXRoKHBhdGgsIHJlc29sdmVkKSkK
-ICAgICAgICBzbnByaW50ZihyZXNvbHZlZCwgc2l6ZW9mKHJlc29sdmVkKSwgIiVzIiwgcGF0aCk7
-CgogICAgRElSICpkID0gb3BlbmRpcihyZXNvbHZlZCk7CiAgICBpZiAoIWQpIHsKICAgICAgICBz
-ZXRfc3RhdHVzKCJceDFiWzMxbVx1MjcxNiBTZW0gcGVybWlzc2FvOiAlc1x4MWJbbSIsIHJlc29s
-dmVkKTsKICAgICAgICByZXR1cm47CiAgICB9CgogICAgc25wcmludGYoZ19mZXhwX2N3ZCwgc2l6
-ZW9mKGdfZmV4cF9jd2QpLCAiJXMiLCByZXNvbHZlZCk7CiAgICBnX2ZleHBfY291bnQgID0gMDsK
-ICAgIGdfZmV4cF9zZWwgICAgPSAwOwogICAgZ19mZXhwX3Njcm9sbCA9IDA7CgogICAgLyogZW50
-cmFkYSAiLi4iIHNlbXByZSBwcmltZWlybyAoZXhjZXRvIG5hIHJhaXopICovCiAgICBpZiAoc3Ry
-Y21wKHJlc29sdmVkLCAiLyIpICE9IDApIHsKICAgICAgICBzbnByaW50ZihnX2ZleHBfZW50cmll
-c1tnX2ZleHBfY291bnRdLm5hbWUsIEZFWFBfTkFNRUxFTiwgIi4uIik7CiAgICAgICAgZ19mZXhw
-X2VudHJpZXNbZ19mZXhwX2NvdW50XS5pc19kaXIgPSAxOwogICAgICAgIGdfZmV4cF9jb3VudCsr
-OwogICAgfQoKICAgIHN0cnVjdCBkaXJlbnQgKmRlOwogICAgd2hpbGUgKChkZSA9IHJlYWRkaXIo
-ZCkpICYmIGdfZmV4cF9jb3VudCA8IEZFWFBfTUFYKSB7CiAgICAgICAgaWYgKGRlLT5kX25hbWVb
-MF0gPT0gJy4nKSBjb250aW51ZTsKICAgICAgICBGRW50cnkgKmZlID0gJmdfZmV4cF9lbnRyaWVz
-W2dfZmV4cF9jb3VudF07CiAgICAgICAgc25wcmludGYoZmUtPm5hbWUsIEZFWFBfTkFNRUxFTiwg
-IiVzIiwgZGUtPmRfbmFtZSk7CiAgICAgICAgY2hhciBmdWxsWzY0MF07CiAgICAgICAgc25wcmlu
-dGYoZnVsbCwgc2l6ZW9mKGZ1bGwpLCAiJXMvJXMiLCByZXNvbHZlZCwgZGUtPmRfbmFtZSk7CiAg
-ICAgICAgc3RydWN0IHN0YXQgc3Q7CiAgICAgICAgZmUtPmlzX2RpciA9IChzdGF0KGZ1bGwsICZz
-dCkgPT0gMCkgPyBTX0lTRElSKHN0LnN0X21vZGUpCiAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgIDogKGRlLT5kX3R5cGUgPT0gRFRfRElSKTsKICAgICAgICBnX2Zl
-eHBfY291bnQrKzsKICAgIH0KICAgIGNsb3NlZGlyKGQpOwoKICAgIGlmIChnX2ZleHBfY291bnQg
-PiAxKSB7CiAgICAgICAgaW50IHN0YXJ0ID0gKHN0cmNtcChnX2ZleHBfZW50cmllc1swXS5uYW1l
-LCAiLi4iKSA9PSAwKSA/IDEgOiAwOwogICAgICAgIHFzb3J0KGdfZmV4cF9lbnRyaWVzICsgc3Rh
-cnQsIGdfZmV4cF9jb3VudCAtIHN0YXJ0LAogICAgICAgICAgICAgIHNpemVvZihGRW50cnkpLCBm
-ZXhwX2NtcCk7CiAgICB9Cn0KCi8qIFNvYmUgdW0gbsOtdmVsIHVzYW5kbyByZWFscGF0aCBwYXJh
-IHJlc29sdmVyIHN5bWxpbmtzIGNvcnJldGFtZW50ZSAqLwpzdGF0aWMgdm9pZCBmZXhwX2dvX3Bh
-cmVudCh2b2lkKSB7CiAgICBjaGFyIHBhcmVudFs2NDBdOwogICAgc25wcmludGYocGFyZW50LCBz
-aXplb2YocGFyZW50KSwgIiVzLy4uIiwgZ19mZXhwX2N3ZCk7CiAgICBjaGFyIHJlc29sdmVkWzUx
-Ml07CiAgICBpZiAoIXJlYWxwYXRoKHBhcmVudCwgcmVzb2x2ZWQpKSB7CiAgICAgICAgY2hhciAq
-c2xhc2ggPSBzdHJyY2hyKGdfZmV4cF9jd2QsICcvJyk7CiAgICAgICAgaWYgKHNsYXNoICYmIHNs
-YXNoICE9IGdfZmV4cF9jd2QpIHsKICAgICAgICAgICAgc25wcmludGYocmVzb2x2ZWQsIHNpemVv
-ZihyZXNvbHZlZCksICIlLipzIiwKICAgICAgICAgICAgICAgICAgICAgKGludCkoc2xhc2ggLSBn
-X2ZleHBfY3dkKSwgZ19mZXhwX2N3ZCk7CiAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgc25w
-cmludGYocmVzb2x2ZWQsIHNpemVvZihyZXNvbHZlZCksICIvIik7CiAgICAgICAgfQogICAgfQog
-ICAgZmV4cF9sb2FkKHJlc29sdmVkKTsKfQoKLyogQWJyZSBvIGV4cGxvcmFkb3Igbm8gZGlyZXTD
-s3JpbyBkbyBhcnF1aXZvIGF0dWFsIG91IEhPTUUgKi8Kc3RhdGljIHZvaWQgZmV4cF9vcGVuKHZv
-aWQpIHsKICAgIGNoYXIgc3RhcnRbNTEyXTsKICAgIGlmIChFLmZpbGVuYW1lKSB7CiAgICAgICAg
-LyogcGVnYSBvIGRpcmV0w7NyaW8gZG8gYXJxdWl2byBhYmVydG8gKi8KICAgICAgICBzbnByaW50
-ZihzdGFydCwgc2l6ZW9mKHN0YXJ0KSwgIiVzIiwgRS5maWxlbmFtZSk7CiAgICAgICAgY2hhciAq
-c2xhc2ggPSBzdHJyY2hyKHN0YXJ0LCAnLycpOwogICAgICAgIGlmIChzbGFzaCAmJiBzbGFzaCAh
-PSBzdGFydCkgeyAqc2xhc2ggPSAnXDAnOyB9CiAgICAgICAgZWxzZSB7IHNucHJpbnRmKHN0YXJ0
-LCBzaXplb2Yoc3RhcnQpLCAiLiIpOyB9CiAgICB9IGVsc2UgewogICAgICAgIGNvbnN0IGNoYXIg
-KmggPSBnZXRlbnYoIkhPTUUiKTsKICAgICAgICBzbnByaW50ZihzdGFydCwgc2l6ZW9mKHN0YXJ0
-KSwgIiVzIiwgaCA/IGggOiAiLiIpOwogICAgfQogICAgZmV4cF9sb2FkKHN0YXJ0KTsKICAgIGdf
-ZmV4cF9hY3RpdmUgPSAxOwogICAgZ19mZXhwX2lucHV0WzBdICAgPSAnXDAnOwogICAgZ19mZXhw
-X2lucHV0X2xlbiAgPSAwOwogICAgZ19mZXhwX2lucHV0X21vZGUgPSAwOwogICAgc2V0X3N0YXR1
-cygiQ3RybCtQOiBcdTIxOTFcdTIxOTMgbmF2ZWdhciAgRW50ZXIgYWJyaXIgIFRhYiBkaWdpdGFy
-IGNhbWluaG8gIEVzYyBmZWNoYXIiKTsKfQoKLyogQWJyZSBvIGFycXVpdm8gc2VsZWNpb25hZG8g
-b3UgZW50cmEgbm8gZGlyZXTDs3JpbyAqLwovKiBBYnJlIG91IGNyaWEgYXJxdWl2byBhIHBhcnRp
-ciBkbyBjYW1pbmhvIGRpZ2l0YWRvIG91IHNlbGVjaW9uYWRvICovCnN0YXRpYyB2b2lkIGZleHBf
-b3Blbl9wYXRoKGNvbnN0IGNoYXIgKnBhdGgpIHsKICAgIGlmICghcGF0aCB8fCAhcGF0aFswXSkg
-cmV0dXJuOwoKICAgIC8qIGV4cGFuZGUgfiBwYXJhIEhPTUUgKi8KICAgIGNoYXIgZXhwYW5kZWRb
-NjQwXTsKICAgIGlmIChwYXRoWzBdID09ICd+JykgewogICAgICAgIGNvbnN0IGNoYXIgKmggPSBn
-ZXRlbnYoIkhPTUUiKTsKICAgICAgICBzbnByaW50ZihleHBhbmRlZCwgc2l6ZW9mKGV4cGFuZGVk
-KSwgIiVzJXMiLCBoID8gaCA6ICIiLCBwYXRoICsgMSk7CiAgICB9IGVsc2UgewogICAgICAgIHNu
-cHJpbnRmKGV4cGFuZGVkLCBzaXplb2YoZXhwYW5kZWQpLCAiJXMiLCBwYXRoKTsKICAgIH0KCiAg
-ICAvKiB2ZXJpZmljYSBzZSBlIGRpcmV0b3JpbyAqLwogICAgc3RydWN0IHN0YXQgc3Q7CiAgICBp
-ZiAoc3RhdChleHBhbmRlZCwgJnN0KSA9PSAwICYmIFNfSVNESVIoc3Quc3RfbW9kZSkpIHsKICAg
-ICAgICBmZXhwX2xvYWQoZXhwYW5kZWQpOwogICAgICAgIGdfZmV4cF9pbnB1dFswXSAgID0gJ1ww
-JzsKICAgICAgICBnX2ZleHBfaW5wdXRfbGVuICA9IDA7CiAgICAgICAgZ19mZXhwX2lucHV0X21v
-ZGUgPSAwOwogICAgICAgIHJldHVybjsKICAgIH0KCiAgICAvKiBlIGFycXVpdm8gKGV4aXN0ZW50
-ZSBvdSBub3ZvKSDigJQgYWJyZSAqLwogICAgZ19mZXhwX2FjdGl2ZSAgICAgPSAwOwogICAgZ19m
-ZXhwX2lucHV0X21vZGUgPSAwOwoKICAgIGlmIChFLmRpcnR5KSB7CiAgICAgICAgc2V0X3N0YXR1
-cygiXHgxYlszM21cdTI2YTAgU2FsdmUgYW50ZXMgKEN0cmwrUykgb3UgYWJyYSBub3ZhbWVudGVc
-eDFiW20iKTsKICAgICAgICByZXR1cm47CiAgICB9CgogICAgLyogbGltcGEgZXN0YWRvIGF0dWFs
-ICovCiAgICBmb3IgKGludCBpID0gMDsgaSA8IEUubnVtcm93czsgaSsrKSB7CiAgICAgICAgZnJl
-ZShFLnJvd1tpXS5jaGFycyk7CiAgICAgICAgZnJlZShFLnJvd1tpXS5yZW5kZXIpOwogICAgICAg
-IGZyZWUoRS5yb3dbaV0uaGwpOwogICAgfQogICAgZnJlZShFLnJvdyk7CiAgICBFLnJvdyA9IE5V
-TEw7IEUubnVtcm93cyA9IDA7CiAgICBmcmVlKEUuZmlsZW5hbWUpOyBFLmZpbGVuYW1lID0gTlVM
-TDsKICAgIEUuY3ggPSAwOyBFLmN5ID0gMDsgRS5yb3dvZmYgPSAwOyBFLmNvbG9mZiA9IDA7IEUu
-ZGlydHkgPSAwOwoKICAgIGlmIChzdGF0KGV4cGFuZGVkLCAmc3QpICE9IDApIHsKICAgICAgICAv
-KiBhcnF1aXZvIG5hbyBleGlzdGUg4oCUIGNyaWEgdmF6aW8gKi8KICAgICAgICBGSUxFICpmcCA9
-IGZvcGVuKGV4cGFuZGVkLCAidyIpOwogICAgICAgIGlmICghZnApIHsgc2V0X3N0YXR1cygiXHgx
-YlszMW1cdTI3MTYgTmFvIGZvaSBwb3NzaXZlbCBjcmlhcjogJXNceDFiW20iLCBleHBhbmRlZCk7
-IHJldHVybjsgfQogICAgICAgIGZjbG9zZShmcCk7CiAgICAgICAgc2V0X3N0YXR1cygiQXJxdWl2
-byBjcmlhZG86ICVzIiwgZXhwYW5kZWQpOwogICAgfQoKICAgIG9wZW5fZmlsZShleHBhbmRlZCk7
-Cn0KCnN0YXRpYyB2b2lkIGZleHBfY29uZmlybSh2b2lkKSB7CiAgICAvKiBtb2RvIGRpZ2l0YWNh
-bzogRW50ZXIgY29uZmlybWEgbyBjYW1pbmhvIGRpZ2l0YWRvICovCiAgICBpZiAoZ19mZXhwX2lu
-cHV0X21vZGUpIHsKICAgICAgICBmZXhwX29wZW5fcGF0aChnX2ZleHBfaW5wdXQpOwogICAgICAg
-IHJldHVybjsKICAgIH0KCiAgICBpZiAoZ19mZXhwX2NvdW50ID09IDApIHJldHVybjsKICAgIEZF
-bnRyeSAqZmUgPSAmZ19mZXhwX2VudHJpZXNbZ19mZXhwX3NlbF07CgogICAgaWYgKHN0cmNtcChm
-ZS0+bmFtZSwgIi4uIikgPT0gMCkgewogICAgICAgIGZleHBfZ29fcGFyZW50KCk7CiAgICAgICAg
-cmV0dXJuOwogICAgfQoKICAgIGNoYXIgZnVsbFs2NDBdOwogICAgc25wcmludGYoZnVsbCwgc2l6
-ZW9mKGZ1bGwpLCAiJXMvJXMiLCBnX2ZleHBfY3dkLCBmZS0+bmFtZSk7CgogICAgaWYgKGZlLT5p
-c19kaXIpIHsKICAgICAgICBmZXhwX2xvYWQoZnVsbCk7CiAgICAgICAgcmV0dXJuOwogICAgfQoK
-ICAgIGZleHBfb3Blbl9wYXRoKGZ1bGwpOwp9CgovKiBEZXNlbmhhIG8gcGFpbmVsIGRvIGV4cGxv
-cmFkb3IgKi8Kc3RhdGljIHZvaWQgZHJhd19mZXhwX3BhbmVsKEFidWYgKmFiKSB7CiAgICBpZiAo
-IWdfZmV4cF9hY3RpdmUpIHJldHVybjsKCiAgICBpbnQgcGFuZWxfaCAgPSBGRVhQX1NIT1c7CiAg
-ICBpbnQgcGFuZWxfdyAgPSA1NDsKICAgIGludCBwYW5lbF9jb2wgPSAoRS5jb2xzIC0gcGFuZWxf
-dykgLyAyOwogICAgaWYgKHBhbmVsX2NvbCA8IDEpIHBhbmVsX2NvbCA9IDE7CiAgICBpbnQgcGFu
-ZWxfcm93ID0gKEUucm93cyAtIHBhbmVsX2ggLSAzKSAvIDI7CiAgICBpZiAocGFuZWxfcm93IDwg
-MikgcGFuZWxfcm93ID0gMjsKCiAgICAvKiB0w610dWxvIGNvbSBwYXRoIGF0dWFsICovCiAgICB7
-CiAgICAgICAgY2hhciBwb3NbMzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJbJWQ7
-JWRIIixwYW5lbF9yb3cscGFuZWxfY29sKTsKICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxl
-bihwb3MpKTsKICAgICAgICBhYl9hcHBlbmQoYWIsIlx4MWJbNDg7NTsxN21ceDFiWzM4OzU7MTE3
-bVx4MWJbMW0iLDI1KTsKICAgICAgICBjaGFyIHRpdGxlWzY0XTsKICAgICAgICAvKiB0cnVuY2Eg
-Y3dkIHBlbGEgZGlyZWl0YSBzZSBtdWl0byBsb25nbyAqLwogICAgICAgIGNvbnN0IGNoYXIgKmN3
-ZCA9IGdfZmV4cF9jd2Q7CiAgICAgICAgaW50IGN3ZGxlbiA9IChpbnQpc3RybGVuKGN3ZCk7CiAg
-ICAgICAgaW50IGF2YWlsICA9IHBhbmVsX3cgLSA0OwogICAgICAgIGlmIChjd2RsZW4gPiBhdmFp
-bCkgY3dkICs9IGN3ZGxlbiAtIGF2YWlsOwogICAgICAgIGludCB0bCA9IHNucHJpbnRmKHRpdGxl
-LHNpemVvZih0aXRsZSksIiDwn5OBICVzICIsY3dkKTsKICAgICAgICBpZiAodGwgPiBwYW5lbF93
-KSB0bCA9IHBhbmVsX3c7CiAgICAgICAgYWJfYXBwZW5kKGFiLHRpdGxlLHRsKTsKICAgICAgICBm
-b3IgKGludCBzPXRsO3M8cGFuZWxfdztzKyspIGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAg
-YWJfYXBwZW5kKGFiLCJceDFiW20iLDMpOwogICAgfQoKICAgIC8qIGFqdXN0YSBzY3JvbGwgKi8K
-ICAgIGlmIChnX2ZleHBfc2VsIDwgZ19mZXhwX3Njcm9sbCkgZ19mZXhwX3Njcm9sbCA9IGdfZmV4
-cF9zZWw7CiAgICBpZiAoZ19mZXhwX3NlbCA+PSBnX2ZleHBfc2Nyb2xsICsgcGFuZWxfaCkgZ19m
-ZXhwX3Njcm9sbCA9IGdfZmV4cF9zZWwgLSBwYW5lbF9oICsgMTsKCiAgICBmb3IgKGludCBpID0g
-MDsgaSA8IHBhbmVsX2g7IGkrKykgewogICAgICAgIGludCBpZHggPSBnX2ZleHBfc2Nyb2xsICsg
-aTsKICAgICAgICBpbnQgcm93ID0gcGFuZWxfcm93ICsgMSArIGk7CiAgICAgICAgaWYgKHJvdyA+
-PSBFLnJvd3MpIGJyZWFrOwoKICAgICAgICBjaGFyIHBvc1szMl07IHNucHJpbnRmKHBvcyxzaXpl
-b2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5lbF9jb2wpOwogICAgICAgIGFiX2FwcGVuZChh
-Yixwb3Msc3RybGVuKHBvcykpOwoKICAgICAgICBpZiAoaWR4ID49IGdfZmV4cF9jb3VudCkgewog
-ICAgICAgICAgICAvKiBsaW5oYSB2YXppYSAqLwogICAgICAgICAgICBhYl9hcHBlbmQoYWIsIlx4
-MWJbNDg7NTsxN20iLDEwKTsKICAgICAgICAgICAgZm9yIChpbnQgcz0wO3M8cGFuZWxfdztzKysp
-IGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYlttIiwz
-KTsKICAgICAgICAgICAgY29udGludWU7CiAgICAgICAgfQoKICAgICAgICBGRW50cnkgKmZlID0g
-JmdfZmV4cF9lbnRyaWVzW2lkeF07CiAgICAgICAgaW50IHNlbGVjdGVkID0gKGlkeCA9PSBnX2Zl
-eHBfc2VsKTsKCiAgICAgICAgaWYgKHNlbGVjdGVkKQogICAgICAgICAgICBhYl9hcHBlbmQoYWIs
-Ilx4MWJbNDg7NTsyN21ceDFiWzM4OzU7MjU1bVx4MWJbMW0iLDI1KTsKICAgICAgICBlbHNlCiAg
-ICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYls0ODs1OzE3bVx4MWJbMzg7NTsxNTNtIiwyMSk7
-CgogICAgICAgIC8qIMOtY29uZSAqLwogICAgICAgIGNvbnN0IGNoYXIgKmljb247CiAgICAgICAg
-aWYgKHN0cmNtcChmZS0+bmFtZSwiLi4iKSA9PSAwKSAgICAgICBpY29uID0gIuKGkSAiOwogICAg
-ICAgIGVsc2UgaWYgKGZlLT5pc19kaXIpICAgICAgICAgICAgICAgICAgIGljb24gPSAi4pa4ICI7
-CiAgICAgICAgZWxzZSB7CiAgICAgICAgICAgIC8qIMOtY29uZSBwb3IgZXh0ZW5zw6NvICovCiAg
-ICAgICAgICAgIGNvbnN0IGNoYXIgKmV4dCA9IHN0cnJjaHIoZmUtPm5hbWUsJy4nKTsKICAgICAg
-ICAgICAgaWYgICAgICAoIWV4dCkgICAgICAgICAgICAgICAgICAgICAgaWNvbiA9ICIgICI7CiAg
-ICAgICAgICAgIGVsc2UgaWYgKCFzdHJjbXAoZXh0LCIubHVhIikpICAgICAgICBpY29uID0gIkwg
-IjsKICAgICAgICAgICAgZWxzZSBpZiAoIXN0cmNtcChleHQsIi5jIil8fAogICAgICAgICAgICAg
-ICAgICAgICAhc3RyY21wKGV4dCwiLmgiKSkgICAgICAgICAgaWNvbiA9ICJDICI7CiAgICAgICAg
-ICAgIGVsc2UgaWYgKCFzdHJjbXAoZXh0LCIuc2giKSkgICAgICAgICBpY29uID0gIiQgIjsKICAg
-ICAgICAgICAgZWxzZSBpZiAoIXN0cmNtcChleHQsIi50eHQiKXx8CiAgICAgICAgICAgICAgICAg
-ICAgICFzdHJjbXAoZXh0LCIubWQiKSkgICAgICAgICBpY29uID0gIlQgIjsKICAgICAgICAgICAg
-ZWxzZSAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGljb24gPSAiwrcgIjsKICAgICAg
-ICB9CgogICAgICAgIGNoYXIgbGluZVs4MF07CiAgICAgICAgaW50IGxsID0gc25wcmludGYobGlu
-ZSxzaXplb2YobGluZSksIiAlcyUtKnMgIiwKICAgICAgICAgICAgICAgICAgICAgICAgICBpY29u
-LCBwYW5lbF93LTQsIGZlLT5uYW1lKTsKICAgICAgICBpZiAobGwgPiBwYW5lbF93KSBsbCA9IHBh
-bmVsX3c7CiAgICAgICAgYWJfYXBwZW5kKGFiLGxpbmUsbGwpOwogICAgICAgIGZvciAoaW50IHM9
-bGw7czxwYW5lbF93O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAgICBhYl9hcHBlbmQo
-YWIsIlx4MWJbbSIsMyk7CiAgICB9CgogICAgLyogY2FtcG8gZGUgaW5wdXQgKi8KICAgIHsKICAg
-ICAgICBpbnQgaXJvdyA9IHBhbmVsX3JvdyArIDEgKyBwYW5lbF9oOwogICAgICAgIGlmIChpcm93
-IDwgRS5yb3dzKSB7CiAgICAgICAgICAgIGNoYXIgcG9zWzMyXTsgc25wcmludGYocG9zLHNpemVv
-Zihwb3MpLCJceDFiWyVkOyVkSCIsaXJvdyxwYW5lbF9jb2wpOwogICAgICAgICAgICBhYl9hcHBl
-bmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICAgICAgaWYgKGdfZmV4cF9pbnB1dF9tb2Rl
-KQogICAgICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiWzQ4OzU7MTltXHgxYlszODs1OzI1
-NW1ceDFiWzFtIiwyOCk7CiAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIGFiX2FwcGVu
-ZChhYiwiXHgxYls0ODs1OzE3bVx4MWJbMzg7NTsyNDBtIiwyMSk7CiAgICAgICAgICAgIGNoYXIg
-aWJ1ZltGRVhQX0lOUFVUX01BWCs4XTsKICAgICAgICAgICAgaW50IGlsOwogICAgICAgICAgICBp
-ZiAoZ19mZXhwX2lucHV0X21vZGUpIHsKICAgICAgICAgICAgICAgIGlsID0gc25wcmludGYoaWJ1
-ZixzaXplb2YoaWJ1ZiksIiDilrggJXPiloggIiwgZ19mZXhwX2lucHV0KTsKICAgICAgICAgICAg
-fSBlbHNlIHsKICAgICAgICAgICAgICAgIGlsID0gc25wcmludGYoaWJ1ZixzaXplb2YoaWJ1Ziks
-IiBUYWI6IGRpZ2l0YXIgY2FtaW5obyAvIG5vdm8gYXJxdWl2byAiKTsKICAgICAgICAgICAgfQog
-ICAgICAgICAgICBpZiAoaWw+cGFuZWxfdykgaWw9cGFuZWxfdzsKICAgICAgICAgICAgYWJfYXBw
-ZW5kKGFiLGlidWYsaWwpOwogICAgICAgICAgICBmb3IgKGludCBzPWlsO3M8cGFuZWxfdztzKysp
-IGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYlttIiwz
-KTsKICAgICAgICB9CiAgICB9CgogICAgLyogcm9kYXDDqSAqLwogICAgewogICAgICAgIGludCBy
-b3cgPSBwYW5lbF9yb3cgKyAyICsgcGFuZWxfaDsKICAgICAgICBpZiAocm93IDwgRS5yb3dzKSB7
-CiAgICAgICAgICAgIGNoYXIgcG9zWzMyXTsgc25wcmludGYocG9zLHNpemVvZihwb3MpLCJceDFi
-WyVkOyVkSCIscm93LHBhbmVsX2NvbCk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixwb3Msc3Ry
-bGVuKHBvcykpOwogICAgICAgICAgICBhYl9hcHBlbmQoYWIsIlx4MWJbNDg7NTsxN21ceDFiWzM4
-OzU7MTE3bSIsMjEpOwogICAgICAgICAgICBjaGFyIGZvb3RbNjRdOwogICAgICAgICAgICBpbnQg
-Zmw7CiAgICAgICAgICAgIGlmIChnX2ZleHBfaW5wdXRfbW9kZSkKICAgICAgICAgICAgICAgIGZs
-ID0gc25wcmludGYoZm9vdCxzaXplb2YoZm9vdCksIiBFbnRlciBjb25maXJtYXIgIEVzYyBjYW5j
-ZWxhciBkaWdpdGFjYW8gIik7CiAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIGZsID0g
-c25wcmludGYoZm9vdCxzaXplb2YoZm9vdCksIiAlZC8lZCAg4oaR4oaTIG5hdmVnYXIgIEVudGVy
-IGFicmlyICBUYWIgY2FtaW5obyAiLAogICAgICAgICAgICAgICAgICAgIGdfZmV4cF9jb3VudD4w
-ID8gZ19mZXhwX3NlbCsxIDogMCwgZ19mZXhwX2NvdW50KTsKICAgICAgICAgICAgaWYgKGZsPnBh
-bmVsX3cpIGZsPXBhbmVsX3c7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixmb290LGZsKTsKICAg
-ICAgICAgICAgZm9yIChpbnQgcz1mbDtzPHBhbmVsX3c7cysrKSBhYl9hcHBlbmQoYWIsIiAiLDEp
-OwogICAgICAgICAgICBhYl9hcHBlbmQoYWIsIlx4MWJbbSIsMyk7CiAgICAgICAgfQogICAgfQp9
-CgovKiBBYnJlIG8gcGFpbmVsIGRlIHNuaXBwZXRzICovCnN0YXRpYyB2b2lkIHNuaXBfb3Blbih2
-b2lkKSB7CiAgICBzbmlwX2J1aWxkX2xpc3QoKTsKICAgIGlmIChzbmlwX3Zpc19jb3VudCA9PSAw
-KSB7CiAgICAgICAgc2V0X3N0YXR1cygiXHgxYlszM23imqAgTmVuaHVtIHNuaXBwZXQgcGFyYSBl
-c3RhIGxpbmd1YWdlbVx4MWJbbSIpOwogICAgICAgIHJldHVybjsKICAgIH0KICAgIGdfc25pcF9z
-ZWwgICAgPSAwOwogICAgZ19zbmlwX3Njcm9sbCA9IDA7CiAgICBnX3NuaXBfYWN0aXZlID0gMTsK
-ICAgIHNldF9zdGF0dXMoIkN0cmwrSTog4oaR4oaTIG5hdmVnYXIgIEVudGVyIGluc2VyaXIgIEVz
-YyBmZWNoYXIiKTsKfQoKLyogRGVzZW5oYSBvIHBhaW5lbCBkZSBzbmlwcGV0cyAqLwovKiDilIDi
-lIAgaGVscGVycyBkbyBwYWluZWwgZGUgc25pcHBldHMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAqCiAqIENhZGEgc25p
-cHBldCB0ZW0gdW0gbm9tZSBxdWUgc2VndWUgbyBwYWRyw6NvOgogKiAgICJQUkVGSVhPOiBub21l
-IGRlc2NyaXRpdm8iICAg4oaSIG9yaWdlbSBFbGxpb3RPUyAgKGV4OiAiRWxsaW90T1M6IHR1aS5t
-YWluIikKICogICAibW9kLnhzcyIgICAgICAgICAgICAgICAgICAgIOKGkiBvcmlnZW0gRWxsaW90
-T1MgIChjb21lw6dhIGNvbSBtb2QuL25ldC4vY3J5cHRvLi8KICogICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVpLi9zeXMuL21zLi9haS4vdHVpLi9m
-cy4pCiAqICAgImlmIC8gdGhlbiAvIGVuZCIgICAgICAgICAgICDihpIgZXN0cnV0dXJhIGRhIGxp
-bmd1YWdlbQogKgogKiBBIGZ1bsOnw6NvIHNuaXBfYmFkZ2UoKSBleHRyYWk6CiAqICAgYmFkZ2Ug
-IOKAlCBzaWdsYSBjdXJ0YSAoTkVULCBNT0QsIENSWVBUTywgU1lTLCBBSSwgSUYsIEZPUiwg4oCm
-KQogKiAgIG9yaWdpbiDigJQgIkVsbGlvdE9TIiBvdSBub21lIGRhIGxpbmd1YWdlbQogKiDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
-lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAgKi8Kc3Rh
-dGljIHZvaWQgc25pcF9iYWRnZShpbnQgc2ksIGNoYXIgKmJhZGdlLCBpbnQgYnN6LCBjaGFyICpv
-cmlnaW4sIGludCBvc3opIHsKICAgIGNvbnN0IGNoYXIgKm5hbWUgPSBnX3NuaXBzW3NpXS5uYW1l
-OwogICAgaW50IGxhbmcgICAgICAgICA9IGdfc25pcHNbc2ldLmxhbmc7CgogICAgLyogb3JpZ2Vt
-IGRhIGxpbmd1YWdlbSBiYXNlICovCiAgICBjb25zdCBjaGFyICpsYW5nX3N0ciA9IChsYW5nPT0w
-KT8iQyI6KGxhbmc9PTEpPyJMdWEiOihsYW5nPT0yKT8iQmFzaCI6CiAgICAgICAgICAgICAgICAg
-ICAgICAgICAgIChsYW5nPT00KT8iSFRNTCI6IioiOwoKICAgIC8qIHByZWZpeG9zIEVsbGlvdE9T
-IGV4cGzDrWNpdG9zOiAiRWxsaW90T1M6IC4uLiIgb3UgIkVsbGlvdE9TOiBtb2QuLi4iICovCiAg
-ICBpZiAoc3RybmNtcChuYW1lLCJFbGxpb3RPUzoiLDkpPT0wKSB7CiAgICAgICAgLyogZXh0cmFp
-IGJhZGdlIGRvIHF1ZSB2ZW0gZGVwb2lzIGRvICJFbGxpb3RPUzogIiAqLwogICAgICAgIGNvbnN0
-IGNoYXIgKmFmdGVyID0gbmFtZSArIDk7CiAgICAgICAgd2hpbGUgKCphZnRlcj09JyAnKSBhZnRl
-cisrOwogICAgICAgIC8qIHBlZ2EgcHJpbWVpcmEgcGFsYXZyYSBvdSB0b2tlbiBhbnRlcyBkZSAn
-KCcgb3UgJy4nIG91ICcgJyAqLwogICAgICAgIGNoYXIgdG1wWzMyXTsgaW50IHRpPTA7CiAgICAg
-ICAgd2hpbGUgKCphZnRlciAmJiAqYWZ0ZXIhPScoJyAmJiAqYWZ0ZXIhPScuJyAmJiAqYWZ0ZXIh
-PScgJyAmJiB0aTwoaW50KXNpemVvZih0bXApLTEpCiAgICAgICAgICAgIHRtcFt0aSsrXT0qYWZ0
-ZXIrKzsKICAgICAgICB0bXBbdGldPSdcMCc7CiAgICAgICAgLyogY29udmVydGUgcGFyYSBtYWnD
-unNjdWxhcyAqLwogICAgICAgIGZvcihpbnQgaT0wO3RtcFtpXTtpKyspIGlmKHRtcFtpXT49J2En
-JiZ0bXBbaV08PSd6JykgdG1wW2ldLT0zMjsKICAgICAgICBzbnByaW50ZihiYWRnZSxic3osIiVz
-Iix0bXBbMF0/dG1wOiJFT1MiKTsKICAgICAgICBzbnByaW50ZihvcmlnaW4sb3N6LCJFbGxpb3RP
-UyIpOwogICAgICAgIHJldHVybjsKICAgIH0KCiAgICAvKiBtw7NkdWxvcyBFbGxpb3RPUyBwZWxv
-IHByZWZpeG8gZG8gbm9tZTogbW9kLiBuZXQuIGNyeXB0by4gdWkuIHN5cy4gbXMuIGFpLiB0dWku
-IGZzLiAqLwogICAgc3RydWN0IHsgY29uc3QgY2hhciAqcGZ4OyBjb25zdCBjaGFyICpiZGc7IH0g
-bW9kc1tdID0gewogICAgICAgIHsibW9kLiIsICAgICJNT0QiICAgfSwKICAgICAgICB7Im5ldC4i
-LCAgICAiTkVUIiAgIH0sCiAgICAgICAgeyJjcnlwdG8uIiwgIkNSWVBUIiB9LAogICAgICAgIHsi
-dWkuIiwgICAgICJVSSIgICAgfSwKICAgICAgICB7InN5cy4iLCAgICAiU1lTIiAgIH0sCiAgICAg
-ICAgeyJtcy4iLCAgICAgIk1TIiAgICB9LAogICAgICAgIHsiYWkuIiwgICAgICJBSSIgICAgfSwK
-ICAgICAgICB7InR1aS4iLCAgICAiVFVJIiAgIH0sCiAgICAgICAgeyJmcy4iLCAgICAgIkZTIiAg
-ICB9LAogICAgICAgIHsid2ViLiIsICAgICJXRUIiICAgfSwKICAgICAgICB7ImRiLiIsICAgICAi
-REIiICAgIH0sCiAgICAgICAge05VTEwsICAgICAgTlVMTCAgICB9CiAgICB9OwogICAgZm9yIChp
-bnQgbT0wOyBtb2RzW21dLnBmeDsgbSsrKSB7CiAgICAgICAgaWYgKHN0cm5jbXAobmFtZSwgbW9k
-c1ttXS5wZngsIHN0cmxlbihtb2RzW21dLnBmeCkpPT0wKSB7CiAgICAgICAgICAgIHNucHJpbnRm
-KGJhZGdlLCAgYnN6LCAiJXMiLCBtb2RzW21dLmJkZyk7CiAgICAgICAgICAgIHNucHJpbnRmKG9y
-aWdpbiwgb3N6LCAiRWxsaW90T1MiKTsKICAgICAgICAgICAgcmV0dXJuOwogICAgICAgIH0KICAg
-IH0KCiAgICAvKiBlc3RydXR1cmFzIGRhIGxpbmd1YWdlbTogcGVnYSBwcmltZWlyYSBwYWxhdnJh
-IGVtIG1hacO6c2N1bGFzICovCiAgICBjaGFyIHRtcFsxNl07IGludCB0aT0wOwogICAgY29uc3Qg
-Y2hhciAqcCA9IG5hbWU7CiAgICB3aGlsZSAoKnAgJiYgKnAhPScgJyAmJiAqcCE9Jy8nICYmIHRp
-PChpbnQpc2l6ZW9mKHRtcCktMSkKICAgICAgICB0bXBbdGkrK109KnArKzsKICAgIHRtcFt0aV09
-J1wwJzsKICAgIGZvcihpbnQgaT0wO3RtcFtpXTtpKyspIGlmKHRtcFtpXT49J2EnJiZ0bXBbaV08
-PSd6JykgdG1wW2ldLT0zMjsKICAgIHNucHJpbnRmKGJhZGdlLCAgYnN6LCAiJXMiLCB0bXBbMF0/
-dG1wOiI/Iik7CiAgICBzbnByaW50ZihvcmlnaW4sIG9zeiwgIiVzIiwgbGFuZ19zdHIpOwp9Cgov
-KiBSZW1vdmUgbWFyY2Fkb3IgZGUgY3Vyc29yIOKWiCAoVVRGLTg6IEUyIDk2IDg4KSBlIHJldG9y
-bmEgc3RyaW5nIGxpbXBhICovCnN0YXRpYyB2b2lkIHNuaXBfc3RyaXBfY3Vyc29yKGNvbnN0IGNo
-YXIgKnRtcGwsIGNoYXIgKm91dCwgaW50IG91dHN6KSB7CiAgICBpbnQgb2I9MDsKICAgIGZvciAo
-aW50IGo9MDsgdG1wbFtqXSAmJiBvYjxvdXRzei0xOyBqKyspIHsKICAgICAgICBpZiAoKHVuc2ln
-bmVkIGNoYXIpdG1wbFtqXT09MHhFMiAmJgogICAgICAgICAgICAodW5zaWduZWQgY2hhcil0bXBs
-W2orMV09PTB4OTYgJiYKICAgICAgICAgICAgKHVuc2lnbmVkIGNoYXIpdG1wbFtqKzJdPT0weDg4
-KSB7CiAgICAgICAgICAgIGorPTI7IC8qIHB1bGEgb3MgMyBieXRlcyBkbyDiloggKi8KICAgICAg
-ICB9IGVsc2UgewogICAgICAgICAgICBvdXRbb2IrK109dG1wbFtqXTsKICAgICAgICB9CiAgICB9
-CiAgICBvdXRbb2JdPSdcMCc7Cn0KCnN0YXRpYyB2b2lkIGRyYXdfc25pcF9wYW5lbChBYnVmICph
-YikgewogICAgaWYgKCFnX3NuaXBfYWN0aXZlIHx8IHNuaXBfdmlzX2NvdW50ID09IDApIHJldHVy
-bjsKCiAgICAvKiDilIDilIAgZGltZW5zw7VlcyDilIDilIAgKi8KICAgIGludCBwYW5lbF93ICAg
-PSA1NDsKICAgIGludCBsaXN0X2ggICAgPSBzbmlwX3Zpc19jb3VudCA8IDEwID8gc25pcF92aXNf
-Y291bnQgOiAxMDsKICAgIGludCBwcmV2X2ggICAgPSA0OyAgIC8qIGxpbmhhcyBkZSBwcmV2aWV3
-IGZpeGFzICovCiAgICBpbnQgdG90YWxfaCAgID0gMSAgICAvKiB0w610dWxvICovCiAgICAgICAg
-ICAgICAgICAgICsgbGlzdF9oCiAgICAgICAgICAgICAgICAgICsgMSAgICAvKiBzZXBhcmFkb3Ig
-Ki8KICAgICAgICAgICAgICAgICAgKyBwcmV2X2gKICAgICAgICAgICAgICAgICAgKyAxOyAgIC8q
-IHJvZGFww6kgKi8KCiAgICBpbnQgcGFuZWxfY29sID0gKEUuY29scyAtIHBhbmVsX3cpIC8gMjsK
-ICAgIGlmIChwYW5lbF9jb2wgPCAxKSBwYW5lbF9jb2wgPSAxOwogICAgaW50IHBhbmVsX3JvdyA9
-IChFLnJvd3MgLSB0b3RhbF9oKSAvIDI7CiAgICBpZiAocGFuZWxfcm93IDwgMSkgcGFuZWxfcm93
-ID0gMTsKCiAgICAvKiBjb3JlcyBiYXNlICovCiAgICBjb25zdCBjaGFyICpDX1RJVExFX0JHICA9
-ICJceDFiWzQ4OzU7MTdtIjsgICAvKiBhenVsIGVzY3VybyAqLwogICAgY29uc3QgY2hhciAqQ19U
-SVRMRV9GRyAgPSAiXHgxYlszODs1OzEyM20iOyAgLyogY2lhbm8gY2xhcm8gKi8KICAgIGNvbnN0
-IGNoYXIgKkNfU0VMX0JHICAgID0gIlx4MWJbNDg7NTsyNG0iOyAgIC8qIGF6dWwgbcOpZGlvICov
-CiAgICBjb25zdCBjaGFyICpDX1NFTF9GRyAgICA9ICJceDFiWzM4OzU7MjU1bSI7ICAvKiBicmFu
-Y28gKi8KICAgIGNvbnN0IGNoYXIgKkNfUk9XX0JHICAgID0gIlx4MWJbNDg7NTsyMzVtIjsgIC8q
-IGNpbnphIG11aXRvIGVzY3VybyAqLwogICAgY29uc3QgY2hhciAqQ19ST1dfRkcgICAgPSAiXHgx
-YlszODs1OzI1MG0iOyAgLyogY2luemEgY2xhcm8gKi8KICAgIGNvbnN0IGNoYXIgKkNfQkFER0Vf
-RU9TID0gIlx4MWJbMzg7NTsyMTRtIjsgIC8qIGxhcmFuamEg4oCUIEVsbGlvdE9TICovCiAgICBj
-b25zdCBjaGFyICpDX0JBREdFX0xORyA9ICJceDFiWzM4OzU7NzVtIjsgICAvKiBhenVsIOKAlCBs
-aW5ndWFnZW0gKi8KICAgIGNvbnN0IGNoYXIgKkNfU0VQICAgICAgID0gIlx4MWJbMzg7NTsyNDBt
-IjsKICAgIGNvbnN0IGNoYXIgKkNfUFJFVl9CRyAgID0gIlx4MWJbNDg7NTsyMzNtIjsKICAgIGNv
-bnN0IGNoYXIgKkNfUFJFVl9GRyAgID0gIlx4MWJbMzg7NTsyNDNtIjsKICAgIGNvbnN0IGNoYXIg
-KkNfUFJFVl9DT0RFID0gIlx4MWJbMzg7NTsxNTBtIjsgIC8qIHZlcmRlIGNsYXJvIHAvIGPDs2Rp
-Z28gKi8KICAgIGNvbnN0IGNoYXIgKkNfRk9PVF9CRyAgID0gIlx4MWJbNDg7NTsxN20iOwogICAg
-Y29uc3QgY2hhciAqQ19GT09UX0ZHICAgPSAiXHgxYlszODs1OzExN20iOwogICAgY29uc3QgY2hh
-ciAqQ19CT0xEICAgICAgPSAiXHgxYlsxbSI7CiAgICBjb25zdCBjaGFyICpDX0RJTSAgICAgICA9
-ICJceDFiWzJtIjsKICAgIGNvbnN0IGNoYXIgKkNfUlNUICAgICAgID0gIlx4MWJbbSI7CgogICAg
-Lyog4pSA4pSAIHTDrXR1bG8g4pSA4pSAICovCiAgICB7CiAgICAgICAgY2hhciBwb3NbMzJdOyBz
-bnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJbJWQ7JWRIIixwYW5lbF9yb3cscGFuZWxfY29s
-KTsKICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICBhYl9hcHBl
-bmQoYWIsQ19USVRMRV9CRyxzdHJsZW4oQ19USVRMRV9CRykpOwogICAgICAgIGFiX2FwcGVuZChh
-YixDX1RJVExFX0ZHLHN0cmxlbihDX1RJVExFX0ZHKSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLENf
-Qk9MRCxzdHJsZW4oQ19CT0xEKSk7CiAgICAgICAgY2hhciB0aXRsZVs4MF07CiAgICAgICAgaW50
-IHRsID0gc25wcmludGYodGl0bGUsc2l6ZW9mKHRpdGxlKSwiIOKcpiBTbmlwcGV0cyAgwrcgICVk
-IGRpc3BvbsOtdmVpcyAiLHNuaXBfdmlzX2NvdW50KTsKICAgICAgICBpZiAodGw+cGFuZWxfdykg
-dGw9cGFuZWxfdzsKICAgICAgICBhYl9hcHBlbmQoYWIsdGl0bGUsdGwpOwogICAgICAgIGZvciAo
-aW50IHM9dGw7czxwYW5lbF93O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAgICBhYl9h
-cHBlbmQoYWIsQ19SU1Qsc3RybGVuKENfUlNUKSk7CiAgICB9CgogICAgLyog4pSA4pSAIHNjcm9s
-bCDilIDilIAgKi8KICAgIGlmIChnX3NuaXBfc2VsIDwgZ19zbmlwX3Njcm9sbCkgZ19zbmlwX3Nj
-cm9sbCA9IGdfc25pcF9zZWw7CiAgICBpZiAoZ19zbmlwX3NlbCA+PSBnX3NuaXBfc2Nyb2xsICsg
-bGlzdF9oKSBnX3NuaXBfc2Nyb2xsID0gZ19zbmlwX3NlbCAtIGxpc3RfaCArIDE7CgogICAgLyog
-4pSA4pSAIGxpc3RhIOKUgOKUgCAqLwogICAgZm9yIChpbnQgaSA9IDA7IGkgPCBsaXN0X2g7IGkr
-KykgewogICAgICAgIGludCBpZHggPSBnX3NuaXBfc2Nyb2xsICsgaTsKICAgICAgICBpZiAoaWR4
-ID49IHNuaXBfdmlzX2NvdW50KSBicmVhazsKICAgICAgICBpbnQgc2kgID0gc25pcF92aXNpYmxl
-W2lkeF07CiAgICAgICAgaW50IHJvdyA9IHBhbmVsX3JvdyArIDEgKyBpOwogICAgICAgIGludCBz
-ZWwgPSAoaWR4ID09IGdfc25pcF9zZWwpOwoKICAgICAgICBjaGFyIHBvc1szMl07IHNucHJpbnRm
-KHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5lbF9jb2wpOwogICAgICAgIGFi
-X2FwcGVuZChhYixwb3Msc3RybGVuKHBvcykpOwoKICAgICAgICAvKiBmdW5kbyBkYSBsaW5oYSAq
-LwogICAgICAgIGFiX2FwcGVuZChhYiwgc2VsID8gQ19TRUxfQkcgOiBDX1JPV19CRywKICAgICAg
-ICAgICAgICAgICAgICAgIHNlbCA/IHN0cmxlbihDX1NFTF9CRykgOiBzdHJsZW4oQ19ST1dfQkcp
-KTsKCiAgICAgICAgLyogb2J0w6ltIGJhZGdlIGUgb3JpZ2VtICovCiAgICAgICAgY2hhciBiYWRn
-ZVsxMl0sIG9yaWdpblsxMl07CiAgICAgICAgc25pcF9iYWRnZShzaSwgYmFkZ2UsIHNpemVvZihi
-YWRnZSksIG9yaWdpbiwgc2l6ZW9mKG9yaWdpbikpOwoKICAgICAgICBpbnQgaXNfZW9zID0gKHN0
-cmNtcChvcmlnaW4sIkVsbGlvdE9TIik9PTApOwoKICAgICAgICAvKiDilIDilIAgYmFkZ2UgY29s
-b3JpZG8g4pSA4pSAICovCiAgICAgICAgLyogZXg6ICIgTkVUICIgZW0gbGFyYW5qYSBvdSAiIElG
-ICIgZW0gYXp1bCAqLwogICAgICAgIGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAgaWYgKHNl
-bCkgewogICAgICAgICAgICBhYl9hcHBlbmQoYWIsIlx4MWJbMzg7NTsyMjBtIiwxMyk7IC8qIGFt
-YXJlbG8gbm8gc2VsZWNpb25hZG8gKi8KICAgICAgICB9IGVsc2UgewogICAgICAgICAgICBhYl9h
-cHBlbmQoYWIsIGlzX2VvcyA/IENfQkFER0VfRU9TIDogQ19CQURHRV9MTkcsCiAgICAgICAgICAg
-ICAgICAgICAgICAgICAgaXNfZW9zID8gc3RybGVuKENfQkFER0VfRU9TKSA6IHN0cmxlbihDX0JB
-REdFX0xORykpOwogICAgICAgIH0KICAgICAgICBhYl9hcHBlbmQoYWIsQ19CT0xELHN0cmxlbihD
-X0JPTEQpKTsKICAgICAgICAvKiBiYWRnZSBhbGluaGFkbyBlbSA2IGNoYXJzICovCiAgICAgICAg
-Y2hhciBiYWRnZV9maWVsZFs4XTsgc25wcmludGYoYmFkZ2VfZmllbGQsc2l6ZW9mKGJhZGdlX2Zp
-ZWxkKSwiJS01cyIsYmFkZ2UpOwogICAgICAgIGFiX2FwcGVuZChhYixiYWRnZV9maWVsZCw1KTsK
-ICAgICAgICBhYl9hcHBlbmQoYWIsQ19SU1Qsc3RybGVuKENfUlNUKSk7CgogICAgICAgIC8qIHNl
-cGFyYWRvciDilIIgKi8KICAgICAgICBhYl9hcHBlbmQoYWIsIHNlbCA/IENfU0VMX0JHIDogQ19S
-T1dfQkcsCiAgICAgICAgICAgICAgICAgICAgICBzZWwgPyBzdHJsZW4oQ19TRUxfQkcpIDogc3Ry
-bGVuKENfUk9XX0JHKSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLCBzZWwgPyAiXHgxYlszODs1OzEx
-N20iIDogQ19TRVAsIHNlbCA/IDE0IDogc3RybGVuKENfU0VQKSk7CiAgICAgICAgYWJfYXBwZW5k
-KGFiLCLilIIiLDMpOwoKICAgICAgICAvKiDilIDilIAgbm9tZSBkbyBzbmlwcGV0IOKUgOKUgCAq
-LwogICAgICAgIGFiX2FwcGVuZChhYiwgc2VsID8gQ19TRUxfRkcgOiBDX1JPV19GRywKICAgICAg
-ICAgICAgICAgICAgICAgIHNlbCA/IHN0cmxlbihDX1NFTF9GRykgOiBzdHJsZW4oQ19ST1dfRkcp
-KTsKICAgICAgICBpZiAoc2VsKSBhYl9hcHBlbmQoYWIsQ19CT0xELHN0cmxlbihDX0JPTEQpKTsK
-ICAgICAgICAvKiBub21lOiBhdMOpIDMzIGNoYXJzICovCiAgICAgICAgY2hhciBuYW1lX2ZpZWxk
-WzQwXTsKICAgICAgICBzbnByaW50ZihuYW1lX2ZpZWxkLHNpemVvZihuYW1lX2ZpZWxkKSwiICUt
-MzNzIixnX3NuaXBzW3NpXS5uYW1lKTsKICAgICAgICBuYW1lX2ZpZWxkWzM1XT0nXDAnOwogICAg
-ICAgIGFiX2FwcGVuZChhYixuYW1lX2ZpZWxkLHN0cmxlbihuYW1lX2ZpZWxkKSk7CgogICAgICAg
-IC8qIOKUgOKUgCBvcmlnZW0gw6AgZGlyZWl0YSDilIDilIAgKi8KICAgICAgICAvKiBleDogIkVs
-bGlvdE9TIiBvdSAiTHVhIiAqLwogICAgICAgIGFiX2FwcGVuZChhYiwgc2VsID8gIlx4MWJbMzg7
-NTsyNDVtIiA6IENfRElNLAogICAgICAgICAgICAgICAgICAgICAgc2VsID8gMTQgOiBzdHJsZW4o
-Q19ESU0pKTsKICAgICAgICBjaGFyIG9yZ19maWVsZFsxMl07IHNucHJpbnRmKG9yZ19maWVsZCxz
-aXplb2Yob3JnX2ZpZWxkKSwiJS04cyAiLG9yaWdpbik7CiAgICAgICAgYWJfYXBwZW5kKGFiLG9y
-Z19maWVsZCxzdHJsZW4ob3JnX2ZpZWxkKSk7CgogICAgICAgIGFiX2FwcGVuZChhYixDX1JTVCxz
-dHJsZW4oQ19SU1QpKTsKICAgICAgICAvKiBwcmVlbmNoZSByZXN0byAqLwogICAgICAgIC8qIGNh
-bGN1bGEgY2hhcnMgZXNjcml0b3M6IDEoc3ApKzUoYmFkZ2UpKzMo4pSCKSszNShub21lKSs5KG9y
-aWdlbSkgPSA1MyAqLwogICAgICAgIC8qIHBhbmVsX3c9NTQ6IGrDoSBPSyAqLwogICAgfQoKICAg
-IC8qIOKUgOKUgCBzZXBhcmFkb3IgYW50ZXMgZG8gcHJldmlldyDilIDilIAgKi8KICAgIHsKICAg
-ICAgICBpbnQgcm93ID0gcGFuZWxfcm93ICsgMSArIGxpc3RfaDsKICAgICAgICBjaGFyIHBvc1sz
-Ml07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5lbF9jb2wp
-OwogICAgICAgIGFiX2FwcGVuZChhYixwb3Msc3RybGVuKHBvcykpOwogICAgICAgIGFiX2FwcGVu
-ZChhYixDX1BSRVZfQkcsc3RybGVuKENfUFJFVl9CRykpOwogICAgICAgIGFiX2FwcGVuZChhYixD
-X1NFUCxzdHJsZW4oQ19TRVApKTsKICAgICAgICAvKiBsaW5oYTogIuKUgOKUgOKUgCBwcmV2aWV3
-IOKUgOKUgOKUgOKUgOKUgOKUgCIgKi8KICAgICAgICBjb25zdCBjaGFyICpzZXBfbGFiZWwgPSAi
-IHByZXZpZXcgIjsKICAgICAgICBpbnQgc2wgPSBzdHJsZW4oc2VwX2xhYmVsKTsKICAgICAgICBp
-bnQgZGFzaGVzX2wgPSAocGFuZWxfdyAtIHNsKSAvIDI7CiAgICAgICAgaW50IGRhc2hlc19yID0g
-cGFuZWxfdyAtIHNsIC0gZGFzaGVzX2w7CiAgICAgICAgZm9yIChpbnQgcz0wO3M8ZGFzaGVzX2w7
-cysrKSBhYl9hcHBlbmQoYWIsIuKUgCIsMyk7CiAgICAgICAgYWJfYXBwZW5kKGFiLHNlcF9sYWJl
-bCxzbCk7CiAgICAgICAgZm9yIChpbnQgcz0wO3M8ZGFzaGVzX3I7cysrKSBhYl9hcHBlbmQoYWIs
-IuKUgCIsMyk7CiAgICAgICAgYWJfYXBwZW5kKGFiLENfUlNULHN0cmxlbihDX1JTVCkpOwogICAg
-fQoKICAgIC8qIOKUgOKUgCBwcmV2aWV3OiBwcmltZWlyYXMgbGluaGFzIGRvIHNuaXBwZXQg4pSA
-4pSAICovCiAgICB7CiAgICAgICAgaW50IHNpICA9IHNuaXBfdmlzaWJsZVtnX3NuaXBfc2VsXTsK
-ICAgICAgICBTbmlwcGV0ICpzbiA9ICZnX3NuaXBzW3NpXTsKICAgICAgICBmb3IgKGludCBpID0g
-MDsgaSA8IHByZXZfaDsgaSsrKSB7CiAgICAgICAgICAgIGludCByb3cgPSBwYW5lbF9yb3cgKyAy
-ICsgbGlzdF9oICsgaTsKICAgICAgICAgICAgaWYgKHJvdyA+PSBFLnJvd3MpIGJyZWFrOwogICAg
-ICAgICAgICBjaGFyIHBvc1szMl07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDsl
-ZEgiLHJvdyxwYW5lbF9jb2wpOwogICAgICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihw
-b3MpKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLENfUFJFVl9CRyxzdHJsZW4oQ19QUkVWX0JH
-KSk7CgogICAgICAgICAgICBpZiAoaSA8IHNuLT5ubGluZXMpIHsKICAgICAgICAgICAgICAgIGNo
-YXIgY2xlYW5bODBdOwogICAgICAgICAgICAgICAgc25pcF9zdHJpcF9jdXJzb3Ioc24tPmxpbmVz
-W2ldLCBjbGVhbiwgc2l6ZW9mKGNsZWFuKSk7CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIs
-Q19QUkVWX0NPREUsc3RybGVuKENfUFJFVl9DT0RFKSk7CiAgICAgICAgICAgICAgICBjaGFyIHBs
-aW5lWzgwXTsKICAgICAgICAgICAgICAgIGludCBwbD1zbnByaW50ZihwbGluZSxzaXplb2YocGxp
-bmUpLCIgJS0qcyAiLHBhbmVsX3ctMixjbGVhbik7CiAgICAgICAgICAgICAgICBpZihwbD5wYW5l
-bF93KXBsPXBhbmVsX3c7CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIscGxpbmUscGwpOwog
-ICAgICAgICAgICB9IGVsc2UgewogICAgICAgICAgICAgICAgLyogbGluaGEgdmF6aWEgZGUgcGFk
-ZGluZyAqLwogICAgICAgICAgICAgICAgYWJfYXBwZW5kKGFiLENfUFJFVl9GRyxzdHJsZW4oQ19Q
-UkVWX0ZHKSk7CiAgICAgICAgICAgICAgICBmb3IoaW50IHM9MDtzPHBhbmVsX3c7cysrKSBhYl9h
-cHBlbmQoYWIsIiAiLDEpOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixD
-X1JTVCxzdHJsZW4oQ19SU1QpKTsKICAgICAgICB9CiAgICB9CgogICAgLyog4pSA4pSAIHJvZGFw
-w6kg4pSA4pSAICovCiAgICB7CiAgICAgICAgaW50IHJvdyA9IHBhbmVsX3JvdyArIDIgKyBsaXN0
-X2ggKyBwcmV2X2g7CiAgICAgICAgaWYgKHJvdyA8IEUucm93cykgewogICAgICAgICAgICBjaGFy
-IHBvc1szMl07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5l
-bF9jb2wpOwogICAgICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAg
-ICAgICAgYWJfYXBwZW5kKGFiLENfRk9PVF9CRyxzdHJsZW4oQ19GT09UX0JHKSk7CiAgICAgICAg
-ICAgIGFiX2FwcGVuZChhYixDX0ZPT1RfRkcsc3RybGVuKENfRk9PVF9GRykpOwogICAgICAgICAg
-ICBjaGFyIGZvb3RbODBdOwogICAgICAgICAgICBpbnQgZmw9c25wcmludGYoZm9vdCxzaXplb2Yo
-Zm9vdCksCiAgICAgICAgICAgICAgICAiIOKGkeKGkyBuYXZlZ2FyICAgRW50ZXIgaW5zZXJpciAg
-IEVzYyBmZWNoYXIgICAlZC8lZCAiLAogICAgICAgICAgICAgICAgZ19zbmlwX3NlbCsxLCBzbmlw
-X3Zpc19jb3VudCk7CiAgICAgICAgICAgIGlmKGZsPnBhbmVsX3cpZmw9cGFuZWxfdzsKICAgICAg
-ICAgICAgYWJfYXBwZW5kKGFiLGZvb3QsZmwpOwogICAgICAgICAgICBmb3IoaW50IHM9Zmw7czxw
-YW5lbF93O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFi
-LENfUlNULHN0cmxlbihDX1JTVCkpOwogICAgICAgIH0KICAgIH0KfQoKLyog4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIFNFTEVUT1IgREUg
-TElOR1VBR0VNIChDdHJsK0wpCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIElSIFBBUkEgREVGSU5Jw4fDg08gKEN0cmwrSikK
-ICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-ICovCgovKiBFeHRyYWkgYSBwYWxhdnJhIHNvYiBvIGN1cnNvciAqLwpzdGF0aWMgaW50IHdvcmRf
-dW5kZXJfY3Vyc29yKGNoYXIgKm91dCwgaW50IG91dHN6KSB7CiAgICBpZiAoRS5jeSA+PSBFLm51
-bXJvd3MpIHJldHVybiAwOwogICAgUm93ICpyb3cgPSAmRS5yb3dbRS5jeV07CiAgICBjaGFyICpz
-ICA9IHJvdy0+Y2hhcnM7CiAgICBpbnQgICBuICA9IHJvdy0+c2l6ZTsKICAgIGludCAgIGN4ID0g
-RS5jeCA8IG4gPyBFLmN4IDogbi0xOwogICAgaWYgKGN4IDwgMCkgcmV0dXJuIDA7CgogICAgLyog
-ZXhwYW5kZSBwYXJhIGVzcXVlcmRhICovCiAgICBpbnQgc3RhcnQgPSBjeDsKICAgIHdoaWxlIChz
-dGFydCA+IDAgJiYgKGlzYWxudW0oKHVuc2lnbmVkIGNoYXIpc1tzdGFydC0xXSkgfHwgc1tzdGFy
-dC0xXT09J18nIHx8IHNbc3RhcnQtMV09PScuJykpCiAgICAgICAgc3RhcnQtLTsKICAgIC8qIGV4
-cGFuZGUgcGFyYSBkaXJlaXRhICovCiAgICBpbnQgZW5kID0gY3g7CiAgICB3aGlsZSAoZW5kIDwg
-biAmJiAoaXNhbG51bSgodW5zaWduZWQgY2hhcilzW2VuZF0pIHx8IHNbZW5kXT09J18nIHx8IHNb
-ZW5kXT09Jy4nKSkKICAgICAgICBlbmQrKzsKCiAgICBpbnQgbGVuID0gZW5kIC0gc3RhcnQ7CiAg
-ICBpZiAobGVuIDw9IDAgfHwgbGVuID49IG91dHN6KSByZXR1cm4gMDsKICAgIG1lbWNweShvdXQs
-IHMrc3RhcnQsIGxlbik7CiAgICBvdXRbbGVuXSA9ICdcMCc7CiAgICByZXR1cm4gbGVuOwp9Cgov
-KiDilIDilIAgVXRpbGl0w6FyaW9zIHVzYWRvcyBwb3IgZ290b19maW5kKCkgKEN0cmwrSikg4pSA
-4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
-4pSACiAqIEVzdGFzIGR1YXMgZnVuw6fDtWVzIGVyYW0gdXNhZGFzIHBlbG8gYW50aWdvIHZlcmlm
-aWNhZG9yIGRlIGPDs2RpZ28KICogKHJlbW92aWRvKSBtYXMgdGFtYsOpbSBzw6NvIHVzYWRhcyBw
-b3IgZ290b19maW5kKCkgbG9nbyBhYmFpeG8sIGVudMOjbwogKiBjb250aW51YW0gZXhpc3RpbmRv
-IGFxdWkuICovCgovKiBSZXRvcm5hIHBvbnRlaXJvIHBhcmEgcHJpbWVpcm8gY2hhciBuw6NvLWVz
-cGHDp28gZGEgbGluaGEgeSwgb3UgTlVMTCBzZSB2YXppYSAqLwpzdGF0aWMgY2hhciAqY2hrX2xp
-bmVfY29udGVudChpbnQgeSkgewogICAgaWYgKHkgPCAwIHx8IHkgPj0gRS5udW1yb3dzKSByZXR1
-cm4gTlVMTDsKICAgIGNoYXIgKnMgPSBFLnJvd1t5XS5jaGFyczsKICAgIGludCBuICAgPSBFLnJv
-d1t5XS5zaXplOwogICAgaW50IGkgPSAwOwogICAgd2hpbGUgKGkgPCBuICYmIChzW2ldPT0nICd8
-fHNbaV09PSdcdCcpKSBpKys7CiAgICBpZiAoaSA+PSBuKSByZXR1cm4gTlVMTDsKICAgIHJldHVy
-biBzICsgaTsKfQoKLyogVmVyaWZpY2Egc2UgYSBzdHJpbmcgcyBjb250w6ltIHRvayBjb21vIHBh
-bGF2cmEgaXNvbGFkYSAqLwpzdGF0aWMgaW50IGhhc193b3JkKGNvbnN0IGNoYXIgKnMsIGNvbnN0
-IGNoYXIgKnRvaykgewogICAgaW50IHRsZW4gPSAoaW50KXN0cmxlbih0b2spOwogICAgY29uc3Qg
-Y2hhciAqcCA9IHM7CiAgICB3aGlsZSAoKHAgPSBzdHJzdHIocCwgdG9rKSkgIT0gTlVMTCkgewog
-ICAgICAgIGludCBwcmUgPSAocCA9PSBzIHx8ICghaXNhbG51bSgodW5zaWduZWQgY2hhcilwWy0x
-XSkgJiYgcFstMV0hPSdfJykpOwogICAgICAgIGludCBwb3MgPSAoIWlzYWxudW0oKHVuc2lnbmVk
-IGNoYXIpcFt0bGVuXSkgJiYgcFt0bGVuXSE9J18nKTsKICAgICAgICBpZiAocHJlICYmIHBvcykg
-cmV0dXJuIDE7CiAgICAgICAgcCsrOwogICAgfQogICAgcmV0dXJuIDA7Cn0KCi8qIFJlc3VsdGFk
-byBkbyBnb3RvOiBsaXN0YSBkZSBtYXRjaGVzICovCiNkZWZpbmUgR09UT19NQVggMzIKdHlwZWRl
-ZiBzdHJ1Y3QgeyBpbnQgbGluZTsgY2hhciBwcmV2aWV3WzgwXTsgfSBHb3RvTWF0Y2g7CnN0YXRp
-YyBHb3RvTWF0Y2ggZ19nb3RvX21hdGNoZXNbR09UT19NQVhdOwpzdGF0aWMgaW50ICAgICAgIGdf
-Z290b19jb3VudCAgPSAwOwpzdGF0aWMgaW50ICAgICAgIGdfZ290b19zZWwgICAgPSAwOwpzdGF0
-aWMgaW50ICAgICAgIGdfZ290b19hY3RpdmUgPSAwOwpzdGF0aWMgY2hhciAgICAgIGdfZ290b193
-b3JkWzY0XTsKCi8qIFByb2N1cmEgZGVmaW5pw6fDtWVzIGRvIHPDrW1ib2xvIG5vIGFycXVpdm8g
-Ki8Kc3RhdGljIHZvaWQgZ290b19maW5kKGNvbnN0IGNoYXIgKndvcmQpIHsKICAgIGdfZ290b19j
-b3VudCA9IDA7CiAgICBpbnQgaXNfbHVhICA9IChFLnN5bnRheCA9PSAmSExEQlsyXSk7CiAgICBp
-bnQgaXNfYyAgICA9IChFLnN5bnRheCA9PSAmSExEQlswXSB8fCBFLnN5bnRheCA9PSAmSExEQlsx
-XSk7CiAgICBpbnQgaXNfYmFzaCA9IChFLnN5bnRheCA9PSAmSExEQlszXSk7CgogICAgZm9yIChp
-bnQgeSA9IDA7IHkgPCBFLm51bXJvd3MgJiYgZ19nb3RvX2NvdW50IDwgR09UT19NQVg7IHkrKykg
-ewogICAgICAgIGNoYXIgKnMgPSBFLnJvd1t5XS5jaGFyczsKICAgICAgICBpbnQgICBuID0gRS5y
-b3dbeV0uc2l6ZTsKICAgICAgICBpbnQgICBmb3VuZCA9IDA7CgogICAgICAgIGlmIChpc19sdWEp
-IHsKICAgICAgICAgICAgLyogZnVuY3Rpb24gbm9tZSAvIGxvY2FsIGZ1bmN0aW9uIG5vbWUgLyBu
-b21lID0gZnVuY3Rpb24gKi8KICAgICAgICAgICAgY2hhciBwYXQxWzgwXSwgcGF0Mls4MF0sIHBh
-dDNbODBdOwogICAgICAgICAgICBzbnByaW50ZihwYXQxLHNpemVvZihwYXQxKSwiZnVuY3Rpb24g
-JXMiLHdvcmQpOwogICAgICAgICAgICBzbnByaW50ZihwYXQyLHNpemVvZihwYXQyKSwiZnVuY3Rp
-b24gJXMoIix3b3JkKTsKICAgICAgICAgICAgc25wcmludGYocGF0MyxzaXplb2YocGF0MyksIiVz
-ID0gZnVuY3Rpb24iLHdvcmQpOwogICAgICAgICAgICBpZiAoc3Ryc3RyKHMscGF0MSl8fHN0cnN0
-cihzLHBhdDIpfHxzdHJzdHIocyxwYXQzKSkgZm91bmQ9MTsKICAgICAgICAgICAgLyogbG9jYWwg
-d29yZCA9ICovCiAgICAgICAgICAgIGlmICghZm91bmQpIHsKICAgICAgICAgICAgICAgIGNoYXIg
-cGF0NFs4MF07IHNucHJpbnRmKHBhdDQsc2l6ZW9mKHBhdDQpLCJsb2NhbCAlcyIsd29yZCk7CiAg
-ICAgICAgICAgICAgICBpZiAoc3Ryc3RyKHMscGF0NCkpIGZvdW5kPTE7CiAgICAgICAgICAgIH0K
-ICAgICAgICB9IGVsc2UgaWYgKGlzX2MpIHsKICAgICAgICAgICAgLyogdGlwbyBub21lKCDigJQg
-aGV1csOtc3RpY2E6IGxpbmhhIHRlbSBwYWxhdnJhIHNlZ3VpZGEgZGUgKCBzZW0gZXNwYcOnbyBk
-ZSBrZXl3b3JkICovCiAgICAgICAgICAgIGNoYXIgcGF0WzgwXTsgc25wcmludGYocGF0LHNpemVv
-ZihwYXQpLCIlcygiLHdvcmQpOwogICAgICAgICAgICBpZiAoc3Ryc3RyKHMscGF0KSkgewogICAg
-ICAgICAgICAgICAgLyogdmVyaWZpY2EgcXVlIG7Do28gw6kgY2hhbWFkYSDigJQgbGluaGEgdGVt
-IHRpcG8gZGUgcmV0b3JubyBhbnRlcyAqLwogICAgICAgICAgICAgICAgY2hhciAqcDIgPSBjaGtf
-bGluZV9jb250ZW50KHkpOwogICAgICAgICAgICAgICAgaWYgKHAyICYmICFoYXNfd29yZChwMiwi
-aWYiKSAmJiAhaGFzX3dvcmQocDIsIndoaWxlIikgJiYKICAgICAgICAgICAgICAgICAgICAhaGFz
-X3dvcmQocDIsImZvciIpICYmICFoYXNfd29yZChwMiwicmV0dXJuIikgJiYKICAgICAgICAgICAg
-ICAgICAgICAhaGFzX3dvcmQocDIsInN3aXRjaCIpKSBmb3VuZD0xOwogICAgICAgICAgICB9CiAg
-ICAgICAgICAgIC8qICNkZWZpbmUgd29yZCAqLwogICAgICAgICAgICBjaGFyIHBhdDJbODBdOyBz
-bnByaW50ZihwYXQyLHNpemVvZihwYXQyKSwiI2RlZmluZSAlcyIsd29yZCk7CiAgICAgICAgICAg
-IGlmIChzdHJzdHIocyxwYXQyKSkgZm91bmQ9MTsKICAgICAgICAgICAgLyogdHlwZWRlZiAuLi4g
-d29yZDsgKi8KICAgICAgICAgICAgaWYgKGhhc193b3JkKHMsInR5cGVkZWYiKSAmJiBzdHJzdHIo
-cyx3b3JkKSkgZm91bmQ9MTsKICAgICAgICB9IGVsc2UgaWYgKGlzX2Jhc2gpIHsKICAgICAgICAg
-ICAgLyogbm9tZSgpIHsgKi8KICAgICAgICAgICAgY2hhciBwYXRbODBdOyBzbnByaW50ZihwYXQs
-c2l6ZW9mKHBhdCksIiVzKCkiLHdvcmQpOwogICAgICAgICAgICBpZiAoc3Ryc3RyKHMscGF0KSkg
-Zm91bmQ9MTsKICAgICAgICAgICAgLyogZnVuY3Rpb24gbm9tZSAqLwogICAgICAgICAgICBjaGFy
-IHBhdDJbODBdOyBzbnByaW50ZihwYXQyLHNpemVvZihwYXQyKSwiZnVuY3Rpb24gJXMiLHdvcmQp
-OwogICAgICAgICAgICBpZiAoc3Ryc3RyKHMscGF0MikpIGZvdW5kPTE7CiAgICAgICAgfQoKICAg
-ICAgICBpZiAoZm91bmQpIHsKICAgICAgICAgICAgR290b01hdGNoICptID0gJmdfZ290b19tYXRj
-aGVzW2dfZ290b19jb3VudCsrXTsKICAgICAgICAgICAgbS0+bGluZSA9IHkrMTsKICAgICAgICAg
-ICAgLyogcHJldmlldzogdHJpbSB3aGl0ZXNwYWNlICovCiAgICAgICAgICAgIGludCBpPTA7IHdo
-aWxlKGk8biYmKHNbaV09PScgJ3x8c1tpXT09J1x0JykpIGkrKzsKICAgICAgICAgICAgaW50IHBs
-PTA7CiAgICAgICAgICAgIHdoaWxlKHBsPDc5JiZpPG4mJnNbaV0hPSdcbicpIG0tPnByZXZpZXdb
-cGwrK109c1tpKytdOwogICAgICAgICAgICBtLT5wcmV2aWV3W3BsXT0nXDAnOwogICAgICAgIH0K
-ICAgIH0KfQoKLyogU2FsdGEgcGFyYSBvIG1hdGNoIHNlbGVjaW9uYWRvICovCnN0YXRpYyB2b2lk
-IGdvdG9fanVtcChpbnQgaWR4KSB7CiAgICBpZiAoaWR4IDwgMCB8fCBpZHggPj0gZ19nb3RvX2Nv
-dW50KSByZXR1cm47CiAgICBFLmN5ID0gZ19nb3RvX21hdGNoZXNbaWR4XS5saW5lIC0gMTsKICAg
-IGlmIChFLmN5ID49IEUubnVtcm93cykgRS5jeSA9IEUubnVtcm93cy0xOwogICAgRS5jeCA9IDA7
-CiAgICAvKiBjZW50cmEgYSB2aWV3ICovCiAgICBFLnJvd29mZiA9IEUuY3kgLSBFLnJvd3MvMjsK
-ICAgIGlmIChFLnJvd29mZiA8IDApIEUucm93b2ZmID0gMDsKfQoKLyogQWJyZSBvIGdvdG9fZGVm
-ICovCnN0YXRpYyB2b2lkIGdvdG9fZGVmaW5pdGlvbih2b2lkKSB7CiAgICBjaGFyIHdvcmRbNjRd
-OwogICAgaWYgKCF3b3JkX3VuZGVyX2N1cnNvcih3b3JkLCBzaXplb2Yod29yZCkpKSB7CiAgICAg
-ICAgc2V0X3N0YXR1cygiXHgxYlszM23imqAgTmVuaHVtYSBwYWxhdnJhIHNvYiBvIGN1cnNvclx4
-MWJbbSIpOwogICAgICAgIHJldHVybjsKICAgIH0KICAgIHNucHJpbnRmKGdfZ290b193b3JkLCBz
-aXplb2YoZ19nb3RvX3dvcmQpLCAiJXMiLCB3b3JkKTsKICAgIGdvdG9fZmluZCh3b3JkKTsKCiAg
-ICBpZiAoZ19nb3RvX2NvdW50ID09IDApIHsKICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMzbeKa
-oCBEZWZpbmnDp8OjbyBkZSAnJXMnIG7Do28gZW5jb250cmFkYVx4MWJbbSIsIHdvcmQpOwogICAg
-ICAgIHJldHVybjsKICAgIH0KICAgIGlmIChnX2dvdG9fY291bnQgPT0gMSkgewogICAgICAgIC8q
-IHPDsyB1bSByZXN1bHRhZG8g4oCUIHB1bGEgZGlyZXRvICovCiAgICAgICAgZ290b19qdW1wKDAp
-OwogICAgICAgIHNldF9zdGF0dXMoIkRlZmluacOnw6NvIGRlICclcycg4oaSIGxpbmhhICVkIiwg
-d29yZCwgZ19nb3RvX21hdGNoZXNbMF0ubGluZSk7CiAgICAgICAgcmV0dXJuOwogICAgfQogICAg
-LyogbcO6bHRpcGxvcyByZXN1bHRhZG9zIOKAlCBhYnJlIHBhaW5lbCBkZSBzZWxlw6fDo28gKi8K
-ICAgIGdfZ290b19zZWwgICAgPSAwOwogICAgZ19nb3RvX2FjdGl2ZSA9IDE7CiAgICBzZXRfc3Rh
-dHVzKCJDdHJsK0o6IOKGkeKGkyBuYXZlZ2FyICBFbnRlciBpciAgRXNjIGZlY2hhciAgWyVkIGRl
-ZmluacOnw7VlcyBkZSAnJXMnXSIsCiAgICAgICAgICAgICAgIGdfZ290b19jb3VudCwgd29yZCk7
-Cn0KCi8qIERlc2VuaGEgbyBwYWluZWwgZGUgZ290byAqLwpzdGF0aWMgdm9pZCBkcmF3X2dvdG9f
-cGFuZWwoQWJ1ZiAqYWIpIHsKICAgIGlmICghZ19nb3RvX2FjdGl2ZSB8fCBnX2dvdG9fY291bnQg
-PT0gMCkgcmV0dXJuOwoKICAgIGludCBwYW5lbF9oICA9IGdfZ290b19jb3VudCA8IDggPyBnX2dv
-dG9fY291bnQgOiA4OwogICAgaW50IHBhbmVsX3cgID0gNTY7CiAgICBpbnQgcGFuZWxfY29sID0g
-KEUuY29scyAtIHBhbmVsX3cpIC8gMjsKICAgIGlmIChwYW5lbF9jb2wgPCAxKSBwYW5lbF9jb2wg
-PSAxOwogICAgaW50IHBhbmVsX3JvdyA9IDI7CgogICAgLyogdMOtdHVsbyAqLwogICAgewogICAg
-ICAgIGNoYXIgcG9zWzMyXTsgc25wcmludGYocG9zLHNpemVvZihwb3MpLCJceDFiWyVkOyVkSCIs
-cGFuZWxfcm93LHBhbmVsX2NvbCk7CiAgICAgICAgYWJfYXBwZW5kKGFiLHBvcyxzdHJsZW4ocG9z
-KSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiWzQ4OzU7NTJtXHgxYlszODs1OzIxNW1ceDFi
-WzFtIiwyNSk7CiAgICAgICAgY2hhciB0aXRsZVs4MF07CiAgICAgICAgaW50IHRsPXNucHJpbnRm
-KHRpdGxlLHNpemVvZih0aXRsZSksIiDiipUgRGVmaW5pw6fDtWVzIGRlICclcycgKCVkKSAiLAog
-ICAgICAgICAgICAgICAgICAgICAgICBnX2dvdG9fd29yZCxnX2dvdG9fY291bnQpOwogICAgICAg
-IGlmKHRsPnBhbmVsX3cpdGw9cGFuZWxfdzsKICAgICAgICBhYl9hcHBlbmQoYWIsdGl0bGUsdGwp
-OwogICAgICAgIGZvcihpbnQgcz10bDtzPHBhbmVsX3c7cysrKSBhYl9hcHBlbmQoYWIsIiAiLDEp
-OwogICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYlttIiwzKTsKICAgIH0KCiAgICBmb3IgKGludCBp
-PTA7aTxwYW5lbF9oO2krKykgewogICAgICAgIGludCBpZHggPSBpOwogICAgICAgIGludCByb3cg
-PSBwYW5lbF9yb3crMStpOwogICAgICAgIGlmIChyb3cgPj0gRS5yb3dzKSBicmVhazsKCiAgICAg
-ICAgY2hhciBwb3NbMzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJbJWQ7JWRIIixy
-b3cscGFuZWxfY29sKTsKICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKCiAg
-ICAgICAgaWYgKGlkeD09Z19nb3RvX3NlbCkKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFi
-WzQ4OzU7ODhtXHgxYlszODs1OzI1NW1ceDFiWzFtIiwyNSk7CiAgICAgICAgZWxzZQogICAgICAg
-ICAgICBhYl9hcHBlbmQoYWIsIlx4MWJbNDg7NTs1Mm1ceDFiWzM4OzU7MjA5bSIsMjEpOwoKICAg
-ICAgICBjaGFyIGxpbmVbODBdOwogICAgICAgIGludCBsbD1zbnByaW50ZihsaW5lLHNpemVvZihs
-aW5lKSwiIEwlLTRkICVzIiwKICAgICAgICAgICAgICAgICAgICAgICAgZ19nb3RvX21hdGNoZXNb
-aWR4XS5saW5lLGdfZ290b19tYXRjaGVzW2lkeF0ucHJldmlldyk7CiAgICAgICAgaWYobGw+cGFu
-ZWxfdylsbD1wYW5lbF93OwogICAgICAgIGFiX2FwcGVuZChhYixsaW5lLGxsKTsKICAgICAgICBm
-b3IoaW50IHM9bGw7czxwYW5lbF93O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAgICBh
-Yl9hcHBlbmQoYWIsIlx4MWJbbSIsMyk7CiAgICB9CgogICAgLyogcm9kYXDDqSAqLwogICAgewog
-ICAgICAgIGludCByb3c9cGFuZWxfcm93KzErcGFuZWxfaDsKICAgICAgICBpZihyb3c8RS5yb3dz
-KXsKICAgICAgICAgICAgY2hhciBwb3NbMzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4
-MWJbJWQ7JWRIIixyb3cscGFuZWxfY29sKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLHBvcyxz
-dHJsZW4ocG9zKSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYls0ODs1OzUybVx4MWJb
-Mzg7NTsyMTVtIiwyMSk7CiAgICAgICAgICAgIGNoYXIgZm9vdFs2NF07CiAgICAgICAgICAgIGlu
-dCBmbD1zbnByaW50Zihmb290LHNpemVvZihmb290KSwiICVkLyVkICBFbnRlciBpciAgRXNjIGZl
-Y2hhciAiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZ19nb3RvX3NlbCsxLGdfZ290b19j
-b3VudCk7CiAgICAgICAgICAgIGlmKGZsPnBhbmVsX3cpZmw9cGFuZWxfdzsKICAgICAgICAgICAg
-YWJfYXBwZW5kKGFiLGZvb3QsZmwpOwogICAgICAgICAgICBmb3IoaW50IHM9Zmw7czxwYW5lbF93
-O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFi
-W20iLDMpOwogICAgICAgIH0KICAgIH0KfQoKc3RhdGljIHZvaWQgY2hvb3NlX2xhbmd1YWdlKHZv
-aWQpIHsKICAgIC8qIE5vbWVzIGUgw61uZGljZXMgbm8gSExEQiAqLwogICAgY29uc3QgY2hhciAq
-bmFtZXNbXSA9IHsgIkMiLCAiQysrIiwgIkx1YS9FbGxpb3RPUyIsICJCYXNoIiwgIkhUTUwiLCBO
-VUxMIH07CiAgICBpbnQgbiA9IDU7CiAgICBpbnQgc2VsID0gMDsKCiAgICAvKiBkZXNjb2JyZSBz
-ZWxlw6fDo28gYXR1YWwgKi8KICAgIGZvciAoaW50IGkgPSAwOyBpIDwgbjsgaSsrKQogICAgICAg
-IGlmIChFLnN5bnRheCA9PSAmSExEQltpXSkgeyBzZWwgPSBpOyBicmVhazsgfQoKICAgIC8qIGxv
-b3AgZGUgbWVudSBpbmxpbmUgbmEgc3RhdHVzIGJhciAqLwogICAgd2hpbGUgKDEpIHsKICAgICAg
-ICAvKiBNb250YSBzdHJpbmcgZGUgbWVudSAqLwogICAgICAgIGNoYXIgbWVudVs1MTJdOwogICAg
-ICAgIGludCBtaSA9IDA7CiAgICAgICAgbWkgKz0gc25wcmludGYobWVudSttaSwgc2l6ZW9mKG1l
-bnUpLW1pLCAiTGluZ3VhZ2VtOiAiKTsKICAgICAgICBmb3IgKGludCBpID0gMDsgaSA8IG47IGkr
-KykgewogICAgICAgICAgICBpZiAoaSA9PSBzZWwpCiAgICAgICAgICAgICAgICBtaSArPSBzbnBy
-aW50ZihtZW51K21pLCBzaXplb2YobWVudSktbWksCiAgICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgICAiXHgxYls0ODs1Ozk5bVx4MWJbMzg7NTsyNTVtXHgxYlsxbSAlcyBceDFiW20iLCBuYW1l
-c1tpXSk7CiAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIG1pICs9IHNucHJpbnRmKG1l
-bnUrbWksIHNpemVvZihtZW51KS1taSwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICJc
-eDFiWzM4OzU7MTQxbSAlcyBceDFiW20iLCBuYW1lc1tpXSk7CiAgICAgICAgICAgIGlmIChpIDwg
-bi0xKQogICAgICAgICAgICAgICAgbWkgKz0gc25wcmludGYobWVudSttaSwgc2l6ZW9mKG1lbnUp
-LW1pLCAi4pSCIik7CiAgICAgICAgfQogICAgICAgIG1pICs9IHNucHJpbnRmKG1lbnUrbWksIHNp
-emVvZihtZW51KS1taSwKICAgICAgICAgICAgICAgICAgICAgICAiICBceDFiWzM4OzU7MTQxbeKG
-kCDihpIgbW92ZXIgIEVudGVyIGNvbmZpcm1hciAgRXNjIGNhbmNlbGFyXHgxYlttIik7CgogICAg
-ICAgIHNucHJpbnRmKEUuc3RhdHVzbXNnLCBzaXplb2YoRS5zdGF0dXNtc2cpLCAiJXMiLCBtZW51
-KTsKICAgICAgICBFLnN0YXR1c21zZ190aW1lID0gdGltZShOVUxMKSArIDk5OTk7IC8qIG1hbnTD
-qW0gdmlzw612ZWwgKi8KICAgICAgICByZWZyZXNoX3NjcmVlbigpOwoKICAgICAgICBpbnQgYyA9
-IHJlYWRfa2V5KCk7CiAgICAgICAgaWYgKGMgPT0gQVJST1dfTEVGVCAgfHwgYyA9PSBDVFJMKCdo
-JykpIHsgc2VsID0gKHNlbCAtIDEgKyBuKSAlIG47IH0KICAgICAgICBlbHNlIGlmIChjID09IEFS
-Uk9XX1JJR0hUIHx8IGMgPT0gJ1x0JykgeyBzZWwgPSAoc2VsICsgMSkgJSBuOyAgICAgfQogICAg
-ICAgIGVsc2UgaWYgKGMgPT0gJ1xyJykgewogICAgICAgICAgICBFLnN5bnRheCA9ICZITERCW3Nl
-bF07CiAgICAgICAgICAgIGZvciAoaW50IHIgPSAwOyByIDwgRS5udW1yb3dzOyByKyspIHVwZGF0
-ZV9zeW50YXgoJkUucm93W3JdKTsKICAgICAgICAgICAgc25wcmludGYoRS5zdGF0dXNtc2csIHNp
-emVvZihFLnN0YXR1c21zZyksCiAgICAgICAgICAgICAgICAgICAgICJceDFiWzMybeKck1x4MWJb
-bSBMaW5ndWFnZW06ICVzIiwgbmFtZXNbc2VsXSk7CiAgICAgICAgICAgIEUuc3RhdHVzbXNnX3Rp
-bWUgPSB0aW1lKE5VTEwpOwogICAgICAgICAgICByZXR1cm47CiAgICAgICAgfQogICAgICAgIGVs
-c2UgaWYgKGMgPT0gJ1x4MWInKSB7CiAgICAgICAgICAgIHNldF9zdGF0dXMoIlNlbGXDp8OjbyBj
-YW5jZWxhZGEiKTsKICAgICAgICAgICAgcmV0dXJuOwogICAgICAgIH0KICAgIH0KfQoKCgoKLyog
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAq
-IFBFUlNJU1TDik5DSUEgREUgUE9TScOHw4NPIERPIENVUlNPUgogKiDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCnN0YXRpYyB2b2lkIHNh
-dmVfY3Vyc29yX3Bvcyh2b2lkKSB7CiAgICBjb25zdCBjaGFyICpob21lID0gZ2V0ZW52KCJIT01F
-Iik7CiAgICBpZiAoIWhvbWUgfHwgIUUuZmlsZW5hbWUpIHJldHVybjsKICAgIGNoYXIgcGF0aFs1
-MTJdOwogICAgc25wcmludGYocGF0aCwgc2l6ZW9mKHBhdGgpLCAiJXMvLmVlX3Bvc2l0aW9ucyIs
-IGhvbWUpOwogICAgLyogbMOqIGVudHJhZGFzIGV4aXN0ZW50ZXMgZXhjZXRvIGEgZG8gYXJxdWl2
-byBhdHVhbCAqLwogICAgRklMRSAqZiA9IGZvcGVuKHBhdGgsICJyIik7CiAgICBjaGFyICpidWYg
-PSBOVUxMOyBzaXplX3QgYnVmbGVuID0gMDsKICAgIGlmIChmKSB7CiAgICAgICAgY2hhciBsaW5l
-Wzc2OF07CiAgICAgICAgd2hpbGUgKGZnZXRzKGxpbmUsIHNpemVvZihsaW5lKSwgZikpIHsKICAg
-ICAgICAgICAgY2hhciAqdGFiID0gc3RyY2hyKGxpbmUsICdcdCcpOwogICAgICAgICAgICBpZiAo
-dGFiKSB7IGNoYXIgc2F2ZSA9ICp0YWI7ICp0YWIgPSAnXDAnOwogICAgICAgICAgICAgICAgaWYg
-KHN0cmNtcChsaW5lLCBFLmZpbGVuYW1lKSA9PSAwKSB7ICp0YWIgPSBzYXZlOyBjb250aW51ZTsg
-fQogICAgICAgICAgICAgICAgKnRhYiA9IHNhdmU7IH0KICAgICAgICAgICAgc2l6ZV90IGxsID0g
-c3RybGVuKGxpbmUpOwogICAgICAgICAgICBidWYgPSByZWFsbG9jKGJ1ZiwgYnVmbGVuICsgbGwg
-KyAxKTsKICAgICAgICAgICAgbWVtY3B5KGJ1ZiArIGJ1ZmxlbiwgbGluZSwgbGwpOyBidWZsZW4g
-Kz0gbGw7CiAgICAgICAgfQogICAgICAgIGZjbG9zZShmKTsKICAgIH0KICAgIGNoYXIgZW50cnlb
-NzY4XTsKICAgIGludCBlbCA9IHNucHJpbnRmKGVudHJ5LCBzaXplb2YoZW50cnkpLCAiJXNcdCVk
-XHQlZFxuIiwgRS5maWxlbmFtZSwgRS5jeCwgRS5jeSk7CiAgICBidWYgPSByZWFsbG9jKGJ1Ziwg
-YnVmbGVuICsgZWwgKyAxKTsKICAgIG1lbWNweShidWYgKyBidWZsZW4sIGVudHJ5LCBlbCk7IGJ1
-ZmxlbiArPSBlbDsKICAgIGYgPSBmb3BlbihwYXRoLCAidyIpOwogICAgaWYgKGYpIHsgZndyaXRl
-KGJ1ZiwgMSwgYnVmbGVuLCBmKTsgZmNsb3NlKGYpOyB9CiAgICBmcmVlKGJ1Zik7Cn0KCnN0YXRp
-YyB2b2lkIHJlc3RvcmVfY3Vyc29yX3Bvcyh2b2lkKSB7CiAgICBjb25zdCBjaGFyICpob21lID0g
-Z2V0ZW52KCJIT01FIik7CiAgICBpZiAoIWhvbWUgfHwgIUUuZmlsZW5hbWUpIHJldHVybjsKICAg
-IGNoYXIgcGF0aFs1MTJdOwogICAgc25wcmludGYocGF0aCwgc2l6ZW9mKHBhdGgpLCAiJXMvLmVl
-X3Bvc2l0aW9ucyIsIGhvbWUpOwogICAgRklMRSAqZiA9IGZvcGVuKHBhdGgsICJyIik7CiAgICBp
-ZiAoIWYpIHJldHVybjsKICAgIGNoYXIgbGluZVs3NjhdOwogICAgd2hpbGUgKGZnZXRzKGxpbmUs
-IHNpemVvZihsaW5lKSwgZikpIHsKICAgICAgICBjaGFyICp0YWIxID0gc3RyY2hyKGxpbmUsICdc
-dCcpOyBpZiAoIXRhYjEpIGNvbnRpbnVlOwogICAgICAgICp0YWIxID0gJ1wwJzsKICAgICAgICBp
-ZiAoc3RyY21wKGxpbmUsIEUuZmlsZW5hbWUpICE9IDApIHsgKnRhYjEgPSAnXHQnOyBjb250aW51
-ZTsgfQogICAgICAgIGludCBjeCA9IGF0b2kodGFiMSArIDEpOwogICAgICAgIGNoYXIgKnRhYjIg
-PSBzdHJjaHIodGFiMSArIDEsICdcdCcpOwogICAgICAgIGludCBjeSA9IHRhYjIgPyBhdG9pKHRh
-YjIgKyAxKSA6IDA7CiAgICAgICAgaWYgKGN5ID49IDAgJiYgY3kgPCBFLm51bXJvd3MpIHsKICAg
-ICAgICAgICAgRS5jeSA9IGN5OwogICAgICAgICAgICBpZiAoY3ggPj0gMCAmJiBjeCA8PSBFLnJv
-d1tjeV0uc2l6ZSkgRS5jeCA9IGN4OwogICAgICAgIH0KICAgICAgICBicmVhazsKICAgIH0KICAg
-IGZjbG9zZShmKTsKfQoKCi8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkAogKiBNVUxUSS1CVUZGRVIKICog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICovCgpzdGF0aWMgdm9pZCBidWZfc2F2
-ZV9zdGF0ZSh2b2lkKSB7CiAgICBpZiAoRS5idWZfaWR4IDwgMCB8fCBFLmJ1Zl9pZHggPj0gOCkg
-cmV0dXJuOwogICAgRS5idWZfY3hbRS5idWZfaWR4XSA9IEUuY3g7ICBFLmJ1Zl9jeVtFLmJ1Zl9p
-ZHhdID0gRS5jeTsKICAgIEUuYnVmX3JvW0UuYnVmX2lkeF0gPSBFLnJvd29mZjsgRS5idWZfY29b
-RS5idWZfaWR4XSA9IEUuY29sb2ZmOwp9CgpzdGF0aWMgdm9pZCBidWZfcmVnaXN0ZXIoY29uc3Qg
-Y2hhciAqZm5hbWUpIHsKICAgIGZvciAoaW50IGk9MDsgaTxFLmJ1Zl9jb3VudDsgaSsrKQogICAg
-ICAgIGlmIChzdHJjbXAoRS5idWZfbGlzdFtpXSwgZm5hbWUpPT0wKSB7IGJ1Zl9zYXZlX3N0YXRl
-KCk7IEUuYnVmX2lkeD1pOyByZXR1cm47IH0KICAgIGlmIChFLmJ1Zl9jb3VudCA8IDgpIHsKICAg
-ICAgICBidWZfc2F2ZV9zdGF0ZSgpOwogICAgICAgIHN0cm5jcHkoRS5idWZfbGlzdFtFLmJ1Zl9j
-b3VudF0sIGZuYW1lLCAyNTUpOwogICAgICAgIEUuYnVmX2xpc3RbRS5idWZfY291bnRdWzI1NV09
-J1wwJzsKICAgICAgICBFLmJ1Zl9jeFtFLmJ1Zl9jb3VudF09MDsgRS5idWZfY3lbRS5idWZfY291
-bnRdPTA7CiAgICAgICAgRS5idWZfcm9bRS5idWZfY291bnRdPTA7IEUuYnVmX2NvW0UuYnVmX2Nv
-dW50XT0wOwogICAgICAgIEUuYnVmX2lkeCA9IEUuYnVmX2NvdW50Kys7CiAgICB9Cn0KCnN0YXRp
-YyB2b2lkIGJ1Zl9zd2l0Y2goaW50IGlkeCkgewogICAgaWYgKGlkeCA8IDAgfHwgaWR4ID49IEUu
-YnVmX2NvdW50IHx8IGlkeCA9PSBFLmJ1Zl9pZHgpIHJldHVybjsKICAgIC8qIHNhbHZhIGVzdGFk
-byBhdHVhbCAqLwogICAgc2F2ZV9jdXJzb3JfcG9zKCk7CiAgICBpZiAoRS5kaXJ0eSkgc2F2ZV9m
-aWxlKCk7CiAgICBidWZfc2F2ZV9zdGF0ZSgpOwogICAgLyogbGliZXJhIGxpbmhhcyAqLwogICAg
-Zm9yIChpbnQgaT0wOyBpPEUubnVtcm93czsgaSsrKSBmcmVlX3JvdygmRS5yb3dbaV0pOwogICAg
-ZnJlZShFLnJvdyk7IEUucm93PU5VTEw7IEUubnVtcm93cz0wOwogICAgRS5kaXJ0eT0wOwogICAg
-LyogYWJyZSBwcsOzeGltbyAqLwogICAgRS5idWZfaWR4ID0gaWR4OwogICAgb3Blbl9maWxlKEUu
-YnVmX2xpc3RbaWR4XSk7CiAgICBFLmN4PUUuYnVmX2N4W2lkeF07IEUuY3k9RS5idWZfY3lbaWR4
-XTsKICAgIEUucm93b2ZmPUUuYnVmX3JvW2lkeF07IEUuY29sb2ZmPUUuYnVmX2NvW2lkeF07CiAg
-ICBpZiAoRS5jeT49RS5udW1yb3dzKSBFLmN5PUUubnVtcm93cz4wP0UubnVtcm93cy0xOjA7CiAg
-ICBzZXRfc3RhdHVzKCJCdWZmZXIgJWQvJWQ6ICVzIiwgaWR4KzEsIEUuYnVmX2NvdW50LCBFLmJ1
-Zl9saXN0W2lkeF0pOwp9CgpzdGF0aWMgdm9pZCBidWZfbmV4dCh2b2lkKSB7IGJ1Zl9zd2l0Y2go
-KEUuYnVmX2lkeCsxKSAlIEUuYnVmX2NvdW50KTsgfQpzdGF0aWMgdm9pZCBidWZfcHJldih2b2lk
-KSB7IGJ1Zl9zd2l0Y2goKEUuYnVmX2lkeCtFLmJ1Zl9jb3VudC0xKSAlIEUuYnVmX2NvdW50KTsg
-fQoKc3RhdGljIHZvaWQgb3Blbl9maWxlKGNvbnN0IGNoYXIgKmZuYW1lKSB7CiAgICBmcmVlKEUu
-ZmlsZW5hbWUpOyBFLmZpbGVuYW1lID0gc3RyZHVwKGZuYW1lKTsKICAgIEZJTEUgKmZwID0gZm9w
-ZW4oZm5hbWUsICJyIik7CiAgICBpZiAoIWZwKSB7IGlmIChlcnJubyA9PSBFTk9FTlQpIHsgc2Vs
-ZWN0X3N5bnRheCgpOyByZXR1cm47IH0gZGllKCJmb3BlbiIpOyB9CiAgICBjaGFyICpsaW5lID0g
-TlVMTDsgc2l6ZV90IGNhcCA9IDA7IHNzaXplX3QgbGVuOwogICAgd2hpbGUgKChsZW4gPSBnZXRs
-aW5lKCZsaW5lLCAmY2FwLCBmcCkpICE9IC0xKSB7CiAgICAgICAgd2hpbGUgKGxlbiA+IDAgJiYg
-KGxpbmVbbGVuLTFdID09ICdccicgfHwgbGluZVtsZW4tMV0gPT0gJ1xuJykpIGxlbi0tOwogICAg
-ICAgIGluc2VydF9yb3coRS5udW1yb3dzLCBsaW5lLCBsZW4pOwogICAgfQogICAgZnJlZShsaW5l
-KTsgZmNsb3NlKGZwKTsKICAgIEUuZGlydHkgPSAwOwogICAgc2VsZWN0X3N5bnRheCgpOwogICAg
-cmVzdG9yZV9jdXJzb3JfcG9zKCk7CiAgICBidWZfcmVnaXN0ZXIoZm5hbWUpOwp9CgpzdGF0aWMg
-dm9pZCBzYXZlX2ZpbGUodm9pZCkgewogICAgaWYgKCFFLmZpbGVuYW1lKSByZXR1cm47CiAgICBp
-bnQgbGVuOyBjaGFyICpidWYgPSByb3dzX3RvX3N0cmluZygmbGVuKTsKICAgIGludCBmZCA9IG9w
-ZW4oRS5maWxlbmFtZSwgT19SRFdSfE9fQ1JFQVR8T19UUlVOQywgMDY0NCk7CiAgICBpZiAoZmQg
-PT0gLTEgfHwgd3JpdGUoZmQsIGJ1ZiwgbGVuKSAhPSBsZW4pIHsKICAgICAgICBpZiAoZmQgIT0g
-LTEpIGNsb3NlKGZkKTsKICAgICAgICBmcmVlKGJ1Zik7CiAgICAgICAgc25wcmludGYoRS5zdGF0
-dXNtc2csIHNpemVvZihFLnN0YXR1c21zZyksICJFcnJvIGFvIHNhbHZhcjogJXMiLCBzdHJlcnJv
-cihlcnJubykpOwogICAgICAgIEUuc3RhdHVzbXNnX3RpbWUgPSB0aW1lKE5VTEwpOyByZXR1cm47
-CiAgICB9CiAgICBjbG9zZShmZCk7IGZyZWUoYnVmKTsgRS5kaXJ0eSA9IDA7CiAgICBzYXZlX2N1
-cnNvcl9wb3MoKTsKICAgIGZvciAoaW50IF9zaSA9IDA7IF9zaSA8IEUubnVtcm93czsgX3NpKysp
-IEUucm93W19zaV0uaXNfZGlydHkgPSAwOwogICAgc25wcmludGYoRS5zdGF0dXNtc2csIHNpemVv
-ZihFLnN0YXR1c21zZyksCiAgICAgICAgIlx4MWJbMzJt4pyTXHgxYlttICVkIGJ5dGVzIHNhbHZv
-cyBlbSBcIiVzXCIiLCBsZW4sIEUuZmlsZW5hbWUpOwogICAgRS5zdGF0dXNtc2dfdGltZSA9IHRp
-bWUoTlVMTCk7Cn0KCi8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkAogKiBCVVNDQQogKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZAgKi8KCnN0YXRpYyB2b2lkIHNlYXJjaF9jYihjaGFyICpx
-dWVyeSwgaW50IGtleSkgewogICAgc3RhdGljIGludCBsYXN0ID0gLTEsIGRpciA9IDE7CiAgICBz
-dGF0aWMgaW50IGhsX2xpbmUgPSAtMTsKICAgIHN0YXRpYyB1bnNpZ25lZCBjaGFyICpzYXZlZF9o
-bCA9IE5VTEw7CgogICAgaWYgKHNhdmVkX2hsKSB7CiAgICAgICAgbWVtY3B5KEUucm93W2hsX2xp
-bmVdLmhsLCBzYXZlZF9obCwgRS5yb3dbaGxfbGluZV0ucnNpemUpOwogICAgICAgIGZyZWUoc2F2
-ZWRfaGwpOyBzYXZlZF9obCA9IE5VTEw7CiAgICB9CiAgICBpZiAoa2V5ID09ICdccicgfHwga2V5
-ID09ICdceDFiJykgeyBsYXN0ID0gLTE7IGRpciA9IDE7IHJldHVybjsgfQogICAgaWYgKGtleSA9
-PSBBUlJPV19SSUdIVCB8fCBrZXkgPT0gQVJST1dfRE9XTikgZGlyID0gMTsKICAgIGVsc2UgaWYg
-KGtleSA9PSBBUlJPV19MRUZUIHx8IGtleSA9PSBBUlJPV19VUCkgZGlyID0gLTE7CiAgICBlbHNl
-IHsgbGFzdCA9IC0xOyBkaXIgPSAxOyB9CiAgICBpZiAobGFzdCA9PSAtMSkgZGlyID0gMTsKCiAg
-ICBpbnQgY3VyID0gbGFzdDsKICAgIGZvciAoaW50IGkgPSAwOyBpIDwgRS5udW1yb3dzOyBpKysp
-IHsKICAgICAgICBjdXIgKz0gZGlyOwogICAgICAgIGlmIChjdXIgPCAwKSBjdXIgPSBFLm51bXJv
-d3MtMTsKICAgICAgICBlbHNlIGlmIChjdXIgPj0gRS5udW1yb3dzKSBjdXIgPSAwOwogICAgICAg
-IFJvdyAqcm93ID0gJkUucm93W2N1cl07CiAgICAgICAgY2hhciAqbSA9IHN0cnN0cihyb3ctPnJl
-bmRlciwgcXVlcnkpOwogICAgICAgIGlmIChtKSB7CiAgICAgICAgICAgIGxhc3QgPSBjdXI7IEUu
-Y3kgPSBjdXI7CiAgICAgICAgICAgIEUuY3ggPSByeF90b19jeChyb3csIChpbnQpKG0gLSByb3ct
-PnJlbmRlcikpOwogICAgICAgICAgICBFLnJvd29mZiA9IEUubnVtcm93czsKICAgICAgICAgICAg
-aGxfbGluZSA9IGN1cjsKICAgICAgICAgICAgc2F2ZWRfaGwgPSBtYWxsb2Mocm93LT5yc2l6ZSk7
-CiAgICAgICAgICAgIG1lbWNweShzYXZlZF9obCwgcm93LT5obCwgcm93LT5yc2l6ZSk7CiAgICAg
-ICAgICAgIG1lbXNldCgmcm93LT5obFttIC0gcm93LT5yZW5kZXJdLCBITF9NQVRDSCwgc3RybGVu
-KHF1ZXJ5KSk7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgIH0KfQoKdm9pZCByZWZy
-ZXNoX3NjcmVlbih2b2lkKTsKCnN0YXRpYyBjaGFyICpwcm9tcHQoY29uc3QgY2hhciAqZm10LCB2
-b2lkICgqY2IpKGNoYXIqLGludCkpIHsKICAgIHNpemVfdCBzeiA9IDEyOCwgbGVuID0gMDsKICAg
-IGNoYXIgKmJ1ZiA9IG1hbGxvYyhzeik7IGJ1ZlswXSA9ICdcMCc7CiAgICB3aGlsZSAoMSkgewog
-ICAgICAgIHNucHJpbnRmKEUuc3RhdHVzbXNnLCBzaXplb2YoRS5zdGF0dXNtc2cpLCBmbXQsIGJ1
-Zik7CiAgICAgICAgRS5zdGF0dXNtc2dfdGltZSA9IHRpbWUoTlVMTCk7CiAgICAgICAgcmVmcmVz
-aF9zY3JlZW4oKTsKICAgICAgICBpbnQgYyA9IHJlYWRfa2V5KCk7CiAgICAgICAgaWYgKGMgPT0g
-REVMX0tFWSB8fCBjID09IENUUkwoJ2gnKSB8fCBjID09IEJBQ0tTUEFDRSkgewogICAgICAgICAg
-ICBpZiAobGVuKSBidWZbLS1sZW5dID0gJ1wwJzsKICAgICAgICB9IGVsc2UgaWYgKGMgPT0gJ1x4
-MWInKSB7CiAgICAgICAgICAgIEUuc3RhdHVzbXNnWzBdID0gJ1wwJzsKICAgICAgICAgICAgaWYg
-KGNiKSBjYihidWYsIGMpOwogICAgICAgICAgICBmcmVlKGJ1Zik7IHJldHVybiBOVUxMOwogICAg
-ICAgIH0gZWxzZSBpZiAoYyA9PSAnXHInKSB7CiAgICAgICAgICAgIGlmIChsZW4pIHsgRS5zdGF0
-dXNtc2dbMF0gPSAnXDAnOyBpZiAoY2IpIGNiKGJ1ZiwgYyk7IHJldHVybiBidWY7IH0KICAgICAg
-ICB9IGVsc2UgaWYgKCFpc2NudHJsKGMpICYmIGMgPCAxMjgpIHsKICAgICAgICAgICAgaWYgKGxl
-biA9PSBzei0xKSB7IHN6ICo9IDI7IGJ1ZiA9IHJlYWxsb2MoYnVmLCBzeik7IH0KICAgICAgICAg
-ICAgYnVmW2xlbisrXSA9IGM7IGJ1ZltsZW5dID0gJ1wwJzsKICAgICAgICB9CiAgICAgICAgaWYg
-KGNiKSBjYihidWYsIGMpOwogICAgfQp9CgoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIEJVU0NBIEUgU1VCU1RJVFVJw4fDg08KICog
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQICov
-CgoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQCiAqIFNFTEXDh8ODTyBFIENMSVBCT0FSRAogKiDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCi8qIG5vcm1hbGl6YSDDom5jb3JhIGUg
-Y3Vyc29yIGVtIChzeTEsc3gxKSDihpIgKHN5MixzeDIpICovCnN0YXRpYyB2b2lkIHNlbF9ub3Jt
-YWxpemUoaW50ICpzeTEsaW50ICpzeDEsaW50ICpzeTIsaW50ICpzeDIpIHsKICAgICpzeTE9RS5z
-ZWxfYXk7ICpzeDE9RS5zZWxfYXg7ICpzeTI9RS5jeTsgKnN4Mj1FLmN4OwogICAgaWYgKCpzeTEg
-PiAqc3kyIHx8ICgqc3kxID09ICpzeTIgJiYgKnN4MSA+ICpzeDIpKSB7CiAgICAgICAgaW50IHQ7
-IHQ9KnN5MTsqc3kxPSpzeTI7KnN5Mj10OyB0PSpzeDE7KnN4MT0qc3gyOypzeDI9dDsKICAgIH0K
-fQoKCi8qIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkAogKiBDw5NQSUEgUE9SIElOVEVSVkFMTyBERSBMSU5IQVMgKEN0cmwrQyBzZW0gc2VsZcOn
-w6NvKQogKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZAgKi8Kc3RhdGljIHZvaWQgY29weV9yYW5nZV9wcm9tcHQodm9pZCkgewogICAgLyogcGVk
-ZSBpbnB1dCAiRGUgbGluaGEgYXTDqSBsaW5oYTogIiBlIGNvcGlhIG8gaW50ZXJ2YWxvICovCiAg
-ICBjaGFyICppbnB1dCA9IHByb21wdCgiQ29waWFyIOKAlCBkZSBsaW5oYSBhdMOpIGxpbmhhOiAl
-cyAgKGV4OiAxIDUsIEVTQyBjYW5jZWxhKSIsIE5VTEwpOwogICAgaWYgKCFpbnB1dCkgcmV0dXJu
-OwoKICAgIGludCBmcm9tID0gMCwgdG8gPSAwOwogICAgaWYgKHNzY2FuZihpbnB1dCwgIiVkICVk
-IiwgJmZyb20sICZ0bykgPT0gMikgewogICAgICAgIC8qIGNvbnZlcnRlIHBhcmEgMC1iYXNlZCBl
-IGNsYW1wZWlhICovCiAgICAgICAgZnJvbS0tOyB0by0tOwogICAgICAgIGlmIChmcm9tIDwgMCkg
-ZnJvbSA9IDA7CiAgICAgICAgaWYgKHRvID49IEUubnVtcm93cykgdG8gPSBFLm51bXJvd3MgLSAx
-OwogICAgICAgIGlmIChmcm9tID4gdG8pIHsgaW50IHQgPSBmcm9tOyBmcm9tID0gdG87IHRvID0g
-dDsgfQoKICAgICAgICBpbnQgY2FwID0gNDA5NjsKICAgICAgICBjaGFyICpidWYgPSBtYWxsb2Mo
-Y2FwKTsKICAgICAgICBpbnQgcG9zID0gMDsKICAgICAgICBmb3IgKGludCB5ID0gZnJvbTsgeSA8
-PSB0bzsgeSsrKSB7CiAgICAgICAgICAgIFJvdyAqcm93ID0gJkUucm93W3ldOwogICAgICAgICAg
-ICBpZiAocG9zICsgcm93LT5zaXplICsgMiA+PSBjYXApIHsKICAgICAgICAgICAgICAgIGNhcCA9
-IChwb3MgKyByb3ctPnNpemUgKyAyKSAqIDI7CiAgICAgICAgICAgICAgICBidWYgPSByZWFsbG9j
-KGJ1ZiwgY2FwKTsKICAgICAgICAgICAgfQogICAgICAgICAgICBtZW1jcHkoYnVmICsgcG9zLCBy
-b3ctPmNoYXJzLCByb3ctPnNpemUpOwogICAgICAgICAgICBwb3MgKz0gcm93LT5zaXplOwogICAg
-ICAgICAgICBidWZbcG9zKytdID0gJ1xuJzsKICAgICAgICB9CiAgICAgICAgYnVmW3Bvc10gPSAn
-XDAnOwogICAgICAgIGZyZWUoRS5jbGlwYm9hcmQpOwogICAgICAgIEUuY2xpcGJvYXJkID0gYnVm
-OwogICAgICAgIEUuY2xpcGJvYXJkX2xlbiA9IHBvczsKICAgICAgICBpbnQgbmxpbmVzID0gdG8g
-LSBmcm9tICsgMTsKICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMybeKck1x4MWJbbSBDb3BpYWRv
-OiBsaW5oYXMgJWTigJMlZCAoJWQgbGluaGElcywgJWQgY2hhciVzKSIsCiAgICAgICAgICAgICAg
-ICAgICBmcm9tKzEsIHRvKzEsCiAgICAgICAgICAgICAgICAgICBubGluZXMsIG5saW5lcyA9PSAx
-ID8gIiIgOiAicyIsCiAgICAgICAgICAgICAgICAgICBwb3MsICAgIHBvcyAgID09IDEgPyAiIiA6
-ICJzIik7CiAgICB9IGVsc2UgaWYgKHNzY2FuZihpbnB1dCwgIiVkIiwgJmZyb20pID09IDEpIHsK
-ICAgICAgICAvKiBhcGVuYXMgdW0gbsO6bWVybzogY29waWEgYXF1ZWxhIGxpbmhhICovCiAgICAg
-ICAgZnJvbS0tOwogICAgICAgIGlmIChmcm9tIDwgMCkgZnJvbSA9IDA7CiAgICAgICAgaWYgKGZy
-b20gPj0gRS5udW1yb3dzKSBmcm9tID0gRS5udW1yb3dzIC0gMTsKICAgICAgICBSb3cgKnIgPSAm
-RS5yb3dbZnJvbV07CiAgICAgICAgZnJlZShFLmNsaXBib2FyZCk7CiAgICAgICAgRS5jbGlwYm9h
-cmQgPSBtYWxsb2Moci0+c2l6ZSArIDIpOwogICAgICAgIG1lbWNweShFLmNsaXBib2FyZCwgci0+
-Y2hhcnMsIHItPnNpemUpOwogICAgICAgIEUuY2xpcGJvYXJkW3ItPnNpemVdID0gJ1xuJzsKICAg
-ICAgICBFLmNsaXBib2FyZFtyLT5zaXplICsgMV0gPSAnXDAnOwogICAgICAgIEUuY2xpcGJvYXJk
-X2xlbiA9IHItPnNpemUgKyAxOwogICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzJt4pyTXHgxYltt
-IExpbmhhICVkIGNvcGlhZGEgKCVkIGNoYXJzKSIsIGZyb20rMSwgci0+c2l6ZSk7CiAgICB9IGVs
-c2UgewogICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzFt4pyWXHgxYlttIEZvcm1hdG8gaW52w6Fs
-aWRvIOKAlCB1c2U6IDEgNSAgb3UgIDMiKTsKICAgIH0KICAgIGZyZWUoaW5wdXQpOwp9CgpzdGF0
-aWMgdm9pZCBzZWxfY29weSh2b2lkKSB7CiAgICBpZiAoIUUuc2VsX2FjdGl2ZSkgewogICAgICAg
-IC8qIHNlbSBzZWxlw6fDo286IGNvcGlhIGxpbmhhIGludGVpcmEgKi8KICAgICAgICBpZiAoRS5j
-eSA+PSBFLm51bXJvd3MpIHJldHVybjsKICAgICAgICBSb3cgKnIgPSAmRS5yb3dbRS5jeV07CiAg
-ICAgICAgZnJlZShFLmNsaXBib2FyZCk7CiAgICAgICAgRS5jbGlwYm9hcmQgPSBtYWxsb2Moci0+
-c2l6ZSArIDIpOwogICAgICAgIG1lbWNweShFLmNsaXBib2FyZCwgci0+Y2hhcnMsIHItPnNpemUp
-OwogICAgICAgIEUuY2xpcGJvYXJkW3ItPnNpemVdID0gJ1xuJzsgRS5jbGlwYm9hcmRbci0+c2l6
-ZSsxXSA9ICdcMCc7CiAgICAgICAgRS5jbGlwYm9hcmRfbGVuID0gci0+c2l6ZSArIDE7CiAgICAg
-ICAgc2V0X3N0YXR1cygiTGluaGEgY29waWFkYSAoJWQgY2hhcnMpIiwgci0+c2l6ZSk7CiAgICAg
-ICAgcmV0dXJuOwogICAgfQogICAgaW50IHN5MSxzeDEsc3kyLHN4Mjsgc2VsX25vcm1hbGl6ZSgm
-c3kxLCZzeDEsJnN5Miwmc3gyKTsKICAgIGludCBjYXA9NDA5NjsgY2hhciAqYnVmPW1hbGxvYyhj
-YXApOyBpbnQgcG9zPTA7CiAgICBmb3IgKGludCB5PXN5MTsgeTw9c3kyOyB5KyspIHsKICAgICAg
-ICBpZiAoeT49RS5udW1yb3dzKSBicmVhazsKICAgICAgICBSb3cgKnJvdz0mRS5yb3dbeV07CiAg
-ICAgICAgaW50IHM9KHk9PXN5MSk/c3gxOjAsIGU9KHk9PXN5Mik/c3gyOnJvdy0+c2l6ZTsKICAg
-ICAgICBpZiAocz5yb3ctPnNpemUpIHM9cm93LT5zaXplOwogICAgICAgIGlmIChlPnJvdy0+c2l6
-ZSkgZT1yb3ctPnNpemU7CiAgICAgICAgaW50IGxsPWUtczsKICAgICAgICBpZiAocG9zK2xsKzI+
-PWNhcCl7Y2FwPShwb3MrbGwrMikqMjtidWY9cmVhbGxvYyhidWYsY2FwKTt9CiAgICAgICAgbWVt
-Y3B5KGJ1Zitwb3Mscm93LT5jaGFycytzLGxsKTsgcG9zKz1sbDsKICAgICAgICBpZiAoeTxzeTIp
-IGJ1Zltwb3MrK109J1xuJzsKICAgIH0KICAgIGJ1Zltwb3NdPSdcMCc7CiAgICBmcmVlKEUuY2xp
-cGJvYXJkKTsgRS5jbGlwYm9hcmQ9YnVmOyBFLmNsaXBib2FyZF9sZW49cG9zOwogICAgc2V0X3N0
-YXR1cygiQ29waWFkbzogJWQgY2hhcihzKSIsIHBvcyk7Cn0KCnN0YXRpYyB2b2lkIHNlbF9jdXQo
-dm9pZCkgewogICAgaWYgKCFFLnNlbF9hY3RpdmUpIHsKICAgICAgICAvKiBzZW0gc2VsZcOnw6Nv
-OiBjb3J0YSBsaW5oYSBpbnRlaXJhICovCiAgICAgICAgaWYgKEUuY3kgPj0gRS5udW1yb3dzKSBy
-ZXR1cm47CiAgICAgICAgUm93ICpyID0gJkUucm93W0UuY3ldOwogICAgICAgIGZyZWUoRS5jbGlw
-Ym9hcmQpOwogICAgICAgIEUuY2xpcGJvYXJkID0gbWFsbG9jKHItPnNpemUgKyAyKTsKICAgICAg
-ICBtZW1jcHkoRS5jbGlwYm9hcmQsIHItPmNoYXJzLCByLT5zaXplKTsKICAgICAgICBFLmNsaXBi
-b2FyZFtyLT5zaXplXT0nXG4nOyBFLmNsaXBib2FyZFtyLT5zaXplKzFdPSdcMCc7CiAgICAgICAg
-RS5jbGlwYm9hcmRfbGVuID0gci0+c2l6ZSArIDE7CiAgICAgICAgdW5kb19wdXNoKCk7IGRlbF9s
-aW5lKCk7IEUuc2VsX2FjdGl2ZSA9IDA7CiAgICAgICAgc2V0X3N0YXR1cygiTGluaGEgY29ydGFk
-YSDigJQgQ3RybCtVIGRlc2ZheiIpOwogICAgICAgIHJldHVybjsKICAgIH0KICAgIHNlbF9jb3B5
-KCk7CiAgICBpbnQgc3kxLHN4MSxzeTIsc3gyOyBzZWxfbm9ybWFsaXplKCZzeTEsJnN4MSwmc3ky
-LCZzeDIpOwogICAgdW5kb19wdXNoKCk7CiAgICAvKiBhcGFnYSBkbyBmaW0gcGFyYSBvIGluw61j
-aW8gcGFyYSBuw6NvIGludmFsaWRhciDDrW5kaWNlcyAqLwogICAgaWYgKHN5MSA9PSBzeTIpIHsK
-ICAgICAgICBFLmN5PXN5MTsgRS5jeD1zeDI7CiAgICAgICAgZm9yIChpbnQgaT1zeDI7IGk+c3gx
-OyBpLS0pIGRlbF9jaGFyKCk7CiAgICB9IGVsc2UgewogICAgICAgIC8qIGFwYWdhIGxpbmhhcyBp
-bnRlcm1lZGnDoXJpYXMgKyBmcmFnbWVudG9zICovCiAgICAgICAgRS5jeT1zeTI7IEUuY3g9c3gy
-OwogICAgICAgIHdoaWxlIChFLmN4PjApIGRlbF9jaGFyKCk7CiAgICAgICAgZm9yIChpbnQgeT1z
-eTI7IHk+c3kxOyB5LS0pIHsKICAgICAgICAgICAgRS5jeT15OyBFLmN4PTA7IGRlbF9jaGFyKCk7
-IC8qIHVuZSBsaW5oYSBjb20gYW50ZXJpb3IgKi8KICAgICAgICB9CiAgICAgICAgRS5jeT1zeTE7
-IEUuY3g9RS5yb3dbc3kxXS5zaXplOwogICAgICAgIHdoaWxlIChFLmN4PnN4MSkgZGVsX2NoYXIo
-KTsKICAgIH0KICAgIEUuc2VsX2FjdGl2ZT0wOwogICAgc2V0X3N0YXR1cygiQ29ydGFkbyDigJQg
-Q3RybCtVIGRlc2ZheiIpOwp9CgpzdGF0aWMgdm9pZCBzZWxfcGFzdGUodm9pZCkgewogICAgaWYg
-KCFFLmNsaXBib2FyZCB8fCBFLmNsaXBib2FyZF9sZW49PTApIHsgc2V0X3N0YXR1cygiQ2xpcGJv
-YXJkIHZhemlvLiIpOyByZXR1cm47IH0KICAgIHVuZG9fcHVzaCgpOwogICAgY2hhciAqcD1FLmNs
-aXBib2FyZCwgKmVuZD1FLmNsaXBib2FyZCtFLmNsaXBib2FyZF9sZW47CiAgICB3aGlsZSAocDxl
-bmQpIHsKICAgICAgICBpZiAoKnA9PSdcbicpIHsgaW5zZXJ0X25ld2xpbmUoKTsgfQogICAgICAg
-IGVsc2UgeyBpbnNlcnRfY2hhcigodW5zaWduZWQgY2hhcikqcCk7IH0KICAgICAgICBwKys7CiAg
-ICB9CiAgICBzZXRfc3RhdHVzKCJDb2xhZG86ICVkIGNoYXIocykiLCBFLmNsaXBib2FyZF9sZW4p
-Owp9CgpzdGF0aWMgdm9pZCBzZWxfY2xlYXIodm9pZCkgeyBFLnNlbF9hY3RpdmU9MDsgfQoKc3Rh
-dGljIHZvaWQgZmluZF9yZXBsYWNlKHZvaWQpIHsKICAgIGNoYXIgKnF1ZXJ5ID0gcHJvbXB0KCJC
-dXNjYXI6ICVzICAoRVNDIGNhbmNlbGEpIiwgTlVMTCk7CiAgICBpZiAoIXF1ZXJ5IHx8ICFxdWVy
-eVswXSkgeyBmcmVlKHF1ZXJ5KTsgcmV0dXJuOyB9CiAgICBjaGFyICpyZXBsYWNlbWVudCA9IHBy
-b21wdCgiU3Vic3RpdHVpciBwb3I6ICVzICAoRVNDIGNhbmNlbGEpIiwgTlVMTCk7CiAgICBpZiAo
-IXJlcGxhY2VtZW50KSB7IGZyZWUocXVlcnkpOyByZXR1cm47IH0KCiAgICBzZXRfc3RhdHVzKCJz
-PXByw7N4aW1vICBhPXRvZG9zICBFU0M9Y2FuY2VsYXIiKTsKICAgIHJlZnJlc2hfc2NyZWVuKCk7
-CgogICAgaW50IHFsZW4gPSAoaW50KXN0cmxlbihxdWVyeSk7CiAgICBpbnQgcmxlbiA9IChpbnQp
-c3RybGVuKHJlcGxhY2VtZW50KTsKICAgIGludCBjb3VudCA9IDA7CiAgICBpbnQga2V5ID0gcmVh
-ZF9rZXkoKTsKCiAgICBpZiAoa2V5ID09ICdhJyB8fCBrZXkgPT0gJ0EnKSB7CiAgICAgICAgLyog
-c3Vic3RpdHVpciB0dWRvICovCiAgICAgICAgdW5kb19wdXNoKCk7CiAgICAgICAgZm9yIChpbnQg
-eSA9IDA7IHkgPCBFLm51bXJvd3M7IHkrKykgewogICAgICAgICAgICBSb3cgKnJvdyA9ICZFLnJv
-d1t5XTsKICAgICAgICAgICAgY2hhciAqcCA9IHJvdy0+Y2hhcnM7CiAgICAgICAgICAgIHdoaWxl
-ICgocCA9IHN0cnN0cihwLCBxdWVyeSkpICE9IE5VTEwpIHsKICAgICAgICAgICAgICAgIGludCBj
-b2wgPSAoaW50KShwIC0gcm93LT5jaGFycyk7CiAgICAgICAgICAgICAgICBmb3IgKGludCBpID0g
-MDsgaSA8IHFsZW47IGkrKykgcm93X2RlbF9jaGFyKHJvdywgY29sKTsKICAgICAgICAgICAgICAg
-IGZvciAoaW50IGkgPSBybGVuIC0gMTsgaSA+PSAwOyBpLS0pIHJvd19pbnNlcnRfY2hhcihyb3cs
-IGNvbCwgKHVuc2lnbmVkIGNoYXIpcmVwbGFjZW1lbnRbaV0pOwogICAgICAgICAgICAgICAgdXBk
-YXRlX3Jvdyhyb3cpOwogICAgICAgICAgICAgICAgcCA9IHJvdy0+Y2hhcnMgKyBjb2wgKyBybGVu
-OwogICAgICAgICAgICAgICAgY291bnQrKzsKICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAg
-ICBpZiAoY291bnQpIHNldF9zdGF0dXMoIiVkIHN1YnN0aXR1acOnw6NvKMO1ZXMpIOKAlCBDdHJs
-K1UgZGVzZmF6IiwgY291bnQpOwogICAgICAgIGVsc2UgICAgICAgc2V0X3N0YXR1cygiTsOjbyBl
-bmNvbnRyYWRvOiAlcyIsIHF1ZXJ5KTsKICAgIH0gZWxzZSBpZiAoa2V5ID09ICdzJyB8fCBrZXkg
-PT0gJ1MnIHx8IGtleSA9PSAnXHInKSB7CiAgICAgICAgLyogc3Vic3RpdHVpciBwcsOzeGltbyAq
-LwogICAgICAgIGZvciAoaW50IGkgPSAwOyBpIDwgRS5udW1yb3dzOyBpKyspIHsKICAgICAgICAg
-ICAgaW50IHkgPSAoRS5jeSArIGkpICUgRS5udW1yb3dzOwogICAgICAgICAgICBSb3cgKnJvdyA9
-ICZFLnJvd1t5XTsKICAgICAgICAgICAgaW50IHN0YXJ0ID0gKHkgPT0gRS5jeSAmJiBpID09IDAp
-ID8gRS5jeCA6IDA7CiAgICAgICAgICAgIGlmIChzdGFydCA+IHJvdy0+c2l6ZSkgc3RhcnQgPSAw
-OwogICAgICAgICAgICBjaGFyICpwID0gc3Ryc3RyKHJvdy0+Y2hhcnMgKyBzdGFydCwgcXVlcnkp
-OwogICAgICAgICAgICBpZiAocCkgewogICAgICAgICAgICAgICAgdW5kb19wdXNoKCk7CiAgICAg
-ICAgICAgICAgICBpbnQgY29sID0gKGludCkocCAtIHJvdy0+Y2hhcnMpOwogICAgICAgICAgICAg
-ICAgZm9yIChpbnQgaiA9IDA7IGogPCBxbGVuOyBqKyspIHJvd19kZWxfY2hhcihyb3csIGNvbCk7
-CiAgICAgICAgICAgICAgICBmb3IgKGludCBqID0gcmxlbiAtIDE7IGogPj0gMDsgai0tKSByb3df
-aW5zZXJ0X2NoYXIocm93LCBjb2wsICh1bnNpZ25lZCBjaGFyKXJlcGxhY2VtZW50W2pdKTsKICAg
-ICAgICAgICAgICAgIHVwZGF0ZV9yb3cocm93KTsKICAgICAgICAgICAgICAgIEUuY3kgPSB5OyBF
-LmN4ID0gY29sICsgcmxlbjsgRS5yb3dvZmYgPSBFLm51bXJvd3M7CiAgICAgICAgICAgICAgICBj
-b3VudCA9IDE7CiAgICAgICAgICAgICAgICBicmVhazsKICAgICAgICAgICAgfQogICAgICAgIH0K
-ICAgICAgICBpZiAoY291bnQpIHNldF9zdGF0dXMoIjEgc3Vic3RpdHVpw6fDo28gZmVpdGEg4oCU
-IEN0cmwrVSBkZXNmYXoiKTsKICAgICAgICBlbHNlICAgICAgIHNldF9zdGF0dXMoIk7Do28gZW5j
-b250cmFkbzogJXMiLCBxdWVyeSk7CiAgICB9IGVsc2UgewogICAgICAgIHNldF9zdGF0dXMoIlN1
-YnN0aXR1acOnw6NvIGNhbmNlbGFkYS4iKTsKICAgIH0KICAgIGZyZWUocXVlcnkpOyBmcmVlKHJl
-cGxhY2VtZW50KTsKfQoKc3RhdGljIHZvaWQgZmluZCh2b2lkKSB7CiAgICBpbnQgc3ggPSBFLmN4
-LCBzeSA9IEUuY3ksIHNjbyA9IEUuY29sb2ZmLCBzcm8gPSBFLnJvd29mZjsKICAgIGNoYXIgKnEg
-PSBwcm9tcHQoIkJ1c2NhciAoc2V0YXMgbmF2LCBFU0MgY2FuY2VsYSk6ICVzIiwgc2VhcmNoX2Ni
-KTsKICAgIGlmIChxKSBmcmVlKHEpOwogICAgZWxzZSB7IEUuY3ggPSBzeDsgRS5jeSA9IHN5OyBF
-LmNvbG9mZiA9IHNjbzsgRS5yb3dvZmYgPSBzcm87IH0KfQoKLyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIFNDUk9MTCAvIENVUlNPUgog
-KiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAg
-Ki8KCnN0YXRpYyB2b2lkIHNjcm9sbCh2b2lkKSB7CiAgICBFLnJ4ID0gKEUuY3kgPCBFLm51bXJv
-d3MpID8gY3hfdG9fcngoJkUucm93W0UuY3ldLCBFLmN4KSA6IDA7CiAgICBpZiAoRS5jeSA8IEUu
-cm93b2ZmKSBFLnJvd29mZiA9IEUuY3k7CiAgICBpZiAoRS5jeSA+PSBFLnJvd29mZiArIEUucm93
-cykgRS5yb3dvZmYgPSBFLmN5IC0gRS5yb3dzICsgMTsKICAgIC8qIHNjcm9sbCBob3Jpem9udGFs
-OiDDoXJlYSB2aXPDrXZlbCDDqSBjb2xzIC0gR1VUVEVSICovCiAgICBpbnQgdncgPSBFLmNvbHMg
-LSBHVVRURVI7CiAgICBpZiAoRS5yeCA8IEUuY29sb2ZmKSBFLmNvbG9mZiA9IEUucng7CiAgICBp
-ZiAoRS5yeCA+PSBFLmNvbG9mZiArIHZ3KSBFLmNvbG9mZiA9IEUucnggLSB2dyArIDE7Cn0KCnN0
-YXRpYyB2b2lkIG1vdmVfY3Vyc29yKGludCBrKSB7CiAgICBSb3cgKnJvdyA9IChFLmN5IDwgRS5u
-dW1yb3dzKSA/ICZFLnJvd1tFLmN5XSA6IE5VTEw7CiAgICBzd2l0Y2ggKGspIHsKICAgICAgICBj
-YXNlIEFSUk9XX0xFRlQ6CiAgICAgICAgICAgIGlmIChFLmN4ID4gMCkgRS5jeC0tOwogICAgICAg
-ICAgICBlbHNlIGlmIChFLmN5ID4gMCkgeyBFLmN5LS07IEUuY3ggPSBFLnJvd1tFLmN5XS5zaXpl
-OyB9CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIGNhc2UgQVJST1dfUklHSFQ6CiAgICAgICAg
-ICAgIGlmIChyb3cgJiYgRS5jeCA8IHJvdy0+c2l6ZSkgRS5jeCsrOwogICAgICAgICAgICBlbHNl
-IGlmIChyb3cgJiYgRS5jeCA9PSByb3ctPnNpemUgJiYgRS5jeSA8IEUubnVtcm93cy0xKSB7IEUu
-Y3krKzsgRS5jeCA9IDA7IH0KICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgY2FzZSBBUlJPV19V
-UDogICBpZiAoRS5jeSA+IDApIEUuY3ktLTsgICAgICAgICBicmVhazsKICAgICAgICBjYXNlIEFS
-Uk9XX0RPV046IGlmIChFLmN5IDwgRS5udW1yb3dzKSBFLmN5Kys7ICBicmVhazsKICAgIH0KICAg
-IHJvdyA9IChFLmN5IDwgRS5udW1yb3dzKSA/ICZFLnJvd1tFLmN5XSA6IE5VTEw7CiAgICBpbnQg
-cmxlbiA9IHJvdyA/IHJvdy0+c2l6ZSA6IDA7CiAgICBpZiAoRS5jeCA+IHJsZW4pIEUuY3ggPSBy
-bGVuOwp9CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZAKICogUkVOREVSCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKc3RhdGljIHZvaWQgZHJhd19yb3dzKEFidWYgKmFiKSB7
-CiAgICBmb3IgKGludCB5ID0gMDsgeSA8IEUucm93czsgeSsrKSB7CiAgICAgICAgaW50IGZyID0g
-eSArIEUucm93b2ZmOwoKICAgICAgICBpZiAoZnIgPj0gRS5udW1yb3dzKSB7CiAgICAgICAgICAg
-IC8qIHRlbGEgdmF6aWEgKi8KICAgICAgICAgICAgaWYgKEUubnVtcm93cyA9PSAwICYmIHkgPT0g
-RS5yb3dzIC8gMykgewogICAgICAgICAgICAgICAgY2hhciBtc2dbMjU2XTsKICAgICAgICAgICAg
-ICAgIGludCBtbCA9IHNucHJpbnRmKG1zZywgc2l6ZW9mKG1zZyksCiAgICAgICAgICAgICAgICAg
-ICAgIkVsbGlvdE9TIEVkaXRvciB2JXMgIHwgIEN0cmwrUyBzYWx2YXIgIEN0cmwrUSBzYWlyICBU
-YWIgY29tcGxldGFyICBDdHJsK04gc25pcHBldHMgIEN0cmwrTyBzw61tYm9sb3MgIEN0cmwrViBj
-aGVjYXIgIEN0cmwrUiBmb3JtYXRhciIsCiAgICAgICAgICAgICAgICAgICAgRURJVE9SX1ZFUlNJ
-T04pOwogICAgICAgICAgICAgICAgaWYgKG1sID4gRS5jb2xzIC0gR1VUVEVSKSBtbCA9IEUuY29s
-cyAtIEdVVFRFUjsKICAgICAgICAgICAgICAgIGludCBwYWQgPSAoRS5jb2xzIC0gbWwpIC8gMjsK
-ICAgICAgICAgICAgICAgIGFiX2FwcGVuZChhYiwgIlx4MWJbOTBtflx4MWJbMG0iLCAxMCk7CiAg
-ICAgICAgICAgICAgICBmb3IgKGludCBpID0gMTsgaSA8IHBhZDsgaSsrKSBhYl9hcHBlbmQoYWIs
-ICIgIiwgMSk7CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIsICJceDFiWzE7MzVtIiwgNyk7
-CiAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIsIG1zZywgbWwpOwogICAgICAgICAgICAgICAg
-YWJfYXBwZW5kKGFiLCAiXHgxYlswbSIsIDQpOwogICAgICAgICAgICB9IGVsc2UgewogICAgICAg
-ICAgICAgICAgYWJfYXBwZW5kKGFiLCAiXHgxYls5MG1+XHgxYlswbSIsIDEwKTsKICAgICAgICAg
-ICAgfQogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIC8qIG7Dum1lcm8gZGUgbGluaGEgKi8K
-ICAgICAgICAgICAgY2hhciBsYnVmWzMyXTsgaW50IGxsOwogICAgICAgICAgICBpZiAoZnIgPT0g
-RS5jeSkKICAgICAgICAgICAgICAgIGxsID0gc25wcmludGYobGJ1Ziwgc2l6ZW9mKGxidWYpLCAi
-XHgxYlsxOzMzbSU0ZCBceDFiWzBtIiwgZnIrMSk7CiAgICAgICAgICAgIGVsc2UgaWYgKEUucm93
-W2ZyXS5pc19kaXJ0eSkKICAgICAgICAgICAgICAgIGxsID0gc25wcmludGYobGJ1Ziwgc2l6ZW9m
-KGxidWYpLCAiXHgxYlszODs1Ozk3bSU0ZFx4MWJbMzJtXHhlMlx4OTRceDgyXHgxYlswbSIsIGZy
-KzEpOwogICAgICAgICAgICBlbHNlCiAgICAgICAgICAgICAgICBsbCA9IHNucHJpbnRmKGxidWYs
-IHNpemVvZihsYnVmKSwgIlx4MWJbMzg7NTs5N20lNGQgXHgxYlswbSIsIGZyKzEpOwogICAgICAg
-ICAgICBhYl9hcHBlbmQoYWIsIGxidWYsIGxsKTsKCiAgICAgICAgICAgIFJvdyAqcm93ID0gJkUu
-cm93W2ZyXTsKICAgICAgICAgICAgaW50IGxlbiA9IHJvdy0+cnNpemUgLSBFLmNvbG9mZjsKICAg
-ICAgICAgICAgaWYgKGxlbiA8IDApIGxlbiA9IDA7CiAgICAgICAgICAgIGlmIChsZW4gPiBFLmNv
-bHMgLSBHVVRURVIpIGxlbiA9IEUuY29scyAtIEdVVFRFUjsKCiAgICAgICAgICAgIC8qIG5vcm1h
-bGl6YSBzZWxlw6fDo28gcGFyYSBoaWdobGlnaHQgKi8KICAgICAgICAgICAgaW50IHNlbF9zeTE9
-LTEsc2VsX3N4MT0wLHNlbF9zeTI9LTEsc2VsX3N4Mj0wOwogICAgICAgICAgICBpZiAoRS5zZWxf
-YWN0aXZlKSB7CiAgICAgICAgICAgICAgICBzZWxfc3kxPUUuc2VsX2F5OyBzZWxfc3gxPUUuc2Vs
-X2F4OwogICAgICAgICAgICAgICAgc2VsX3N5Mj1FLmN5OyAgICAgc2VsX3N4Mj1FLmN4OwogICAg
-ICAgICAgICAgICAgaWYgKHNlbF9zeTE+c2VsX3N5Mnx8KHNlbF9zeTE9PXNlbF9zeTImJnNlbF9z
-eDE+c2VsX3N4MikpewogICAgICAgICAgICAgICAgICAgIGludCB0OyB0PXNlbF9zeTE7c2VsX3N5
-MT1zZWxfc3kyO3NlbF9zeTI9dDsKICAgICAgICAgICAgICAgICAgICB0PXNlbF9zeDE7c2VsX3N4
-MT1zZWxfc3gyO3NlbF9zeDI9dDsgfQogICAgICAgICAgICB9CgogICAgICAgICAgICBjaGFyICpj
-aCA9ICZyb3ctPnJlbmRlcltFLmNvbG9mZl07CiAgICAgICAgICAgIHVuc2lnbmVkIGNoYXIgKmhs
-ID0gJnJvdy0+aGxbRS5jb2xvZmZdOwogICAgICAgICAgICBpbnQgY3VyX2NvbG9yID0gLTE7CiAg
-ICAgICAgICAgIGludCBpbl9zZWxfcHJldiA9IDA7CgogICAgICAgICAgICBmb3IgKGludCBqID0g
-MDsgaiA8IGxlbjsgaisrKSB7CiAgICAgICAgICAgICAgICAvKiBoaWdobGlnaHQgZGUgc2VsZcOn
-w6NvICovCiAgICAgICAgICAgICAgICBpbnQgYWJzX2NvbCA9IGogKyBFLmNvbG9mZjsKICAgICAg
-ICAgICAgICAgIGludCBpbl9zZWwgPSAwOwogICAgICAgICAgICAgICAgaWYgKEUuc2VsX2FjdGl2
-ZSAmJiBmcj49c2VsX3N5MSAmJiBmcjw9c2VsX3N5MikgewogICAgICAgICAgICAgICAgICAgIGlu
-dCBscyA9IChmcj09c2VsX3N5MSk/c2VsX3N4MTowOwogICAgICAgICAgICAgICAgICAgIGludCBs
-ZSA9IChmcj09c2VsX3N5Mik/c2VsX3N4Mjpyb3ctPnNpemU7CiAgICAgICAgICAgICAgICAgICAg
-LyogY29udmVydGUgY3ggcGFyYSByeCAqLwogICAgICAgICAgICAgICAgICAgIGluX3NlbCA9IChh
-YnNfY29sPj1scyAmJiBhYnNfY29sPGxlKTsKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAg
-ICAgIGlmIChpbl9zZWwgJiYgIWluX3NlbF9wcmV2KSB7IGFiX2FwcGVuZChhYiwiXHgxYls0ODs1
-OzI0bSIsMTEpOyBjdXJfY29sb3I9LTk5OyB9CiAgICAgICAgICAgICAgICBpZiAoIWluX3NlbCAm
-JiBpbl9zZWxfcHJldikgeyBhYl9hcHBlbmQoYWIsIlx4MWJbNDltIiw1KTsgY3VyX2NvbG9yPS0x
-OyB9CiAgICAgICAgICAgICAgICBpbl9zZWxfcHJldj1pbl9zZWw7CiAgICAgICAgICAgICAgICBp
-ZiAoaXNjbnRybCgodW5zaWduZWQgY2hhciljaFtqXSkpIHsKICAgICAgICAgICAgICAgICAgICBj
-aGFyIHN5bSA9IChjaFtqXSA8PSAyNikgPyAnQCcgKyBjaFtqXSA6ICc/JzsKICAgICAgICAgICAg
-ICAgICAgICBhYl9hcHBlbmQoYWIsICJceDFiWzdtIiwgNCk7CiAgICAgICAgICAgICAgICAgICAg
-YWJfYXBwZW5kKGFiLCAmc3ltLCAxKTsKICAgICAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIs
-ICJceDFiW20iLCAzKTsKICAgICAgICAgICAgICAgICAgICBpZiAoY3VyX2NvbG9yICE9IC0xKSB7
-CiAgICAgICAgICAgICAgICAgICAgICAgIGNoYXIgY2JbMjRdOyBpbnQgYmw7CiAgICAgICAgICAg
-ICAgICAgICAgICAgIGlmIChjdXJfY29sb3IgPCAwKQogICAgICAgICAgICAgICAgICAgICAgICAg
-ICAgYmwgPSBzbnByaW50ZihjYiwgc2l6ZW9mKGNiKSwgIlx4MWJbJWRtIiwgLWN1cl9jb2xvcik7
-CiAgICAgICAgICAgICAgICAgICAgICAgIGVsc2UgaWYgKGN1cl9jb2xvciA+IDM3KQogICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgYmwgPSBzbnByaW50ZihjYiwgc2l6ZW9mKGNiKSwgIlx4MWJb
-Mzg7NTslZG0iLCBjdXJfY29sb3IpOwogICAgICAgICAgICAgICAgICAgICAgICBlbHNlCiAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICBibCA9IHNucHJpbnRmKGNiLCBzaXplb2YoY2IpLCAiXHgx
-YlslZG0iLCBjdXJfY29sb3IpOwogICAgICAgICAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIs
-IGNiLCBibCk7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfSBlbHNlIGlm
-IChobFtqXSA9PSBITF9OT1JNQUwpIHsKICAgICAgICAgICAgICAgICAgICBpZiAoY3VyX2NvbG9y
-ICE9IC0xKSB7IGFiX2FwcGVuZChhYiwgIlx4MWJbMzltIiwgNSk7IGN1cl9jb2xvciA9IC0xOyB9
-CiAgICAgICAgICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCAmY2hbal0sIDEpOwogICAgICAgICAg
-ICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgICAgICAgICBpbnQgY29sb3IgPSBobF90b19jb2xv
-cihobFtqXSk7CiAgICAgICAgICAgICAgICAgICAgaWYgKGNvbG9yICE9IGN1cl9jb2xvcikgewog
-ICAgICAgICAgICAgICAgICAgICAgICBjdXJfY29sb3IgPSBjb2xvcjsKICAgICAgICAgICAgICAg
-ICAgICAgICAgY2hhciBjYnVmWzI0XTsgaW50IGJsOwogICAgICAgICAgICAgICAgICAgICAgICBp
-ZiAoY29sb3IgPCAwKQogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmwgPSBzbnByaW50Zihj
-YnVmLCBzaXplb2YoY2J1ZiksICJceDFiWyVkbSIsIC1jb2xvcik7CiAgICAgICAgICAgICAgICAg
-ICAgICAgIGVsc2UgaWYgKGNvbG9yID4gMzcpCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBi
-bCA9IHNucHJpbnRmKGNidWYsIHNpemVvZihjYnVmKSwgIlx4MWJbMzg7NTslZG0iLCBjb2xvcik7
-CiAgICAgICAgICAgICAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgICAgICAgICAgICAg
-IGJsID0gc25wcmludGYoY2J1Ziwgc2l6ZW9mKGNidWYpLCAiXHgxYlslZG0iLCBjb2xvcik7CiAg
-ICAgICAgICAgICAgICAgICAgICAgIGFiX2FwcGVuZChhYiwgY2J1ZiwgYmwpOwogICAgICAgICAg
-ICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBhYl9hcHBlbmQoYWIsICZjaFtqXSwgMSk7
-CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgaWYgKGluX3NlbF9w
-cmV2KSBhYl9hcHBlbmQoYWIsIlx4MWJbNDltIiw1KTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFi
-LCAiXHgxYlszOW0iLCA1KTsKICAgICAgICB9CiAgICAgICAgYWJfYXBwZW5kKGFiLCAiXHgxYltL
-XHJcbiIsIDUpOwogICAgfQp9CgpzdGF0aWMgdm9pZCBkcmF3X3N0YXR1cyhBYnVmICphYikgewog
-ICAgLyogZnVuZG8gcm94byBlc2N1cm8gKyB0ZXh0byBsYXZhbmRhICovCiAgICBhYl9hcHBlbmQo
-YWIsICJceDFiWzQ4OzU7NTRtXHgxYlszODs1OzE4OW0iLCAyMSk7CiAgICBjaGFyIGxlZnRbMTYw
-XSwgcmlnaHRbNjRdOwogICAgY29uc3QgY2hhciAqZnQgPSBFLnN5bnRheCA/IEUuc3ludGF4LT5m
-aWxldHlwZSA6ICJwbGFpbiI7CiAgICAvKiB0YWIgaW5mbyAqLwogICAgY2hhciB0YWJfaW5mb1s2
-NF0gPSAiIjsKICAgIGlmIChFLmJ1Zl9jb3VudCA+IDEpCiAgICAgICAgc25wcmludGYodGFiX2lu
-Zm8sIHNpemVvZih0YWJfaW5mbyksICIgWyVkLyVkXSIsIEUuYnVmX2lkeCsxLCBFLmJ1Zl9jb3Vu
-dCk7CiAgICBpbnQgbGwsIHJsOwoKICAgIGlmIChFLmRpcnR5KQogICAgICAgIGxsID0gc25wcmlu
-dGYobGVmdCwgc2l6ZW9mKGxlZnQpLAogICAgICAgICAgICAiICBceDFiWzM4OzU7MjIwbeKXj1x4
-MWJbMzg7NTsxODltICVzICBceDFiWzM4OzU7MTQxbVslc11ceDFiWzM4OzU7MTg5bSIsCiAgICAg
-ICAgICAgIEUuZmlsZW5hbWUgPyBFLmZpbGVuYW1lIDogInNlbSBub21lIiwgZnQpOwogICAgZWxz
-ZQogICAgICAgIGxsID0gc25wcmludGYobGVmdCwgc2l6ZW9mKGxlZnQpLAogICAgICAgICAgICAi
-ICBceDFiWzM4OzU7MTE0beKck1x4MWJbMzg7NTsxODltICVzICBceDFiWzM4OzU7MTQxbVslc11c
-eDFiWzM4OzU7MTg5bSIsCiAgICAgICAgICAgIEUuZmlsZW5hbWUgPyBFLmZpbGVuYW1lIDogInNl
-bSBub21lIiwgZnQpOwoKICAgIHJsID0gc25wcmludGYocmlnaHQsIHNpemVvZihyaWdodCksCiAg
-ICAgICAgIiAgTG4gJWQvJWQgIENvbCAlZCAgIiwgRS5jeSsxLCBFLm51bXJvd3MsIEUucngrMSk7
-CgogICAgLyogY29udGEgY2hhcnMgdmlzw612ZWlzIChzZW0gZXNjYXBlcyBBTlNJKSBkZSBsZWZ0
-ICovCiAgICBpbnQgdmlzaWJsZSA9IDA7CiAgICBpbnQgaW5fZXNjID0gMDsKICAgIGZvciAoaW50
-IGkgPSAwOyBsZWZ0W2ldOyBpKyspIHsKICAgICAgICBpZiAobGVmdFtpXSA9PSAnXHgxYicpIHsg
-aW5fZXNjID0gMTsgY29udGludWU7IH0KICAgICAgICBpZiAoaW5fZXNjKSB7IGlmIChpc2FscGhh
-KCh1bnNpZ25lZCBjaGFyKWxlZnRbaV0pKSBpbl9lc2MgPSAwOyBjb250aW51ZTsgfQogICAgICAg
-IHZpc2libGUrKzsKICAgIH0KCiAgICBhYl9hcHBlbmQoYWIsIGxlZnQsIGxsKTsKICAgIGludCBw
-YWQgPSBFLmNvbHMgLSB2aXNpYmxlIC0gcmw7CiAgICB3aGlsZSAocGFkLS0gPiAwKSBhYl9hcHBl
-bmQoYWIsICIgIiwgMSk7CiAgICBpZiAocmwgPiAwKSBhYl9hcHBlbmQoYWIsIHJpZ2h0LCBybCk7
-CiAgICBhYl9hcHBlbmQoYWIsICJceDFiW21cclxuIiwgNSk7Cn0KCnN0YXRpYyB2b2lkIGRyYXdf
-bXNnKEFidWYgKmFiKSB7CiAgICBhYl9hcHBlbmQoYWIsICJceDFiW0siLCAzKTsKICAgIGludCBt
-bCA9IHN0cmxlbihFLnN0YXR1c21zZyk7CiAgICAvKiBOw6NvIHRydW5jYXIgcG9yIEUuY29scyDi
-gJQgbyBzdGF0dXNtc2cgcG9kZSBjb250ZXIgc2VxdcOqbmNpYXMgZGUgZXNjYXBlCiAgICAgKiBx
-dWUgbsOjbyBvY3VwYW0gY29sdW5hcyB2aXN1YWlzIChleDogbWVudSBkZSBsaW5ndWFnZW0pLiBP
-IHRlcm1pbmFsCiAgICAgKiBjdWlkYSBkbyBjbGlwcGluZy4gU8OzIGxpbWl0YW1vcyBwZWxvIHRh
-bWFuaG8gcmVhbCBkbyBidWZmZXIuICovCiAgICBpZiAobWwgJiYgdGltZShOVUxMKSAtIEUuc3Rh
-dHVzbXNnX3RpbWUgPCBTVEFUVVNfTVNHX1RJTUUpCiAgICAgICAgYWJfYXBwZW5kKGFiLCBFLnN0
-YXR1c21zZywgbWwpOwp9CgovKiDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZAKICogR09UTyBTWU1CT0wgKEN0cmwrTykKICog4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqCiAqIExpc3RhIHRv
-ZG9zIG9zIHPDrW1ib2xvcyBkZWZpbmlkb3Mgbm8gYXJxdWl2byAoZnVuw6fDtWVzLCB2YXJpw6F2
-ZWlzLAogKiBzdHJ1Y3RzLCBtYWNyb3MsIHRhZ3MgSFRNTCkgZmlsdHLDoXZlaXMgcG9yIGRpZ2l0
-YcOnw6NvIGluY3JlbWVudGFsLgogKiBBdGFsaG9zIG5vIHBhaW5lbDoKICogICDihpHihpMgICAg
-ICAgbmF2ZWdhcgogKiAgIEVudGVyICAgIHB1bGFyIHBhcmEgbyBzw61tYm9sbwogKiAgIGxldHJh
-L0JhY2tzcGFjZSAgZmlsdHJhciBsaXN0YQogKiAgIEVzYyAgICAgIGZlY2hhcgogKiDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
-lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAgKi8KCiNkZWZp
-bmUgU1lNX01BWCAgIDI1NgojZGVmaW5lIFNZTV9QUkVWICA2MAoKdHlwZWRlZiBzdHJ1Y3Qgewog
-ICAgaW50ICBsaW5lOwogICAgY2hhciBraW5kOyAgICAvKiAnZic9ZnVuw6fDo28gICdtJz1tYWNy
-byAgJ3MnPXN0cnVjdC90eXBlZGVmICAnaCc9aHRtbCAqLwogICAgY2hhciBuYW1lWzY0XTsKICAg
-IGNoYXIgcHJldmlld1tTWU1fUFJFVl07Cn0gU3ltYm9sOwoKc3RhdGljIFN5bWJvbCBnX3N5bXNb
-U1lNX01BWF07CnN0YXRpYyBpbnQgICAgZ19zeW1fY291bnQgID0gMDsKc3RhdGljIGludCAgICBn
-X3N5bV9zZWwgICAgPSAwOwpzdGF0aWMgaW50ICAgIGdfc3ltX3Njcm9sbCA9IDA7CnN0YXRpYyBp
-bnQgICAgZ19zeW1fYWN0aXZlID0gMDsKc3RhdGljIGNoYXIgICBnX3N5bV9xdWVyeVs0OF0gPSB7
-MH07CnN0YXRpYyBpbnQgICAgZ19zeW1fcWxlbiAgICAgID0gMDsKc3RhdGljIGludCAgICBnX3N5
-bV92aXNbU1lNX01BWF07CnN0YXRpYyBpbnQgICAgZ19zeW1fdmlzX2NvdW50ID0gMDsKCnN0YXRp
-YyBpbnQgc3ltX2ljb250YWlucyhjb25zdCBjaGFyICpoYXksIGNvbnN0IGNoYXIgKm5lZWRsZSkg
-ewogICAgaWYgKCFuZWVkbGVbMF0pIHJldHVybiAxOwogICAgaW50IG5sID0gKGludClzdHJsZW4o
-bmVlZGxlKTsKICAgIGZvciAoaW50IGkgPSAwOyBoYXlbaV07IGkrKykgewogICAgICAgIGludCBv
-ayA9IDE7CiAgICAgICAgZm9yIChpbnQgaiA9IDA7IGogPCBubDsgaisrKSB7CiAgICAgICAgICAg
-IGlmICh0b2xvd2VyKCh1bnNpZ25lZCBjaGFyKWhheVtpK2pdKSAhPQogICAgICAgICAgICAgICAg
-dG9sb3dlcigodW5zaWduZWQgY2hhciluZWVkbGVbal0pKSB7IG9rPTA7IGJyZWFrOyB9CiAgICAg
-ICAgfQogICAgICAgIGlmIChvaykgcmV0dXJuIDE7CiAgICB9CiAgICByZXR1cm4gMDsKfQoKc3Rh
-dGljIHZvaWQgc3ltX2J1aWxkX3Zpcyh2b2lkKSB7CiAgICBnX3N5bV92aXNfY291bnQgPSAwOwog
-ICAgZm9yIChpbnQgaSA9IDA7IGkgPCBnX3N5bV9jb3VudDsgaSsrKQogICAgICAgIGlmIChzeW1f
-aWNvbnRhaW5zKGdfc3ltc1tpXS5uYW1lLCBnX3N5bV9xdWVyeSkpCiAgICAgICAgICAgIGdfc3lt
-X3Zpc1tnX3N5bV92aXNfY291bnQrK10gPSBpOwogICAgaWYgKGdfc3ltX3NlbCA+PSBnX3N5bV92
-aXNfY291bnQpCiAgICAgICAgZ19zeW1fc2VsID0gZ19zeW1fdmlzX2NvdW50ID4gMCA/IGdfc3lt
-X3Zpc19jb3VudC0xIDogMDsKfQoKc3RhdGljIGludCBzeW1fZXh0cmFjdF9uYW1lKGNvbnN0IGNo
-YXIgKnMsIGludCBza2lwLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNoYXIgKm91dCwg
-aW50IG91dHN6KSB7CiAgICBjb25zdCBjaGFyICpwID0gcyArIHNraXA7CiAgICB3aGlsZSAoKnA9
-PScgJ3x8KnA9PSdcdCcpIHArKzsKICAgIGludCBpPTA7CiAgICB3aGlsZSAoaTxvdXRzei0xICYm
-IChpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKXBbaV0pfHxwW2ldPT0nXycpKQogICAgICAgIHsgb3V0
-W2ldPXBbaV07IGkrKzsgfQogICAgb3V0W2ldPSdcMCc7IHJldHVybiBpOwp9CgpzdGF0aWMgdm9p
-ZCBzeW1fY29sbGVjdCh2b2lkKSB7CiAgICBnX3N5bV9jb3VudCA9IDA7CiAgICBpbnQgaXNfYyAg
-ICA9IChFLnN5bnRheD09JkhMREJbMF18fEUuc3ludGF4PT0mSExEQlsxXSk7CiAgICBpbnQgaXNf
-bHVhICA9IChFLnN5bnRheD09JkhMREJbMl0pOwogICAgaW50IGlzX2Jhc2ggPSAoRS5zeW50YXg9
-PSZITERCWzNdKTsKICAgIGludCBpc19odG1sID0gKEUuc3ludGF4PT0mSExEQls0XSk7CgogICAg
-Zm9yIChpbnQgeSA9IDA7IHkgPCBFLm51bXJvd3MgJiYgZ19zeW1fY291bnQgPCBTWU1fTUFYOyB5
-KyspIHsKICAgICAgICBjaGFyICpzID0gRS5yb3dbeV0uY2hhcnM7CiAgICAgICAgaW50ICAgbiA9
-IEUucm93W3ldLnNpemU7CiAgICAgICAgaW50ICAgdHMgPSAwOwogICAgICAgIHdoaWxlICh0czxu
-ICYmIChzW3RzXT09JyAnfHxzW3RzXT09J1x0JykpIHRzKys7CiAgICAgICAgY2hhciAqcCA9IHMg
-KyB0czsKICAgICAgICBjaGFyIG5hbWVbNjRdOyBjaGFyIGtpbmQgPSAwOwoKICAgICAgICBpZiAo
-aXNfbHVhKSB7CiAgICAgICAgICAgIGlmIChzdHJuY21wKHAsImZ1bmN0aW9uICIsOSk9PTApIHsK
-ICAgICAgICAgICAgICAgIGlmIChzeW1fZXh0cmFjdF9uYW1lKHAsOSxuYW1lLHNpemVvZihuYW1l
-KSk+MCkga2luZD0nZic7CiAgICAgICAgICAgIH0gZWxzZSBpZiAoc3RybmNtcChwLCJsb2NhbCBm
-dW5jdGlvbiAiLDE1KT09MCkgewogICAgICAgICAgICAgICAgaWYgKHN5bV9leHRyYWN0X25hbWUo
-cCwxNSxuYW1lLHNpemVvZihuYW1lKSk+MCkga2luZD0nZic7CiAgICAgICAgICAgIH0gZWxzZSB7
-CiAgICAgICAgICAgICAgICBjb25zdCBjaGFyICplcT1zdHJzdHIocCwiPSBmdW5jdGlvbiIpOwog
-ICAgICAgICAgICAgICAgaWYgKGVxKSB7CiAgICAgICAgICAgICAgICAgICAgY29uc3QgY2hhciAq
-cT1wOwogICAgICAgICAgICAgICAgICAgIGlmIChzdHJuY21wKHEsImxvY2FsICIsNik9PTApIHEr
-PTY7CiAgICAgICAgICAgICAgICAgICAgaW50IGk9MDsKICAgICAgICAgICAgICAgICAgICB3aGls
-ZShpPDYzJiYoaXNhbG51bSgodW5zaWduZWQgY2hhcilxW2ldKXx8cVtpXT09J18nfHxxW2ldPT0n
-LicpKQogICAgICAgICAgICAgICAgICAgICAgICB7IG5hbWVbaV09cVtpXTsgaSsrOyB9CiAgICAg
-ICAgICAgICAgICAgICAgbmFtZVtpXT0nXDAnOwogICAgICAgICAgICAgICAgICAgIGlmIChpPjAp
-IGtpbmQ9J2YnOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgfSBlbHNl
-IGlmIChpc19jKSB7CiAgICAgICAgICAgIGlmIChzdHJuY21wKHAsIiNkZWZpbmUgIiw4KT09MCkg
-ewogICAgICAgICAgICAgICAgaWYgKHN5bV9leHRyYWN0X25hbWUocCw4LG5hbWUsc2l6ZW9mKG5h
-bWUpKT4wKSBraW5kPSdtJzsKICAgICAgICAgICAgfSBlbHNlIGlmIChzdHJuY21wKHAsInN0cnVj
-dCAiLDcpPT0wfHxzdHJuY21wKHAsImVudW0gIiw1KT09MHx8CiAgICAgICAgICAgICAgICAgICAg
-ICAgc3RybmNtcChwLCJ1bmlvbiAiLDYpPT0wfHxzdHJuY21wKHAsImNsYXNzICIsNik9PTApIHsK
-ICAgICAgICAgICAgICAgIGludCBzaz0oc3RybmNtcChwLCJzdHJ1Y3QgIiw3KT09MCk/NzoKICAg
-ICAgICAgICAgICAgICAgICAgICAoc3RybmNtcChwLCJlbnVtICIsNSk9PTApPzU6CiAgICAgICAg
-ICAgICAgICAgICAgICAgKHN0cm5jbXAocCwidW5pb24gIiw2KT09MCk/Njo2OwogICAgICAgICAg
-ICAgICAgaWYgKHN5bV9leHRyYWN0X25hbWUocCxzayxuYW1lLHNpemVvZihuYW1lKSk+MCkga2lu
-ZD0ncyc7CiAgICAgICAgICAgIH0gZWxzZSBpZiAoc3RybmNtcChwLCJ0eXBlZGVmICIsOCk9PTAp
-IHsKICAgICAgICAgICAgICAgIGludCB0bD0oaW50KXN0cmxlbihwKSxpPXRsLTE7CiAgICAgICAg
-ICAgICAgICB3aGlsZShpPjAmJihwW2ldPT0nOyd8fHBbaV09PScgJ3x8cFtpXT09J1x0JykpIGkt
-LTsKICAgICAgICAgICAgICAgIGludCBlbmQ9aSsxLHNpMj1pOwogICAgICAgICAgICAgICAgd2hp
-bGUoc2kyPjAmJihpc2FsbnVtKCh1bnNpZ25lZCBjaGFyKXBbc2kyLTFdKXx8cFtzaTItMV09PSdf
-JykpIHNpMi0tOwogICAgICAgICAgICAgICAgaW50IGxlbj1lbmQtc2kyOyBpZihsZW4+MCYmbGVu
-PDYzKSB7CiAgICAgICAgICAgICAgICAgICAgbWVtY3B5KG5hbWUscCtzaTIsbGVuKTsgbmFtZVts
-ZW5dPSdcMCc7IGtpbmQ9J3MnOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9IGVsc2Ug
-ewogICAgICAgICAgICAgICAgY2hhciAqbHA9c3RyY2hyKHAsJygnKTsKICAgICAgICAgICAgICAg
-IGlmIChscCYmbHA+cCkgewogICAgICAgICAgICAgICAgICAgIGludCBiYWQ9KHN0cm5jbXAocCwi
-aWYgIiwzKT09MHx8c3RybmNtcChwLCJpZigiLDMpPT0wfHwKICAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICBzdHJuY21wKHAsImZvciAiLDQpPT0wfHxzdHJuY21wKHAsImZvcigiLDQpPT0wfHwK
-ICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHJuY21wKHAsIndoaWxlICIsNik9PTB8fHN0
-cm5jbXAocCwid2hpbGUoIiw2KT09MHx8CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3Ry
-bmNtcChwLCJyZXR1cm4gIiw3KT09MHx8c3RybmNtcChwLCJzd2l0Y2giLDYpPT0wfHwKICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICBzdHJuY21wKHAsIi8vIiwyKT09MHx8c3RybmNtcChwLCIv
-KiIsMik9PTB8fAogICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBbMF09PScqJyk7CiAgICAg
-ICAgICAgICAgICAgICAgaWYgKCFiYWQpIHsKICAgICAgICAgICAgICAgICAgICAgICAgaW50IGVp
-PShpbnQpKGxwLXApOwogICAgICAgICAgICAgICAgICAgICAgICB3aGlsZShlaT4wJiYocFtlaS0x
-XT09JyAnfHxwW2VpLTFdPT0nXHQnKSkgZWktLTsKICAgICAgICAgICAgICAgICAgICAgICAgaW50
-IHNpMj1laTsKICAgICAgICAgICAgICAgICAgICAgICAgd2hpbGUoc2kyPjAmJihpc2FsbnVtKCh1
-bnNpZ25lZCBjaGFyKXBbc2kyLTFdKXx8cFtzaTItMV09PSdfJykpIHNpMi0tOwogICAgICAgICAg
-ICAgICAgICAgICAgICBpbnQgbGVuPWVpLXNpMjsKICAgICAgICAgICAgICAgICAgICAgICAgaWYo
-bGVuPjAmJmxlbjw2MykgeyBtZW1jcHkobmFtZSxwK3NpMixsZW4pOyBuYW1lW2xlbl09J1wwJzsg
-a2luZD0nZic7IH0KICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9CiAgICAg
-ICAgICAgIH0KICAgICAgICB9IGVsc2UgaWYgKGlzX2Jhc2gpIHsKICAgICAgICAgICAgaWYgKHN0
-cm5jbXAocCwiZnVuY3Rpb24gIiw5KT09MCkgewogICAgICAgICAgICAgICAgaWYgKHN5bV9leHRy
-YWN0X25hbWUocCw5LG5hbWUsc2l6ZW9mKG5hbWUpKT4wKSBraW5kPSdmJzsKICAgICAgICAgICAg
-fSBlbHNlIHsKICAgICAgICAgICAgICAgIGNoYXIgKmxwPXN0cnN0cihwLCIoKSIpOwogICAgICAg
-ICAgICAgICAgaWYobHAmJmxwPnApIHsKICAgICAgICAgICAgICAgICAgICBpbnQgZWk9KGludCko
-bHAtcCksc2kyPWVpOwogICAgICAgICAgICAgICAgICAgIHdoaWxlKHNpMj4wJiYoaXNhbG51bSgo
-dW5zaWduZWQgY2hhcilwW3NpMi0xXSl8fHBbc2kyLTFdPT0nXycpKSBzaTItLTsKICAgICAgICAg
-ICAgICAgICAgICBpbnQgbGVuPWVpLXNpMjsKICAgICAgICAgICAgICAgICAgICBpZihsZW4+MCYm
-bGVuPDYzKXsgbWVtY3B5KG5hbWUscCtzaTIsbGVuKTsgbmFtZVtsZW5dPSdcMCc7IGtpbmQ9J2Yn
-OyB9CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9IGVsc2UgaWYgKGlz
-X2h0bWwpIHsKICAgICAgICAgICAgc3RhdGljIGNvbnN0IGNoYXIgKmh0YWdzW109eyI8aDEiLCI8
-aDIiLCI8aDMiLCI8aDQiLCI8aDUiLCI8aDYiLAogICAgICAgICAgICAgICAgIjxzZWN0aW9uIiwi
-PGFydGljbGUiLCI8bmF2IiwiPG1haW4iLCI8Zm9vdGVyIiwiPGhlYWRlciIsIjxhc2lkZSIsTlVM
-TH07CiAgICAgICAgICAgIGZvcihpbnQgdD0wO2h0YWdzW3RdO3QrKykgewogICAgICAgICAgICAg
-ICAgaWYoc3RybmNhc2VjbXAocCxodGFnc1t0XSxzdHJsZW4oaHRhZ3NbdF0pKT09MCkgewogICAg
-ICAgICAgICAgICAgICAgIGludCBpPTA7CiAgICAgICAgICAgICAgICAgICAgd2hpbGUoaTw2MyYm
-cFtpXSYmcFtpXSE9Jz4nJiZwW2ldIT0nICcpIHsgbmFtZVtpXT1wW2ldOyBpKys7IH0KICAgICAg
-ICAgICAgICAgICAgICBuYW1lW2ldPSdcMCc7IGtpbmQ9J2gnOyBicmVhazsKICAgICAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgfQogICAgICAgIH0KCiAgICAgICAgaWYgKGtpbmQgJiYgbmFtZVsw
-XSkgewogICAgICAgICAgICBTeW1ib2wgKnN5bSA9ICZnX3N5bXNbZ19zeW1fY291bnQrK107CiAg
-ICAgICAgICAgIHN5bS0+bGluZSA9IHkrMTsgc3ltLT5raW5kID0ga2luZDsKICAgICAgICAgICAg
-c25wcmludGYoc3ltLT5uYW1lLHNpemVvZihzeW0tPm5hbWUpLCIlcyIsbmFtZSk7CiAgICAgICAg
-ICAgIGludCBwbD0wLCBpMj10czsKICAgICAgICAgICAgd2hpbGUocGw8U1lNX1BSRVYtMSYmaTI8
-biYmc1tpMl0hPSdcbicpIHN5bS0+cHJldmlld1twbCsrXT1zW2kyKytdOwogICAgICAgICAgICBz
-eW0tPnByZXZpZXdbcGxdPSdcMCc7CiAgICAgICAgfQogICAgfQp9CgpzdGF0aWMgdm9pZCBzeW1f
-b3Blbih2b2lkKSB7CiAgICBzeW1fY29sbGVjdCgpOwogICAgaWYgKGdfc3ltX2NvdW50ID09IDAp
-IHsKICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMzbeKaoCBOZW5odW0gc8OtbWJvbG8gZW5jb250
-cmFkbyBuZXN0ZSBhcnF1aXZvXHgxYlttIik7CiAgICAgICAgcmV0dXJuOwogICAgfQogICAgZ19z
-eW1fcXVlcnlbMF09J1wwJzsgZ19zeW1fcWxlbj0wOwogICAgZ19zeW1fc2VsPTA7IGdfc3ltX3Nj
-cm9sbD0wOyBnX3N5bV9hY3RpdmU9MTsKICAgIHN5bV9idWlsZF92aXMoKTsKICAgIHNldF9zdGF0
-dXMoIkN0cmwrTzogXHhlMlx4ODZceDkxXHhlMlx4ODZceDkzIG5hdmVnYXIgIEVudGVyIGlyICBE
-aWdpdGUgcGFyYSBmaWx0cmFyICBFc2MgZmVjaGFyICBbJWQgc1x4YzNceGFkbWJvbG9zXSIsCiAg
-ICAgICAgICAgICAgIGdfc3ltX2NvdW50KTsKfQoKc3RhdGljIHZvaWQgc3ltX2p1bXAoaW50IHZp
-KSB7CiAgICBpZiAodmk8MHx8dmk+PWdfc3ltX3Zpc19jb3VudCkgcmV0dXJuOwogICAgaW50IHNp
-PWdfc3ltX3Zpc1t2aV07CiAgICBFLmN5PWdfc3ltc1tzaV0ubGluZS0xOwogICAgaWYoRS5jeT49
-RS5udW1yb3dzKSBFLmN5PUUubnVtcm93cy0xOwogICAgRS5jeD0wOwogICAgRS5yb3dvZmY9RS5j
-eS1FLnJvd3MvMjsKICAgIGlmKEUucm93b2ZmPDApIEUucm93b2ZmPTA7Cn0KCnN0YXRpYyBjb25z
-dCBjaGFyICpzeW1faWNvbihjaGFyIGspIHsKICAgIHN3aXRjaChrKSB7CiAgICAgICAgY2FzZSAn
-Zic6IHJldHVybiAiXHhjNlx4OTIgIjsgICAvKiDGkiAqLwogICAgICAgIGNhc2UgJ20nOiByZXR1
-cm4gIiMgIjsKICAgICAgICBjYXNlICdzJzogcmV0dXJuICJceGUyXHg5N1x4ODYgIjsgLyog4peG
-ICovCiAgICAgICAgY2FzZSAnaCc6IHJldHVybiAiXHhlMlx4ODBceGEyICI7IC8qIOKAoiAqLwog
-ICAgICAgIGRlZmF1bHQ6ICByZXR1cm4gIn4gIjsKICAgIH0KfQoKc3RhdGljIHZvaWQgZHJhd19z
-eW1fcGFuZWwoQWJ1ZiAqYWIpIHsKICAgIGlmICghZ19zeW1fYWN0aXZlKSByZXR1cm47CgogICAg
-aW50IGxpc3RfaCAgID0gZ19zeW1fdmlzX2NvdW50IDwgMTIgPyBnX3N5bV92aXNfY291bnQgOiAx
-MjsKICAgIGludCBwYW5lbF93ICA9IDYyOwogICAgaW50IHBhbmVsX2NvbCA9IChFLmNvbHMgLSBw
-YW5lbF93KSAvIDI7CiAgICBpZiAocGFuZWxfY29sIDwgMSkgcGFuZWxfY29sID0gMTsKICAgIGlu
-dCBwYW5lbF9yb3cgPSAxOwoKICAgIC8qIHTDrXR1bG8gKi8KICAgIHsKICAgICAgICBjaGFyIHBv
-c1szMl07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHBhbmVsX3Jvdyxw
-YW5lbF9jb2wpOwogICAgICAgIGFiX2FwcGVuZChhYixwb3Msc3RybGVuKHBvcykpOwogICAgICAg
-IGFiX2FwcGVuZChhYiwiXHgxYls0ODs1OzE3bVx4MWJbMzg7NTsxMjNtXHgxYlsxbSIsMjUpOwog
-ICAgICAgIGNoYXIgdGl0bGVbODBdOwogICAgICAgIGludCB0bD1zbnByaW50Zih0aXRsZSxzaXpl
-b2YodGl0bGUpLAogICAgICAgICAgICAiIFx4ZTJceDk3XHg4OCBTXHhjM1x4YWRtYm9sb3MgIFx4
-YzJceGI3ICAlZC8lZCAiLAogICAgICAgICAgICBnX3N5bV92aXNfY291bnQsIGdfc3ltX2NvdW50
-KTsKICAgICAgICBpZih0bD5wYW5lbF93KSB0bD1wYW5lbF93OwogICAgICAgIGFiX2FwcGVuZChh
-Yix0aXRsZSx0bCk7CiAgICAgICAgZm9yKGludCBzPXRsO3M8cGFuZWxfdztzKyspIGFiX2FwcGVu
-ZChhYiwiICIsMSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiW20iLDMpOwogICAgfQogICAg
-LyogZmlsdHJvICovCiAgICB7CiAgICAgICAgaW50IHJvdz1wYW5lbF9yb3crMTsKICAgICAgICBj
-aGFyIHBvc1szMl07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxw
-YW5lbF9jb2wpOwogICAgICAgIGFiX2FwcGVuZChhYixwb3Msc3RybGVuKHBvcykpOwogICAgICAg
-IGFiX2FwcGVuZChhYiwiXHgxYls0ODs1OzE4bVx4MWJbMzg7NTsyNTVtIiwyMSk7CiAgICAgICAg
-Y2hhciBmbGluZVs4MF07CiAgICAgICAgaW50IGZsPXNucHJpbnRmKGZsaW5lLHNpemVvZihmbGlu
-ZSksIiBceGYwXHg5Zlx4OTRceDhkICVzXyIsZ19zeW1fcXVlcnkpOwogICAgICAgIGlmKGZsPnBh
-bmVsX3cpIGZsPXBhbmVsX3c7CiAgICAgICAgYWJfYXBwZW5kKGFiLGZsaW5lLGZsKTsKICAgICAg
-ICBmb3IoaW50IHM9Zmw7czxwYW5lbF93O3MrKykgYWJfYXBwZW5kKGFiLCIgIiwxKTsKICAgICAg
-ICBhYl9hcHBlbmQoYWIsIlx4MWJbbSIsMyk7CiAgICB9CiAgICAvKiBzY3JvbGwgKi8KICAgIGlm
-KGdfc3ltX3NlbDxnX3N5bV9zY3JvbGwpIGdfc3ltX3Njcm9sbD1nX3N5bV9zZWw7CiAgICBpZihn
-X3N5bV9zZWw+PWdfc3ltX3Njcm9sbCtsaXN0X2gpIGdfc3ltX3Njcm9sbD1nX3N5bV9zZWwtbGlz
-dF9oKzE7CiAgICAvKiBpdGVucyAqLwogICAgZm9yKGludCBpPTA7aTxsaXN0X2g7aSsrKSB7CiAg
-ICAgICAgaW50IGlkeD1nX3N5bV9zY3JvbGwraTsKICAgICAgICBpZihpZHg+PWdfc3ltX3Zpc19j
-b3VudCkgYnJlYWs7CiAgICAgICAgaW50IHNpPWdfc3ltX3Zpc1tpZHhdOwogICAgICAgIGludCBy
-b3c9cGFuZWxfcm93KzIraTsKICAgICAgICBpZihyb3c+PUUucm93cykgYnJlYWs7CiAgICAgICAg
-Y2hhciBwb3NbMzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJbJWQ7JWRIIixyb3cs
-cGFuZWxfY29sKTsKICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAg
-ICBpZihpZHg9PWdfc3ltX3NlbCkKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiWzQ4OzU7
-MTltXHgxYlszODs1OzI1NW1ceDFiWzFtIiwyNSk7CiAgICAgICAgZWxzZQogICAgICAgICAgICBh
-Yl9hcHBlbmQoYWIsIlx4MWJbNDg7NTsxN21ceDFiWzM4OzU7MTUzbSIsMjEpOwogICAgICAgIGNo
-YXIgbGluZVs4MF07CiAgICAgICAgaW50IGxsPXNucHJpbnRmKGxpbmUsc2l6ZW9mKGxpbmUpLCIg
-JXNMJS00ZCAgJS0zMHMiLAogICAgICAgICAgICAgICAgICAgICAgICBzeW1faWNvbihnX3N5bXNb
-c2ldLmtpbmQpLAogICAgICAgICAgICAgICAgICAgICAgICBnX3N5bXNbc2ldLmxpbmUsIGdfc3lt
-c1tzaV0ubmFtZSk7CiAgICAgICAgaWYobGw+cGFuZWxfdykgbGw9cGFuZWxfdzsKICAgICAgICBh
-Yl9hcHBlbmQoYWIsbGluZSxsbCk7CiAgICAgICAgZm9yKGludCBzPWxsO3M8cGFuZWxfdztzKysp
-IGFiX2FwcGVuZChhYiwiICIsMSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiW20iLDMpOwog
-ICAgfQogICAgLyogcHJldmlldyAqLwogICAgaWYoZ19zeW1fdmlzX2NvdW50PjApIHsKICAgICAg
-ICBpbnQgc2k9Z19zeW1fdmlzW2dfc3ltX3NlbF07CiAgICAgICAgaW50IHJvdz1wYW5lbF9yb3cr
-MitsaXN0X2g7CiAgICAgICAgaWYocm93PEUucm93cykgewogICAgICAgICAgICBjaGFyIHBvc1sz
-Ml07IHNucHJpbnRmKHBvcyxzaXplb2YocG9zKSwiXHgxYlslZDslZEgiLHJvdyxwYW5lbF9jb2wp
-OwogICAgICAgICAgICBhYl9hcHBlbmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICAgICAg
-YWJfYXBwZW5kKGFiLCJceDFiWzQ4OzU7MjM1bVx4MWJbMzg7NTsyNDRtIiwyMSk7CiAgICAgICAg
-ICAgIGNoYXIgcHJldls4MF07CiAgICAgICAgICAgIGludCBwbD1zbnByaW50ZihwcmV2LHNpemVv
-ZihwcmV2KSwiID4gJXMiLGdfc3ltc1tzaV0ucHJldmlldyk7CiAgICAgICAgICAgIGlmKHBsPnBh
-bmVsX3cpIHBsPXBhbmVsX3c7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixwcmV2LHBsKTsKICAg
-ICAgICAgICAgZm9yKGludCBzPXBsO3M8cGFuZWxfdztzKyspIGFiX2FwcGVuZChhYiwiICIsMSk7
-CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYlttIiwzKTsgcm93Kys7CiAgICAgICAgfSBl
-bHNlIHsgaW50IHJvdzI9cm93KzE7CiAgICAgICAgLyogcm9kYXDDqSAqLwogICAgICAgIGlmKHJv
-dzI8RS5yb3dzKSB7CiAgICAgICAgICAgIGNoYXIgcG9zWzMyXTsgc25wcmludGYocG9zLHNpemVv
-Zihwb3MpLCJceDFiWyVkOyVkSCIscm93MixwYW5lbF9jb2wpOwogICAgICAgICAgICBhYl9hcHBl
-bmQoYWIscG9zLHN0cmxlbihwb3MpKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLCJceDFiWzQ4
-OzU7MTdtXHgxYlszODs1OzEyM20iLDIxKTsKICAgICAgICAgICAgY2hhciBmb290WzgwXTsKICAg
-ICAgICAgICAgaW50IGZsPXNucHJpbnRmKGZvb3Qsc2l6ZW9mKGZvb3QpLCIgJWQvJWQgIEVudGVy
-IGlyICBFc2MgZmVjaGFyICIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBnX3N5bV92aXNf
-Y291bnQ+MD9nX3N5bV9zZWwrMTowLGdfc3ltX3Zpc19jb3VudCk7CiAgICAgICAgICAgIGlmKGZs
-PnBhbmVsX3cpIGZsPXBhbmVsX3c7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYixmb290LGZsKTsK
-ICAgICAgICAgICAgZm9yKGludCBzPWZsO3M8cGFuZWxfdztzKyspIGFiX2FwcGVuZChhYiwiICIs
-MSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYlttIiwzKTsKICAgICAgICB9fQogICAg
-ICAgIC8qIHJvZGFww6kgKGNhc28gbm9ybWFsKSAqLwogICAgICAgIGlmKHJvdzxFLnJvd3MpIHsK
-ICAgICAgICAgICAgY2hhciBwb3NbMzJdOyBzbnByaW50Zihwb3Msc2l6ZW9mKHBvcyksIlx4MWJb
-JWQ7JWRIIixyb3cscGFuZWxfY29sKTsKICAgICAgICAgICAgYWJfYXBwZW5kKGFiLHBvcyxzdHJs
-ZW4ocG9zKSk7CiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwiXHgxYls0ODs1OzE3bVx4MWJbMzg7
-NTsxMjNtIiwyMSk7CiAgICAgICAgICAgIGNoYXIgZm9vdFs4MF07CiAgICAgICAgICAgIGludCBm
-bD1zbnByaW50Zihmb290LHNpemVvZihmb290KSwiICVkLyVkICBFbnRlciBpciAgRXNjIGZlY2hh
-ciAiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZ19zeW1fdmlzX2NvdW50PjA/Z19zeW1f
-c2VsKzE6MCxnX3N5bV92aXNfY291bnQpOwogICAgICAgICAgICBpZihmbD5wYW5lbF93KSBmbD1w
-YW5lbF93OwogICAgICAgICAgICBhYl9hcHBlbmQoYWIsZm9vdCxmbCk7CiAgICAgICAgICAgIGZv
-cihpbnQgcz1mbDtzPHBhbmVsX3c7cysrKSBhYl9hcHBlbmQoYWIsIiAiLDEpOwogICAgICAgICAg
-ICBhYl9hcHBlbmQoYWIsIlx4MWJbbSIsMyk7CiAgICAgICAgfQogICAgfQp9CgovKiBQb3B1cCBk
-ZSBjb21wbGV0aW9uIGRlc2VuaGFkbyBzb2JyZSBvIHRleHRvICovCnN0YXRpYyB2b2lkIGRyYXdf
-Y29tcGxldGlvbihBYnVmICphYikgewogICAgaWYgKCFFLmNvbXAuYWN0aXZlIHx8IEUuY29tcC5j
-b3VudCA9PSAwKSByZXR1cm47CgogICAgaW50IHBvcHVwX3JvdyA9IChFLmN5IC0gRS5yb3dvZmYp
-ICsgMjsgIC8qIGxpbmhhIGFiYWl4byBkbyBjdXJzb3IgKi8KICAgIGludCB0cmlnZ2VyX3J4ID0g
-KEUuY3kgPCBFLm51bXJvd3MpID8gY3hfdG9fcngoJkUucm93W0UuY3ldLCBFLmNvbXAudHJpZ2dl
-cl9jeCkgOiBFLnJ4OwogICAgLyogK0dVVFRFUisxOiBjb252ZXJ0ZSByeCAoMC1pbmRleGVkKSBw
-YXJhIGNvbHVuYSBkZSB0ZXJtaW5hbCAoMS1pbmRleGVkKSBjb20gZ3V0dGVyLgogICAgICogLTE6
-IG8gZXNwYcOnbyBkZSBwYWRkaW5nIGFudGVzIGRvIGl0ZW0gb2N1cGEgMSBjb2wsIGVudMOjbyBy
-ZWN1YW1vcyBwYXJhIG7Do28gY29ydGFyIG8gMcK6IGNoYXIuICovCiAgICBpbnQgcG9wdXBfY29s
-ID0gKHRyaWdnZXJfcnggLSBFLmNvbG9mZikgKyBHVVRURVI7CiAgICBpZiAocG9wdXBfY29sICsg
-MzQgPiBFLmNvbHMpIHBvcHVwX2NvbCA9IEUuY29scyAtIDM0OwogICAgaWYgKHBvcHVwX2NvbCA8
-IDEpIHBvcHVwX2NvbCA9IDE7CgogICAgaW50IHNob3cgID0gKEUuY29tcC5jb3VudCA8IENPTVBM
-RVRJT05fU0hPVykgPyBFLmNvbXAuY291bnQgOiBDT01QTEVUSU9OX1NIT1c7CiAgICBpbnQgc3Rh
-cnQgPSBFLmNvbXAuc2VsZWN0ZWQgLSBzaG93LzI7CiAgICBpZiAoc3RhcnQgPCAwKSBzdGFydCA9
-IDA7CiAgICBpZiAoc3RhcnQgKyBzaG93ID4gRS5jb21wLmNvdW50KSBzdGFydCA9IEUuY29tcC5j
-b3VudCAtIHNob3c7CiAgICBpZiAoc3RhcnQgPCAwKSBzdGFydCA9IDA7CgogICAgZm9yIChpbnQg
-aSA9IDA7IGkgPCBzaG93OyBpKyspIHsKICAgICAgICBpbnQgaWR4ID0gc3RhcnQgKyBpOwogICAg
-ICAgIGludCByb3cgPSBwb3B1cF9yb3cgKyBpOwogICAgICAgIGlmIChyb3cgPj0gRS5yb3dzICsg
-MSkgYnJlYWs7CgogICAgICAgIGNoYXIgcG9zWzMyXTsKICAgICAgICBzbnByaW50Zihwb3MsIHNp
-emVvZihwb3MpLCAiXHgxYlslZDslZEgiLCByb3csIHBvcHVwX2NvbCk7CiAgICAgICAgYWJfYXBw
-ZW5kKGFiLCBwb3MsIHN0cmxlbihwb3MpKTsKCiAgICAgICAgaWYgKGlkeCA9PSBFLmNvbXAuc2Vs
-ZWN0ZWQpCiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwgIlx4MWJbNDg7NTs5OW1ceDFiWzM4OzU7
-MjU1bVx4MWJbMW0iLCAyNSk7ICAvKiBzZWxlY2lvbmFkbzogcm94byB2aXZvICsgYnJhbmNvIGJv
-bGQgKi8KICAgICAgICBlbHNlCiAgICAgICAgICAgIGFiX2FwcGVuZChhYiwgIlx4MWJbNDg7NTs1
-M21ceDFiWzM4OzU7MTgzbSIsIDIxKTsgICAgICAgICAgLyogbm9ybWFsOiByb3hvIGVzY3VybyAr
-IGxpbMOhcyAqLwoKICAgICAgICBjb25zdCBjaGFyICppdGVtID0gRS5jb21wLml0ZW1zW2lkeF07
-CiAgICAgICAgaW50IGlsZW4gPSAoaW50KXN0cmxlbihpdGVtKTsKICAgICAgICBpZiAoaWxlbiA+
-IDMyKSBpbGVuID0gMzI7CiAgICAgICAgYWJfYXBwZW5kKGFiLCAiICIsIDEpOwogICAgICAgIGFi
-X2FwcGVuZChhYiwgaXRlbSwgaWxlbik7CiAgICAgICAgZm9yIChpbnQgcyA9IGlsZW47IHMgPCAz
-MjsgcysrKSBhYl9hcHBlbmQoYWIsICIgIiwgMSk7CiAgICAgICAgYWJfYXBwZW5kKGFiLCAiIFx4
-MWJbbSIsIDQpOwogICAgfQogICAgLyogcm9kYXDDqSBkbyBwb3B1cCAqLwogICAgY2hhciBmb290
-ZXJbMTI4XTsKICAgIGludCBmbCA9IHNucHJpbnRmKGZvb3Rlciwgc2l6ZW9mKGZvb3RlciksCiAg
-ICAgICAgIlx4MWJbJWQ7JWRIXHgxYls0ODs1OzU1bVx4MWJbMzg7NTsxNDFtIOKGkeKGkyBuYXZl
-Z2FyICBFbnRlci9UYWIgYXBsaWNhciAgRXNjIGZlY2hhciBceDFiW20iLAogICAgICAgIHBvcHVw
-X3JvdyArIHNob3csIHBvcHVwX2NvbCk7CiAgICBhYl9hcHBlbmQoYWIsIGZvb3RlciwgZmwpOwp9
-Cgp2b2lkIHJlZnJlc2hfc2NyZWVuKHZvaWQpIHsKICAgIHNjcm9sbCgpOwogICAgQWJ1ZiBhYiA9
-IEFCVUZfSU5JVDsKICAgIGFiX2FwcGVuZCgmYWIsICJceDFiWz8yNWxceDFiW0giLCA5KTsgIC8q
-IGVzY29uZGUgY3Vyc29yLCB2YWkgcGFyYSBob21lICovCiAgICBkcmF3X3Jvd3MoJmFiKTsKICAg
-IGRyYXdfc3RhdHVzKCZhYik7CiAgICBkcmF3X21zZygmYWIpOwogICAgZHJhd19jb21wbGV0aW9u
-KCZhYik7CiAgICBkcmF3X2NoZWNrX3BhbmVsKCZhYik7CiAgICBkcmF3X3NuaXBfcGFuZWwoJmFi
-KTsKICAgIGRyYXdfZmV4cF9wYW5lbCgmYWIpOwogICAgZHJhd19nb3RvX3BhbmVsKCZhYik7CiAg
-ICBkcmF3X3N5bV9wYW5lbCgmYWIpOwogICAgLyogcG9zaWNpb25hIGN1cnNvciAqLwogICAgY2hh
-ciBidWZbMzJdOwogICAgc25wcmludGYoYnVmLCBzaXplb2YoYnVmKSwgIlx4MWJbJWQ7JWRIIiwK
-ICAgICAgICAoRS5jeSAtIEUucm93b2ZmKSArIDEsCiAgICAgICAgKEUucnggLSBFLmNvbG9mZikg
-KyBHVVRURVIgKyAxKTsKICAgIGFiX2FwcGVuZCgmYWIsIGJ1Ziwgc3RybGVuKGJ1ZikpOwogICAg
-YWJfYXBwZW5kKCZhYiwgIlx4MWJbPzI1aCIsIDYpOyAgLyogbW9zdHJhIGN1cnNvciAqLwogICAg
-d3JpdGUoU1RET1VUX0ZJTEVOTywgYWIuYiwgYWIubGVuKTsKICAgIGFiX2ZyZWUoJmFiKTsKfQoK
-Lyog4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-CiAqIFBST0NFU1NBTUVOVE8gREUgVEVDTEFTCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkCAqLwoKc3RhdGljIHZvaWQgc2V0X3N0YXR1cyhj
-b25zdCBjaGFyICpmbXQsIC4uLikgewogICAgdmFfbGlzdCBhcDsgdmFfc3RhcnQoYXAsIGZtdCk7
-CiAgICB2c25wcmludGYoRS5zdGF0dXNtc2csIHNpemVvZihFLnN0YXR1c21zZyksIGZtdCwgYXAp
-OwogICAgdmFfZW5kKGFwKTsKICAgIEUuc3RhdHVzbXNnX3RpbWUgPSB0aW1lKE5VTEwpOwp9Cgpz
-dGF0aWMgdm9pZCBwcm9jZXNzX2tleSh2b2lkKSB7CiAgICBzdGF0aWMgaW50IHF1aXRfdGltZXMg
-PSAxOwogICAgaW50IGMgPSByZWFkX2tleSgpOwogICAgaWYgKGMgPT0gMCkgcmV0dXJuOyAvKiB0
-aW1lb3V0IGRlIDEwMG1zIOKAlCBzw7MgcmVkZXNlbmhhLCBzZW0gaW5wdXQgKi8KCiAgICAvKiDi
-lIDilIAgcGFpbmVsIGRlIGNoZWNhZ2VtIGF0aXZvIChDdHJsK0UpOiBpbnRlcmNlcHRhIG5hdmVn
-YcOnw6NvIOKUgOKUgAogICAgICAgbWVzbW8gcGFkcsOjbyBkbyBwYWluZWwgZGUgZ290byAoQ3Ry
-bCtKKTogbmF2ZWdhw6fDo28gY29tIHNldGFzLAogICAgICAgRW50ZXIgY29uZmlybWEgZSBmZWNo
-YSwgRXNjIG91IHF1YWxxdWVyIG91dHJhIHRlY2xhIGZlY2hhLgogICAgICAgTmVuaHVtYSBsZWl0
-dXJhIGRlIHRlY2xhZG8gcHLDs3ByaWEg4oCUIHVzYSBvIHJlYWRfa2V5KCkgYWNpbWEuIOKUgOKU
-gCAqLwogICAgaWYgKGdfZWlzc3VlX2FjdGl2ZSkgewogICAgICAgIHN3aXRjaCAoYykgewogICAg
-ICAgICAgICBjYXNlIEFSUk9XX0RPV046CiAgICAgICAgICAgICAgICBnX2Vpc3N1ZV9zZWwrKzsK
-ICAgICAgICAgICAgICAgIGlmIChnX2Vpc3N1ZV9zZWwgPj0gZ19laXNzdWVfY291bnQpIGdfZWlz
-c3VlX3NlbCA9IDA7CiAgICAgICAgICAgICAgICBlaXNzdWVfanVtcChnX2Vpc3N1ZV9zZWwpOwog
-ICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlIEFSUk9XX1VQOgogICAgICAg
-ICAgICAgICAgZ19laXNzdWVfc2VsLS07CiAgICAgICAgICAgICAgICBpZiAoZ19laXNzdWVfc2Vs
-IDwgMCkgZ19laXNzdWVfc2VsID0gZ19laXNzdWVfY291bnQgLSAxOwogICAgICAgICAgICAgICAg
-ZWlzc3VlX2p1bXAoZ19laXNzdWVfc2VsKTsKICAgICAgICAgICAgICAgIHJldHVybjsKICAgICAg
-ICAgICAgY2FzZSAnXHInOgogICAgICAgICAgICAgICAgZWlzc3VlX2p1bXAoZ19laXNzdWVfc2Vs
-KTsKICAgICAgICAgICAgICAgIGdfZWlzc3VlX2FjdGl2ZSA9IDA7CiAgICAgICAgICAgICAgICBz
-ZXRfc3RhdHVzKCJMaW5oYSAlZCIsIGdfZWlzc3Vlc1tnX2Vpc3N1ZV9zZWxdLmxpbmUpOwogICAg
-ICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlICdceDFiJzoKICAgICAgICAgICAg
-Y2FzZSBDVFJMKCdlJyk6CiAgICAgICAgICAgICAgICBnX2Vpc3N1ZV9hY3RpdmUgPSAwOwogICAg
-ICAgICAgICAgICAgc2V0X3N0YXR1cygiVmVyaWZpY2HDp8OjbyBmZWNoYWRhIik7CiAgICAgICAg
-ICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGRlZmF1bHQ6CiAgICAgICAgICAgICAgICBnX2Vp
-c3N1ZV9hY3RpdmUgPSAwOwogICAgICAgICAgICAgICAgYnJlYWs7CiAgICAgICAgfQogICAgfQoK
-ICAgIC8qIOKUgOKUgCBwYWluZWwgZGUgc25pcHBldHMgYXRpdm86IGludGVyY2VwdGEgbmF2ZWdh
-w6fDo28g4pSA4pSAICovCiAgICBpZiAoZ19zbmlwX2FjdGl2ZSkgewogICAgICAgIHN3aXRjaCAo
-YykgewogICAgICAgICAgICBjYXNlIEFSUk9XX0RPV046CiAgICAgICAgICAgICAgICBnX3NuaXBf
-c2VsKys7CiAgICAgICAgICAgICAgICBpZiAoZ19zbmlwX3NlbCA+PSBzbmlwX3Zpc19jb3VudCkg
-Z19zbmlwX3NlbCA9IDA7CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGNhc2Ug
-QVJST1dfVVA6CiAgICAgICAgICAgICAgICBnX3NuaXBfc2VsLS07CiAgICAgICAgICAgICAgICBp
-ZiAoZ19zbmlwX3NlbCA8IDApIGdfc25pcF9zZWwgPSBzbmlwX3Zpc19jb3VudCAtIDE7CiAgICAg
-ICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGNhc2UgJ1xyJzogewogICAgICAgICAgICAg
-ICAgaW50IHNpID0gc25pcF92aXNpYmxlW2dfc25pcF9zZWxdOwogICAgICAgICAgICAgICAgZ19z
-bmlwX2FjdGl2ZSA9IDA7CiAgICAgICAgICAgICAgICBzbmlwX2luc2VydChzaSk7CiAgICAgICAg
-ICAgICAgICBzZXRfc3RhdHVzKCJTbmlwcGV0ICclcycgaW5zZXJpZG8g4oCUIGN1cnNvciBubyBw
-b250byBkZSBlZGnDp8OjbyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgIGdfc25pcHNbc2ld
-Lm5hbWUpOwogICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICB9CiAgICAgICAgICAg
-IGNhc2UgJ1x4MWInOgogICAgICAgICAgICBjYXNlIENUUkwoJ24nKToKICAgICAgICAgICAgICAg
-IGdfc25pcF9hY3RpdmUgPSAwOwogICAgICAgICAgICAgICAgc2V0X3N0YXR1cygiU25pcHBldHMg
-ZmVjaGFkbyIpOwogICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBkZWZhdWx0Ogog
-ICAgICAgICAgICAgICAgZ19zbmlwX2FjdGl2ZSA9IDA7CiAgICAgICAgICAgICAgICBicmVhazsK
-ICAgICAgICB9CiAgICB9CgogICAgLyog4pSA4pSAIGV4cGxvcmFkb3IgZGUgYXJxdWl2b3MgYXRp
-dm86IGludGVyY2VwdGEgbmF2ZWdhw6fDo28g4pSA4pSAICovCiAgICBpZiAoZ19mZXhwX2FjdGl2
-ZSkgewogICAgICAgIC8qIG1vZG8gZGlnaXRhY2FvOiBjYXB0dXJhIGNhcmFjdGVyZXMgcGFyYSBv
-IGNhbXBvIGRlIGlucHV0ICovCiAgICAgICAgaWYgKGdfZmV4cF9pbnB1dF9tb2RlKSB7CiAgICAg
-ICAgICAgIGlmIChjID09ICdccicpIHsKICAgICAgICAgICAgICAgIGZleHBfY29uZmlybSgpOwog
-ICAgICAgICAgICB9IGVsc2UgaWYgKGMgPT0gJ1x4MWInKSB7CiAgICAgICAgICAgICAgICAvKiBF
-c2MgY2FuY2VsYSBkaWdpdGFjYW8sIHZvbHRhIHBhcmEgbmF2ZWdhY2FvICovCiAgICAgICAgICAg
-ICAgICBnX2ZleHBfaW5wdXRbMF0gICA9ICdcMCc7CiAgICAgICAgICAgICAgICBnX2ZleHBfaW5w
-dXRfbGVuICA9IDA7CiAgICAgICAgICAgICAgICBnX2ZleHBfaW5wdXRfbW9kZSA9IDA7CiAgICAg
-ICAgICAgICAgICBzZXRfc3RhdHVzKCJDdHJsK1A6IFx1MjE5MVx1MjE5MyBuYXZlZ2FyICBFbnRl
-ciBhYnJpciAgVGFiIGRpZ2l0YXIgY2FtaW5obyAgRXNjIGZlY2hhciIpOwogICAgICAgICAgICB9
-IGVsc2UgaWYgKGMgPT0gQkFDS1NQQUNFIHx8IGMgPT0gMTI3IHx8IGMgPT0gQ1RSTCgnaCcpKSB7
-CiAgICAgICAgICAgICAgICBpZiAoZ19mZXhwX2lucHV0X2xlbiA+IDApIHsKICAgICAgICAgICAg
-ICAgICAgICAvKiBiYWNrc3BhY2UgcmVzcGVpdGEgVVRGLTggKi8KICAgICAgICAgICAgICAgICAg
-ICBnX2ZleHBfaW5wdXRfbGVuLS07CiAgICAgICAgICAgICAgICAgICAgLyogdm9sdGEgYnl0ZXMg
-ZGUgY29udGludWFjYW8gVVRGLTggKi8KICAgICAgICAgICAgICAgICAgICB3aGlsZSAoZ19mZXhw
-X2lucHV0X2xlbiA+IDAgJiYKICAgICAgICAgICAgICAgICAgICAgICAgICAgKGdfZmV4cF9pbnB1
-dFtnX2ZleHBfaW5wdXRfbGVuXSAmIDB4QzApID09IDB4ODApCiAgICAgICAgICAgICAgICAgICAg
-ICAgIGdfZmV4cF9pbnB1dF9sZW4tLTsKICAgICAgICAgICAgICAgICAgICBnX2ZleHBfaW5wdXRb
-Z19mZXhwX2lucHV0X2xlbl0gPSAnXDAnOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9
-IGVsc2UgaWYgKGMgPj0gMzIgJiYgZ19mZXhwX2lucHV0X2xlbiA8IEZFWFBfSU5QVVRfTUFYIC0g
-NCkgewogICAgICAgICAgICAgICAgLyogY2FyYWN0ZXJlIGltcHJpbWl2ZWwgKi8KICAgICAgICAg
-ICAgICAgIGdfZmV4cF9pbnB1dFtnX2ZleHBfaW5wdXRfbGVuKytdID0gKGNoYXIpYzsKICAgICAg
-ICAgICAgICAgIGdfZmV4cF9pbnB1dFtnX2ZleHBfaW5wdXRfbGVuXSAgID0gJ1wwJzsKICAgICAg
-ICAgICAgfQogICAgICAgICAgICByZXR1cm47CiAgICAgICAgfQoKICAgICAgICAvKiBtb2RvIG5h
-dmVnYWNhbyBub3JtYWwgKi8KICAgICAgICBzd2l0Y2ggKGMpIHsKICAgICAgICAgICAgY2FzZSBB
-UlJPV19ET1dOOgogICAgICAgICAgICAgICAgZ19mZXhwX3NlbCsrOwogICAgICAgICAgICAgICAg
-aWYgKGdfZmV4cF9zZWwgPj0gZ19mZXhwX2NvdW50KSBnX2ZleHBfc2VsID0gMDsKICAgICAgICAg
-ICAgICAgIHJldHVybjsKICAgICAgICAgICAgY2FzZSBBUlJPV19VUDoKICAgICAgICAgICAgICAg
-IGdfZmV4cF9zZWwtLTsKICAgICAgICAgICAgICAgIGlmIChnX2ZleHBfc2VsIDwgMCkgZ19mZXhw
-X3NlbCA9IGdfZmV4cF9jb3VudCAtIDE7CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAg
-ICAgIGNhc2UgJ1xyJzoKICAgICAgICAgICAgICAgIGZleHBfY29uZmlybSgpOwogICAgICAgICAg
-ICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlICdcdCc6CiAgICAgICAgICAgICAgICAvKiBU
-YWIgYXRpdmEgbW9kbyBkaWdpdGFjYW8gKi8KICAgICAgICAgICAgICAgIGdfZmV4cF9pbnB1dF9t
-b2RlID0gMTsKICAgICAgICAgICAgICAgIGdfZmV4cF9pbnB1dFswXSAgID0gJ1wwJzsKICAgICAg
-ICAgICAgICAgIGdfZmV4cF9pbnB1dF9sZW4gID0gMDsKICAgICAgICAgICAgICAgIHNldF9zdGF0
-dXMoIkRpZ2l0ZSBvIGNhbWluaG8gZSBwcmVzc2lvbmUgRW50ZXIgKH4gcGFyYSBob21lKSIpOwog
-ICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlICdceDFiJzoKICAgICAgICAg
-ICAgY2FzZSBDVFJMKCdwJyk6CiAgICAgICAgICAgICAgICBnX2ZleHBfYWN0aXZlID0gMDsKICAg
-ICAgICAgICAgICAgIHNldF9zdGF0dXMoIkV4cGxvcmFkb3IgZmVjaGFkbyIpOwogICAgICAgICAg
-ICAgICAgcmV0dXJuOwogICAgICAgICAgICBkZWZhdWx0OgogICAgICAgICAgICAgICAgLyogbGV0
-cmEgZGlnaXRhZGEgYXRpdmEgaW5wdXQgYXV0b21hdGljYW1lbnRlICovCiAgICAgICAgICAgICAg
-ICBpZiAoYyA+PSAzMiAmJiBjIDwgMTI3KSB7CiAgICAgICAgICAgICAgICAgICAgZ19mZXhwX2lu
-cHV0X21vZGUgPSAxOwogICAgICAgICAgICAgICAgICAgIGdfZmV4cF9pbnB1dF9sZW4gID0gMDsK
-ICAgICAgICAgICAgICAgICAgICBnX2ZleHBfaW5wdXRbZ19mZXhwX2lucHV0X2xlbisrXSA9IChj
-aGFyKWM7CiAgICAgICAgICAgICAgICAgICAgZ19mZXhwX2lucHV0W2dfZmV4cF9pbnB1dF9sZW5d
-ICAgPSAnXDAnOwogICAgICAgICAgICAgICAgICAgIHNldF9zdGF0dXMoIkRpZ2l0ZSBvIGNhbWlu
-aG8gZSBwcmVzc2lvbmUgRW50ZXIgKH4gcGFyYSBob21lKSIpOwogICAgICAgICAgICAgICAgfSBl
-bHNlIHsKICAgICAgICAgICAgICAgICAgICBnX2ZleHBfYWN0aXZlID0gMDsKICAgICAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KICAgICAgICByZXR1cm47CiAg
-ICB9CgogICAgLyog4pSA4pSAIHBhaW5lbCBnb3RvIGRlZmluacOnw6NvIGF0aXZvIOKUgOKUgCAq
-LwogICAgaWYgKGdfZ290b19hY3RpdmUpIHsKICAgICAgICBzd2l0Y2ggKGMpIHsKICAgICAgICAg
-ICAgY2FzZSBBUlJPV19ET1dOOgogICAgICAgICAgICAgICAgZ19nb3RvX3NlbCsrOwogICAgICAg
-ICAgICAgICAgaWYgKGdfZ290b19zZWwgPj0gZ19nb3RvX2NvdW50KSBnX2dvdG9fc2VsID0gMDsK
-ICAgICAgICAgICAgICAgIGdvdG9fanVtcChnX2dvdG9fc2VsKTsKICAgICAgICAgICAgICAgIHJl
-dHVybjsKICAgICAgICAgICAgY2FzZSBBUlJPV19VUDoKICAgICAgICAgICAgICAgIGdfZ290b19z
-ZWwtLTsKICAgICAgICAgICAgICAgIGlmIChnX2dvdG9fc2VsIDwgMCkgZ19nb3RvX3NlbCA9IGdf
-Z290b19jb3VudC0xOwogICAgICAgICAgICAgICAgZ290b19qdW1wKGdfZ290b19zZWwpOwogICAg
-ICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlICdccic6CiAgICAgICAgICAgICAg
-ICBnb3RvX2p1bXAoZ19nb3RvX3NlbCk7CiAgICAgICAgICAgICAgICBnX2dvdG9fYWN0aXZlID0g
-MDsKICAgICAgICAgICAgICAgIHNldF9zdGF0dXMoIkxpbmhhICVkIiwgZ19nb3RvX21hdGNoZXNb
-Z19nb3RvX3NlbF0ubGluZSk7CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGNh
-c2UgJ1x4MWInOgogICAgICAgICAgICBjYXNlIENUUkwoJ2onKToKICAgICAgICAgICAgICAgIGdf
-Z290b19hY3RpdmUgPSAwOwogICAgICAgICAgICAgICAgc2V0X3N0YXR1cygiR290byBmZWNoYWRv
-Iik7CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGRlZmF1bHQ6CiAgICAgICAg
-ICAgICAgICBnX2dvdG9fYWN0aXZlID0gMDsKICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAg
-IH0KICAgIH0KCiAgICAvKiDilIDilIAgcGFpbmVsIGRlIHPDrW1ib2xvcyBhdGl2bzogaW50ZXJj
-ZXB0YSBuYXZlZ2HDp8OjbyBlIGZpbHRybyDilIDilIAgKi8KICAgIGlmIChnX3N5bV9hY3RpdmUp
-IHsKICAgICAgICBzd2l0Y2ggKGMpIHsKICAgICAgICAgICAgY2FzZSBBUlJPV19ET1dOOgogICAg
-ICAgICAgICAgICAgZ19zeW1fc2VsKys7CiAgICAgICAgICAgICAgICBpZiAoZ19zeW1fc2VsID49
-IGdfc3ltX3Zpc19jb3VudCkgZ19zeW1fc2VsID0gMDsKICAgICAgICAgICAgICAgIHJldHVybjsK
-ICAgICAgICAgICAgY2FzZSBBUlJPV19VUDoKICAgICAgICAgICAgICAgIGdfc3ltX3NlbC0tOwog
-ICAgICAgICAgICAgICAgaWYgKGdfc3ltX3NlbCA8IDApIGdfc3ltX3NlbCA9IGdfc3ltX3Zpc19j
-b3VudCA+IDAgPyBnX3N5bV92aXNfY291bnQtMSA6IDA7CiAgICAgICAgICAgICAgICByZXR1cm47
-CiAgICAgICAgICAgIGNhc2UgJ1xyJzoKICAgICAgICAgICAgICAgIHN5bV9qdW1wKGdfc3ltX3Nl
-bCk7CiAgICAgICAgICAgICAgICBnX3N5bV9hY3RpdmUgPSAwOwogICAgICAgICAgICAgICAgaWYg
-KGdfc3ltX3Zpc19jb3VudCA+IDApIHsKICAgICAgICAgICAgICAgICAgICBpbnQgc2kgPSBnX3N5
-bV92aXNbZ19zeW1fc2VsXTsKICAgICAgICAgICAgICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMy
-beKck1x4MWJbbSBTw61tYm9sbyAnJXMnIOKGkiBsaW5oYSAlZCIsCiAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICAgICBnX3N5bXNbc2ldLm5hbWUsIGdfc3ltc1tzaV0ubGluZSk7CiAgICAgICAg
-ICAgICAgICB9CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGNhc2UgJ1x4MWIn
-OgogICAgICAgICAgICBjYXNlIENUUkwoJ28nKToKICAgICAgICAgICAgICAgIGdfc3ltX2FjdGl2
-ZSA9IDA7CiAgICAgICAgICAgICAgICBzZXRfc3RhdHVzKCJTw61tYm9sb3MgZmVjaGFkbyIpOwog
-ICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICBjYXNlIEJBQ0tTUEFDRToKICAgICAg
-ICAgICAgY2FzZSBDVFJMKCdoJyk6CiAgICAgICAgICAgICAgICBpZiAoZ19zeW1fcWxlbiA+IDAp
-IHsKICAgICAgICAgICAgICAgICAgICBnX3N5bV9xdWVyeVstLWdfc3ltX3FsZW5dID0gJ1wwJzsK
-ICAgICAgICAgICAgICAgICAgICBnX3N5bV9zZWwgPSAwOyBnX3N5bV9zY3JvbGwgPSAwOwogICAg
-ICAgICAgICAgICAgICAgIHN5bV9idWlsZF92aXMoKTsKICAgICAgICAgICAgICAgIH0KICAgICAg
-ICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgZGVmYXVsdDoKICAgICAgICAgICAgICAgIC8q
-IHF1YWxxdWVyIGNhcmFjdGVyZSBpbXByaW3DrXZlbCBmaWx0cmEgYSBsaXN0YSAqLwogICAgICAg
-ICAgICAgICAgaWYgKCFpc2NudHJsKGMpICYmIGdfc3ltX3FsZW4gPCAoaW50KXNpemVvZihnX3N5
-bV9xdWVyeSktMSkgewogICAgICAgICAgICAgICAgICAgIGdfc3ltX3F1ZXJ5W2dfc3ltX3FsZW4r
-K10gPSAoY2hhciljOwogICAgICAgICAgICAgICAgICAgIGdfc3ltX3F1ZXJ5W2dfc3ltX3FsZW5d
-ICAgPSAnXDAnOwogICAgICAgICAgICAgICAgICAgIGdfc3ltX3NlbCA9IDA7IGdfc3ltX3Njcm9s
-bCA9IDA7CiAgICAgICAgICAgICAgICAgICAgc3ltX2J1aWxkX3ZpcygpOwogICAgICAgICAgICAg
-ICAgfQogICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgIH0KICAgIH0KCiAgICAvKiDilIDi
-lIAgY29tcGxldGlvbiBhdGl2YTogaW50ZXJjZXB0YSBuYXZlZ2HDp8OjbyDilIDilIAgKi8KICAg
-IGlmIChFLmNvbXAuYWN0aXZlKSB7CiAgICAgICAgc3dpdGNoIChjKSB7CiAgICAgICAgICAgIGNh
-c2UgQVJST1dfRE9XTjoKICAgICAgICAgICAgICAgIEUuY29tcC5zZWxlY3RlZCsrOwogICAgICAg
-ICAgICAgICAgaWYgKEUuY29tcC5zZWxlY3RlZCA+PSBFLmNvbXAuY291bnQpIEUuY29tcC5zZWxl
-Y3RlZCA9IDA7CiAgICAgICAgICAgICAgICByZXR1cm47CiAgICAgICAgICAgIGNhc2UgQVJST1df
-VVA6CiAgICAgICAgICAgICAgICBFLmNvbXAuc2VsZWN0ZWQtLTsKICAgICAgICAgICAgICAgIGlm
-IChFLmNvbXAuc2VsZWN0ZWQgPCAwKSBFLmNvbXAuc2VsZWN0ZWQgPSBFLmNvbXAuY291bnQtMTsK
-ICAgICAgICAgICAgICAgIHJldHVybjsKICAgICAgICAgICAgY2FzZSAnXHInOgogICAgICAgICAg
-ICBjYXNlICdcdCc6CiAgICAgICAgICAgICAgICB1bmRvX3B1c2goKTsgY29tcF9hcHBseSgpOyBy
-ZXR1cm47CiAgICAgICAgICAgIGNhc2UgJ1x4MWInOgogICAgICAgICAgICAgICAgY29tcF9jbG9z
-ZSgpOyByZXR1cm47CiAgICAgICAgICAgIGRlZmF1bHQ6CiAgICAgICAgICAgICAgICBjb21wX2Ns
-b3NlKCk7IC8qIHF1YWxxdWVyIG91dHJhIHRlY2xhIGZlY2hhICovCiAgICAgICAgICAgICAgICBi
-cmVhazsKICAgICAgICB9CiAgICB9CgogICAgc3dpdGNoIChjKSB7CgogICAgICAgIC8qIOKUgOKU
-gCBFbnRlciDilIDilIAgKi8KICAgICAgICBjYXNlICdccic6IHsKICAgICAgICAgICAgLyogSFRN
-TDogc2UgbGluaGEgYXR1YWwgw6kgYXBlbmFzICIhIiDihpIgZXhwYW5kZSBwYXJhIHRlbXBsYXRl
-IEhUTUw1ICovCiAgICAgICAgICAgIGlmIChFLnN5bnRheCA9PSAmSExEQls0XSAmJiBFLmN5IDwg
-RS5udW1yb3dzKSB7CiAgICAgICAgICAgICAgICBSb3cgKmN1ciA9ICZFLnJvd1tFLmN5XTsKICAg
-ICAgICAgICAgICAgIC8qIHRyaW0gZXNwYcOnb3MgKi8KICAgICAgICAgICAgICAgIGludCB0cyA9
-IDAsIHRlID0gY3VyLT5zaXplIC0gMTsKICAgICAgICAgICAgICAgIHdoaWxlICh0cyA8PSB0ZSAm
-JiAoY3VyLT5jaGFyc1t0c109PScgJ3x8Y3VyLT5jaGFyc1t0c109PSdcdCcpKSB0cysrOwogICAg
-ICAgICAgICAgICAgd2hpbGUgKHRlID49IHRzICYmIChjdXItPmNoYXJzW3RlXT09JyAnfHxjdXIt
-PmNoYXJzW3RlXT09J1x0JykpIHRlLS07CiAgICAgICAgICAgICAgICBpZiAodGUgLSB0cyA9PSAw
-ICYmIGN1ci0+Y2hhcnNbdHNdID09ICchJykgewogICAgICAgICAgICAgICAgICAgIC8qIERldGVj
-dGEgbm9tZSBkbyBhcnF1aXZvIHBhcmEgbyA8dGl0bGU+ICovCiAgICAgICAgICAgICAgICAgICAg
-Y2hhciB0aXRsZV9zdHJbNjRdID0gIk1ldSBTaXRlIjsKICAgICAgICAgICAgICAgICAgICBpZiAo
-RS5maWxlbmFtZSkgewogICAgICAgICAgICAgICAgICAgICAgICBjb25zdCBjaGFyICpiYXNlID0g
-c3RycmNocihFLmZpbGVuYW1lLCAnLycpOwogICAgICAgICAgICAgICAgICAgICAgICBiYXNlID0g
-YmFzZSA/IGJhc2UrMSA6IEUuZmlsZW5hbWU7CiAgICAgICAgICAgICAgICAgICAgICAgIHNucHJp
-bnRmKHRpdGxlX3N0ciwgc2l6ZW9mKHRpdGxlX3N0ciksICIlcyIsIGJhc2UpOwogICAgICAgICAg
-ICAgICAgICAgICAgICAvKiByZW1vdmUgZXh0ZW5zw6NvICovCiAgICAgICAgICAgICAgICAgICAg
-ICAgIGNoYXIgKmRvdDIgPSBzdHJyY2hyKHRpdGxlX3N0ciwgJy4nKTsKICAgICAgICAgICAgICAg
-ICAgICAgICAgaWYgKGRvdDIpICpkb3QyID0gJ1wwJzsKICAgICAgICAgICAgICAgICAgICB9CiAg
-ICAgICAgICAgICAgICAgICAgLyogTW9udGEgdGVtcGxhdGUgSFRNTDUg4oCUIGFycmF5IHNlbSBO
-VUxMIG5vIG1laW8gKi8KICAgICAgICAgICAgICAgICAgICBjaGFyIHRpdGxlX2xpbmVbMTI4XTsK
-ICAgICAgICAgICAgICAgICAgICBzbnByaW50Zih0aXRsZV9saW5lLCBzaXplb2YodGl0bGVfbGlu
-ZSksICIgICAgPHRpdGxlPiVzPC90aXRsZT4iLCB0aXRsZV9zdHIpOwogICAgICAgICAgICAgICAg
-ICAgIGNvbnN0IGNoYXIgKmh0bWxfdHBsWzI0XTsKICAgICAgICAgICAgICAgICAgICBpbnQgaHRp
-ID0gMDsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiPCFET0NUWVBFIGh0
-bWw+IjsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiPGh0bWwgbGFuZz1c
-InB0LUJSXCI+IjsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiPGhlYWQ+
-IjsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiICAgIDxtZXRhIGNoYXJz
-ZXQ9XCJVVEYtOFwiPiI7CiAgICAgICAgICAgICAgICAgICAgaHRtbF90cGxbaHRpKytdID0gIiAg
-ICA8bWV0YSBuYW1lPVwidmlld3BvcnRcIiBjb250ZW50PVwid2lkdGg9ZGV2aWNlLXdpZHRoLCBp
-bml0aWFsLXNjYWxlPTEuMFwiPiI7CiAgICAgICAgICAgICAgICAgICAgaHRtbF90cGxbaHRpKytd
-ID0gdGl0bGVfbGluZTsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiICAg
-IDxzdHlsZT4iOwogICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0aSsrXSA9ICIgICAgICAg
-ICogeyBib3gtc2l6aW5nOiBib3JkZXItYm94OyBtYXJnaW46IDA7IHBhZGRpbmc6IDA7IH0iOwog
-ICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0aSsrXSA9ICIgICAgICAgIGJvZHkgeyBmb250
-LWZhbWlseTogc2Fucy1zZXJpZjsgYmFja2dyb3VuZDogIzBmMGYwZjsgY29sb3I6ICNlMGUwZTA7
-IH0iOwogICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0aSsrXSA9ICIgICAgICAgIG1haW4g
-eyBtYXgtd2lkdGg6IDkwMHB4OyBtYXJnaW46IDJyZW0gYXV0bzsgcGFkZGluZzogMXJlbTsgfSI7
-CiAgICAgICAgICAgICAgICAgICAgaHRtbF90cGxbaHRpKytdID0gIiAgICAgICAgaDEgeyBjb2xv
-cjogIzdjNmFmNTsgbWFyZ2luLWJvdHRvbTogMXJlbTsgfSI7CiAgICAgICAgICAgICAgICAgICAg
-aHRtbF90cGxbaHRpKytdID0gIiAgICA8L3N0eWxlPiI7CiAgICAgICAgICAgICAgICAgICAgaHRt
-bF90cGxbaHRpKytdID0gIjwvaGVhZD4iOwogICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0
-aSsrXSA9ICI8Ym9keT4iOwogICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0aSsrXSA9ICIg
-ICAgPG1haW4+IjsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiICAgICAg
-ICA8aDE+XHhmMFx4OWZceDk0XHhhZSBFbGxpb3RPUzwvaDE+IjsKICAgICAgICAgICAgICAgICAg
-ICBodG1sX3RwbFtodGkrK10gPSAiICAgICAgICA8cD48IS0tIGNvbnRldWRvIGFxdWkgLS0+PC9w
-PiI7CiAgICAgICAgICAgICAgICAgICAgaHRtbF90cGxbaHRpKytdID0gIiAgICA8L21haW4+IjsK
-ICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiICAgIDxzY3JpcHQ+IjsKICAg
-ICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiICAgICAgICAvLyBKYXZhU2NyaXB0
-IGFxdWkiOwogICAgICAgICAgICAgICAgICAgIGh0bWxfdHBsW2h0aSsrXSA9ICIgICAgPC9zY3Jp
-cHQ+IjsKICAgICAgICAgICAgICAgICAgICBodG1sX3RwbFtodGkrK10gPSAiPC9ib2R5PiI7CiAg
-ICAgICAgICAgICAgICAgICAgaHRtbF90cGxbaHRpKytdID0gIjwvaHRtbD4iOwogICAgICAgICAg
-ICAgICAgICAgIC8qIERlbGV0YSBhIGxpbmhhICIhIiBvcmlnaW5hbCBlIGluc2VyZSB0ZW1wbGF0
-ZSAqLwogICAgICAgICAgICAgICAgICAgIGludCBvcmlnX2N5ID0gRS5jeTsKICAgICAgICAgICAg
-ICAgICAgICBkZWxfcm93KG9yaWdfY3kpOwogICAgICAgICAgICAgICAgICAgIGZvciAoaW50IHRp
-ID0gMDsgdGkgPCBodGk7IHRpKyspIHsKICAgICAgICAgICAgICAgICAgICAgICAgaW5zZXJ0X3Jv
-dyhvcmlnX2N5ICsgdGksIGh0bWxfdHBsW3RpXSwgKGludClzdHJsZW4oaHRtbF90cGxbdGldKSk7
-CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIC8qIHBvc2ljaW9uYSBj
-dXJzb3Igbm8gPGgxPiAobGluaGEgMTUsIGluZGV4IDE0KSAqLwogICAgICAgICAgICAgICAgICAg
-IEUuY3kgPSBvcmlnX2N5ICsgMTQ7CiAgICAgICAgICAgICAgICAgICAgRS5yb3dvZmYgPSBvcmln
-X2N5OyAgLyogc2Nyb2xsIHBhcmEgbyB0b3BvIGRvIHRlbXBsYXRlICovCiAgICAgICAgICAgICAg
-ICAgICAgaWYgKEUuY3kgPj0gRS5udW1yb3dzKSBFLmN5ID0gRS5udW1yb3dzIC0gMTsKICAgICAg
-ICAgICAgICAgICAgICBFLmN4ID0gMTI7IC8qIGRlbnRybyBkbyBjb21lbnTDoXJpbyAqLwogICAg
-ICAgICAgICAgICAgICAgIGZvciAoaW50IHIgPSAwOyByIDwgRS5udW1yb3dzOyByKyspIHVwZGF0
-ZV9zeW50YXgoJkUucm93W3JdKTsKICAgICAgICAgICAgICAgICAgICBFLmRpcnR5ID0gMTsKICAg
-ICAgICAgICAgICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMybeKck1x4MWJbbSBUZW1wbGF0ZSBI
-VE1MNSBpbnNlcmlkbyDigJQgZWRpdGUgbyBjb250ZcO6ZG8gZSBDdHJsK1MgcGFyYSBzYWx2YXIi
-KTsKICAgICAgICAgICAgICAgICAgICBicmVhazsKICAgICAgICAgICAgICAgIH0KICAgICAgICAg
-ICAgfQogICAgICAgICAgICAvKiBDOiBsaW5oYSAiISIg4oaSIHRlbXBsYXRlIG1haW4oKSAqLwog
-ICAgICAgICAgICBpZiAoKEUuc3ludGF4ID09ICZITERCWzBdKSAmJiBFLmN5IDwgRS5udW1yb3dz
-KSB7CiAgICAgICAgICAgICAgICBSb3cgKmN1ciA9ICZFLnJvd1tFLmN5XTsKICAgICAgICAgICAg
-ICAgIGludCB0cyA9IDAsIHRlID0gY3VyLT5zaXplIC0gMTsKICAgICAgICAgICAgICAgIHdoaWxl
-ICh0cyA8PSB0ZSAmJiAoY3VyLT5jaGFyc1t0c109PScgJ3x8Y3VyLT5jaGFyc1t0c109PSdcdCcp
-KSB0cysrOwogICAgICAgICAgICAgICAgd2hpbGUgKHRlID49IHRzICYmIChjdXItPmNoYXJzW3Rl
-XT09JyAnfHxjdXItPmNoYXJzW3RlXT09J1x0JykpIHRlLS07CiAgICAgICAgICAgICAgICBpZiAo
-dGUgLSB0cyA9PSAwICYmIGN1ci0+Y2hhcnNbdHNdID09ICchJykgewogICAgICAgICAgICAgICAg
-ICAgIGNvbnN0IGNoYXIgKnRwbFtdID0gewogICAgICAgICAgICAgICAgICAgICAgICAiI2luY2x1
-ZGUgPHN0ZGlvLmg+IiwKICAgICAgICAgICAgICAgICAgICAgICAgIiNpbmNsdWRlIDxzdGRsaWIu
-aD4iLAogICAgICAgICAgICAgICAgICAgICAgICAiI2luY2x1ZGUgPHN0cmluZy5oPiIsCiAgICAg
-ICAgICAgICAgICAgICAgICAgICIiLAogICAgICAgICAgICAgICAgICAgICAgICAiaW50IG1haW4o
-dm9pZCkgeyIsCiAgICAgICAgICAgICAgICAgICAgICAgICIgICAgcHJpbnRmKFwiXHhmMFx4OWZc
-eDk0XHhhZSBFbGxpb3RPU1xcblwiKTsiLAogICAgICAgICAgICAgICAgICAgICAgICAiICAgIHJl
-dHVybiAwOyIsCiAgICAgICAgICAgICAgICAgICAgICAgICJ9IiwKICAgICAgICAgICAgICAgICAg
-ICAgICAgTlVMTAogICAgICAgICAgICAgICAgICAgIH07CiAgICAgICAgICAgICAgICAgICAgaW50
-IG9yaWdfY3kgPSBFLmN5OyBkZWxfcm93KG9yaWdfY3kpOwogICAgICAgICAgICAgICAgICAgIGlu
-dCB0aSA9IDA7CiAgICAgICAgICAgICAgICAgICAgZm9yICg7IHRwbFt0aV07IHRpKyspIGluc2Vy
-dF9yb3cob3JpZ19jeSt0aSwgdHBsW3RpXSwgKGludClzdHJsZW4odHBsW3RpXSkpOwogICAgICAg
-ICAgICAgICAgICAgIEUuY3kgPSBvcmlnX2N5ICsgNTsgRS5jeCA9IDEyOyBFLnJvd29mZiA9IG9y
-aWdfY3k7CiAgICAgICAgICAgICAgICAgICAgZm9yIChpbnQgciA9IDA7IHIgPCBFLm51bXJvd3M7
-IHIrKykgdXBkYXRlX3N5bnRheCgmRS5yb3dbcl0pOwogICAgICAgICAgICAgICAgICAgIEUuZGly
-dHkgPSAxOwogICAgICAgICAgICAgICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzJt4pyTXHgxYltt
-IFRlbXBsYXRlIEMgaW5zZXJpZG8g4oCUIEN0cmwrUyBwYXJhIHNhbHZhciIpOwogICAgICAgICAg
-ICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAg
-ICAgIC8qIEMrKzogbGluaGEgIiEiIOKGkiB0ZW1wbGF0ZSBtYWluKCkgQysrICovCiAgICAgICAg
-ICAgIGlmICgoRS5zeW50YXggPT0gJkhMREJbMV0pICYmIEUuY3kgPCBFLm51bXJvd3MpIHsKICAg
-ICAgICAgICAgICAgIFJvdyAqY3VyID0gJkUucm93W0UuY3ldOwogICAgICAgICAgICAgICAgaW50
-IHRzID0gMCwgdGUgPSBjdXItPnNpemUgLSAxOwogICAgICAgICAgICAgICAgd2hpbGUgKHRzIDw9
-IHRlICYmIChjdXItPmNoYXJzW3RzXT09JyAnfHxjdXItPmNoYXJzW3RzXT09J1x0JykpIHRzKys7
-CiAgICAgICAgICAgICAgICB3aGlsZSAodGUgPj0gdHMgJiYgKGN1ci0+Y2hhcnNbdGVdPT0nICd8
-fGN1ci0+Y2hhcnNbdGVdPT0nXHQnKSkgdGUtLTsKICAgICAgICAgICAgICAgIGlmICh0ZSAtIHRz
-ID09IDAgJiYgY3VyLT5jaGFyc1t0c10gPT0gJyEnKSB7CiAgICAgICAgICAgICAgICAgICAgY29u
-c3QgY2hhciAqdHBsW10gPSB7CiAgICAgICAgICAgICAgICAgICAgICAgICIjaW5jbHVkZSA8aW9z
-dHJlYW0+IiwKICAgICAgICAgICAgICAgICAgICAgICAgIiNpbmNsdWRlIDxzdHJpbmc+IiwKICAg
-ICAgICAgICAgICAgICAgICAgICAgIiNpbmNsdWRlIDx2ZWN0b3I+IiwKICAgICAgICAgICAgICAg
-ICAgICAgICAgIiIsCiAgICAgICAgICAgICAgICAgICAgICAgICJpbnQgbWFpbigpIHsiLAogICAg
-ICAgICAgICAgICAgICAgICAgICAiICAgIHN0ZDo6Y291dCA8PCBcIlx4ZjBceDlmXHg5NFx4YWUg
-RWxsaW90T1NcIiA8PCBzdGQ6OmVuZGw7IiwKICAgICAgICAgICAgICAgICAgICAgICAgIiAgICBy
-ZXR1cm4gMDsiLAogICAgICAgICAgICAgICAgICAgICAgICAifSIsCiAgICAgICAgICAgICAgICAg
-ICAgICAgIE5VTEwKICAgICAgICAgICAgICAgICAgICB9OwogICAgICAgICAgICAgICAgICAgIGlu
-dCBvcmlnX2N5ID0gRS5jeTsgZGVsX3JvdyhvcmlnX2N5KTsKICAgICAgICAgICAgICAgICAgICBp
-bnQgdGkgPSAwOwogICAgICAgICAgICAgICAgICAgIGZvciAoOyB0cGxbdGldOyB0aSsrKSBpbnNl
-cnRfcm93KG9yaWdfY3krdGksIHRwbFt0aV0sIChpbnQpc3RybGVuKHRwbFt0aV0pKTsKICAgICAg
-ICAgICAgICAgICAgICBFLmN5ID0gb3JpZ19jeSArIDU7IEUuY3ggPSAxNjsgRS5yb3dvZmYgPSBv
-cmlnX2N5OwogICAgICAgICAgICAgICAgICAgIGZvciAoaW50IHIgPSAwOyByIDwgRS5udW1yb3dz
-OyByKyspIHVwZGF0ZV9zeW50YXgoJkUucm93W3JdKTsKICAgICAgICAgICAgICAgICAgICBFLmRp
-cnR5ID0gMTsKICAgICAgICAgICAgICAgICAgICBzZXRfc3RhdHVzKCJceDFiWzMybeKck1x4MWJb
-bSBUZW1wbGF0ZSBDKysgaW5zZXJpZG8g4oCUIEN0cmwrUyBwYXJhIHNhbHZhciIpOwogICAgICAg
-ICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAg
-ICAgICAgIC8qIEx1YS9FbGxpb3RPUzogbGluaGEgIiEiIOKGkiB0ZW1wbGF0ZSBzY3JpcHQgTHVh
-ICovCiAgICAgICAgICAgIGlmICgoRS5zeW50YXggPT0gJkhMREJbMl0pICYmIEUuY3kgPCBFLm51
-bXJvd3MpIHsKICAgICAgICAgICAgICAgIFJvdyAqY3VyID0gJkUucm93W0UuY3ldOwogICAgICAg
-ICAgICAgICAgaW50IHRzID0gMCwgdGUgPSBjdXItPnNpemUgLSAxOwogICAgICAgICAgICAgICAg
-d2hpbGUgKHRzIDw9IHRlICYmIChjdXItPmNoYXJzW3RzXT09JyAnfHxjdXItPmNoYXJzW3RzXT09
-J1x0JykpIHRzKys7CiAgICAgICAgICAgICAgICB3aGlsZSAodGUgPj0gdHMgJiYgKGN1ci0+Y2hh
-cnNbdGVdPT0nICd8fGN1ci0+Y2hhcnNbdGVdPT0nXHQnKSkgdGUtLTsKICAgICAgICAgICAgICAg
-IGlmICh0ZSAtIHRzID09IDAgJiYgY3VyLT5jaGFyc1t0c10gPT0gJyEnKSB7CiAgICAgICAgICAg
-ICAgICAgICAgY29uc3QgY2hhciAqdHBsW10gPSB7CiAgICAgICAgICAgICAgICAgICAgICAgICIt
-LSBceGYwXHg5Zlx4OTRceGFlIEVsbGlvdE9TIOKAlCBTY3JpcHQgTHVhIiwKICAgICAgICAgICAg
-ICAgICAgICAgICAgIiIsCiAgICAgICAgICAgICAgICAgICAgICAgICJsb2NhbCBmdW5jdGlvbiBt
-YWluKCkiLAogICAgICAgICAgICAgICAgICAgICAgICAiICAgIHByaW50KFwiXHhmMFx4OWZceDk0
-XHhhZSBFbGxpb3RPU1wiKSIsCiAgICAgICAgICAgICAgICAgICAgICAgICJlbmQiLAogICAgICAg
-ICAgICAgICAgICAgICAgICAiIiwKICAgICAgICAgICAgICAgICAgICAgICAgIm1haW4oKSIsCiAg
-ICAgICAgICAgICAgICAgICAgICAgIE5VTEwKICAgICAgICAgICAgICAgICAgICB9OwogICAgICAg
-ICAgICAgICAgICAgIGludCBvcmlnX2N5ID0gRS5jeTsgZGVsX3JvdyhvcmlnX2N5KTsKICAgICAg
-ICAgICAgICAgICAgICBpbnQgdGkgPSAwOwogICAgICAgICAgICAgICAgICAgIGZvciAoOyB0cGxb
-dGldOyB0aSsrKSBpbnNlcnRfcm93KG9yaWdfY3krdGksIHRwbFt0aV0sIChpbnQpc3RybGVuKHRw
-bFt0aV0pKTsKICAgICAgICAgICAgICAgICAgICBFLmN5ID0gb3JpZ19jeSArIDM7IEUuY3ggPSAx
-MTsgRS5yb3dvZmYgPSBvcmlnX2N5OwogICAgICAgICAgICAgICAgICAgIGZvciAoaW50IHIgPSAw
-OyByIDwgRS5udW1yb3dzOyByKyspIHVwZGF0ZV9zeW50YXgoJkUucm93W3JdKTsKICAgICAgICAg
-ICAgICAgICAgICBFLmRpcnR5ID0gMTsKICAgICAgICAgICAgICAgICAgICBzZXRfc3RhdHVzKCJc
-eDFiWzMybeKck1x4MWJbbSBUZW1wbGF0ZSBMdWEgaW5zZXJpZG8g4oCUIEN0cmwrUyBwYXJhIHNh
-bHZhciIpOwogICAgICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAg
-ICAgICAgICB9CiAgICAgICAgICAgIC8qIEJhc2g6IGxpbmhhICIhIiDihpIgdGVtcGxhdGUgc2Ny
-aXB0IHNoZWxsICovCiAgICAgICAgICAgIGlmICgoRS5zeW50YXggPT0gJkhMREJbM10pICYmIEUu
-Y3kgPCBFLm51bXJvd3MpIHsKICAgICAgICAgICAgICAgIFJvdyAqY3VyID0gJkUucm93W0UuY3ld
-OwogICAgICAgICAgICAgICAgaW50IHRzID0gMCwgdGUgPSBjdXItPnNpemUgLSAxOwogICAgICAg
-ICAgICAgICAgd2hpbGUgKHRzIDw9IHRlICYmIChjdXItPmNoYXJzW3RzXT09JyAnfHxjdXItPmNo
-YXJzW3RzXT09J1x0JykpIHRzKys7CiAgICAgICAgICAgICAgICB3aGlsZSAodGUgPj0gdHMgJiYg
-KGN1ci0+Y2hhcnNbdGVdPT0nICd8fGN1ci0+Y2hhcnNbdGVdPT0nXHQnKSkgdGUtLTsKICAgICAg
-ICAgICAgICAgIGlmICh0ZSAtIHRzID09IDAgJiYgY3VyLT5jaGFyc1t0c10gPT0gJyEnKSB7CiAg
-ICAgICAgICAgICAgICAgICAgY29uc3QgY2hhciAqdHBsW10gPSB7CiAgICAgICAgICAgICAgICAg
-ICAgICAgICIjIS91c3IvYmluL2VudiBiYXNoIiwKICAgICAgICAgICAgICAgICAgICAgICAgIiMg
-XHhmMFx4OWZceDk0XHhhZSBFbGxpb3RPUyDigJQgU2NyaXB0IEJhc2giLAogICAgICAgICAgICAg
-ICAgICAgICAgICAic2V0IC1ldW8gcGlwZWZhaWwiLAogICAgICAgICAgICAgICAgICAgICAgICAi
-IiwKICAgICAgICAgICAgICAgICAgICAgICAgIm1haW4oKSB7IiwKICAgICAgICAgICAgICAgICAg
-ICAgICAgIiAgICBlY2hvIFwiXHhmMFx4OWZceDk0XHhhZSBFbGxpb3RPU1wiIiwKICAgICAgICAg
-ICAgICAgICAgICAgICAgIn0iLAogICAgICAgICAgICAgICAgICAgICAgICAiIiwKICAgICAgICAg
-ICAgICAgICAgICAgICAgIm1haW4gXCIkQFwiIiwKICAgICAgICAgICAgICAgICAgICAgICAgTlVM
-TAogICAgICAgICAgICAgICAgICAgIH07CiAgICAgICAgICAgICAgICAgICAgaW50IG9yaWdfY3kg
-PSBFLmN5OyBkZWxfcm93KG9yaWdfY3kpOwogICAgICAgICAgICAgICAgICAgIGludCB0aSA9IDA7
-CiAgICAgICAgICAgICAgICAgICAgZm9yICg7IHRwbFt0aV07IHRpKyspIGluc2VydF9yb3cob3Jp
-Z19jeSt0aSwgdHBsW3RpXSwgKGludClzdHJsZW4odHBsW3RpXSkpOwogICAgICAgICAgICAgICAg
-ICAgIEUuY3kgPSBvcmlnX2N5ICsgNTsgRS5jeCA9IDEwOyBFLnJvd29mZiA9IG9yaWdfY3k7CiAg
-ICAgICAgICAgICAgICAgICAgZm9yIChpbnQgciA9IDA7IHIgPCBFLm51bXJvd3M7IHIrKykgdXBk
-YXRlX3N5bnRheCgmRS5yb3dbcl0pOwogICAgICAgICAgICAgICAgICAgIEUuZGlydHkgPSAxOwog
-ICAgICAgICAgICAgICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzJt4pyTXHgxYlttIFRlbXBsYXRl
-IEJhc2ggaW5zZXJpZG8g4oCUIEN0cmwrUyBwYXJhIHNhbHZhciIpOwogICAgICAgICAgICAgICAg
-ICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CiAgICAgICAgICAgIHVu
-ZG9fcHVzaCgpOyBpbnNlcnRfbmV3bGluZSgpOwogICAgICAgICAgICBicmVhazsKICAgICAgICB9
-CgogICAgICAgIC8qIOKUgOKUgCBTYWlyIOKUgOKUgCAqLwogICAgICAgIGNhc2UgQ1RSTCgncScp
-OgogICAgICAgICAgICBpZiAoRS5kaXJ0eSAmJiBxdWl0X3RpbWVzID4gMCkgewogICAgICAgICAg
-ICAgICAgc2V0X3N0YXR1cygiXHgxYlszMW3imqAgQXJxdWl2byBuw6NvIHNhbHZvISAiCiAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICJDdHJsK1Egbm92YW1lbnRlIHBhcmEgc2FpciBzZW0gc2Fs
-dmFyLlx4MWJbbSIpOwogICAgICAgICAgICAgICAgcXVpdF90aW1lcy0tOyByZXR1cm47CiAgICAg
-ICAgICAgIH0KICAgICAgICAgICAgc2F2ZV9jdXJzb3JfcG9zKCk7CiAgICAgICAgICAgIHdyaXRl
-KFNURE9VVF9GSUxFTk8sICJceDFiWzJKXHgxYltIIiwgNyk7CiAgICAgICAgICAgIGV4aXQoMCk7
-CgogICAgICAgIC8qIOKUgOKUgCBTYWx2YXIg4pSA4pSAICovCiAgICAgICAgY2FzZSBDVFJMKCdz
-Jyk6CiAgICAgICAgICAgIGlmICghRS5maWxlbmFtZSkgewogICAgICAgICAgICAgICAgY2hhciAq
-Zm4gPSBwcm9tcHQoIlNhbHZhciBjb21vOiAlcyAgKEVTQyBjYW5jZWxhKSIsIE5VTEwpOwogICAg
-ICAgICAgICAgICAgaWYgKCFmbikgeyBzZXRfc3RhdHVzKCJTYWx2YXIgY2FuY2VsYWRvLiIpOyBy
-ZXR1cm47IH0KICAgICAgICAgICAgICAgIGZyZWUoRS5maWxlbmFtZSk7IEUuZmlsZW5hbWUgPSBm
-bjsgc2VsZWN0X3N5bnRheCgpOwogICAgICAgICAgICB9CiAgICAgICAgICAgIHNhdmVfZmlsZSgp
-OwogICAgICAgICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIEJ1c2NhciDilIDilIAgKi8K
-ICAgICAgICBjYXNlIENUUkwoJ2YnKToKICAgICAgICAgICAgZmluZCgpOwogICAgICAgICAgICBi
-cmVhazsKCiAgICAgICAgLyog4pSA4pSAIEJ1c2NhcitTdWJzdGl0dWlyOiBDdHJsK1xcIOKUgOKU
-gCAqLwogICAgICAgIGNhc2UgMjg6CiAgICAgICAgICAgIGZpbmRfcmVwbGFjZSgpOwogICAgICAg
-ICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIElyIHBhcmEgbGluaGEg4pSA4pSAICovCiAg
-ICAgICAgY2FzZSBDVFJMKCdnJyk6IHsKICAgICAgICAgICAgY2hhciAqbG4gPSBwcm9tcHQoIkly
-IHBhcmEgbGluaGE6ICVzIiwgTlVMTCk7CiAgICAgICAgICAgIGlmIChsbikgewogICAgICAgICAg
-ICAgICAgaW50IG4gPSBhdG9pKGxuKSAtIDE7IGZyZWUobG4pOwogICAgICAgICAgICAgICAgaWYg
-KG4gPCAwKSBuID0gMDsKICAgICAgICAgICAgICAgIGlmIChuID49IEUubnVtcm93cykgbiA9IEUu
-bnVtcm93cy0xOwogICAgICAgICAgICAgICAgRS5jeSA9IG47IEUuY3ggPSAwOwogICAgICAgICAg
-ICB9CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0KCiAgICAgICAgLyog4pSA4pSAIERlbGV0
-YXIgbGluaGEg4pSA4pSAICovCiAgICAgICAgY2FzZSBDVFJMKCdrJyk6CiAgICAgICAgICAgIHVu
-ZG9fcHVzaCgpOyBkZWxfbGluZSgpOwogICAgICAgICAgICBzZXRfc3RhdHVzKCJMaW5oYSBkZWxl
-dGFkYSAgKEN0cmwrVSBkZXNmYXopIik7CiAgICAgICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDi
-lIDilIAgTGltcGFyIGFycXVpdm8gaW50ZWlybzogQ3RybCtUIOKUgOKUgCAqLwogICAgICAgIGNh
-c2UgQ1RSTCgndCcpOgogICAgICAgICAgICB1bmRvX3B1c2goKTsKICAgICAgICAgICAgZm9yIChp
-bnQgaSA9IEUubnVtcm93cyAtIDE7IGkgPj0gMDsgaS0tKSBkZWxfcm93KGkpOwogICAgICAgICAg
-ICBpZiAoRS5udW1yb3dzID09IDApIGluc2VydF9yb3coMCwgIiIsIDApOwogICAgICAgICAgICBF
-LmN4ID0gMDsgRS5jeSA9IDA7IEUucm93b2ZmID0gMDsgRS5jb2xvZmYgPSAwOwogICAgICAgICAg
-ICBFLmRpcnR5Kys7CiAgICAgICAgICAgIHNldF9zdGF0dXMoIlx4MWJbMzFt4pyWIEFycXVpdm8g
-bGltcG8hIChDdHJsK1UgZGVzZmF6KVx4MWJbbSIpOwogICAgICAgICAgICByZXR1cm47CgogICAg
-ICAgIC8qIOKUgOKUgCBEdXBsaWNhciBsaW5oYSDilIDilIAgKi8KICAgICAgICBjYXNlIENUUkwo
-J2QnKToKICAgICAgICAgICAgdW5kb19wdXNoKCk7IGR1cF9saW5lKCk7CiAgICAgICAgICAgIHNl
-dF9zdGF0dXMoIkxpbmhhIGR1cGxpY2FkYSIpOwogICAgICAgICAgICBicmVhazsKCiAgICAgICAg
-Lyog4pSA4pSAIERlc2ZhemVyIOKUgOKUgCAqLwogICAgICAgIGNhc2UgQ1RSTCgndScpOgogICAg
-ICAgICAgICB1bmRvX3BvcCgpOwogICAgICAgICAgICBzZXRfc3RhdHVzKCJEZXNmZWl0byIpOwog
-ICAgICAgICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIFJlZmF6ZXI6IEN0cmwrWSDilIDi
-lIAgKi8KICAgICAgICBjYXNlIENUUkwoJ3knKToKICAgICAgICAgICAgcmVkb19wb3AoKTsKICAg
-ICAgICAgICAgc2V0X3N0YXR1cygiUmVmZWl0byIpOwogICAgICAgICAgICBicmVhazsKCiAgICAg
-ICAgLyog4pSA4pSAIE1vdmVyIGxpbmhhOiBBbHQrVXAgLyBBbHQrRG93biDilIDilIAgKi8KICAg
-ICAgICBjYXNlIEFMVF9VUDoKICAgICAgICAgICAgdW5kb19wdXNoKCk7IG1vdmVfbGluZV91cCgp
-OwogICAgICAgICAgICBicmVhazsKICAgICAgICBjYXNlIEFMVF9ET1dOOgogICAgICAgICAgICB1
-bmRvX3B1c2goKTsgbW92ZV9saW5lX2Rvd24oKTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAg
-IC8qIOKUgOKUgCBDb21lbnRhci9kZXNjb21lbnRhcjogQ3RybCsvIOKUgOKUgCAqLwogICAgICAg
-IGNhc2UgMzE6ICAvKiBDdHJsKy8gZW0gbXVpdG9zIHRlcm1pbmFpcyAvIEN0cmwrXyAqLwogICAg
-ICAgICAgICB1bmRvX3B1c2goKTsgdG9nZ2xlX2NvbW1lbnQoKTsKICAgICAgICAgICAgYnJlYWs7
-CgogICAgICAgIC8qIOKUgOKUgCBFc2NvbGhlciBsaW5ndWFnZW06IEN0cmwrTCDilIDilIAgKi8K
-ICAgICAgICBjYXNlIENUUkwoJ2wnKToKICAgICAgICAgICAgY2hvb3NlX2xhbmd1YWdlKCk7CiAg
-ICAgICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDilIDilIAgRm9ybWF0YXIgY8OzZGlnbzogQ3Ry
-bCtSIOKUgOKUgCAqLwogICAgICAgIGNhc2UgQ1RSTCgncicpOgogICAgICAgICAgICBmb3JtYXRf
-Y29kZSgpOwogICAgICAgICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIFZlcmlmaWNhciBj
-w7NkaWdvOiBDdHJsK0Ug4pSA4pSAICovCiAgICAgICAgY2FzZSBDVFJMKCdlJyk6CiAgICAgICAg
-ICAgIGNoZWNrX2NvZGUoKTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAgIC8qIOKUgOKUgCBD
-b2xhcjogQ3RybCtWICh1bml2ZXJzYWwpIOKUgOKUgCAqLwogICAgICAgIGNhc2UgQ1RSTCgndicp
-OgogICAgICAgICAgICBzZWxfcGFzdGUoKTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAgIC8q
-IOKUgOKUgCBDb3BpYXI6IEN0cmwrQyDilIDilIAgKi8KICAgICAgICBjYXNlIENUUkwoJ2MnKToK
-ICAgICAgICAgICAgaWYgKEUuc2VsX2FjdGl2ZSkKICAgICAgICAgICAgICAgIHNlbF9jb3B5KCk7
-CiAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIGNvcHlfcmFuZ2VfcHJvbXB0KCk7CiAg
-ICAgICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDilIDilIAgQ29ydGFyOiBDdHJsK1gg4pSA4pSA
-ICovCiAgICAgICAgY2FzZSBDVFJMKCd4Jyk6CiAgICAgICAgICAgIHNlbF9jdXQoKTsKICAgICAg
-ICAgICAgYnJlYWs7CgogICAgICAgIC8qIOKUgOKUgCBDb2xhciAoYWxpYXMpOiBDdHJsK0IgKG1h
-bnRpZG8gcG9yIGNvbXBhdGliaWxpZGFkZSkg4pSA4pSAICovCiAgICAgICAgY2FzZSBDVFJMKCdi
-Jyk6CiAgICAgICAgICAgIHNlbF9wYXN0ZSgpOwogICAgICAgICAgICBicmVhazsKCiAgICAgICAg
-Lyog4pSA4pSAIFNuaXBwZXRzOiBDdHJsK04g4pSA4pSAICovCiAgICAgICAgY2FzZSBDVFJMKCdu
-Jyk6CiAgICAgICAgICAgIHNuaXBfb3BlbigpOwogICAgICAgICAgICBicmVhazsKCiAgICAgICAg
-Lyog4pSA4pSAIEV4cGxvcmFkb3IgZGUgYXJxdWl2b3M6IEN0cmwrUCDilIDilIAgKi8KICAgICAg
-ICBjYXNlIENUUkwoJ3AnKToKICAgICAgICAgICAgZmV4cF9vcGVuKCk7CiAgICAgICAgICAgIGJy
-ZWFrOwoKICAgICAgICAvKiDilIDilIAgSXIgcGFyYSBkZWZpbmnDp8OjbzogQ3RybCtKIOKUgOKU
-gCAqLwogICAgICAgIGNhc2UgQ1RSTCgnaicpOgogICAgICAgICAgICBnb3RvX2RlZmluaXRpb24o
-KTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAgIC8qIOKUgOKUgCBQcsOzeGltbyBidWZmZXI6
-IEYyIOKUgOKUgCAqLwogICAgICAgIGNhc2UgRjI6CiAgICAgICAgICAgIGlmIChFLmJ1Zl9jb3Vu
-dCA+IDEpIGJ1Zl9uZXh0KCk7CiAgICAgICAgICAgIGVsc2Ugc2V0X3N0YXR1cygiQXBlbmFzIDEg
-YnVmZmVyIGFiZXJ0by4iKTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAgIC8qIOKUgOKUgCBC
-dWZmZXIgYW50ZXJpb3I6IEYzIOKUgOKUgCAqLwogICAgICAgIGNhc2UgRjM6CiAgICAgICAgICAg
-IGlmIChFLmJ1Zl9jb3VudCA+IDEpIGJ1Zl9wcmV2KCk7CiAgICAgICAgICAgIGVsc2Ugc2V0X3N0
-YXR1cygiQXBlbmFzIDEgYnVmZmVyIGFiZXJ0by4iKTsKICAgICAgICAgICAgYnJlYWs7CgogICAg
-ICAgIC8qIOKUgOKUgCBHb3RvIFN5bWJvbDogQ3RybCtPIOKUgOKUgCAqLwogICAgICAgIGNhc2Ug
-Q1RSTCgnbycpOgogICAgICAgICAgICBzeW1fb3BlbigpOwogICAgICAgICAgICBicmVhazsKCiAg
-ICAgICAgLyog4pSA4pSAIFRhYjogY29tcGxldGlvbiBvdSBpbmRlbnQg4pSA4pSAICovCiAgICAg
-ICAgY2FzZSAnXHQnOiB7CiAgICAgICAgICAgIC8qIGNvbnRleHRvcyBlc3BlY2lhaXM6ICNpbmNs
-dWRlIGUgcmVxdWlyZSgpICovCiAgICAgICAgICAgIGlmICgoRS5zeW50YXggPT0gJkhMREJbMF0g
-fHwgRS5zeW50YXggPT0gJkhMREJbMV0pICYmIGNvbXBfb3Blbl9pbmNsdWRlKCkpIHJldHVybjsK
-ICAgICAgICAgICAgaWYgKEUuc3ludGF4ID09ICZITERCWzJdICYmIGNvbXBfb3Blbl9yZXF1aXJl
-KCkpIHJldHVybjsKICAgICAgICAgICAgY2hhciBwcmVmaXhbMTI4XTsKICAgICAgICAgICAgaW50
-IHBsZW4gPSBnZXRfcHJlZml4KHByZWZpeCwgc2l6ZW9mKHByZWZpeCkpOwogICAgICAgICAgICBp
-ZiAocGxlbiA+PSAyKSB7CiAgICAgICAgICAgICAgICBjb21wX29wZW4oKTsKICAgICAgICAgICAg
-ICAgIGlmIChFLmNvbXAuYWN0aXZlKSByZXR1cm47CiAgICAgICAgICAgIH0KICAgICAgICAgICAg
-dW5kb19wdXNoKCk7IGluZGVudF9saW5lKCk7CiAgICAgICAgICAgIGJyZWFrOwogICAgICAgIH0K
-CiAgICAgICAgLyog4pSA4pSAIFNoaWZ0K1RhYjogZGVpbmRlbnQg4pSA4pSAICovCiAgICAgICAg
-Y2FzZSBTSElGVF9UQUI6CiAgICAgICAgICAgIHVuZG9fcHVzaCgpOyBkZWluZGVudF9saW5lKCk7
-CiAgICAgICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDilIDilIAgTmF2ZWdhw6fDo28g4pSA4pSA
-ICovCiAgICAgICAgY2FzZSBIT01FX0tFWTogRS5jeCA9IDA7IGJyZWFrOwogICAgICAgIGNhc2Ug
-RU5EX0tFWToKICAgICAgICAgICAgaWYgKEUuY3kgPCBFLm51bXJvd3MpIEUuY3ggPSBFLnJvd1tF
-LmN5XS5zaXplOwogICAgICAgICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIEFqdWRhIChh
-dGFsaG9zKTogQ3RybCtXIOKUgOKUgCAqLwogICAgICAgIGNhc2UgQ1RSTCgndycpOgogICAgICAg
-ICAgICBzZXRfc3RhdHVzKEhFTFBfTVNHKTsKICAgICAgICAgICAgYnJlYWs7CgogICAgICAgIC8q
-IOKUgOKUgCBCYWNrc3BhY2Ug4pSA4pSAICovCiAgICAgICAgY2FzZSBCQUNLU1BBQ0U6CiAgICAg
-ICAgY2FzZSBDVFJMKCdoJyk6CiAgICAgICAgICAgIGlmICghdHJ5X3NtYXJ0X2JhY2tzcGFjZSgp
-KSB7CiAgICAgICAgICAgICAgICB1bmRvX3B1c2goKTsgZGVsX2NoYXIoKTsKICAgICAgICAgICAg
-fQogICAgICAgICAgICBicmVhazsKCiAgICAgICAgLyog4pSA4pSAIERlbGV0ZSDilIDilIAgKi8K
-ICAgICAgICBjYXNlIERFTF9LRVk6CiAgICAgICAgICAgIHVuZG9fcHVzaCgpOyBtb3ZlX2N1cnNv
-cihBUlJPV19SSUdIVCk7IGRlbF9jaGFyKCk7CiAgICAgICAgICAgIGJyZWFrOwoKICAgICAgICAv
-KiDilIDilIAgUGFnZSBVcC9Eb3duIOKUgOKUgCAqLwogICAgICAgIGNhc2UgUEFHRV9VUDoKICAg
-ICAgICBjYXNlIFBBR0VfRE9XTjogewogICAgICAgICAgICBpZiAoYyA9PSBQQUdFX1VQKSBFLmN5
-ID0gRS5yb3dvZmY7CiAgICAgICAgICAgIGVsc2UgewogICAgICAgICAgICAgICAgRS5jeSA9IEUu
-cm93b2ZmICsgRS5yb3dzIC0gMTsKICAgICAgICAgICAgICAgIGlmIChFLmN5ID4gRS5udW1yb3dz
-KSBFLmN5ID0gRS5udW1yb3dzOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGludCB0ID0gRS5y
-b3dzOwogICAgICAgICAgICB3aGlsZSAodC0tKSBtb3ZlX2N1cnNvcihjID09IFBBR0VfVVAgPyBB
-UlJPV19VUCA6IEFSUk9XX0RPV04pOwogICAgICAgICAgICBicmVhazsKICAgICAgICB9CgogICAg
-ICAgIC8qIOKUgOKUgCBTZXRhcyDilIDilIAgKi8KICAgICAgICBjYXNlIEFSUk9XX1VQOiBjYXNl
-IEFSUk9XX0RPV046CiAgICAgICAgY2FzZSBBUlJPV19MRUZUOiBjYXNlIEFSUk9XX1JJR0hUOgog
-ICAgICAgICAgICBzZWxfY2xlYXIoKTsKICAgICAgICAgICAgbW92ZV9jdXJzb3IoYyk7CiAgICAg
-ICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDilIDilIAgU2V0YXMgY29tIFNoaWZ0OiBzZWxlw6fD
-o28g4pSA4pSAICovCiAgICAgICAgY2FzZSBTSElGVF9VUDoKICAgICAgICBjYXNlIFNISUZUX0RP
-V046CiAgICAgICAgY2FzZSBTSElGVF9MRUZUOgogICAgICAgIGNhc2UgU0hJRlRfUklHSFQ6CiAg
-ICAgICAgICAgIGlmICghRS5zZWxfYWN0aXZlKSB7IEUuc2VsX2FjdGl2ZT0xOyBFLnNlbF9heD1F
-LmN4OyBFLnNlbF9heT1FLmN5OyB9CiAgICAgICAgICAgIG1vdmVfY3Vyc29yKGM9PVNISUZUX1VQ
-P0FSUk9XX1VQOmM9PVNISUZUX0RPV04/QVJST1dfRE9XTjoKICAgICAgICAgICAgICAgICAgICAg
-ICAgYz09U0hJRlRfTEVGVD9BUlJPV19MRUZUOkFSUk9XX1JJR0hUKTsKICAgICAgICAgICAgYnJl
-YWs7CgogICAgICAgIC8qIOKUgOKUgCBJZ25vcmFkb3Mg4pSA4pSAICovCiAgICAgICAgY2FzZSAn
-XHgxYic6CiAgICAgICAgICAgIGJyZWFrOwoKICAgICAgICAvKiDilIDilIAgQ2FyYWN0ZXJlIG5v
-cm1hbCDilIDilIAgKi8KICAgICAgICBkZWZhdWx0OgogICAgICAgICAgICBpZiAoaXNjbnRybChj
-KSkgYnJlYWs7CgogICAgICAgICAgICAvKiDilIDilIAgQ29udGV4dG8gI2luY2x1ZGUgZW0gQy9D
-Kys6ICc8JyBhYnJlIGNvbXBsZXRpb24gRSBmYXogYXV0by1wYWlyIOKUgOKUgCAqLwogICAgICAg
-ICAgICBpZiAoYyA9PSAnPCcgJiYgKEUuc3ludGF4ID09ICZITERCWzBdIHx8IEUuc3ludGF4ID09
-ICZITERCWzFdKSkgewogICAgICAgICAgICAgICAgaWYgKEUuY3kgPCBFLm51bXJvd3MpIHsKICAg
-ICAgICAgICAgICAgICAgICBSb3cgKnJvdyA9ICZFLnJvd1tFLmN5XTsKICAgICAgICAgICAgICAg
-ICAgICBjaGFyICpsaW5lID0gcm93LT5jaGFyczsKICAgICAgICAgICAgICAgICAgICBpbnQgaWkg
-PSAwOwogICAgICAgICAgICAgICAgICAgIHdoaWxlIChpaSA8IHJvdy0+c2l6ZSAmJiAobGluZVtp
-aV09PScgJ3x8bGluZVtpaV09PSdcdCcpKSBpaSsrOwogICAgICAgICAgICAgICAgICAgIGlmIChz
-dHJuY21wKGxpbmUraWksICIjaW5jbHVkZSIsIDgpID09IDApIHsKICAgICAgICAgICAgICAgICAg
-ICAgICAgLyogYXV0by1wYWlyIDw+IGUgYWJyZSBjb21wbGV0aW9uICovCiAgICAgICAgICAgICAg
-ICAgICAgICAgIHVuZG9fcHVzaCgpOwogICAgICAgICAgICAgICAgICAgICAgICB0cnlfYXV0b19w
-YWlyKCc8Jyk7CiAgICAgICAgICAgICAgICAgICAgICAgIGlmIChjb21wX29wZW5faW5jbHVkZSgp
-KSByZXR1cm47CiAgICAgICAgICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAg
-ICAgIH0KICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgfQoKICAgICAgICAgICAgLyog4pSA
-4pSAIENvbnRleHRvIHJlcXVpcmUoKSBlbSBMdWE6ICciJyBvdSAnXCcnIGFicmUgY29tcGxldGlv
-biDilIDilIAgKi8KICAgICAgICAgICAgaWYgKChjID09ICciJyB8fCBjID09ICdcJycpICYmIEUu
-c3ludGF4ID09ICZITERCWzJdKSB7CiAgICAgICAgICAgICAgICBpZiAoRS5jeSA8IEUubnVtcm93
-cykgewogICAgICAgICAgICAgICAgICAgIHVuZG9fcHVzaCgpOwogICAgICAgICAgICAgICAgICAg
-IHRyeV9hdXRvX3BhaXIoYyk7ICAgICAgICAgIC8qIGluc2VyZSBvIHBhciBlIHBvc2ljaW9uYSBj
-dXJzb3IgKi8KICAgICAgICAgICAgICAgICAgICBpZiAoY29tcF9vcGVuX3JlcXVpcmUoKSkgcmV0
-dXJuOwogICAgICAgICAgICAgICAgICAgIGJyZWFrOwogICAgICAgICAgICAgICAgfQogICAgICAg
-ICAgICB9CgogICAgICAgICAgICAvKiBhdXRvLXBhaXIgbm9ybWFsOiAoIFsgeyAiICcgYAogICAg
-ICAgICAgICAgKiAnPCcgTsODTyBlbnRyYSBhcXVpIOKAlCBzw7Mgw6kgZmVjaGFkbyBhdXRvbWF0
-aWNhbWVudGUgZGVudHJvIGRlCiAgICAgICAgICAgICAqICNpbmNsdWRlIDwuLi4+ICh0cmF0YWRv
-IGFjaW1hIGVtIGNvbXBfb3Blbl9pbmNsdWRlKSAqLwogICAgICAgICAgICBpZiAoYyA9PSAnKCcg
-fHwgYyA9PSAnWycgfHwgYyA9PSAneycgfHwKICAgICAgICAgICAgICAgIGMgPT0gJyInIHx8IGMg
-PT0gJ1wnJyB8fCBjID09ICdgJykgewogICAgICAgICAgICAgICAgdW5kb19wdXNoKCk7CiAgICAg
-ICAgICAgICAgICB0cnlfYXV0b19wYWlyKGMpOwogICAgICAgICAgICAgICAgYnJlYWs7CiAgICAg
-ICAgICAgIH0KICAgICAgICAgICAgLyogc2tpcCBjbG9zaW5nOiApIF0gfSA+ICovCiAgICAgICAg
-ICAgIGlmICh0cnlfc2tpcF9jbG9zZShjKSkgYnJlYWs7CgogICAgICAgICAgICB1bmRvX3B1c2go
-KTsKICAgICAgICAgICAgaW5zZXJ0X2NoYXIoYyk7CgogICAgICAgICAgICAvKiBjb21wbGV0aW9u
-IGF1dG9tw6F0aWNvIGFww7NzICcuJyBlbSBMdWEgKi8KICAgICAgICAgICAgaWYgKGMgPT0gJy4n
-ICYmIEUuc3ludGF4ID09ICZITERCWzJdKSB7CiAgICAgICAgICAgICAgICBjb21wX29wZW4oKTsK
-ICAgICAgICAgICAgfQogICAgICAgICAgICBpZiAoRS5zeW50YXggPT0gJkhMREJbMF0gfHwgRS5z
-eW50YXggPT0gJkhMREJbMV0pIHsKICAgICAgICAgICAgICAgIGNoYXIgcGZ4WzEyOF07IGludCB1
-YTsKICAgICAgICAgICAgICAgIGlmIChkZXRlY3RfaW5jbHVkZV9jdHgocGZ4LCBzaXplb2YocGZ4
-KSwgJnVhKSkgewogICAgICAgICAgICAgICAgICAgIGNvbXBfb3Blbl9pbmNsdWRlKCk7CiAgICAg
-ICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICAgICAgaWYgKEUuc3ludGF4ID09ICZI
-TERCWzJdKSB7CiAgICAgICAgICAgICAgICBjaGFyIHBmeFsxMjhdOwogICAgICAgICAgICAgICAg
-aWYgKGRldGVjdF9yZXF1aXJlX2N0eChwZngsIHNpemVvZihwZngpKSkgewogICAgICAgICAgICAg
-ICAgICAgIGNvbXBfb3Blbl9yZXF1aXJlKCk7CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAg
-IH0KICAgICAgICAgICAgYnJlYWs7CiAgICB9CiAgICBxdWl0X3RpbWVzID0gMTsKfQoKLyog4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
-4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAqIElO
-SVQgLyBNQUlOCiAqIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
-kOKVkOKVkOKVkCAqLwoKc3RhdGljIHZvaWQgaW5pdCh2b2lkKSB7CiAgICBFLmN4ID0gRS5jeSA9
-IEUucnggPSAwOwogICAgRS5yb3dvZmYgPSBFLmNvbG9mZiA9IDA7CiAgICBFLm51bXJvd3MgPSAw
-OyBFLnJvdyA9IE5VTEw7CiAgICBFLmRpcnR5ID0gMDsgRS5maWxlbmFtZSA9IE5VTEw7CiAgICBF
-LnN0YXR1c21zZ1swXSA9ICdcMCc7IEUuc3RhdHVzbXNnX3RpbWUgPSAwOwogICAgRS5zeW50YXgg
-PSBOVUxMOyBFLnVuZG9fdG9wID0gMDsgRS51c2VfdGFicyA9IDA7CiAgICBtZW1zZXQoJkUuY29t
-cCwgMCwgc2l6ZW9mKEUuY29tcCkpOwogICAgbWVtc2V0KEUudW5kbywgMCwgc2l6ZW9mKEUudW5k
-bykpOwogICAgaWYgKGdldF93aW5zeigmRS5yb3dzLCAmRS5jb2xzKSA9PSAtMSkgZGllKCJnZXRf
-d2luc3oiKTsKICAgIEUucm93cyAtPSAyOyAgLyogcmVzZXJ2YSBzdGF0dXMgYmFyICsgbXNnICov
-Cn0KCmludCBtYWluKGludCBhcmdjLCBjaGFyICphcmd2W10pIHsKCiAgICAvKiDilIDilIAgZmxh
-Z3MgcXVlIG7Do28gZW50cmFtIG5vIG1vZG8gVFVJIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
-gOKUgOKUgOKUgCAqLwogICAgaWYgKGFyZ2MgPj0gMikgewogICAgICAgIGNvbnN0IGNoYXIgKmEg
-PSBhcmd2WzFdOwogICAgICAgIGlmIChzdHJjbXAoYSwiLWgiKT09MCB8fCBzdHJjbXAoYSwiLS1o
-ZWxwIik9PTAgfHwgc3RyY21wKGEsIi0/Iik9PTApIHsKICAgICAgICAgICAgcHJpbnRmKAoiZWUg
-4oCUIEVsbGlvdE9TIEVkaXRvciB2IiBFRElUT1JfVkVSU0lPTiAiXG4iCiJcbiIKIlVTT1xuIgoi
-ICBlZSBbYXJxdWl2b10gICAgICAgICAgQWJyZSBhcnF1aXZvIChjcmlhIHNlIG7Do28gZXhpc3Rp
-cilcbiIKIiAgZWUgLXAgICAgICAgICAgICAgICAgIEFicmUgZXhwbG9yYWRvciBkZSBhcnF1aXZv
-cyBkaXJldG9cbiIKIiAgZWUgLWggfCAtLWhlbHAgICAgICAgIEVzdGUgaGVscFxuIgoiICBlZSAt
-LXZlcnNpb24gICAgICAgICAgVmVyc8Ojb1xuIgoiXG4iCiJBVEFMSE9TIERFIFRFQ0xBRE9cbiIK
-IiAgQ3RybCtTICAgU2FsdmFyICAgICAgICAgICAgICAgICAgIEN0cmwrUSAgIFNhaXJcbiIKIiAg
-Q3RybCtGICAgQnVzY2FyICAgICAgICAgICAgICAgICAgIEN0cmwrRyAgIElyIHBhcmEgbGluaGFc
-biIKIiAgQ3RybCtLICAgRGVsZXRhciBsaW5oYSAgICAgICAgICAgIEN0cmwrRCAgIER1cGxpY2Fy
-IGxpbmhhXG4iCiIgIEN0cmwrVSAgIERlc2ZhemVyICAgICAgICAgICAgICAgICBDdHJsK1kgICBS
-ZWZhemVyXG4iCiIgIEN0cmwrLyAgIENvbWVudGFyL2Rlc2NvbWVudGFyICAgICAgIEN0cmwrXFxc
-XCAgQnVzY2FyK1N1YnN0aXR1aXJcbiIKIiAgQ3RybCtSICAgRm9ybWF0YXIgY8OzZGlnbyAgICAg
-ICAgICBDdHJsK1YgICBWZXJpZmljYXIgY8OzZGlnb1xuIgoiICBDdHJsK0ogICBJciBwYXJhIGRl
-ZmluacOnw6NvICAgICAgICBDdHJsK04gICBJbnNlcmlyIHNuaXBwZXRcbiIKIiAgQ3RybCtQICAg
-RXhwbG9yYWRvciBkZSBhcnF1aXZvcyAgIEN0cmwrTyAgIExpc3RhIGRlIHPDrW1ib2xvc1xuIgoi
-ICBDdHJsK0wgICBFc2NvbGhlciBsaW5ndWFnZW0gICAgICAgQ3RybCtUICAgTGltcGFyIHRlbGFc
-biIKIiAgQ3RybCtXICAgQWp1ZGEgcsOhcGlkYSAoc3RhdHVzKSAgICBDdHJsK0UgICBFeGVjdXRh
-ciBsaW5oYVxuIgoiICBUYWIgICAgICBDb21wbGV0YXIgLyBpbmRlbnRhciAgICAgU2hpZnQrVGFi
-ICBEZWluZGVudGFyXG4iCiIgIFNoaWZ0K+KGkeKGk+KGkOKGkiAgU2VsZWNpb25hciB0ZXh0byAg
-ICAgICAgQ3RybCtDICAgQ29waWFyIHNlbGXDp8OjbyAvIGxpbmhhXG4iCiIgIEN0cmwrWCAgQ29y
-dGFyIHNlbGXDp8OjbyAvIGxpbmhhICAgQ3RybCtCICAgQ29sYXJcbiIKIiAgQWx0K+KGkSAgICBN
-b3ZlciBsaW5oYSBhY2ltYSAgICAgICAgQWx0K+KGkyAgICBNb3ZlciBsaW5oYSBhYmFpeG9cbiIK
-IiAgRjIgICAgICAgUHLDs3hpbW8gYnVmZmVyICAgICAgICAgICAgRjMgICAgICAgQnVmZmVyIGFu
-dGVyaW9yXG4iCiJcbiIKIkFVVE8tQ09NUExFVEFSXG4iCiIgIFRhYiBhcMOzcyBxdWFsaWZpY2Fk
-b3IgKG5ldC4gc3lzLiB1aS4gYWkuIGZzLiBzaC4gY3J5cHRvLiBtb2QuKVxuIgoiICBzdWdlcmUg
-bcOpdG9kb3MgRWxsaW90T1MgYXV0b21hdGljYW1lbnRlLlxuIgoiICBUYWIgbm8gbWVpbyBkZSB1
-bSBpZGVudGlmaWNhZG9yIGNvbXBsZXRhIHBhbGF2cmFzIGRvIGFycXVpdm8uXG4iCiJcbiIKIkFV
-VE8tUEFJUlxuIgoiICAoICBbICB7ICBcIiAgJyAgYCAgIEZlY2hhIHBhciBhdXRvbWF0aWNhbWVu
-dGVcbiIKIiAgKSAgXSAgfSAgICAgICAgICAgICBQdWxhIHNlIG8gY2FyYWN0ZXJlIGrDoSBlc3TD
-oSBmZWNoYWRvXG4iCiIgIEJhY2tzcGFjZSAgICAgICAgICAgQXBhZ2EgcGFyIHZhemlvIGludGVp
-cm9cbiIKIlxuIgoiVkVSSUZJQ0HDh8ODTyBERSBDw5NESUdPICAoQ3RybCtWKVxuIgoiICAubHVh
-ICAgbHVhYyAtcCAgICAgICAgICAuc2gvLmJhc2ggICBhbsOhbGlzZSBkZSBib2FzIHByw6F0aWNh
-c1xuIgoiICAuYy8uaCAgY2xhbmcgLWZzeW50YXggICAuaHRtbCAgICAgICBlc3RydXR1cmEgZGUg
-dGFnc1xuIgoiICAuY3BwICAgY2xhbmcgLWZzeW50YXhcbiIKIlxuIgoiTElOR1VBR0VOUyBTVVBP
-UlRBREFTXG4iCiIgIEMsIEMrKywgTHVhL0VsbGlvdE9TLCBCYXNoLCBIVE1MXG4iCiIgIChkZXRl
-Y8Onw6NvIGF1dG9tw6F0aWNhIHBlbGEgZXh0ZW5zw6NvIGRvIGFycXVpdm8pXG4iCiJcbiIKIlNO
-SVBQRVRTICAoQ3RybCtOKVxuIgoiICBBYnJlIG1lbnUgZGUgc25pcHBldHMgcHJvbnRvcyBwYXJh
-IGEgbGluZ3VhZ2VtIGF0dWFsLlxuIgoiXG4iCiJQRVJTSVNUw4pOQ0lBXG4iCiIgIMOabHRpbW8g
-YXJxdWl2byBhYmVydG8gc2Fsdm8gZW0gfi8uZWVfbGFzdFxuIgoiICBIaXN0w7NyaWNvIGRlIGJ1
-c2NhOiB+Ly5lZV9zZWFyY2hfaGlzdG9yeVxuIgoiXG4iCiJFWEVNUExPU1xuIgoiICBlZSBtYWlu
-Lmx1YSAgICAgICBFZGl0YSBtYWluLmx1YSBjb20gaGlnaGxpZ2h0IEx1YS9FbGxpb3RPU1xuIgoi
-ICBlZSBzY3JpcHQuc2ggICAgICBFZGl0YSBzY3JpcHQgQmFzaCBjb20gdmVyaWZpY2HDp8OjbyBh
-dXRvbcOhdGljYVxuIgoiICBtcyAtZSBtYWluLmx1YSAgICBBYnJlIGVlIGRpcmV0YW1lbnRlIGRv
-IHJ1bm5lciBtc1xuIgogICAgICAgICAgICApOwogICAgICAgICAgICByZXR1cm4gMDsKICAgICAg
-ICB9CiAgICAgICAgaWYgKHN0cmNtcChhLCItLXZlcnNpb24iKT09MCB8fCBzdHJjbXAoYSwiLVYi
-KT09MCkgewogICAgICAgICAgICBwcmludGYoImVlICVzXG4iLCBFRElUT1JfVkVSU0lPTik7CiAg
-ICAgICAgICAgIHJldHVybiAwOwogICAgICAgIH0KICAgIH0KCiAgICAvKiBlbnRyYSBubyBidWZm
-ZXIgYWx0ZXJuYXRpdm8g4oCUIGFvIHNhaXIgdm9sdGEgZXhhdGFtZW50ZSBjb21vIGVzdGF2YSAq
-LwogICAgd3JpdGUoU1RET1VUX0ZJTEVOTywgIlx4MWJbPzEwNDloXHgxYlsySlx4MWJbSCIsIDE1
-KTsKCiAgICByYXdfb24oKTsKICAgIHNpZ25hbChTSUdXSU5DSCwgaGFuZGxlX3Jlc2l6ZSk7CiAg
-ICBpbml0KCk7CgogICAgaWYgKGFyZ2MgPj0gMiAmJiBhcmd2WzFdWzBdPT0nLScgJiYgYXJndlsx
-XVsxXT09J3AnICYmIGFyZ3ZbMV1bMl09PSdcMCcpIHsKICAgICAgICAvKiBlZSAtcCDigJQgYWJy
-ZSBleHBsb3JhZG9yIGRpcmV0byAqLwogICAgICAgIHNldF9zdGF0dXMoSEVMUF9NU0cpOwogICAg
-ICAgIGZleHBfb3BlbigpOwogICAgfSBlbHNlIGlmIChhcmdjID49IDIpIHsKICAgICAgICBvcGVu
-X2ZpbGUoYXJndlsxXSk7CiAgICAgICAgc2V0X3N0YXR1cyhIRUxQX01TRyk7CiAgICB9IGVsc2Ug
-ewogICAgICAgIHNldF9zdGF0dXMoCiAgICAgICAgICAgICJFbGxpb3RPUyBFZGl0b3IgIOKAlCAg
-c2VtIGFycXVpdm8gICIKICAgICAgICAgICAgIkN0cmwrUyBwYXJhIHNhbHZhciAgQ3RybCtRIHBh
-cmEgc2FpciAgQ3RybCtQIGV4cGxvcmFkb3IiKTsKICAgIH0KCiAgICB3aGlsZSAoMSkgewogICAg
-ICAgIHJlZnJlc2hfc2NyZWVuKCk7CiAgICAgICAgcHJvY2Vzc19rZXkoKTsKICAgIH0KICAgIHJl
-dHVybiAwOwp9Cg==
-EDITOR_B64_EOF
+    cat << 'EDITOR_C_EOF' > "$_EE_SRC"
+/*
+ * ███████╗██╗     ██╗     ██╗ ██████╗ ████████╗
+ * ██╔════╝██║     ██║     ██║██╔═══██╗╚══██╔══╝
+ * █████╗  ██║     ██║     ██║██║   ██║   ██║
+ * ██╔══╝  ██║     ██║     ██║██║   ██║   ██║
+ * ███████╗███████╗███████╗██║╚██████╔╝   ██║
+ * ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝    ╚═╝
+ *  ElliotOS Editor — editor CLI nativo do ElliotOS
+ *
+ *  Compilar: cc -o elliot-edit editor.c
+ *  Uso:      elliot-edit [arquivo]
+ *
+ *  Atalhos:
+ *    Ctrl+S  Salvar         Ctrl+Q  Sair
+ *    Ctrl+F  Buscar         Ctrl+G  Ir para linha
+ *    Ctrl+K  Deletar linha  Ctrl+D  Duplicar linha
+ *    Ctrl+U  Desfazer       Ctrl+/  Comentar/descomentar linha
+ *    Ctrl+L  Escolher linguagem     Ctrl+R  Formatar código
+ *    Ctrl+V  Checar código (análise + clang se disponível)
+ *    Tab     Completar/indent        Shift+Tab  Deindent
+ *    Alt+Up/Down  Mover linha para cima/baixo
+ *    (  [  {  "  '  `   Auto-pair / auto-close
+ *    )  ]  }            Skip se já fechado
+ *    Backspace           Smart: apaga par vazio
+ */
+
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+#include <unistd.h>
+#include <termios.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+/* ════════════════════════════════════════════════════════
+ * CONSTANTES
+ * ════════════════════════════════════════════════════════ */
+
+#define EDITOR_VERSION   "3.0-ElliotOS"
+#define TAB_SIZE         4
+#define UNDO_LIMIT       256
+#define STATUS_MSG_TIME  2
+
+#define HELP_MSG \
+    "Ctrl+S salvar  Ctrl+Q sair  Ctrl+F buscar  Ctrl+A substituir  Ctrl+G linha  " \
+    "Ctrl+C copiar  Ctrl+X cortar  Ctrl+B colar  Shift+↑↓←→ selecionar  " \
+    "Ctrl+U desfaz  Ctrl+Y refaz  Ctrl+K del.linha  Ctrl+D dup  " \
+    "Ctrl+/ comentar  Ctrl+R formatar  Ctrl+V checar  Ctrl+J definição  " \
+    "Ctrl+N snippets  Ctrl+P arquivos  Ctrl+O símbolos  Ctrl+L linguagem  " \
+    "Alt+↑↓ mover  F2/F3 buffers  Ctrl+W ajuda"
+#define COMPLETION_MAX   512
+#define COMPLETION_SHOW  12
+#define CTRL(k)          ((k) & 0x1f)
+#define GUTTER           5   /* largura do número de linha: 4 dígitos + 1 espaço */
+
+/* ════════════════════════════════════════════════════════
+ * TECLAS ESPECIAIS
+ * ════════════════════════════════════════════════════════ */
+
+enum Key {
+    BACKSPACE    = 127,
+    ARROW_LEFT   = 1000, ARROW_RIGHT, ARROW_UP, ARROW_DOWN,
+    PAGE_UP, PAGE_DOWN,
+    HOME_KEY, END_KEY, DEL_KEY,
+    ALT_UP, ALT_DOWN,
+    SHIFT_TAB,
+    SHIFT_LEFT, SHIFT_RIGHT, SHIFT_UP, SHIFT_DOWN,
+    MOUSE_MOVE,
+    F1, F2, F3, F4, F5
+};
+
+/* ════════════════════════════════════════════════════════
+ * HIGHLIGHT — IDs
+ * ════════════════════════════════════════════════════════ */
+
+#define HL_NORMAL   0
+#define HL_COMMENT  1
+#define HL_KEYWORD1 2   /* controle de fluxo */
+#define HL_KEYWORD2 3   /* builtins / stdlib */
+#define HL_STRING   4
+#define HL_NUMBER   5
+#define HL_MATCH    6   /* resultado de busca */
+#define HL_SYMBOL   7
+#define HL_TYPE     8   /* tipos C / namespaces ElliotOS */
+#define HL_PREPROC  9   /* diretivas #include etc */
+#define HL_METHOD   10  /* métodos ElliotOS após ponto */
+#define HL_VAR      11  /* $VAR no Bash */
+#define HL_OPERATOR 12  /* operadores especiais: -> :: ** */
+#define HL_TAG      13  /* tags HTML <tag> */
+#define HL_ATTR     14  /* atributos HTML */
+
+#define HL_FLAG_NUMBERS (1<<0)
+#define HL_FLAG_STRINGS (1<<1)
+
+typedef struct {
+    const char  *filetype;
+    const char **extensions;
+    const char **kw_flow;      /* if/else/for/while... */
+    const char **kw_builtin;   /* funções stdlib */
+    const char **kw_types;     /* tipos C / namespaces ElliotOS */
+    const char **kw_preproc;   /* #diretivas C / métodos ElliotOS */
+    const char  *scomment;
+    const char  *mcs, *mce;   /* multi-line comment start/end */
+    int flags;
+} Syntax;
+
+/* ── C / C++ ─────────────────────────────────────────── */
+static const char *c_ext[]   = { ".c",".h", NULL };
+static const char *cpp_ext[] = { ".cpp",".cc",".cxx",".hpp",".hxx",".inl", NULL };
+static const char *c_flow[] = {
+    "if","else","while","for","do","switch","case","break","continue",
+    "return","goto","default","sizeof","typeof","alignof","offsetof",
+    "typedef","struct","enum","union","class","namespace","template",
+    "typename","public","private","protected","virtual","override","final",
+    "extern","static","const","constexpr","consteval","constinit",
+    "volatile","inline","register","auto","explicit","operator","friend",
+    "new","delete","throw","try","catch","using","static_assert",
+    "noexcept","nullptr","this","decltype","static_cast","reinterpret_cast",
+    "dynamic_cast","const_cast","co_await","co_return","co_yield",NULL
+};
+static const char *c_bi[]   = {
+    /* tipos primitivos */
+    "void","int","char","long","short","float","double","unsigned","signed",
+    "bool","wchar_t","char8_t","char16_t","char32_t",
+    /* valores especiais */
+    "NULL","true","false","EOF","SEEK_SET","SEEK_CUR","SEEK_END",
+    /* funções stdlib comuns */
+    "printf","fprintf","sprintf","snprintf","scanf","sscanf","fscanf",
+    "malloc","calloc","realloc","free","memcpy","memmove","memset","memcmp",
+    "strlen","strcpy","strncpy","strcat","strncat","strcmp","strncmp",
+    "strchr","strrchr","strstr","strtok","strdup","strndup",
+    "fopen","fclose","fread","fwrite","fgets","fputs","fgetc","fputc",
+    "fseek","ftell","rewind","feof","ferror","fflush","ftruncate",
+    "open","close","read","write","lseek","stat","fstat","lstat",
+    "fork","exec","execl","execv","execvp","execlp","waitpid","exit","_exit",
+    "getenv","setenv","putenv","system","popen","pclose",
+    "atoi","atol","atof","strtol","strtoul","strtod","abs","labs","fabs",
+    "sin","cos","tan","sqrt","pow","log","log2","log10","floor","ceil","round",
+    "rand","srand","qsort","bsearch",
+    "assert","abort","perror","strerror",
+    "time","clock","difftime","mktime","gmtime","localtime",
+    "pthread_create","pthread_join","pthread_mutex_lock","pthread_mutex_unlock",
+    "socket","bind","listen","accept","connect","send","recv","sendto","recvfrom",
+    "inet_aton","inet_ntoa","inet_pton","inet_ntop","htons","htonl","ntohs","ntohl",
+    "getaddrinfo","freeaddrinfo","getnameinfo","gethostbyname",NULL
+};
+static const char *c_types[]= {
+    "uint8_t","uint16_t","uint32_t","uint64_t",
+    "int8_t","int16_t","int32_t","int64_t",
+    "size_t","ssize_t","ptrdiff_t","uintptr_t","intptr_t",
+    "off_t","mode_t","uid_t","gid_t","dev_t","ino_t","nlink_t",
+    "pid_t","tid_t","pthread_t","pthread_mutex_t","pthread_cond_t",
+    "FILE","DIR","time_t","clock_t","suseconds_t",
+    "sockaddr","sockaddr_in","sockaddr_in6","sockaddr_un","socklen_t",
+    "in_addr","in6_addr","addrinfo","hostent","servent",
+    "fd_set","sigset_t","struct","va_list",
+    "lua_State","lua_Integer","lua_Number","lua_CFunction","lua_Debug",
+    "luaL_Reg","luaL_Buffer",
+    /* C++ STL */
+    "string","vector","map","unordered_map","set","unordered_set",
+    "list","deque","queue","stack","array","tuple","pair","optional",
+    "variant","shared_ptr","unique_ptr","weak_ptr","function",
+    "thread","mutex","condition_variable","atomic","future","promise",
+    "stringstream","fstream","ifstream","ofstream","iostream",
+    "iterator","initializer_list","exception","runtime_error",NULL
+};
+static const char *c_pp[]   = {
+    "#include","#define","#undef","#ifdef","#ifndef","#if","#else",
+    "#elif","#endif","#pragma","#error","#warning","#line",
+    "#defined","once","NULL",NULL
+};
+
+/* ── Lua / ElliotOS ──────────────────────────────────── */
+static const char *lua_ext[] = { ".lua", NULL };
+static const char *lua_flow[]= {
+    "if","then","else","elseif","end","for","while","do","repeat",
+    "until","function","local","return","break","goto","in",
+    "and","or","not",NULL
+};
+static const char *lua_bi[]  = {
+    /* valores */
+    "nil","true","false",
+    /* funções globais */
+    "print","require","type","tostring","tonumber","error","assert",
+    "pcall","xpcall","ipairs","pairs","next","select","unpack",
+    "rawget","rawset","rawequal","rawlen",
+    "setmetatable","getmetatable","setfenv","getfenv",
+    "load","loadfile","loadstring","dofile","collectgarbage",
+    "module","package","require",
+    /* iteradores e misc */
+    "_G","_ENV","_VERSION","...","arg",
+    /* coroutine */
+    "coroutine","coroutine.create","coroutine.resume","coroutine.yield",
+    "coroutine.wrap","coroutine.status","coroutine.isyieldable",
+    /* string */
+    "string","string.format","string.find","string.match","string.gmatch",
+    "string.gsub","string.sub","string.len","string.upper","string.lower",
+    "string.rep","string.byte","string.char","string.reverse","string.dump",
+    /* table */
+    "table","table.insert","table.remove","table.concat","table.sort",
+    "table.unpack","table.move","table.pack",
+    /* math */
+    "math","math.floor","math.ceil","math.abs","math.max","math.min",
+    "math.random","math.randomseed","math.sqrt","math.huge","math.pi",
+    "math.sin","math.cos","math.tan","math.exp","math.log","math.modf",
+    "math.fmod","math.type","math.tointeger","math.maxinteger","math.mininteger",
+    /* io */
+    "io","io.open","io.read","io.write","io.lines","io.close",
+    "io.flush","io.input","io.output","io.tmpfile","io.popen",
+    /* os */
+    "os","os.time","os.date","os.execute","os.clock","os.exit",
+    "os.getenv","os.remove","os.rename","os.tmpname",
+    /* utf8 */
+    "utf8","utf8.char","utf8.codes","utf8.codepoint","utf8.len",NULL
+};
+/* namespaces ElliotOS → destacados como tipos */
+static const char *lua_ns[]  = {
+    "net","mod","ai","agent","fs","sys","crypto","lmod","ms",
+    "util","date","json","web","ivar","db","cc","ui","tui",
+    "sh","exploit","pent",
+    "num","path","color","test","Queue","Stack",NULL
+};
+/* métodos ElliotOS → destacados como HL_METHOD */
+static const char *lua_meth[]= {
+    /* net */
+    "get","post","geth","fetch","connect","tcp","tcp6","udp","listen",
+    "socketex","socket","send","recv","recvall","recvline","recvfrom",
+    "close","scan","dns","ping","hosts","ip","os","import",
+    "bind","accept","peer","info","wait","lines","sendall","sendto",
+    "peek","shutdown","settimeout","setsockopt","getsockopt",
+    /* mod */
+    "xss","sqli","nosql","lfi","rce","ssrf","ssti","redir","cors","csrf",
+    "jwt","idor","xxe","headers","waf","spider","dirs","backup","secrets",
+    "params","subdomains","chain","force","scan","recon","payload",
+    "graphql","ws","crlf","git","open_redirect","dos","fuzz","auth","info",
+    /* ai */
+    "ask","code","model","key","clear","forget","history","rp","persona",
+    "provider","add","remove","list","main","models_code",
+    /* agent */
+    "run","chat","reset",
+    /* fs */
+    "read","write","append","copy","move","delete","rm","mkdir","ls",
+    "exists","glob","chmod","stat","isfile","isdir",
+    /* sh */
+    "exec","capture",
+    /* sys */
+    "thread","join","spawn","sh","kill","env","pid","exit","list",
+    "net","storage","time","time_ms","sleep","mutex","channel",
+    /* crypto */
+    "md5","sha1","sha256","sha512","b64enc","b64dec",
+    "hexenc","hexdec","hmac","aes_enc","aes_dec","rand",
+    /* db */
+    "open","exec","query","tables",
+    /* cc */
+    "run","lua2c",
+    /* ui */
+    "color","box","clear","sleep","fig","input",
+    /* tui */
+    "main","func","close","read",
+    /* web */
+    "save","serve","stop","links","forms","scripts",
+    /* ivar */
+    "enable","disable","status","reset","preprocess",
+    /* num */
+    "parse","format","clamp","lerp","round","sign","is_int","is_nan","in_range",
+    "to_bin","to_hex","to_oct","avg",
+    /* path */
+    "join","basename","dirname","ext","stem","abs","expanduser","parts","split",
+    /* color */
+    "red","green","yellow","blue","magenta","cyan","white","black","bold","dim",
+    "italic","underline","blink","bright_red","bright_green","bright_yellow",
+    "bright_blue","bright_magenta","bright_cyan","bright_white",
+    "bg_red","bg_green","bg_yellow","bg_blue","bg_magenta","bg_cyan","bg_white",
+    "rgb","bg_rgb","strip","len",
+    /* test */
+    "ok","eq","neq","gt","lt","gte","lte","nil_","not_nil","type_is","deep_eq",
+    "contains","match","err","no_err","suite","report",
+    /* Queue/Stack */
+    "push","pop","peek","size","is_empty","to_table",
+    /* table extras */
+    "flat","reverse","sorted","slice","find","any","all","index_of",
+    "concat_all","zip","group_by",
+    /* json extras */
+    "pretty","query",
+    /* sys extras */
+    "which","hostname","cpu_count","mem",
+    /* fs extras */
+    "tempfile","watch",
+    /* re extras */
+    "named","gmatch",
+    /* exploit */
+    "sqli","xss","lfi","rce","ssti","idor",
+    /* pent */
+    "start","stop","list",
+    /* util */
+    "map","filter","reduce","any","all","count","range","enumerate","zip",
+    "flatten","unique","sorted","sum","min","max","chunk","groupby",
+    "keys","values","pick","omit","merge","deepcopy","partial","memoize",
+    "once","retry","with_file","pp","printf",
+    "mean","median","mode","variance","stdev","stdev_sample",
+    "percentile","normalize","clamp","round",
+    "iter","generator","take","drop","step","tally","flat_map","interleave",
+    "first","last","index_of","without","difference","intersection","union",
+    "rotate","transpose","combinations","permutations",
+    "pipe","compose","identity","noop","always","flip","tap","default",
+    "truthy","falsy",
+    /* date */
+    "now","today","format","parse","diff","add","sub","weekday",
+    "is_leap","timestamp","from_timestamp",
+    /* json */
+    "encode","decode",
+    /* ms */
+    "check","alias","force",
+    /* lmod */
+    "new","path","mod","list","remove",
+    /* help — compartilhado */
+    "help",NULL
+};
+
+/* ── Bash / Shell ─────────────────────────────────────── */
+static const char *sh_ext[]  = { ".sh",".bash",".zsh",".ksh", NULL };
+static const char *sh_flow[] = {
+    "if","then","else","elif","fi","for","while","do","done","case",
+    "esac","function","return","break","continue","exit","select",
+    "until","time","in","local","declare","typeset",NULL
+};
+static const char *sh_bi[]   = {
+    /* comandos de output */
+    "echo","printf","read",
+    /* navegação e arquivos */
+    "cd","ls","mkdir","rmdir","rm","cp","mv","cat","touch","ln",
+    "find","locate","which","whereis","type","file","stat",
+    /* texto */
+    "grep","egrep","fgrep","sed","awk","cut","tr","sort","uniq","wc",
+    "head","tail","less","more","diff","patch","column","fmt","fold",
+    /* permissões */
+    "chmod","chown","chgrp","umask","id","whoami","groups",
+    /* processos */
+    "kill","killall","pkill","pgrep","ps","top","jobs","bg","fg","wait",
+    "sleep","nice","nohup","timeout","watch",
+    /* variáveis e ambiente */
+    "export","unset","set","env","printenv","source","alias","unalias",
+    "readonly","eval","exec","shift","trap",
+    /* strings e aritmética */
+    "test","expr","let","basename","dirname","realpath","readlink",
+    /* rede */
+    "curl","wget","ping","ssh","scp","rsync","netstat","ss","ip",
+    "nc","ncat","nmap","dig","nslookup","host","traceroute",
+    /* compressão */
+    "tar","gzip","gunzip","zip","unzip","bzip2","xz",
+    /* misc */
+    "tee","xargs","parallel","yes","true","false","noop",
+    "date","cal","bc","dc","jq","base64",
+    /* pkg */
+    "pkg","apt","apt-get","dpkg","brew","pip","npm","cargo",
+    /* compiladores */
+    "cc","gcc","clang","g++","clang++","make","cmake","ld",
+    /* outros shells / interpreters */
+    "bash","sh","zsh","python3","node","lua","perl","ruby",NULL
+};
+static const char *sh_vars[] = {
+    /* variáveis especiais */
+    "HOME","PATH","PREFIX","IFS","TERM","USER","SHELL","LOGNAME",
+    "PWD","OLDPWD","EDITOR","VISUAL","PAGER","LANG","LC_ALL","LC_TYPE",
+    "BASH_VERSION","BASH_SOURCE","BASH_LINENO","BASH_COMMAND",
+    "FUNCNAME","LINENO","RANDOM","SECONDS","PIPESTATUS",
+    "REPLY","OPTARG","OPTIND","OPTERR",
+    /* posicionais e especiais */
+    "0","1","2","3","4","5","6","7","8","9",
+    "@","*","#","?","!","$","-",
+    /* Termux */
+    "TERMUX_VERSION","ANDROID_ROOT","ANDROID_DATA",NULL
+};
+
+/* ── HTML ─────────────────────────────────────────────── */
+static const char *html_ext[] = { ".html",".htm",".xhtml", NULL };
+
+/* kw_flow → tags estruturais (HL_KEYWORD1 = azul/ciano) */
+static const char *html_flow[] = {
+    "html","head","body","header","footer","main","nav","section",
+    "article","aside","div","span","template","slot","shadow",NULL
+};
+/* kw_builtin → tags de conteúdo (HL_KEYWORD2 = verde) */
+static const char *html_bi[] = {
+    "a","p","h1","h2","h3","h4","h5","h6","ul","ol","li","dl","dt","dd",
+    "table","thead","tbody","tfoot","tr","th","td","caption","colgroup","col",
+    "form","input","button","select","option","optgroup","textarea","label",
+    "fieldset","legend","datalist","output","progress","meter",
+    "img","figure","figcaption","picture","source","video","audio","track",
+    "iframe","embed","object","canvas","svg","math",
+    "pre","code","blockquote","q","cite","abbr","acronym",
+    "strong","em","b","i","u","s","del","ins","mark","small","sub","sup",
+    "br","hr","wbr","details","summary","dialog","menu","menuitem",
+    "script","style","link","meta","base","title",
+    "address","time","data","var","samp","kbd","bdi","bdo","ruby","rt","rp",NULL
+};
+/* kw_types → atributos comuns (HL_TYPE = amarelo) */
+static const char *html_attrs[] = {
+    "class","id","style","src","href","alt","title","type","name","value",
+    "placeholder","action","method","enctype","target","rel","charset",
+    "content","lang","dir","tabindex","accesskey","draggable","hidden",
+    "disabled","readonly","required","checked","selected","multiple",
+    "width","height","colspan","rowspan","scope","for","form",
+    "data-","aria-","role","xmlns","async","defer","crossorigin",
+    "loading","decoding","srcset","sizes","media","integrity",
+    "onload","onclick","onchange","oninput","onsubmit","onerror",NULL
+};
+/* kw_preproc → DOCTYPE e entidades (HL_PREPROC = magenta) */
+static const char *html_pp[] = {
+    "DOCTYPE","&amp;","&lt;","&gt;","&quot;","&apos;","&nbsp;",
+    "&copy;","&reg;","&trade;","&mdash;","&ndash;","&hellip;",NULL
+};
+
+static Syntax HLDB[] = {
+    { "C",           c_ext,   c_flow,  c_bi,   c_types, c_pp,
+      "//","/*","*/", HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
+    { "C++",         cpp_ext, c_flow,  c_bi,   c_types, c_pp,
+      "//","/*","*/", HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
+    { "Lua/ElliotOS",lua_ext, lua_flow,lua_bi, lua_ns,  lua_meth,
+      "--","--[[","]]",HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
+    { "Bash",        sh_ext,  sh_flow, sh_bi,  sh_vars, NULL,
+      "#",NULL,NULL,  HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
+    { "HTML",        html_ext,html_flow,html_bi,html_attrs,html_pp,
+      NULL,"<!--","-->", HL_FLAG_STRINGS },
+};
+#define HLDB_SIZE (int)(sizeof(HLDB)/sizeof(HLDB[0]))
+
+/* ════════════════════════════════════════════════════════
+ * COMPLETIONS — API ElliotOS + stdlib Lua
+ * ════════════════════════════════════════════════════════ */
+
+/* COMPLETIONS: fonte unica compartilhada com G_completions do REPL
+ * -------------------------------------------------------------------- */
+static const char *COMPLETIONS[] = {
+    /* Lua 5.4 builtins — módulos ElliotOS vêm do cache do REPL */
+    "print(","tostring(","tonumber(","type(","pairs(","ipairs(",
+    "next(","select(","rawget(","rawset(","rawequal(","rawlen(",
+    "setmetatable(","getmetatable(","require(","load(","loadfile(",
+    "dofile(","pcall(","xpcall(","error(","assert(","collectgarbage(",
+    "warn(","_VERSION",
+    "coroutine.create(","coroutine.resume(","coroutine.yield(",
+    "coroutine.wrap(","coroutine.status(","coroutine.isyieldable(",
+    "coroutine.running(","coroutine.close(",
+    "string.format(","string.find(","string.match(","string.gmatch(",
+    "string.gsub(","string.sub(","string.len(","string.byte(",
+    "string.char(","string.rep(","string.reverse(","string.upper(",
+    "string.lower(",
+    "table.insert(","table.remove(","table.sort(","table.concat(",
+    "table.unpack(","table.move(","table.pack(",
+    "math.abs(","math.ceil(","math.floor(","math.sqrt(","math.max(",
+    "math.min(","math.random(","math.randomseed(","math.sin(","math.cos(",
+    "math.tan(","math.atan(","math.log(","math.exp(","math.fmod(",
+    "math.modf(","math.huge","math.pi","math.maxinteger","math.mininteger",
+    "math.tointeger(","math.type(",
+    "io.read(","io.write(","io.open(","io.close(","io.lines(",
+    "io.popen(","io.input(","io.output(","io.flush(",
+    "os.time(","os.clock(","os.date(","os.exit(","os.getenv(",
+    "os.execute(","os.rename(","os.remove(","os.tmpname(","os.difftime(",
+    "os.setlocale(",
+    /* utf8.* */
+    "utf8.char(","utf8.codepoint(","utf8.codes(","utf8.len(",
+    "utf8.offset(","utf8.charpattern",
+    /* debug.* */
+    "debug.getinfo(","debug.getlocal(","debug.setlocal(",
+    "debug.getmetatable(","debug.setmetatable(",
+    "debug.getupvalue(","debug.setupvalue(",
+    "debug.traceback(","debug.sethook(","debug.getregistry()",
+    "debug.upvalueid(","debug.upvaluejoin(",
+    /* package.* */
+    "package.path","package.cpath","package.loaded","package.preload",
+    "package.loadlib(","package.searchpath(",
+    /* io extras */
+    "io.stderr","io.stdin","io.stdout","io.tmpfile(","io.type(",
+    /* math extras */
+    "math.ult(","math.asin(","math.acos(","math.sinh(","math.cosh(","math.tanh(",
+    /* globals base */
+    "unpack(","rawlen(","warn(","string.dump(","string.char(",
+    /* keywords Lua */
+    "repeat","until","while","for","do","end","then","else","elseif",
+    "local","function","return","break","goto","in",
+    "nil","true","false","not","and","or",
+    NULL
+};
+
+/* ════════════════════════════════════════════════════════
+ * INCLUDE / REQUIRE COMPLETIONS
+ * ════════════════════════════════════════════════════════ */
+
+/* Headers C puro (stdlib + POSIX + Termux) */
+static const char *C_HEADERS[] = {
+    /* C stdlib */
+    "assert.h","complex.h","ctype.h","errno.h","fenv.h","float.h",
+    "inttypes.h","iso646.h","limits.h","locale.h","math.h","setjmp.h",
+    "signal.h","stdarg.h","stdbool.h","stddef.h","stdint.h","stdio.h",
+    "stdlib.h","string.h","tgmath.h","time.h","uchar.h","wchar.h","wctype.h",
+    /* POSIX */
+    "dirent.h","fcntl.h","fnmatch.h","glob.h","grp.h","netdb.h",
+    "poll.h","pthread.h","pwd.h","regex.h","sched.h","semaphore.h",
+    "spawn.h","strings.h","syslog.h","termios.h","unistd.h","utime.h",
+    "wordexp.h",
+    /* sys/ */
+    "sys/epoll.h","sys/inotify.h","sys/ioctl.h","sys/mman.h",
+    "sys/mount.h","sys/param.h","sys/prctl.h","sys/ptrace.h",
+    "sys/resource.h","sys/select.h","sys/sendfile.h","sys/signalfd.h",
+    "sys/socket.h","sys/stat.h","sys/statvfs.h","sys/time.h",
+    "sys/timerfd.h","sys/types.h","sys/uio.h","sys/un.h","sys/wait.h",
+    /* net */
+    "arpa/inet.h","net/if.h","netinet/in.h","netinet/tcp.h",
+    "netinet/udp.h","netpacket/packet.h",
+    NULL
+};
+
+/* Headers C++ (STL + wrappers C) */
+static const char *CPP_HEADERS[] = {
+    /* C++ STL */
+    "algorithm","array","atomic","bitset","chrono","condition_variable",
+    "deque","exception","filesystem","forward_list","fstream","functional",
+    "future","initializer_list","iomanip","ios","iostream","istream",
+    "iterator","limits","list","map","memory","mutex","numeric","optional",
+    "ostream","queue","random","regex","set","shared_mutex","sstream",
+    "stack","stdexcept","string","string_view","thread","tuple",
+    "type_traits","unordered_map","unordered_set","utility","variant","vector",
+    /* C wrappers C++ */
+    "cassert","cctype","cerrno","cfloat","climits","cmath","cstdint",
+    "cstdio","cstdlib","cstring","ctime",
+    /* POSIX (também usados em C++) */
+    "dirent.h","fcntl.h","fnmatch.h","glob.h","grp.h","netdb.h",
+    "poll.h","pthread.h","pwd.h","regex.h","sched.h","semaphore.h",
+    "spawn.h","strings.h","syslog.h","termios.h","unistd.h","utime.h",
+    "wordexp.h",
+    /* sys/ */
+    "sys/epoll.h","sys/inotify.h","sys/ioctl.h","sys/mman.h",
+    "sys/mount.h","sys/param.h","sys/prctl.h","sys/ptrace.h",
+    "sys/resource.h","sys/select.h","sys/sendfile.h","sys/signalfd.h",
+    "sys/socket.h","sys/stat.h","sys/statvfs.h","sys/time.h",
+    "sys/timerfd.h","sys/types.h","sys/uio.h","sys/un.h","sys/wait.h",
+    /* net */
+    "arpa/inet.h","net/if.h","netinet/in.h","netinet/tcp.h",
+    "netinet/udp.h","netpacket/packet.h",
+    NULL
+};
+
+/* Módulos Lua padrão (require) + ElliotOS globals */
+static const char *LUA_STD_MODS[] = {
+    /* ElliotOS @std — todos os módulos */
+    "@std",
+    "@std/net","@std/fs","@std/sys","@std/ai","@std/crypto",
+    "@std/db","@std/web","@std/ui","@std/ms","@std/mod",
+    "@std/re","@std/util","@std/log","@std/csv","@std/json",
+    "@std/tui","@std/ivar","@std/exploit","@std/pent","@std/adb",
+    "@std/agent","@std/lmod","@std/sh","@std/cc",
+    /* @user/ — arquivos locais */
+    "@user/",
+    /* stdlib Lua pura */
+    "io","os","math","string","table","coroutine","package","debug","utf8",
+    NULL
+};
+
+/* ── funções de detect/scan/comp_open_include/require definidas após Editor ── */
+
+/* ════════════════════════════════════════════════════════
+ * ESTRUTURAS PRINCIPAIS
+ * ════════════════════════════════════════════════════════ */
+
+typedef struct {
+    int size, rsize;
+    char *chars, *render;
+    unsigned char *hl;
+    int hl_open_comment;
+    int is_dirty;  /* 1 se linha foi modificada desde o último save */
+} Row;
+
+typedef struct { char *data; int len; int cx, cy; } UndoEntry;
+
+typedef struct {
+    char *items[COMPLETION_MAX];
+    int count, selected, active;
+    int trigger_cx;
+} Comp;
+
+typedef struct {
+    int cx, cy, rx, rowoff, coloff, rows, cols;
+    int numrows;
+    Row *row;
+    int dirty;
+    char *filename;
+    char statusmsg[256];
+    time_t statusmsg_time;
+    Syntax *syntax;
+    struct termios orig_termios;
+    UndoEntry undo[UNDO_LIMIT];
+    int undo_top;
+    UndoEntry redo_stack[UNDO_LIMIT];
+    int redo_top;
+    /* seleção de texto */
+    int sel_active;
+    int sel_ax, sel_ay;        /* âncora da seleção */
+    /* clipboard interno */
+    char *clipboard;
+    int   clipboard_len;
+    /* multi-buffer */
+    char  buf_list[8][256];   /* lista de arquivos abertos */
+    int   buf_cx[8], buf_cy[8], buf_ro[8], buf_co[8];
+    int   buf_count;
+    int   buf_idx;            /* índice do buffer atual */
+    Comp comp;
+    int use_tabs;
+} Editor;
+
+static Editor E;
+
+/* forward declarations */
+static void comp_close(void);
+static void update_row(Row *row);
+static void update_syntax(Row *row);
+static void set_status(const char *fmt, ...);
+static void refresh_screen(void);
+
+/* ════════════════════════════════════════════════════════
+ * INCLUDE / REQUIRE — detecção de contexto e completion
+ * ════════════════════════════════════════════════════════ */
+
+/* Retorna 1 se o cursor está dentro de #include <...> ou #include "..."
+ * Preenche *prefix com o que já foi digitado e *use_angle (1=<> 0="") */
+static int detect_include_ctx(char *prefix, int bufsz, int *use_angle) {
+    if (E.cy >= E.numrows) return 0;
+    Row *row = &E.row[E.cy];
+    char *line = row->chars;
+    int i = 0;
+    while (i < row->size && (line[i]==' '||line[i]=='\t')) i++;
+    if (strncmp(line+i, "#include", 8) != 0) return 0;
+    i += 8;
+    while (i < row->size && (line[i]==' '||line[i]=='\t')) i++;
+    if (i >= row->size) return 0;
+    char open = line[i];
+    if (open != '<' && open != '"') return 0;
+    char close = (open == '<') ? '>' : '"';
+    *use_angle = (open == '<');
+    int open_pos = i;
+    i++;
+    int cx = E.cx;
+    if (cx <= open_pos) return 0;
+    int close_pos = -1;
+    for (int j = open_pos+1; j < row->size; j++)
+        if (line[j] == close) { close_pos = j; break; }
+    if (close_pos != -1 && cx > close_pos) return 0;
+    int plen = cx - (open_pos + 1);
+    if (plen < 0) plen = 0;
+    if (plen >= bufsz) plen = bufsz - 1;
+    memcpy(prefix, line + open_pos + 1, plen);
+    prefix[plen] = '\0';
+    return 1;
+}
+
+/* Retorna 1 se o cursor está dentro de require("...") ou require('...') */
+static int detect_require_ctx(char *prefix, int bufsz) {
+    if (E.cy >= E.numrows) return 0;
+    Row *row = &E.row[E.cy];
+    char *line = row->chars;
+    int cx = E.cx;
+    int rpos = -1;
+    for (int i = 0; i <= cx - 8; i++) {
+        if (strncmp(line+i, "require", 7) == 0) {
+            int j = i + 7;
+            while (j < cx && (line[j]==' '||line[j]=='\t')) j++;
+            if (j < cx && line[j] == '(') rpos = j;
+        }
+    }
+    if (rpos < 0) return 0;
+    int i = rpos + 1;
+    while (i < cx && (line[i]==' '||line[i]=='\t')) i++;
+    if (i >= cx) return 0;
+    char q = line[i];
+    if (q != '"' && q != '\'') return 0;
+    i++;
+    if (i > cx) return 0;
+    int plen = cx - i;
+    if (plen < 0) plen = 0;
+    if (plen >= bufsz) plen = bufsz - 1;
+    memcpy(prefix, line + i, plen);
+    prefix[plen] = '\0';
+    return 1;
+}
+
+/* Adiciona item à comp se bate com prefix e não é duplicado */
+static void comp_add(const char *item, const char *prefix, int plen) {
+    if (E.comp.count >= COMPLETION_MAX) return;
+    if (plen > 0 && strncmp(item, prefix, plen) != 0) return;
+    int ilen = (int)strlen(item);
+    int is_fn = (ilen>0 && item[ilen-1]=='(');
+    for (int k = 0; k < E.comp.count; k++) {
+        if (!strcmp(E.comp.items[k], item)) return;  /* exato: duplicata */
+        /* se já existe "name(" não adiciona "name" e vice-versa */
+        int klen = (int)strlen(E.comp.items[k]);
+        int k_is_fn = (klen>0 && E.comp.items[k][klen-1]=='(');
+        if(is_fn && !k_is_fn && klen==ilen-1 && !strncmp(E.comp.items[k],item,ilen-1)) return;
+        if(!is_fn && k_is_fn && klen==ilen+1 && !strncmp(item,E.comp.items[k],ilen)) return;
+    }
+    E.comp.items[E.comp.count++] = strdup(item);
+}
+
+/* Varre /data/data/com.termux/files/usr/include e subdirs */
+static void scan_c_headers(const char *prefix, int plen) {
+    const char *base = "/data/data/com.termux/files/usr/include";
+    const char *subdirs[] = {
+        "", "sys", "net", "netinet", "arpa", "netpacket",
+        "linux", "asm", "bits", NULL
+    };
+    for (int s = 0; subdirs[s]; s++) {
+        char path[256];
+        if (subdirs[s][0])
+            snprintf(path, sizeof(path), "%s/%s", base, subdirs[s]);
+        else
+            snprintf(path, sizeof(path), "%s", base);
+        DIR *d = opendir(path);
+        if (!d) continue;
+        struct dirent *ent;
+        while ((ent = readdir(d)) && E.comp.count < COMPLETION_MAX) {
+            char *dot = strrchr(ent->d_name, '.');
+            if (!dot || strcmp(dot, ".h") != 0) continue;
+            char item[128];
+            if (subdirs[s][0])
+                snprintf(item, sizeof(item), "%s/%s", subdirs[s], ent->d_name);
+            else
+                snprintf(item, sizeof(item), "%s", ent->d_name);
+            comp_add(item, prefix, plen);
+        }
+        closedir(d);
+    }
+}
+
+/* Varre um diretório em busca de módulos Lua (.lua e diretórios com init) */
+static void scan_lua_dir(const char *path, const char *prefix, int plen) {
+    DIR *d = opendir(path);
+    if (!d) return;
+    struct dirent *ent;
+    while ((ent = readdir(d)) && E.comp.count < COMPLETION_MAX) {
+        if (ent->d_name[0] == '.') continue;
+        char *dot = strrchr(ent->d_name, '.');
+        if (dot && strcmp(dot, ".lua") == 0) {
+            /* arquivo .lua — extrai nome sem extensão */
+            char mod[128];
+            int mlen = (int)(dot - ent->d_name);
+            if (mlen <= 0 || mlen >= (int)sizeof(mod)) continue;
+            memcpy(mod, ent->d_name, mlen); mod[mlen] = '\0';
+            comp_add(mod, prefix, plen);
+        } else if (!dot) {
+            /* possível diretório (módulo com init.lua) */
+            char full[512];
+            snprintf(full, sizeof(full), "%s/%s/init.lua", path, ent->d_name);
+            struct stat st;
+            if (stat(full, &st) == 0)
+                comp_add(ent->d_name, prefix, plen);
+        }
+    }
+    closedir(d);
+}
+
+/* Varre ~/.lua-modules/ e paths do luarocks */
+static void scan_lua_modules(const char *prefix, int plen) {
+    const char *home = getenv("HOME");
+    if (!home) home = "/data/data/com.termux/files/home";
+
+    /* 1. ~/.lua-modules/ (lmod) */
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.lua-modules", home);
+    scan_lua_dir(path, prefix, plen);
+
+    /* 2. ~/.luarocks/share/lua/5.4/ (luarocks user) */
+    snprintf(path, sizeof(path), "%s/.luarocks/share/lua/5.4", home);
+    scan_lua_dir(path, prefix, plen);
+
+    /* 3. luarocks global Termux: $PREFIX/share/lua/5.4/ */
+    const char *pfx = getenv("PREFIX");
+    if (!pfx) pfx = "/data/data/com.termux/files/usr";
+    snprintf(path, sizeof(path), "%s/share/lua/5.4", pfx);
+    scan_lua_dir(path, prefix, plen);
+
+    /* 4. luarocks lib: $PREFIX/lib/lua/5.4/ (módulos C) */
+    snprintf(path, sizeof(path), "%s/lib/lua/5.4", pfx);
+    scan_lua_dir(path, prefix, plen);
+}
+
+/* Abre completion para #include <...> / #include "..." */
+static int comp_open_include(void) {
+    char prefix[128]; int use_angle;
+    if (!detect_include_ctx(prefix, sizeof(prefix), &use_angle)) return 0;
+    comp_close();
+    int plen = (int)strlen(prefix);
+    /* usa lista de headers conforme linguagem ativa */
+    const char **hlist = (E.syntax == &HLDB[1]) ? CPP_HEADERS : C_HEADERS;
+    for (int i = 0; hlist[i]; i++)
+        comp_add(hlist[i], prefix, plen);
+    /* scan do filesystem: para C só .h, para C++ também sem extensão */
+    if (E.syntax == &HLDB[1]) {
+        /* C++: scan normal de .h + headers sem extensão do STL */
+        scan_c_headers(prefix, plen);
+    } else {
+        scan_c_headers(prefix, plen);
+    }
+    if (E.comp.count == 0) return 0;
+    E.comp.selected = 0;
+    E.comp.active   = 1;
+    /* trigger_cx = posição logo após '<' ou '"' */
+    Row *row = &E.row[E.cy];
+    char *line = row->chars;
+    int i = 0;
+    while (i < row->size && (line[i]==' '||line[i]=='\t')) i++;
+    i += 8; /* salta "#include" */
+    while (i < row->size && (line[i]==' '||line[i]=='\t')) i++;
+    i++; /* salta '<' ou '"' */
+    E.comp.trigger_cx = i;
+    return 1;
+}
+
+/* Resolve path com ../ sem realpath() externo */
+static void ee_resolve_path(const char *base, const char *rel, char *out, size_t olen) {
+    char tmp[1024];
+    snprintf(tmp, sizeof(tmp), "%s/%s", base, rel);
+    char *parts[64]; int nparts=0;
+    char *copy = strdup(tmp);
+    char *tok  = strtok(copy, "/");
+    while(tok && nparts<63){
+        if(!strcmp(tok,".."))      { if(nparts>0) nparts--; }
+        else if(strcmp(tok,".")!=0 && tok[0]){ parts[nparts++]=tok; }
+        tok=strtok(NULL,"/");
+    }
+    out[0]='\0';
+    for(int i=0;i<nparts;i++){
+        strncat(out,"/",olen-strlen(out)-1);
+        strncat(out,parts[i],olen-strlen(out)-1);
+    }
+    if(!out[0]) strncpy(out,"/",olen-1);
+    free(copy);
+}
+
+/* Varre arquivos .lua e subdiretórios para @user/ completion */
+static void scan_user_files(const char *suffix, const char *fprefix, int fplen) {
+    const char *home = getenv("HOME");
+    if(!home) return;
+    char dir_abs[1024];
+    ee_resolve_path(home, suffix, dir_abs, sizeof(dir_abs));
+    DIR *d = opendir(dir_abs);
+    if(!d) return;
+    struct dirent *ent;
+    while((ent=readdir(d)) && E.comp.count < COMPLETION_MAX){
+        if(ent->d_name[0]=='.') continue;
+        if(fplen>0 && strncmp(ent->d_name,fprefix,fplen)!=0) continue;
+        char full[1024];
+        snprintf(full,sizeof(full),"%s/%s",dir_abs,ent->d_name);
+        struct stat st;
+        if(stat(full,&st)!=0) continue;
+        char entry[512];
+        /* reconstrói o path @user/... completo */
+        if(S_ISDIR(st.st_mode)){
+            if(suffix[0])
+                snprintf(entry,sizeof(entry),"@user/%s/%s/",suffix,ent->d_name);
+            else
+                snprintf(entry,sizeof(entry),"@user/%s/",ent->d_name);
+            comp_add(entry,"",0);
+        } else if(S_ISREG(st.st_mode)){
+            char *dot=strrchr(ent->d_name,'.');
+            if(!dot||strcmp(dot,".lua")!=0) continue;
+            int nlen=(int)(dot-ent->d_name);
+            if(suffix[0])
+                snprintf(entry,sizeof(entry),"@user/%s/%.*s",suffix,nlen,ent->d_name);
+            else
+                snprintf(entry,sizeof(entry),"@user/%.*s",nlen,ent->d_name);
+            comp_add(entry,"",0);
+        }
+    }
+    closedir(d);
+}
+
+/* Abre completion para require("...") / require('...') */
+static int comp_open_require(void) {
+    char prefix[128];
+    if (!detect_require_ctx(prefix, sizeof(prefix))) return 0;
+    comp_close();
+    int plen = (int)strlen(prefix);
+
+    /* @user/ — lista arquivos locais em vez dos módulos padrão */
+    if(strncmp(prefix,"@user",5)==0){
+        /* suffix = path após "@user/" */
+        const char *sfx = prefix+5;
+        if(*sfx=='/') sfx++;
+        /* separa diretório do prefixo de arquivo */
+        char dir_rel[512]={0}, fprefix[256]={0};
+        const char *last_slash=strrchr(sfx,'/');
+        if(last_slash){
+            int dlen=(int)(last_slash-sfx);
+            strncpy(dir_rel,sfx,dlen<(int)sizeof(dir_rel)?dlen:(int)sizeof(dir_rel)-1);
+            strncpy(fprefix,last_slash+1,sizeof(fprefix)-1);
+        } else {
+            strncpy(fprefix,sfx,sizeof(fprefix)-1);
+        }
+        scan_user_files(dir_rel, fprefix, (int)strlen(fprefix));
+        if(E.comp.count==0) return 0;
+        E.comp.selected=0; E.comp.active=1;
+        /* trigger_cx logo após a aspa de abertura */
+        Row *row=&E.row[E.cy]; char *line=row->chars; int cx=E.cx;
+        int rpos=-1;
+        for(int i=0;i<=cx-8;i++){
+            if(strncmp(line+i,"require",7)==0){
+                int j=i+7;
+                while(j<cx&&(line[j]==' '||line[j]=='	'))j++;
+                if(j<cx&&line[j]=='(') rpos=j;
+            }
+        }
+        int i2=rpos+1;
+        while(i2<cx&&(line[i2]==' '||line[i2]=='	'))i2++;
+        i2++;
+        E.comp.trigger_cx=i2;
+        return 1;
+    }
+
+    for (int i = 0; LUA_STD_MODS[i]; i++)
+        comp_add(LUA_STD_MODS[i], prefix, plen);
+    scan_lua_modules(prefix, plen);
+    if (E.comp.count == 0) return 0;
+    E.comp.selected = 0;
+    E.comp.active   = 1;
+    /* trigger_cx = posição logo após as aspas de abertura */
+    Row *row = &E.row[E.cy];
+    char *line = row->chars;
+    int cx = E.cx;
+    int rpos = -1;
+    for (int i = 0; i <= cx - 8; i++) {
+        if (strncmp(line+i,"require",7)==0) {
+            int j=i+7;
+            while(j<cx&&(line[j]==' '||line[j]=='\t'))j++;
+            if(j<cx&&line[j]=='(') rpos=j;
+        }
+    }
+    int i2 = rpos + 1;
+    while (i2 < cx && (line[i2]==' '||line[i2]=='\t')) i2++;
+    i2++; /* salta aspas */
+    E.comp.trigger_cx = i2;
+    return 1;
+}
+
+
+
+static void die(const char *s) {
+    write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7);
+    perror(s); exit(1);
+}
+static void raw_off(void) {
+    write(STDOUT_FILENO, "\033[?1000l", 9); /* desativa mouse */
+    /* sai do buffer alternativo e restaura o terminal */
+    write(STDOUT_FILENO, "\x1b[?1049l", 8);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios);
+}
+static void raw_on(void) {
+    if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
+    atexit(raw_off);
+    struct termios r = E.orig_termios;
+    r.c_iflag &= ~(BRKINT|ICRNL|INPCK|ISTRIP|IXON);
+    r.c_oflag &= ~OPOST; r.c_cflag |= CS8;
+    r.c_lflag &= ~(ECHO|ICANON|IEXTEN|ISIG);
+    r.c_cc[VMIN] = 0; r.c_cc[VTIME] = 1;
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &r) == -1) die("tcsetattr");
+    write(STDOUT_FILENO, "\033[?1000h", 9); /* ativa mouse: clique + scroll */
+}
+
+static int get_winsz(int *rows, int *cols) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) return -1;
+    *cols = ws.ws_col; *rows = ws.ws_row; return 0;
+}
+
+static void handle_resize(int sig) {
+    (void)sig;
+    if (get_winsz(&E.rows, &E.cols) != -1) {
+        E.rows -= 2;  /* reserva status bar + msg */
+        /* Garante que o cursor não fique fora da área visível */
+        if (E.cy >= E.rows) E.cy = E.rows > 0 ? E.rows - 1 : 0;
+        if (E.cx >= E.cols) E.cx = E.cols > 0 ? E.cols - 1 : 0;
+    }
+}
+
+/* forward declarations necessárias para o handler de mouse em read_key */
+static int  rx_to_cx(Row *row, int rx);
+static void move_cursor(int k);
+static void save_file(void);
+
+static int read_key(void) {
+    int n; char c;
+
+    /* tenta ler com timeout de 100ms para permitir redraw periódico */
+    while (1) {
+        fd_set fds; FD_ZERO(&fds); FD_SET(STDIN_FILENO, &fds);
+        struct timeval tv = {0, 100000}; /* 100ms */
+        int ready = select(STDIN_FILENO+1, &fds, NULL, NULL, &tv);
+        if (ready < 0 && errno != EINTR) die("select");
+        if (ready == 0) return 0; /* timeout — sem input */
+        n = read(STDIN_FILENO, &c, 1);
+        if (n == 1) break;
+        if (n == -1 && errno != EAGAIN) die("read");
+    }
+
+    if (c != '\x1b') return c;
+
+    char s[8] = {0};
+    if (read(STDIN_FILENO, &s[0], 1) != 1) return '\x1b';
+    if (read(STDIN_FILENO, &s[1], 1) != 1) return '\x1b';
+
+    /* ESC [ sequences */
+    if (s[0] == '[') {
+        if (s[1] >= '0' && s[1] <= '9') {
+            read(STDIN_FILENO, &s[2], 1);
+            if (s[2] == '~') {
+                switch (s[1]) {
+                    case '1': return HOME_KEY;
+                    case '3': return DEL_KEY;
+                    case '4': return END_KEY;
+                    case '5': return PAGE_UP;
+                    case '6': return PAGE_DOWN;
+                    case '7': return HOME_KEY;
+                    case '8': return END_KEY;
+                }
+            }
+            /* ESC [ 1 ; mod A/B — Alt+Arrow */
+            if (s[1] == '1' && s[2] == ';') {
+                read(STDIN_FILENO, &s[3], 1); /* mod */
+                read(STDIN_FILENO, &s[4], 1); /* letter */
+                if (s[3] == '3') { /* Alt */
+                    if (s[4] == 'A') return ALT_UP;
+                    if (s[4] == 'B') return ALT_DOWN;
+                }
+                if (s[3] == '2') { /* Shift */
+                    if (s[4] == 'A') return SHIFT_UP;
+                    if (s[4] == 'B') return SHIFT_DOWN;
+                    if (s[4] == 'C') return SHIFT_RIGHT;
+                    if (s[4] == 'D') return SHIFT_LEFT;
+                }
+            }
+            /* F2 / F3 */
+            if (s[1] == '1' && s[2] == '2' ) { read(STDIN_FILENO,&s[3],1); if(s[3]=='~') return F2; }
+            if (s[1] == '1' && s[2] == '3' ) { read(STDIN_FILENO,&s[3],1); if(s[3]=='~') return F3; }
+        } else {
+            switch (s[1]) {
+                case 'A': return ARROW_UP;
+                case 'B': return ARROW_DOWN;
+                case 'C': return ARROW_RIGHT;
+                case 'D': return ARROW_LEFT;
+                case 'H': return HOME_KEY;
+                case 'F': return END_KEY;
+                case 'Z': return SHIFT_TAB;  /* Shift+Tab */
+                case 'M': { /* mouse: ESC [ M <btn> <cx> <cy> */
+                    char mb[3];
+                    if (read(STDIN_FILENO, mb, 3) == 3) {
+                        int btn = (unsigned char)mb[0] - 32;
+                        int mx  = (unsigned char)mb[1] - 33; /* 0-indexed col */
+                        int my  = (unsigned char)mb[2] - 33; /* 0-indexed row */
+                        if (btn == 0 && mx >= GUTTER) {
+                            /* clique esquerdo: move cursor */
+                            int fr = my + E.rowoff;
+                            if (fr >= 0 && fr < E.numrows) {
+                                E.cy = fr;
+                                int rx = mx - GUTTER + E.coloff;
+                                E.cx = rx_to_cx(&E.row[E.cy], rx);
+                                E.sel_active = 0;
+                            }
+                        } else if (btn == 64) { /* scroll up */
+                            for (int i=0;i<3;i++) move_cursor(ARROW_UP);
+                        } else if (btn == 65) { /* scroll down */
+                            for (int i=0;i<3;i++) move_cursor(ARROW_DOWN);
+                        }
+                    }
+                    return 0; /* redesenha sem tecla */
+                }
+            }
+        }
+    }
+    /* ESC O sequences */
+    if (s[0] == 'O') {
+        switch (s[1]) {
+            case 'A': return ARROW_UP;
+            case 'B': return ARROW_DOWN;
+            case 'C': return ARROW_RIGHT;
+            case 'D': return ARROW_LEFT;
+            case 'H': return HOME_KEY;
+            case 'F': return END_KEY;
+            case 'P': return F1;
+            case 'Q': return F2;
+            case 'R': return F3;
+            case 'S': return F4;
+        }
+    }
+    return '\x1b';
+}
+
+/* ════════════════════════════════════════════════════════
+ * APPEND BUFFER
+ * ════════════════════════════════════════════════════════ */
+
+typedef struct { char *b; int len; } Abuf;
+#define ABUF_INIT {NULL,0}
+
+static void draw_snip_panel(Abuf *ab);
+static void draw_fexp_panel(Abuf *ab);
+static void draw_check_panel(Abuf *ab);
+static void draw_goto_panel(Abuf *ab);
+static void draw_sym_panel(Abuf *ab);
+static int has_word(const char *s, const char *tok);
+static void insert_newline(void);
+static void open_file(const char *fname);
+
+static void ab_append(Abuf *ab, const char *s, int len) {
+    char *p = realloc(ab->b, ab->len + len);
+    if (!p) return;
+    memcpy(&p[ab->len], s, len);
+    ab->b = p; ab->len += len;
+}
+static void ab_free(Abuf *ab) { free(ab->b); }
+
+/* ════════════════════════════════════════════════════════
+ * SYNTAX HIGHLIGHT
+ * ════════════════════════════════════════════════════════ */
+
+static int is_sep(int c) {
+    return isspace(c) || c == '\0' || strchr(",.()+-/*=~%<>[];{}:&|^!?@#", c);
+}
+
+static void update_syntax(Row *row) {
+    row->hl = realloc(row->hl, row->rsize);
+    memset(row->hl, HL_NORMAL, row->rsize);
+    if (!E.syntax) return;
+
+    const char **fl  = E.syntax->kw_flow;
+    const char **bi  = E.syntax->kw_builtin;
+    const char **ty  = E.syntax->kw_types;
+    const char **pp  = E.syntax->kw_preproc;
+    const char  *sc  = E.syntax->scomment;
+    const char  *mcs = E.syntax->mcs;
+    const char  *mce = E.syntax->mce;
+    int slen = sc  ? (int)strlen(sc)  : 0;
+    int msl  = mcs ? (int)strlen(mcs) : 0;
+    int mel  = mce ? (int)strlen(mce) : 0;
+
+    int is_c    = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
+    int is_lua  = (E.syntax == &HLDB[2]);
+    int is_bash = (E.syntax == &HLDB[3]);
+    int is_html = (E.syntax == &HLDB[4]);
+
+    int prev_sep    = 1;
+    int in_string   = 0;
+    int in_comment  = row->hl_open_comment;
+    int in_long_str = 0;
+    int i = 0;
+
+    /* ── HTML: highlight especial de tags, atributos e entidades ── */
+    if (is_html) {
+        int in_tag = 0;       /* dentro de < ... > */
+        int in_attr_val = 0;  /* dentro de atributo "valor" ou 'valor' */
+        int tag_name_done = 0;/* já lemos o nome da tag */
+        char attr_q = 0;
+        /* Reinicia o highlight — comentários HTML já tratados pelo loop geral */
+        memset(row->hl, HL_NORMAL, row->rsize);
+        /* Se linha está dentro de comentário HTML aberto (<!-- ... -->) */
+        if (row->hl_open_comment) {
+            for (int j = 0; j < row->rsize; j++) {
+                row->hl[j] = HL_COMMENT;
+                if (j+2 < row->rsize &&
+                    row->render[j]=='-' && row->render[j+1]=='-' && row->render[j+2]=='>') {
+                    row->hl[j]=row->hl[j+1]=row->hl[j+2]=HL_COMMENT;
+                    row->hl_open_comment = 0; j+=2; in_comment=0; break;
+                }
+            }
+            if (row->hl_open_comment) {
+                Row *next = (row - E.row + 1 < E.numrows) ? row+1 : NULL;
+                if (next && !next->hl_open_comment) {
+                    next->hl_open_comment = 1; update_syntax(next);
+                }
+                return;
+            }
+        }
+        for (int j = 0; j < row->rsize; ) {
+            char c = row->render[j];
+            /* Comentário HTML: <!-- ... --> */
+            if (!in_tag && !in_attr_val && j+3 < row->rsize &&
+                c=='<' && row->render[j+1]=='!' &&
+                row->render[j+2]=='-' && row->render[j+3]=='-') {
+                /* procura --> */
+                int k = j;
+                row->hl[k++]=HL_COMMENT; row->hl[k++]=HL_COMMENT;
+                row->hl[k++]=HL_COMMENT; row->hl[k++]=HL_COMMENT;
+                int found=0;
+                while(k < row->rsize) {
+                    row->hl[k]=HL_COMMENT;
+                    if(k+2<row->rsize&&row->render[k]=='-'&&row->render[k+1]=='-'&&row->render[k+2]=='>'){
+                        row->hl[k]=row->hl[k+1]=row->hl[k+2]=HL_COMMENT;
+                        k+=3; found=1; break;
+                    }
+                    k++;
+                }
+                if(!found){
+                    /* comentário multi-linha */
+                    row->hl_open_comment=1;
+                    Row *next=(row-E.row+1<E.numrows)?row+1:NULL;
+                    if(next){next->hl_open_comment=1;update_syntax(next);}
+                }
+                j=k; continue;
+            }
+            /* Entidade HTML: &nome; */
+            if (!in_tag && !in_attr_val && c=='&') {
+                int k=j; row->hl[k++]=HL_PREPROC;
+                while(k<row->rsize && row->render[k]!=';' && row->render[k]!=' ' && k-j<12){
+                    row->hl[k++]=HL_PREPROC;
+                }
+                if(k<row->rsize && row->render[k]==';') row->hl[k++]=HL_PREPROC;
+                j=k; continue;
+            }
+            /* Abertura de tag */
+            if (!in_tag && !in_attr_val && c=='<') {
+                in_tag=1; tag_name_done=0;
+                row->hl[j++]=HL_SYMBOL; /* < em cinza/branco */
+                /* / de fechamento */
+                if(j<row->rsize && row->render[j]=='/'){row->hl[j++]=HL_SYMBOL;}
+                /* ! de DOCTYPE */
+                if(j<row->rsize && row->render[j]=='!'){row->hl[j++]=HL_PREPROC;}
+                /* Nome da tag */
+                int ks=j;
+                while(j<row->rsize && (isalnum((unsigned char)row->render[j])||row->render[j]=='-'))
+                    j++;
+                int kl=j-ks;
+                if(kl>0){
+                    /* classifica: flow=KEYWORD1, builtin=KEYWORD2 */
+                    char tname[32]={0};
+                    if(kl<(int)sizeof(tname)){memcpy(tname,row->render+ks,kl);tname[kl]=0;}
+                    int tkind=HL_TYPE; /* default: atributo-like */
+                    for(int q=0;html_flow[q];q++) if(!strcasecmp(tname,html_flow[q])){tkind=HL_KEYWORD1;break;}
+                    for(int q=0;html_bi[q];q++)   if(!strcasecmp(tname,html_bi[q])){tkind=HL_KEYWORD2;break;}
+                    for(int q=ks;q<j;q++) row->hl[q]=tkind;
+                }
+                tag_name_done=1;
+                continue;
+            }
+            /* Dentro de tag: atributos e fechamento */
+            if (in_tag) {
+                if (in_attr_val) {
+                    row->hl[j]=HL_STRING;
+                    if(c==attr_q){in_attr_val=0;} j++; continue;
+                }
+                if(c=='>'||c=='/'){ row->hl[j++]=HL_SYMBOL; if(c=='>') in_tag=0; continue; }
+                if(c=='"'||c=='\''){
+                    row->hl[j++]=HL_STRING; in_attr_val=1; attr_q=c; continue;
+                }
+                if(c=='='){ row->hl[j++]=HL_OPERATOR; continue; }
+                /* nome de atributo */
+                if(isalpha((unsigned char)c)||c=='-'||c=='_') {
+                    int ks=j;
+                    while(j<row->rsize&&(isalnum((unsigned char)row->render[j])||row->render[j]=='-'||row->render[j]=='_'||row->render[j]==':'))
+                        j++;
+                    for(int q=ks;q<j;q++) row->hl[q]=HL_TYPE;
+                    continue;
+                }
+                j++; continue;
+            }
+            /* Fora de tag: texto normal */
+            j++;
+        }
+        (void)is_c; (void)is_lua; (void)is_bash;
+        (void)prev_sep; (void)in_string; (void)in_long_str;
+        return;
+    }
+
+    /* ── Bash shebang: linha 0 começando com #! ── */
+    if (is_bash && row == &E.row[0] && row->rsize >= 2
+        && row->render[0] == '#' && row->render[1] == '!') {
+        memset(row->hl, HL_COMMENT, row->rsize);
+        goto finish;
+    }
+
+    /* ── C preproc: linha começa com # (ignorando espaços) ── */
+    if (is_c && !in_comment) {
+        int p = 0;
+        while (p < row->rsize && (row->render[p]==' '||row->render[p]=='\t')) p++;
+        if (p < row->rsize && row->render[p] == '#') {
+            /* colorir o # */
+            memset(&row->hl[p], HL_PREPROC, 1);
+            p++;
+            /* procura qual diretiva */
+            for (int j = 0; pp && pp[j]; j++) {
+                const char *kw = pp[j];
+                /* pular o # no início da keyword da lista */
+                if (kw[0] == '#') kw++;
+                int kl = (int)strlen(kw);
+                if (p + kl <= row->rsize
+                    && !strncmp(&row->render[p], kw, kl)
+                    && (p+kl >= row->rsize || is_sep(row->render[p+kl])
+                        || row->render[p+kl] == ' ')) {
+                    memset(&row->hl[p], HL_PREPROC, kl);
+                    p += kl; break;
+                }
+            }
+            /* resto da linha: string do include em HL_STRING, resto normal */
+            while (p < row->rsize) {
+                char c2 = row->render[p];
+                if (c2 == '"' || c2 == '<') {
+                    char cl = (c2 == '<') ? '>' : '"';
+                    row->hl[p++] = HL_STRING;
+                    while (p < row->rsize && row->render[p] != cl)
+                        row->hl[p++] = HL_STRING;
+                    if (p < row->rsize) row->hl[p++] = HL_STRING;
+                } else if (c2 == '/' && p+1 < row->rsize && row->render[p+1] == '/') {
+                    memset(&row->hl[p], HL_COMMENT, row->rsize - p); break;
+                } else p++;
+            }
+            goto finish;
+        }
+    }
+
+    while (i < row->rsize) {
+        char c  = row->render[i];
+        unsigned char prev_hl = (i > 0) ? row->hl[i-1] : HL_NORMAL;
+
+        /* ── multi-line comment ── */
+        if (mcs && mce && !in_string && !in_long_str) {
+            if (in_comment) {
+                row->hl[i] = HL_COMMENT;
+                if (!strncmp(&row->render[i], mce, mel)) {
+                    memset(&row->hl[i], HL_COMMENT, mel);
+                    i += mel; in_comment = 0;
+                } else i++;
+                continue;
+            }
+            if (!strncmp(&row->render[i], mcs, msl)) {
+                memset(&row->hl[i], HL_COMMENT, msl);
+                i += msl; in_comment = 1; continue;
+            }
+        }
+
+        /* ── Lua long string [[...]] ── */
+        if (is_lua && !in_string && !in_comment) {
+            if (!in_long_str && i+1 < row->rsize
+                && c == '[' && row->render[i+1] == '[') {
+                in_long_str = 1;
+                row->hl[i] = row->hl[i+1] = HL_STRING;
+                i += 2; continue;
+            }
+            if (in_long_str) {
+                row->hl[i] = HL_STRING;
+                if (i+1 < row->rsize && c == ']' && row->render[i+1] == ']') {
+                    row->hl[i+1] = HL_STRING; i += 2; in_long_str = 0;
+                } else i++;
+                continue;
+            }
+        }
+
+        /* ── single-line comment ── */
+        if (sc && !in_string && !in_comment && !in_long_str) {
+            if (!strncmp(&row->render[i], sc, slen)) {
+                memset(&row->hl[i], HL_COMMENT, row->rsize - i);
+                break;
+            }
+        }
+
+        /* ── strings e char literals ── */
+        if ((E.syntax->flags & HL_FLAG_STRINGS) && !in_comment && !in_long_str) {
+            if (in_string) {
+                row->hl[i] = HL_STRING;
+                if (c == '\\' && i+1 < row->rsize) {
+                    row->hl[i+1] = HL_STRING; i += 2; continue;
+                }
+                if (c == (char)in_string) in_string = 0;
+                i++; prev_sep = 1; continue;
+            }
+            /* char literal C: 'x' '\n' '\0' */
+            if (is_c && c == '\'' && prev_sep) {
+                int j = i;
+                row->hl[j++] = HL_STRING;
+                if (j < row->rsize && row->render[j] == '\\') row->hl[j++] = HL_STRING;
+                if (j < row->rsize) row->hl[j++] = HL_STRING;
+                if (j < row->rsize && row->render[j] == '\'') {
+                    row->hl[j++] = HL_STRING; i = j; prev_sep = 0; continue;
+                }
+                /* não era char literal — cai no default */
+            }
+            /* Bash: aspas simples sem escape */
+            if (is_bash && c == '\'') {
+                row->hl[i++] = HL_STRING;
+                while (i < row->rsize && row->render[i] != '\'')
+                    row->hl[i++] = HL_STRING;
+                if (i < row->rsize) row->hl[i++] = HL_STRING;
+                prev_sep = 1; continue;
+            }
+            if (c == '"' || (!is_c && c == '\'') || c == '`') {
+                in_string = c; row->hl[i++] = HL_STRING; continue;
+            }
+        }
+
+        /* ── Bash: $VAR ${VAR} $1 $@ etc ── */
+        if (is_bash && !in_comment && !in_string && c == '$') {
+            row->hl[i++] = HL_VAR;
+            if (i < row->rsize && row->render[i] == '{') {
+                row->hl[i++] = HL_VAR;
+                while (i < row->rsize && row->render[i] != '}')
+                    row->hl[i++] = HL_VAR;
+                if (i < row->rsize) row->hl[i++] = HL_VAR;
+            } else {
+                while (i < row->rsize
+                    && (isalnum((unsigned char)row->render[i])
+                        || row->render[i]=='_'
+                        || strchr("@*#?!$-", row->render[i])))
+                    row->hl[i++] = HL_VAR;
+            }
+            prev_sep = 0; continue;
+        }
+
+        /* ── C: operadores especiais -> :: == != <= >= && || ++ -- ── */
+        if (is_c && !in_string && !in_comment) {
+            if (i+1 < row->rsize) {
+                char n = row->render[i+1];
+                if ((c=='-'&&n=='>') || (c==':'&&n==':') ||
+                    (c=='='&&n=='=') || (c=='!'&&n=='=') ||
+                    (c=='<'&&n=='=') || (c=='>'&&n=='=') ||
+                    (c=='&'&&n=='&') || (c=='|'&&n=='|') ||
+                    (c=='+'&&n=='+') || (c=='-'&&n=='-') ||
+                    (c=='<'&&n=='<') || (c=='>'&&n=='>')) {
+                    row->hl[i] = row->hl[i+1] = HL_OPERATOR;
+                    i += 2; prev_sep = 1; continue;
+                }
+            }
+        }
+
+        /* ── Lua: operadores .. ~= ── */
+        if (is_lua && !in_string && !in_comment) {
+            if (i+1 < row->rsize) {
+                char n = row->render[i+1];
+                if ((c=='.'&&n=='.') || (c=='~'&&n=='=') ||
+                    (c=='='&&n=='=') || (c=='<'&&n=='=') ||
+                    (c=='>'&&n=='=') || (c=='~'&&n=='=')) {
+                    row->hl[i] = row->hl[i+1] = HL_OPERATOR;
+                    i += 2; prev_sep = 1; continue;
+                }
+                /* ... (varargs) */
+                if (c=='.'&&n=='.'&&i+2<row->rsize&&row->render[i+2]=='.') {
+                    row->hl[i]=row->hl[i+1]=row->hl[i+2]=HL_OPERATOR;
+                    i += 3; prev_sep = 0; continue;
+                }
+            }
+        }
+
+        /* ── números: hex 0x, float, decimal com sufixos ── */
+        if ((E.syntax->flags & HL_FLAG_NUMBERS) && !in_string && !in_comment) {
+            if (prev_sep && c == '0' && i+1 < row->rsize
+                && (row->render[i+1]=='x' || row->render[i+1]=='X')) {
+                row->hl[i] = row->hl[i+1] = HL_NUMBER; i += 2;
+                while (i < row->rsize && (isxdigit((unsigned char)row->render[i])
+                       || row->render[i]=='u'||row->render[i]=='U'
+                       || row->render[i]=='l'||row->render[i]=='L'))
+                    row->hl[i++] = HL_NUMBER;
+                prev_sep = 0; continue;
+            }
+            if ((isdigit((unsigned char)c) && (prev_sep || prev_hl == HL_NUMBER)) ||
+                (c == '.' && prev_hl == HL_NUMBER)) {
+                row->hl[i++] = HL_NUMBER; prev_sep = 0;
+                while (i < row->rsize && (isdigit((unsigned char)row->render[i])
+                       || row->render[i]=='.'||row->render[i]=='e'
+                       || row->render[i]=='E'||row->render[i]=='f'
+                       || row->render[i]=='F'||row->render[i]=='u'
+                       || row->render[i]=='U'||row->render[i]=='l'
+                       || row->render[i]=='L'||row->render[i]=='_'))
+                    row->hl[i++] = HL_NUMBER;
+                continue;
+            }
+        }
+
+        /* ── símbolos (sem # que já foi tratado) ── */
+        if (!in_string && !in_comment
+            && strchr("(){}[]<>=+*&|!~^%;:,@?\\/-.", c)) {
+            row->hl[i] = HL_SYMBOL; i++; prev_sep = 1; continue;
+        }
+
+        /* ── ElliotOS: método após ponto (Lua) ── */
+        if (c == '.' && !in_string && !in_comment && is_lua && pp) {
+            int ni = i + 1;
+            for (int j = 0; pp[j]; j++) {
+                int kl = (int)strlen(pp[j]);
+                if (ni + kl <= row->rsize
+                    && !strncmp(&row->render[ni], pp[j], kl)
+                    && (is_sep(row->render[ni+kl]) || row->render[ni+kl]=='(')) {
+                    memset(&row->hl[ni], HL_METHOD, kl);
+                    break;
+                }
+            }
+            prev_sep = 1; i++; continue;
+        }
+
+        /* ── keywords (só quando prev_sep) ── */
+        if (prev_sep && !in_string && !in_comment) {
+            int matched = 0;
+
+            /* tipos / namespaces — prioridade alta */
+            if (ty && !matched) {
+                for (int j = 0; ty[j] && !matched; j++) {
+                    int kl = (int)strlen(ty[j]);
+                    if (i + kl <= row->rsize
+                        && !strncmp(&row->render[i], ty[j], kl)
+                        && is_sep(row->render[i+kl])) {
+                        memset(&row->hl[i], HL_TYPE, kl);
+                        i += kl; matched = 1;
+                    }
+                }
+                if (matched) { prev_sep = 0; continue; }
+            }
+
+            /* controle de fluxo */
+            if (fl && !matched) {
+                for (int j = 0; fl[j] && !matched; j++) {
+                    int kl = (int)strlen(fl[j]);
+                    if (i + kl <= row->rsize
+                        && !strncmp(&row->render[i], fl[j], kl)
+                        && is_sep(row->render[i+kl])) {
+                        memset(&row->hl[i], HL_KEYWORD1, kl);
+                        i += kl; matched = 1;
+                    }
+                }
+                if (matched) { prev_sep = 0; continue; }
+            }
+
+            /* builtins */
+            if (bi && !matched) {
+                for (int j = 0; bi[j] && !matched; j++) {
+                    int kl = (int)strlen(bi[j]);
+                    if (i + kl <= row->rsize
+                        && !strncmp(&row->render[i], bi[j], kl)
+                        && is_sep(row->render[i+kl])) {
+                        memset(&row->hl[i], HL_KEYWORD2, kl);
+                        i += kl; matched = 1;
+                    }
+                }
+                if (matched) { prev_sep = 0; continue; }
+            }
+
+            /* chamadas de função: identifier seguido de '(' */
+            if (!matched && !in_string && !in_comment) {
+                if (isalpha((unsigned char)c) || c == '_') {
+                    int j = i;
+                    while (j < row->rsize && (isalnum((unsigned char)row->render[j])
+                           || row->render[j] == '_')) j++;
+                    if (j < row->rsize && row->render[j] == '(') {
+                        memset(&row->hl[i], HL_METHOD, j - i);
+                        i = j; matched = 1;
+                    }
+                }
+                if (matched) { prev_sep = 0; continue; }
+            }
+        }
+
+        prev_sep = is_sep(c);
+        i++;
+    }
+
+finish:;
+    int changed = (row->hl_open_comment != in_comment);
+    row->hl_open_comment = in_comment;
+    if (changed && (row - E.row) + 1 < E.numrows)
+        update_syntax(row + 1);
+}
+
+static int hl_to_color(int hl) {
+    switch (hl) {
+        case HL_COMMENT:  return -90;  /* negativo = ANSI direto: \x1b[90m */
+        case HL_KEYWORD1: return 135;  /* lilás       — flow */
+        case HL_KEYWORD2: return 141;  /* lilás claro — builtins */
+        case HL_TYPE:     return 147;  /* lavanda     — tipos */
+        case HL_PREPROC:  return 129;  /* roxo vivo   — #diretivas */
+        case HL_METHOD:   return 183;  /* lilás pálido — métodos ElliotOS */
+        case HL_STRING:   return 114;  /* verde-menta — strings */
+        case HL_NUMBER:   return 210;  /* salmão      — números */
+        case HL_MATCH:    return 99;   /* roxo-azul   — busca */
+        case HL_SYMBOL:   return -90;  /* cinza ANSI  — símbolos */
+        case HL_VAR:      return 222;  /* amarelo pálido — $VAR bash */
+        case HL_OPERATOR: return 219;  /* rosa        — -> :: */
+        case HL_TAG:      return  75;  /* azul-céu    — nome de tag HTML */
+        case HL_ATTR:     return 222;  /* amarelo      — atributos HTML */
+        default:          return 39;
+    }
+}
+
+static void select_syntax(void) {
+    E.syntax = NULL;
+    if (!E.filename) return;
+    char *dot = strrchr(E.filename, '.');
+    const char *ext = dot ? dot : "";
+
+    /* shebang na primeira linha */
+    if (E.numrows > 0 && E.row[0].size > 1
+        && E.row[0].chars[0] == '#' && E.row[0].chars[1] == '!') {
+        if (strstr(E.row[0].chars, "bash") || strstr(E.row[0].chars, "/sh"))
+            { E.syntax = &HLDB[3]; goto rescan; }
+        if (strstr(E.row[0].chars, "lua") || strstr(E.row[0].chars, "/ms"))
+            { E.syntax = &HLDB[2]; goto rescan; }
+    }
+
+    for (int i = 0; i < HLDB_SIZE; i++)
+        for (int j = 0; HLDB[i].extensions[j]; j++)
+            if (!strcmp(ext, HLDB[i].extensions[j]))
+                { E.syntax = &HLDB[i]; goto rescan; }
+
+    /* Detecção heurística por conteúdo: conta keywords Lua em até 60 linhas */
+    {
+        static const char *lua_hints[] = {
+            "then","end","local","function","elseif","repeat","until",
+            "do","ipairs","pairs","require","pcall","xpcall", NULL
+        };
+        int score = 0;
+        int limit = E.numrows < 60 ? E.numrows : 60;
+        for (int y = 0; y < limit; y++) {
+            char *s = E.row[y].chars;
+            for (int k = 0; lua_hints[k]; k++) {
+                int tlen = (int)strlen(lua_hints[k]);
+                char *p = s;
+                while ((p = strstr(p, lua_hints[k])) != NULL) {
+                    int pre = (p==s||(!isalnum((unsigned char)p[-1])&&p[-1]!='_'));
+                    int pos = (!isalnum((unsigned char)p[tlen])&&p[tlen]!='_');
+                    if (pre && pos) { score++; break; }
+                    p++;
+                }
+            }
+        }
+        if (score >= 2) { E.syntax = &HLDB[2]; goto rescan; }
+    }
+
+    /* Detecção heurística HTML: procura DOCTYPE ou <html nos primeiros 5 linhas */
+    {
+        int limit = E.numrows < 5 ? E.numrows : 5;
+        for (int y = 0; y < limit; y++) {
+            char *s = E.row[y].chars;
+            if (strstr(s, "<!DOCTYPE") || strstr(s, "<html") || strstr(s, "<HTML")) {
+                E.syntax = &HLDB[4]; goto rescan;
+            }
+        }
+    }
+    return;
+rescan:
+    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+}
+
+/* ════════════════════════════════════════════════════════
+ * LINHAS
+ * ════════════════════════════════════════════════════════ */
+
+static int cx_to_rx(Row *row, int cx) {
+    int rx = 0;
+    for (int j = 0; j < cx; j++) {
+        if (row->chars[j] == '\t') rx += (TAB_SIZE-1) - (rx % TAB_SIZE);
+        rx++;
+    }
+    return rx;
+}
+
+static int rx_to_cx(Row *row, int rx) {
+    int cur = 0, cx;
+    for (cx = 0; cx < row->size; cx++) {
+        if (row->chars[cx] == '\t') cur += (TAB_SIZE-1) - (cur % TAB_SIZE);
+        cur++;
+        if (cur > rx) return cx;
+    }
+    return cx;
+}
+
+static void update_row(Row *row) {
+    int tabs = 0;
+    for (int j = 0; j < row->size; j++) if (row->chars[j] == '\t') tabs++;
+    free(row->render);
+    row->render = malloc(row->size + tabs*(TAB_SIZE-1) + 1);
+    int idx = 0;
+    for (int j = 0; j < row->size; j++) {
+        if (row->chars[j] == '\t') {
+            row->render[idx++] = ' ';
+            while (idx % TAB_SIZE) row->render[idx++] = ' ';
+        } else row->render[idx++] = row->chars[j];
+    }
+    row->render[idx] = '\0'; row->rsize = idx;
+    update_syntax(row);
+}
+
+static void insert_row(int at, const char *s, int len) {
+    if (at < 0 || at > E.numrows) return;
+    E.row = realloc(E.row, sizeof(Row) * (E.numrows+1));
+    memmove(&E.row[at+1], &E.row[at], sizeof(Row)*(E.numrows-at));
+    E.row[at].size  = len;
+    E.row[at].chars = malloc(len+1);
+    memcpy(E.row[at].chars, s, len);
+    E.row[at].chars[len] = '\0';
+    E.row[at].rsize = 0; E.row[at].render = NULL;
+    E.row[at].hl = NULL; E.row[at].hl_open_comment = 0;
+    update_row(&E.row[at]);
+    E.numrows++; E.dirty++;
+}
+
+static void free_row(Row *row) { free(row->render); free(row->chars); free(row->hl); }
+
+static void del_row(int at) {
+    if (at < 0 || at >= E.numrows) return;
+    free_row(&E.row[at]);
+    memmove(&E.row[at], &E.row[at+1], sizeof(Row)*(E.numrows-at-1));
+    E.numrows--; E.dirty++;
+}
+
+static void row_insert_char(Row *row, int at, int c) {
+    row->is_dirty = 1;
+    if (at < 0 || at > row->size) at = row->size;
+    row->chars = realloc(row->chars, row->size+2);
+    memmove(&row->chars[at+1], &row->chars[at], row->size-at+1);
+    row->chars[at] = (char)c; row->size++;
+    update_row(row); E.dirty++;
+}
+
+static void row_del_char(Row *row, int at) {
+    row->is_dirty = 1;
+    if (at < 0 || at >= row->size) return;
+    memmove(&row->chars[at], &row->chars[at+1], row->size-at);
+    row->size--; update_row(row); E.dirty++;
+}
+
+static void row_append_string(Row *row, const char *s, int len) {
+    row->chars = realloc(row->chars, row->size+len+1);
+    memcpy(&row->chars[row->size], s, len);
+    row->size += len; row->chars[row->size] = '\0';
+    update_row(row); E.dirty++;
+}
+
+/* ════════════════════════════════════════════════════════
+ * AUTO-PAIR / AUTO-CLOSE
+ * ════════════════════════════════════════════════════════ */
+
+static char pair_close_char(char c) {
+    switch (c) {
+        case '(': return ')';
+        case '[': return ']';
+        case '{': return '}';
+        case '<': return '>';
+        case '"': return '"';
+        case '\'': return '\'';
+        case '`': return '`';
+    }
+    return 0;
+}
+
+/* Retorna 1 se auto-pair foi aplicado (não chama insert_char depois) */
+static int try_auto_pair(int c) {
+    char close = pair_close_char((char)c);
+    if (!close) return 0;
+
+    if (E.cy == E.numrows) insert_row(E.numrows, "", 0);
+    Row *row = &E.row[E.cy];
+
+    /* Para aspas: skip só se o char imediatamente à direita é igual E
+     * o char depois dele NÃO é também igual (evita skip falso em início de palavra).
+     * Exemplo: cursor em |"  → skip para "| mas
+     *          cursor em |" texto → insere novo par normalmente */
+    if ((c == '"' || c == '\'' || c == '`')
+        && E.cx < row->size && row->chars[E.cx] == (char)c) {
+        /* só skipa se veio de um auto-pair: char anterior é o open e
+         * o que está à direita é o close solitário (não é início de string) */
+        int prev_is_open = (E.cx > 0 && row->chars[E.cx - 1] == (char)c);
+        if (prev_is_open) {
+            E.cx++;
+            return 1;
+        }
+    }
+
+    /* Insere abertura */
+    row_insert_char(row, E.cx, c);
+    E.cx++;
+    /* Insere fechamento (cursor fica entre os dois) */
+    row_insert_char(row, E.cx, close);
+    return 1;
+}
+
+/* Backspace inteligente: apaga par vazio () [] {} "" '' `` */
+static int try_smart_backspace(void) {
+    if (E.cy >= E.numrows || E.cx == 0) return 0;
+    Row *row = &E.row[E.cy];
+    char prev  = row->chars[E.cx - 1];
+    char close = pair_close_char(prev);
+    if (close && E.cx < row->size && row->chars[E.cx] == close) {
+        row_del_char(row, E.cx);       /* apaga fechamento */
+        row_del_char(row, E.cx - 1);   /* apaga abertura */
+        E.cx--;
+        return 1;
+    }
+    return 0;
+}
+
+/* Pula o char de fechamento se o cursor já está antes dele */
+static int try_skip_close(int c) {
+    if (c != ')' && c != ']' && c != '}') return 0;
+    if (E.cy >= E.numrows) return 0;
+    Row *row = &E.row[E.cy];
+    if (E.cx < row->size && row->chars[E.cx] == (char)c) {
+        E.cx++;
+        return 1;
+    }
+    return 0;
+}
+
+/* ════════════════════════════════════════════════════════
+ * AUTO-COMPLETE
+ * ════════════════════════════════════════════════════════ */
+
+static void comp_close(void) {
+    for (int i = 0; i < E.comp.count; i++) { free(E.comp.items[i]); E.comp.items[i] = NULL; }
+    E.comp.count = 0; E.comp.active = 0;
+}
+
+/* Extrai o prefixo de identificador antes do cursor */
+static int get_prefix(char *buf, int bufsz) {
+    if (E.cy >= E.numrows) return 0;
+    Row *row = &E.row[E.cy];
+    int end = E.cx, start = end;
+    while (start > 0 && (isalnum((unsigned char)row->chars[start-1])
+           || row->chars[start-1] == '.' || row->chars[start-1] == '_'
+           || row->chars[start-1] == ':'))
+        start--;
+    int len = end - start;
+    if (len <= 0 || len >= bufsz) return 0;
+    memcpy(buf, &row->chars[start], len);
+    buf[len] = '\0';
+    return len;
+}
+
+/* Tabela de hints por módulo — espelha G_mod_hints do REPL */
+typedef struct { const char *mod; const char *alias; const char *fns[48]; } EeModHint;
+static const EeModHint EE_MOD_HINTS[] = {
+    {"@std/net","net",{"net.tcp(","net.udp(","net.scan(","net.dns(","net.http(","net.https(",
+        "net.get(","net.geth(","net.post(","net.connect(","net.socketex(","net.listen(",
+        "net.socket(","net.syn(","net.ping(","net.tcp6(","net.help()",NULL}},
+    {"@std/fs","fs",{"fs.read(","fs.write(","fs.append(","fs.ls(","fs.exists(","fs.mkdir(",
+        "fs.rm(","fs.cp(","fs.mv(","fs.stat(","fs.glob(","fs.help()",NULL}},
+    {"@std/sys","sys",{"sys.sh(","sys.exec(","sys.env(","sys.kill(","sys.pid()","sys.sleep(",
+        "sys.help()",NULL}},
+    {"@std/ai","ai",{"ai.ask(","ai.chat(","ai.reset()","ai.model(","ai.help()",NULL}},
+    {"@std/crypto","crypto",{"crypto.md5(","crypto.sha256(","crypto.sha1(",
+        "crypto.base64_enc(","crypto.base64_dec(","crypto.rand(","crypto.help()",NULL}},
+    {"@std/db","db",{"db.open(","db.exec(","db.query(","db.close(","db.help()",NULL}},
+    {"@std/web","web",{"web.serve(","web.stop()","web.route(","web.static(","web.help()",NULL}},
+    {"@std/ui","ui",{"ui.alert(","ui.input(","ui.menu(","ui.confirm(","ui.help()",NULL}},
+    {"@std/ms","ms",{"ms.help()",NULL}},
+    {"@std/mod","mod",{"mod.xss(","mod.sqli(","mod.nosql(","mod.lfi(","mod.rce(",
+        "mod.ssrf(","mod.ssti(","mod.redir(","mod.cors(","mod.csrf(","mod.jwt(",
+        "mod.idor(","mod.xxe(","mod.headers(","mod.waf(","mod.spider(","mod.dirs(",
+        "mod.backup(","mod.secrets(","mod.params(","mod.subdomains(","mod.chain(",NULL}},
+    {"@std/tui","tui",{"tui.box(","tui.table(","tui.progress(","tui.color(","tui.help()",NULL}},
+    {"@std/exploit","exploit",{"exploit.run(","exploit.list(","exploit.search(","exploit.help()",NULL}},
+    {"@std/pent","pent",{"pent.scan(","pent.enum(","pent.brute(","pent.help()",NULL}},
+    {"@std/adb","adb",{"adb.devices()","adb.shell(","adb.push(","adb.pull(","adb.help()",NULL}},
+    {"@std/agent","agent",{"agent.new(","agent.run(","agent.help()",NULL}},
+    {"@std/lmod","lmod",{"lmod.new(","lmod.list()","lmod.install(","lmod.help()",NULL}},
+    {"@std/sh","sh",{"sh.exec(","sh.pipe(","sh.bg(","sh.help()",NULL}},
+    {"@std/cc","cc",{"cc.compile(","cc.run(","cc.help()",NULL}},
+    {"@std/ivar","ivar",{"ivar.get(","ivar.set(","ivar.list()","ivar.del(","ivar.help()",NULL}},
+    {"@std/re","re",{"re.match(","re.find(","re.gmatch(","re.gsub(","re.split(","re.test(","re.compile(","re.help()",NULL}},
+    {"@std/util","util",{"util.trim(","util.split(","util.join(","util.keys(","util.values(","util.map(","util.filter(","util.reduce(","util.dump(","util.copy(","util.merge(","util.help()",NULL}},
+    {"@std/log","log",{"log.info(","log.warn(","log.error(","log.debug(","log.fatal(","log.set_level(","log.to_file(","log.help()",NULL}},
+    {"@std/csv","csv",{"csv.parse(","csv.encode(","csv.read(","csv.write(","csv.headers(","csv.rows(","csv.help()",NULL}},
+    {"@std/json","json",{"json.encode(","json.decode(","json.pretty(","json.parse(","json.stringify(","json.help()",NULL}},
+    {"@std",NULL,{"net.tcp(","net.dns(","fs.read(","fs.write(","sys.sh(","ai.ask(",
+        "crypto.md5(","db.open(","web.serve(","mod.xss(","tui.box(","ms.help()",NULL}},
+    {NULL,NULL,{NULL}}
+};
+
+/* Escaneia todas as linhas do arquivo atual por require("mod")
+ * e adiciona os hints do módulo + alias se houver */
+static void scan_file_requires(const char *prefix, int plen) {
+    for(int y=0; y<E.numrows; y++) {
+        char *line = E.row[y].chars;
+        int sz = E.row[y].size;
+        char *p = line;
+        while((p = strstr(p, "require(")) != NULL) {
+            char *rq = p;
+            p += 8;
+            while(*p==' '||*p=='\t') p++;
+            char q=0;
+            if(*p=='"'||*p=='\''){q=*p;p++;}
+            char modname[128]={0}; int mi=0;
+            while(*p && (q?*p!=q:(*p!=')'&&*p!=' ')) && mi<127)
+                modname[mi++]=*p++;
+            modname[mi]='\0';
+            if(!mi){ p++; continue; }
+
+            /* Detecta alias à esquerda do '=' antes do require */
+            char alias[64]={0};
+            /* procura '=' entre início da linha e 'require(' */
+            int rq_off=(int)(rq-line);
+            for(int ei=rq_off-1;ei>=0;ei--){
+                if(line[ei]=='='){
+                    /* encontrou '=', pega token à esquerda */
+                    int ae=ei-1;
+                    while(ae>=0&&(line[ae]==' '||line[ae]=='\t'))ae--;
+                    int as2=ae;
+                    while(as2>0&&(isalnum((unsigned char)line[as2-1])||line[as2-1]=='_'))as2--;
+                    int al=ae-as2+1;
+                    if(al>0&&al<(int)sizeof(alias)){
+                        memcpy(alias,line+as2,al);alias[al]='\0';
+                    }
+                    break;
+                }
+                if(line[ei]==';'||line[ei]=='\n') break;
+            }
+
+            /* Adiciona hints do módulo */
+            for(int m=0; EE_MOD_HINTS[m].mod; m++) {
+                if(strcmp(modname, EE_MOD_HINTS[m].mod)!=0) continue;
+                const char *def_alias = EE_MOD_HINTS[m].alias;
+                for(int f=0; EE_MOD_HINTS[m].fns[f]; f++) {
+                    const char *fn = EE_MOD_HINTS[m].fns[f];
+                    comp_add(fn, prefix, plen);
+                    /* Se alias diferente do padrão, adiciona versão renomeada */
+                    if(alias[0] && def_alias && strcmp(alias,def_alias)!=0) {
+                        const char *dot=strchr(fn,'.');
+                        if(dot){
+                            char renamed[128];
+                            snprintf(renamed,sizeof(renamed),"%s%s",alias,dot);
+                            comp_add(renamed, prefix, plen);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
+/* Lê ~/.elliot_ac_cache (escrito pelo REPL a cada Tab) */
+static void scan_ac_cache(const char *prefix, int plen) {
+    const char *home = getenv("HOME");
+    if(!home) return;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.elliot_ac_cache", home);
+    FILE *f = fopen(path, "r");
+    if(!f) return;
+    char line[256];
+    while(fgets(line, sizeof(line), f)) {
+        int l = (int)strlen(line);
+        while(l>0 && (line[l-1]=='\n'||line[l-1]=='\r')) line[--l]='\0';
+        /* descarta entradas vazias ou que não começam com letra/_/@ */
+        if(l==0) continue;
+        if(!isalpha((unsigned char)line[0]) && line[0]!='_' && line[0]!='@') continue;
+        comp_add(line, prefix, plen);
+    }
+    fclose(f);
+}
+
+/* Escaneia o arquivo atual por declarações Lua:
+ *   local x, x =, function x(), local function x() */
+static void scan_current_file(const char *prefix, int plen) {
+    for(int y=0; y<E.numrows && E.comp.count<COMPLETION_MAX; y++) {
+        char *s = E.row[y].chars;
+        int sz  = E.row[y].size;
+        int i   = 0;
+
+        /* Pula comentários de linha */
+        char *cm = strstr(s, "--");
+        int cm_pos = cm ? (int)(cm-s) : sz;
+
+        while(i < cm_pos) {
+            while(i<cm_pos && (s[i]==' '||s[i]=='\t')) i++;
+            if(i>=cm_pos) break;
+
+            int is_local=0, is_func=0;
+
+            /* "local" */
+            if(i+5<=cm_pos && strncmp(s+i,"local",5)==0 &&
+               (i+5>=cm_pos || (!isalnum((unsigned char)s[i+5])&&s[i+5]!='_'))) {
+                i+=5; is_local=1;
+                while(i<cm_pos&&(s[i]==' '||s[i]=='\t'))i++;
+                /* "local function" */
+                if(i+8<=cm_pos && strncmp(s+i,"function",8)==0 &&
+                   (i+8>=cm_pos||(!isalnum((unsigned char)s[i+8])&&s[i+8]!='_'))){
+                    i+=8; is_func=1;
+                    while(i<cm_pos&&(s[i]==' '||s[i]=='\t'))i++;
+                }
+            }
+            /* "function" sem local */
+            else if(i+8<=cm_pos && strncmp(s+i,"function",8)==0 &&
+                    (i+8>=cm_pos||(!isalnum((unsigned char)s[i+8])&&s[i+8]!='_'))) {
+                i+=8; is_func=1;
+                while(i<cm_pos&&(s[i]==' '||s[i]=='\t'))i++;
+            }
+
+            /* Extrai identificador (inclui . e :) */
+            int ts=i;
+            while(i<cm_pos &&
+                  (isalnum((unsigned char)s[i])||s[i]=='_'||s[i]=='.'||s[i]==':')) i++;
+            int tlen2=i-ts;
+
+            if(tlen2>0 && tlen2<120 && (isalpha((unsigned char)s[ts])||s[ts]=='_')) {
+                char tok[128];
+                memcpy(tok,s+ts,tlen2); tok[tlen2]='\0';
+
+                /* Confirma padrão de declaração */
+                int j=i;
+                while(j<cm_pos&&(s[j]==' '||s[j]=='\t'))j++;
+                int next_is_assign = (j<cm_pos && s[j]=='=');
+                int next_is_paren  = (j<cm_pos && s[j]=='(');
+
+                if(is_func) {
+                    /* function nome(...) → adiciona nome( */
+                    char entry[130];
+                    snprintf(entry,sizeof(entry),"%s(",tok);
+                    comp_add(entry, prefix, plen);
+                } else if(is_local && (next_is_assign||next_is_paren)) {
+                    comp_add(tok, prefix, plen);
+                } else if(!is_local && !is_func && next_is_assign) {
+                    /* variável global: x = ... */
+                    comp_add(tok, prefix, plen);
+                }
+            }
+
+            /* Avança para o próximo token separador */
+            while(i<cm_pos && s[i]!=' ' && s[i]!='\t' && s[i]!=';'
+                            && s[i]!=',' && s[i]!='(' && s[i]!=')') i++;
+            if(i<cm_pos) i++;
+        }
+    }
+}
+
+static void comp_apply(void);  /* forward decl */
+static void comp_open(void) {
+    /* ── Contextos especiais têm prioridade ── */
+    if (E.syntax && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {   /* C / C++ */
+        if (comp_open_include()) return;
+    }
+    if (E.syntax && E.syntax == &HLDB[2]) {   /* Lua */
+        if (comp_open_require()) return;
+    }
+
+    char prefix[128];
+    int plen = get_prefix(prefix, sizeof(prefix));
+    comp_close();
+    if (plen < 1) return;
+
+    /* 1. Cache do REPL (_G em tempo real) */
+    int cache_count_before = E.comp.count;
+    scan_ac_cache(prefix, plen);
+    int cache_loaded = (E.comp.count > cache_count_before);
+
+    /* 2. Símbolos do arquivo atual + módulos via require() */
+    scan_current_file(prefix, plen);
+    scan_file_requires(prefix, plen);
+
+    /* 3. COMPLETIONS[] fixo — só quando cache vazio (REPL não iniciado) */
+    if(!cache_loaded) {
+        for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
+            if (!strncmp(COMPLETIONS[i], prefix, plen))
+                E.comp.items[E.comp.count++] = strdup(COMPLETIONS[i]);
+        }
+    }
+
+    /* Keywords da sintaxe — sempre, cache não contém keywords */
+    if (E.syntax) {
+        const char **lists[] = {
+            E.syntax->kw_flow, E.syntax->kw_builtin,
+            E.syntax->kw_types, E.syntax->kw_preproc, NULL
+        };
+        for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++) {
+            for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++) {
+                comp_add(lists[l][j], prefix, plen);
+            }
+        }
+    }
+
+    if (E.comp.count == 0) return;
+    E.comp.selected  = 0;
+    E.comp.active    = 1;
+    E.comp.trigger_cx = E.cx - plen;
+    /* Match único: aplica direto sem mostrar popup */
+    if (E.comp.count == 1) {
+        comp_apply();
+        return;
+    }
+}
+
+/* Como comp_open(), mas nunca auto-aplica — só exibe popup (live typing) */
+static void comp_open_live(void) {
+    if (E.syntax && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {
+        if (comp_open_include()) return;
+    }
+    if (E.syntax && E.syntax == &HLDB[2]) {
+        if (comp_open_require()) return;
+    }
+
+    char prefix[128];
+    int plen = get_prefix(prefix, sizeof(prefix));
+    comp_close();
+    if (plen < 1) return;
+
+    int cache_count_before = E.comp.count;
+    scan_ac_cache(prefix, plen);
+    int cache_loaded = (E.comp.count > cache_count_before);
+
+    scan_current_file(prefix, plen);
+    scan_file_requires(prefix, plen);
+
+    if (!cache_loaded) {
+        for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
+            if (!strncmp(COMPLETIONS[i], prefix, plen))
+                E.comp.items[E.comp.count++] = strdup(COMPLETIONS[i]);
+        }
+    }
+    /* kw_flow/kw_builtin sempre — keywords não estão no cache do REPL */
+    if (E.syntax) {
+        const char **lists[] = {
+            E.syntax->kw_flow, E.syntax->kw_builtin,
+            E.syntax->kw_types, E.syntax->kw_preproc, NULL
+        };
+        for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++)
+            for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++)
+                comp_add(lists[l][j], prefix, plen);
+    }
+
+    if (E.comp.count == 0) return;
+    E.comp.selected   = 0;
+    E.comp.active     = 1;
+    E.comp.trigger_cx = E.cx - plen;
+    /* Nunca auto-aplica: sempre mostra popup */
+}
+
+static void comp_apply(void) {
+    if (!E.comp.active || E.comp.count == 0) return;
+    const char *item = E.comp.items[E.comp.selected];
+    int ilen = (int)strlen(item);
+
+    /* plen real = distância do trigger ao cursor atual */
+    int plen = E.cx - E.comp.trigger_cx;
+    if (plen < 0) plen = 0;
+
+    /* Apaga o prefixo digitado desde trigger_cx */
+    for (int i = 0; i < plen; i++) row_del_char(&E.row[E.cy], E.comp.trigger_cx);
+    E.cx = E.comp.trigger_cx;
+
+    /* Insere o item completo */
+    if(ilen>0 && item[ilen-1]=='(' && strcmp(item,"require(")==0) {
+        /* require(: insere require("") com cursor entre as aspas */
+        for(int i=0;i<ilen;i++){row_insert_char(&E.row[E.cy],E.cx,item[i]);E.cx++;}
+        row_insert_char(&E.row[E.cy],E.cx,'"');E.cx++;
+        row_insert_char(&E.row[E.cy],E.cx,'"');
+        row_insert_char(&E.row[E.cy],E.cx+1,')');
+        /* cursor fica entre as aspas: require("|") */
+        comp_close();
+        comp_open_require();  /* abre popup após completar require("") */
+        return;
+    } else if(ilen>0 && item[ilen-1]=='(') {
+        /* Função: insere "nome()" e posiciona cursor entre os parênteses */
+        for(int i=0;i<ilen;i++){row_insert_char(&E.row[E.cy],E.cx,item[i]);E.cx++;}
+        row_insert_char(&E.row[E.cy],E.cx,')');
+        /* cursor fica entre ( e ) — não avança */
+    } else {
+        for(int i=0;i<ilen;i++){row_insert_char(&E.row[E.cy],E.cx,item[i]);E.cx++;}
+    }
+    comp_close();
+}
+
+/* ════════════════════════════════════════════════════════
+ * UNDO
+ * ════════════════════════════════════════════════════════ */
+
+static char *rows_to_string(int *len) {
+    int total = 0;
+    for (int j = 0; j < E.numrows; j++) total += E.row[j].size + 1;
+    *len = total;
+    char *buf = malloc(total + 1), *p = buf;
+    for (int j = 0; j < E.numrows; j++) {
+        memcpy(p, E.row[j].chars, E.row[j].size);
+        p += E.row[j].size; *p++ = '\n';
+    }
+    *p = '\0';
+    return buf;
+}
+
+static void undo_push(void) {
+    /* nova edição limpa a pilha de redo */
+    for (int i = 0; i < E.redo_top && i < UNDO_LIMIT; i++) {
+        free(E.redo_stack[i % UNDO_LIMIT].data);
+        E.redo_stack[i % UNDO_LIMIT].data = NULL;
+    }
+    E.redo_top = 0;
+    int idx = E.undo_top % UNDO_LIMIT;
+    free(E.undo[idx].data);
+    E.undo[idx].data = rows_to_string(&E.undo[idx].len);
+    E.undo[idx].cx = E.cx; E.undo[idx].cy = E.cy;
+    E.undo_top++;
+}
+
+static void apply_snapshot(char *data, int len, int cx, int cy) {
+    for (int i = 0; i < E.numrows; i++) free_row(&E.row[i]);
+    free(E.row); E.row = NULL; E.numrows = 0;
+    char *p = data, *end = data + len;
+    while (p < end) {
+        char *nl = memchr(p, '\n', end-p);
+        int ll = nl ? (int)(nl-p) : (int)(end-p);
+        insert_row(E.numrows, p, ll);
+        p = nl ? nl+1 : end;
+    }
+    E.cx = cx; E.cy = cy; E.dirty++;
+}
+
+static void undo_pop(void) {
+    if (E.undo_top <= 0) { set_status("Nada para desfazer."); return; }
+    /* salva estado atual no redo antes de desfazer */
+    int ri = E.redo_top % UNDO_LIMIT;
+    free(E.redo_stack[ri].data);
+    E.redo_stack[ri].data = rows_to_string(&E.redo_stack[ri].len);
+    E.redo_stack[ri].cx = E.cx; E.redo_stack[ri].cy = E.cy;
+    E.redo_top++;
+    E.undo_top--;
+    int idx = E.undo_top % UNDO_LIMIT;
+    if (!E.undo[idx].data) return;
+    apply_snapshot(E.undo[idx].data, E.undo[idx].len, E.undo[idx].cx, E.undo[idx].cy);
+}
+
+static void redo_pop(void) {
+    if (E.redo_top <= 0) { set_status("Nada para refazer."); return; }
+    /* salva no undo */
+    int ui = E.undo_top % UNDO_LIMIT;
+    free(E.undo[ui].data);
+    E.undo[ui].data = rows_to_string(&E.undo[ui].len);
+    E.undo[ui].cx = E.cx; E.undo[ui].cy = E.cy;
+    E.undo_top++;
+    E.redo_top--;
+    int idx = E.redo_top % UNDO_LIMIT;
+    if (!E.redo_stack[idx].data) return;
+    apply_snapshot(E.redo_stack[idx].data, E.redo_stack[idx].len,
+                   E.redo_stack[idx].cx, E.redo_stack[idx].cy);
+}
+
+/* ════════════════════════════════════════════════════════
+ * EDIÇÃO
+ * ════════════════════════════════════════════════════════ */
+
+static void insert_char(int c) {
+    if (E.cy == E.numrows) insert_row(E.numrows, "", 0);
+    row_insert_char(&E.row[E.cy], E.cx, c);
+    E.cx++;
+}
+
+static void insert_newline(void) {
+    if (E.cx == 0) {
+        insert_row(E.cy, "", 0);
+    } else {
+        Row *row = &E.row[E.cy];
+        /* calcula indent da linha atual */
+        int indent = 0;
+        while (indent < row->size
+               && (row->chars[indent] == ' ' || row->chars[indent] == '\t'))
+            indent++;
+
+        insert_row(E.cy+1, &row->chars[E.cx], row->size - E.cx);
+        /* trunca linha atual */
+        row = &E.row[E.cy];
+        row->size = E.cx; row->chars[row->size] = '\0';
+        update_row(row);
+
+        /* aplica indent na nova linha */
+        if (indent > 0) {
+            Row *nr = &E.row[E.cy+1];
+            char *tmp = malloc(indent + nr->size + 1);
+            memset(tmp, ' ', indent);
+            memcpy(tmp + indent, nr->chars, nr->size);
+            free(nr->chars); nr->chars = tmp;
+            nr->size += indent; nr->chars[nr->size] = '\0';
+            update_row(nr); E.dirty++;
+        }
+    }
+    E.cy++; 
+    /* posiciona após o indent */
+    if (E.cy < E.numrows) {
+        Row *nr = &E.row[E.cy];
+        int i = 0;
+        while (i < nr->size && (nr->chars[i] == ' ' || nr->chars[i] == '\t')) i++;
+        E.cx = i;
+    } else {
+        E.cx = 0;
+    }
+}
+
+static void del_char(void) {
+    if (E.cy == E.numrows) return;
+    if (E.cx == 0 && E.cy == 0) return;
+    if (E.cx > 0) {
+        row_del_char(&E.row[E.cy], E.cx-1); E.cx--;
+    } else {
+        E.cx = E.row[E.cy-1].size;
+        row_append_string(&E.row[E.cy-1], E.row[E.cy].chars, E.row[E.cy].size);
+        del_row(E.cy); E.cy--;
+    }
+}
+
+static void del_line(void) {
+    if (E.cy >= E.numrows) return;
+    del_row(E.cy);
+    if (E.cy >= E.numrows && E.cy > 0) E.cy--;
+    E.cx = 0;
+}
+
+static void dup_line(void) {
+    if (E.cy >= E.numrows) return;
+    Row *r = &E.row[E.cy];
+    insert_row(E.cy+1, r->chars, r->size);
+    E.cy++;
+}
+
+static void move_line_up(void) {
+    if (E.cy <= 0 || E.cy >= E.numrows) return;
+    Row tmp = E.row[E.cy-1];
+    E.row[E.cy-1] = E.row[E.cy];
+    E.row[E.cy]   = tmp;
+    update_syntax(&E.row[E.cy-1]);
+    update_syntax(&E.row[E.cy]);
+    E.cy--; E.dirty++;
+}
+
+static void move_line_down(void) {
+    if (E.cy >= E.numrows-1) return;
+    Row tmp = E.row[E.cy+1];
+    E.row[E.cy+1] = E.row[E.cy];
+    E.row[E.cy]   = tmp;
+    update_syntax(&E.row[E.cy]);
+    update_syntax(&E.row[E.cy+1]);
+    E.cy++; E.dirty++;
+}
+
+static void toggle_comment(void) {
+    if (E.cy >= E.numrows || !E.syntax || !E.syntax->scomment) return;
+    Row *row = &E.row[E.cy];
+    const char *sc  = E.syntax->scomment;
+    int sclen = strlen(sc);
+    /* skip leading whitespace */
+    int i = 0;
+    while (i < row->size && row->chars[i] == ' ') i++;
+    if (!strncmp(&row->chars[i], sc, sclen)) {
+        /* descomentar */
+        int rm = sclen;
+        if (i + sclen < row->size && row->chars[i+sclen] == ' ') rm++;
+        for (int j = 0; j < rm; j++) row_del_char(row, i);
+    } else {
+        /* comentar */
+        for (int j = sclen-1; j >= 0; j--) row_insert_char(row, 0, sc[j]);
+        row_insert_char(row, sclen, ' ');
+    }
+    E.dirty++;
+}
+
+static void indent_line(void) {
+    if (E.cy >= E.numrows) return;
+    for (int i = 0; i < TAB_SIZE; i++) row_insert_char(&E.row[E.cy], 0, ' ');
+    E.cx += TAB_SIZE; E.dirty++;
+}
+
+static void deindent_line(void) {
+    if (E.cy >= E.numrows) return;
+    Row *row = &E.row[E.cy];
+    int sp = 0;
+    while (sp < row->size && sp < TAB_SIZE && row->chars[sp] == ' ') sp++;
+    for (int i = 0; i < sp; i++) row_del_char(row, 0);
+    E.cx -= sp; if (E.cx < 0) E.cx = 0;
+    E.dirty++;
+}
+
+/* ════════════════════════════════════════════════════════
+ * FORMATADOR DE CÓDIGO (Ctrl+M)
+ * ════════════════════════════════════════════════════════ */
+
+/* ── Utilitários internos do formatador ─────────────── */
+
+/* Conta espaços iniciais de uma string */
+static int count_indent(const char *s, int len) {
+    int n = 0;
+    while (n < len && s[n] == ' ') n++;
+    return n;
+}
+
+/* Remove trailing whitespace de uma Row */
+static void row_trim_trailing(Row *row) {
+    while (row->size > 0 && (row->chars[row->size-1] == ' '
+                           || row->chars[row->size-1] == '\t'))
+        row->size--;
+    row->chars[row->size] = '\0';
+}
+
+/* Substitui toda a linha por uma nova string */
+static void row_replace(int y, const char *s, int slen) {
+    Row *row = &E.row[y];
+    free(row->chars);
+    row->chars = malloc(slen + 1);
+    memcpy(row->chars, s, slen);
+    row->chars[slen] = '\0';
+    row->size = slen;
+    update_row(row);
+    if (E.syntax) update_syntax(row);
+}
+
+/* ── Formatador C/C++ ─────────────────────────────── */
+/*
+ * Regras aplicadas linha por linha:
+ *   - Remove trailing spaces
+ *   - Normaliza espaço após keywords (if/for/while/switch)
+ *   - Espaço ao redor de operadores binários = += -= etc.
+ *   - Sem espaço antes de ( em chamadas de função
+ *   - { na mesma linha do bloco (K&R)
+ *   - Recuo automático baseado em chaves {}
+ */
+static void format_c(void) {
+    /* Passo 1: trailing whitespace e tabs → espaços */
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        /* expande tabs */
+        char *expanded = malloc(row->size * TAB_SIZE + 1);
+        int elen = 0;
+        for (int i = 0; i < row->size; i++) {
+            if (row->chars[i] == '\t') {
+                int sp = TAB_SIZE - (elen % TAB_SIZE);
+                for (int k = 0; k < sp; k++) expanded[elen++] = ' ';
+            } else {
+                expanded[elen++] = row->chars[i];
+            }
+        }
+        expanded[elen] = '\0';
+        /* trailing */
+        while (elen > 0 && expanded[elen-1] == ' ') elen--;
+        expanded[elen] = '\0';
+        row_replace(y, expanded, elen);
+        free(expanded);
+    }
+
+    /* Passo 2: espaço ao redor de = mas não ==, !=, <=, >= */
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s = row->chars;
+        int n = row->size;
+
+        /* Detecta linhas a ignorar: comentários, strings, preprocessor */
+        int lead = count_indent(s, n);
+        if (lead < n && s[lead] == '#') continue;  /* preprocessor */
+        if (lead+1 < n && s[lead]=='/' && s[lead+1]=='/') continue; /* // */
+
+        char out[4096]; int oi = 0;
+        int in_str = 0, str_ch = 0, in_char = 0;
+
+        for (int i = 0; i < n && oi < (int)sizeof(out)-4; i++) {
+            char c = s[i];
+            /* tracking strings simples */
+            if (!in_str && !in_char && (c == '"' || c == '\'')) {
+                in_str = 1; str_ch = c;
+                out[oi++] = c; continue;
+            }
+            if (in_str) {
+                if (c == '\\') { out[oi++] = c; if (i+1<n) out[oi++] = s[++i]; continue; }
+                if (c == str_ch) in_str = 0;
+                out[oi++] = c; continue;
+            }
+
+            /* operadores binários: = += -= *= /= %= &= |= ^= */
+            if ((c=='='||c=='+'||c=='-'||c=='*'||c=='/'||c=='%'||c=='&'||c=='|'||c=='^')
+                && i+1 < n && s[i+1] == '=' && c != '!' && c != '<' && c != '>') {
+                /* garante espaço antes */
+                if (oi > 0 && out[oi-1] != ' ') out[oi++] = ' ';
+                out[oi++] = c; out[oi++] = '='; i++;
+                /* garante espaço depois */
+                if (i+1 < n && s[i+1] != ' ') out[oi++] = ' ';
+                continue;
+            }
+            /* = sozinho (não ==) */
+            if (c == '=' && (i+1 >= n || s[i+1] != '=')
+                         && (i   == 0 || s[i-1] != '!')
+                         && (i   == 0 || s[i-1] != '<')
+                         && (i   == 0 || s[i-1] != '>')
+                         && (i   == 0 || s[i-1] != '=')) {
+                if (oi > 0 && out[oi-1] != ' ') out[oi++] = ' ';
+                out[oi++] = '=';
+                if (i+1 < n && s[i+1] != ' ' && s[i+1] != '=') out[oi++] = ' ';
+                continue;
+            }
+            out[oi++] = c;
+        }
+        out[oi] = '\0';
+        row_replace(y, out, oi);
+    }
+
+    /* Passo 3: espaço após keywords if/for/while/switch/return antes de '(' */
+    const char *kws[] = {"if","for","while","switch","return","else","do",NULL};
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s = row->chars;
+        int n = row->size;
+        int lead = count_indent(s, n);
+        if (lead < n && s[lead] == '#') continue;
+
+        char out[4096]; int oi = 0;
+        for (int i = 0; i < n && oi < (int)sizeof(out)-4; i++) {
+            /* tenta cada keyword */
+            int matched = 0;
+            for (int k = 0; kws[k]; k++) {
+                int klen = (int)strlen(kws[k]);
+                if (i + klen <= n && strncmp(s+i, kws[k], klen) == 0) {
+                    /* deve ser seguido de '(' ou espaço+'(' */
+                    int j = i + klen;
+                    if (j < n && (s[j] == '(' || s[j] == ' ' || s[j] == '\t')) {
+                        /* copia keyword */
+                        memcpy(out+oi, kws[k], klen); oi += klen;
+                        /* pula whitespace existente */
+                        while (j < n && (s[j]==' '||s[j]=='\t')) j++;
+                        /* adiciona exatamente um espaço (exceto return sem '(') */
+                        if (j < n && s[j] == '(') out[oi++] = ' ';
+                        else if (j < n) out[oi++] = ' ';
+                        i = j - 1; matched = 1; break;
+                    }
+                }
+            }
+            if (!matched) out[oi++] = s[i];
+        }
+        out[oi] = '\0';
+        row_replace(y, out, oi);
+    }
+
+    /* Passo 4: recálculo de indent baseado em {} */
+    int depth = 0;
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s = row->chars;
+        int n = row->size;
+        int lead = count_indent(s, n);
+        /* conteúdo sem indent atual */
+        char *content = s + lead;
+        int clen = n - lead;
+
+        /* se linha começa com }, reduz antes de indentar */
+        if (clen > 0 && content[0] == '}') { depth--; if (depth < 0) depth = 0; }
+
+        /* monta nova linha com indent correto */
+        char out[4096];
+        int indent = depth * TAB_SIZE;
+        if (indent >= (int)sizeof(out)) indent = (int)sizeof(out) - 1;
+        memset(out, ' ', indent);
+        if (clen > 0 && indent + clen < (int)sizeof(out)) {
+            memcpy(out + indent, content, clen);
+        }
+        int olen = indent + clen;
+        out[olen] = '\0';
+        row_replace(y, out, olen);
+
+        /* conta { e } na linha para próxima */
+        int in_str2 = 0; char sq = 0;
+        for (int i = 0; i < clen; i++) {
+            char c = content[i];
+            if (!in_str2 && (c=='"'||c=='\'')) { in_str2=1; sq=c; continue; }
+            if (in_str2) { if(c=='\\'){i++;continue;} if(c==sq) in_str2=0; continue; }
+            /* ignorar conteúdo de comentário // */
+            if (c=='/' && i+1<clen && content[i+1]=='/') break;
+            if (c == '{') depth++;
+            else if (c == '}' && content[0] != '}') { depth--; if (depth<0) depth=0; }
+        }
+    }
+
+    E.dirty++;
+    E.cx = 0;
+    set_status("\x1b[32m✓\x1b[m Código C/C++ formatado");
+}
+
+/* ── Formatador Lua ─────────────────────────────────── */
+/*
+ * Regras:
+ *   - Remove trailing spaces
+ *   - Espaço ao redor de = (não ==, ~=, <=, >=)
+ *   - Espaço após , e ;
+ *   - Recuo baseado em blocos: function/if/for/while/do/repeat → +1
+ *                              end/until/else/elseif → -1 (antes) ou 0
+ */
+static void format_lua(void) {
+    /* Passo 1: trailing whitespace */
+    for (int y = 0; y < E.numrows; y++)
+        row_trim_trailing(&E.row[y]);
+
+    /* Passo 2: espaço ao redor de = simples e após , */
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s = row->chars;
+        int n = row->size;
+        /* ignora comentários */
+        int lead = count_indent(s, n);
+        if (lead+1 < n && s[lead]=='-' && s[lead+1]=='-') continue;
+
+        char out[4096]; int oi = 0;
+        int in_str = 0; char sq = 0;
+
+        for (int i = 0; i < n && oi < (int)sizeof(out)-4; i++) {
+            char c = s[i];
+            if (!in_str && (c=='"'||c=='\'')) { in_str=1; sq=c; out[oi++]=c; continue; }
+            if (in_str) {
+                if (c=='\\'){out[oi++]=c; if(i+1<n) out[oi++]=s[++i]; continue;}
+                if (c==sq) in_str=0;
+                out[oi++]=c; continue;
+            }
+            /* vírgula: garante espaço depois */
+            if (c == ',') {
+                out[oi++] = ',';
+                if (i+1<n && s[i+1] != ' ') out[oi++] = ' ';
+                continue;
+            }
+            /* = simples (não ==, ~=, <=, >=) */
+            if (c == '=' && (i+1>=n || s[i+1]!='=')
+                         && (i==0 || (s[i-1]!='~' && s[i-1]!='<'
+                                   && s[i-1]!='>' && s[i-1]!='='))) {
+                if (oi > 0 && out[oi-1] != ' ') out[oi++] = ' ';
+                out[oi++] = '=';
+                if (i+1<n && s[i+1]!=' ' && s[i+1]!='=') out[oi++] = ' ';
+                continue;
+            }
+            /* ~= (not equal) — copia junto sem modificar */
+            if (c == '~' && i+1<n && s[i+1]=='=') {
+                if (oi>0 && out[oi-1]!=' ') out[oi++]=' ';
+                out[oi++]='~'; out[oi++]='='; i++;
+                if (i+1<n && s[i+1]!=' ') out[oi++]=' ';
+                continue;
+            }
+            out[oi++] = c;
+        }
+        out[oi] = '\0';
+        row_replace(y, out, oi);
+    }
+
+    /* Passo 3: recuo baseado em palavras-chave de bloco E em chaves {} de tabela */
+    const char *open_kw[]  = {"function","if","trif","for","while","do","repeat",NULL};
+    const char *close_kw[] = {"end","tryend","until",NULL};
+    const char *mid_kw[]   = {"else","elseif","tryelse","tryelseif",NULL};
+
+    int depth = 0;
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s   = row->chars;
+        int n     = row->size;
+        int lead  = count_indent(s, n);
+        char *content = s + lead;
+        int clen  = n - lead;
+        if (clen <= 0) { continue; }
+
+        /* ignora comentários */
+        if (clen >= 2 && content[0]=='-' && content[1]=='-') continue;
+
+        /* Detecta se linha inicia com close/mid keyword ou '}' */
+        int is_close = 0, is_mid = 0;
+
+        /* } de tabela fecha antes de indentar */
+        if (content[0] == '}') { is_close = 1; }
+
+        if (!is_close)
+        for (int k = 0; close_kw[k]; k++) {
+            int kl = (int)strlen(close_kw[k]);
+            if (clen >= kl && strncmp(content, close_kw[k], kl) == 0
+                && (clen == kl || !isalnum((unsigned char)content[kl])))
+                { is_close = 1; break; }
+        }
+        if (!is_close)
+        for (int k = 0; mid_kw[k]; k++) {
+            int kl = (int)strlen(mid_kw[k]);
+            if (clen >= kl && strncmp(content, mid_kw[k], kl) == 0
+                && (clen == kl || !isalnum((unsigned char)content[kl])))
+                { is_mid = 1; break; }
+        }
+
+        if (is_close || is_mid) { depth--; if (depth < 0) depth = 0; }
+
+        /* aplica indent */
+        char out[4096];
+        int indent = depth * TAB_SIZE;
+        if (indent >= (int)sizeof(out)) indent = (int)sizeof(out)-1;
+        memset(out, ' ', indent);
+        if (clen > 0 && indent + clen < (int)sizeof(out))
+            memcpy(out + indent, content, clen);
+        int olen = indent + clen;
+        out[olen] = '\0';
+        row_replace(y, out, olen);
+
+        if (is_mid) { depth++; continue; }
+
+        /* re-lê content após row_replace */
+        content = E.row[y].chars + indent;
+        clen    = E.row[y].size  - indent;
+
+        /* Conta abertura de blocos na linha:
+         * - { de tabela/function body → +1 por cada {
+         * - keywords de bloco (sem end na mesma linha) → +1
+         * Ignora strings e comentários */
+        int in_str2 = 0; char sq2 = 0;
+        int kw_opens = 0;
+        for (int i = 0; i < clen; i++) {
+            char c = content[i];
+            /* comentário de linha */
+            if (!in_str2 && c=='-' && i+1<clen && content[i+1]=='-') break;
+            /* strings */
+            if (!in_str2 && (c=='"'||c=='\'')) { in_str2=1; sq2=c; continue; }
+            if (in_str2) {
+                if (c=='\\') { i++; continue; }
+                if (c==sq2) in_str2=0;
+                continue;
+            }
+            /* { abre, } fecha (já tratado como is_close acima apenas se início) */
+            if (c == '{') { depth++; }
+            else if (c == '}' && i > 0) { depth--; if (depth<0) depth=0; }
+        }
+
+        /* keywords de bloco que não usam { */
+        if (!is_close) {
+            for (int k = 0; open_kw[k]; k++) {
+                int kl = (int)strlen(open_kw[k]);
+                for (int i = 0; i <= clen - kl; i++) {
+                    if (!in_str2
+                        && strncmp(content+i, open_kw[k], kl) == 0
+                        && (i==0 || !isalnum((unsigned char)content[i-1]))
+                        && (i+kl >= clen || !isalnum((unsigned char)content[i+kl]))) {
+                        /* verifica se end aparece depois na mesma linha */
+                        int has_end = 0;
+                        for (int j = i+kl; j <= clen-3; j++)
+                            if (strncmp(content+j,"end",3)==0
+                                && (j==0||!isalnum((unsigned char)content[j-1]))
+                                && (j+3>=clen||!isalnum((unsigned char)content[j+3])))
+                                { has_end=1; break; }
+                        /* e se tem { na mesma linha (já contado acima) */
+                        int has_brace = 0;
+                        for (int j = i+kl; j < clen; j++)
+                            if (content[j]=='{') { has_brace=1; break; }
+                        if (!has_end && !has_brace) { depth++; }
+                        kw_opens++;
+                        break;
+                    }
+                }
+                if (kw_opens) break;
+            }
+        }
+    }
+
+    E.dirty++;
+    E.cx = 0;
+    set_status("\x1b[32m✓\x1b[m Código Lua formatado");
+}
+
+/* ── Formatador Bash ────────────────────────────────── */
+/*
+ * Regras:
+ *   - Remove trailing spaces
+ *   - Expande tabs → espaços
+ *   - Recuo baseado em: if/then/for/while/do/case/function → +1
+ *                       fi/done/esac/} → -1 (antes)
+ *                       else/elif → manter nível do if
+ */
+static void format_bash(void) {
+    /* Passo 1: trailing + tab expand */
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *expanded = malloc(row->size * TAB_SIZE + 1);
+        int elen = 0;
+        for (int i = 0; i < row->size; i++) {
+            if (row->chars[i] == '\t') {
+                int sp = TAB_SIZE - (elen % TAB_SIZE);
+                for (int k = 0; k < sp; k++) expanded[elen++] = ' ';
+            } else expanded[elen++] = row->chars[i];
+        }
+        while (elen > 0 && expanded[elen-1]==' ') elen--;
+        expanded[elen] = '\0';
+        row_replace(y, expanded, elen);
+        free(expanded);
+    }
+
+    /* Passo 2: recuo */
+    const char *bash_open[]  = {"then","do","function","{",NULL};
+    const char *bash_close[] = {"fi","done","esac","}",NULL};
+    const char *bash_mid[]   = {"else","elif",NULL};
+
+    int depth = 0;
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char *s   = row->chars;
+        int n     = row->size;
+        int lead  = count_indent(s, n);
+        char *content = s + lead;
+        int clen  = n - lead;
+        if (clen <= 0) continue;
+
+        /* ignora comentários e shebangs */
+        if (content[0] == '#') {
+            /* mantém indent zero para shebangs, senão aplica depth */
+            if (lead == 0) continue;
+        }
+
+        int is_close = 0, is_mid = 0;
+        for (int k = 0; bash_close[k]; k++) {
+            int kl = (int)strlen(bash_close[k]);
+            if (clen >= kl && strncmp(content, bash_close[k], kl)==0
+                && (clen==kl || !isalnum((unsigned char)content[kl])))
+                { is_close=1; break; }
+        }
+        if (!is_close)
+        for (int k = 0; bash_mid[k]; k++) {
+            int kl = (int)strlen(bash_mid[k]);
+            if (clen >= kl && strncmp(content, bash_mid[k], kl)==0
+                && (clen==kl || !isalnum((unsigned char)content[kl])))
+                { is_mid=1; break; }
+        }
+
+        if (is_close || is_mid) { depth--; if (depth<0) depth=0; }
+
+        char out[4096];
+        int indent = depth * TAB_SIZE;
+        if (indent >= (int)sizeof(out)) indent = (int)sizeof(out)-1;
+        memset(out, ' ', indent);
+        if (clen>0 && indent+clen < (int)sizeof(out))
+            memcpy(out+indent, content, clen);
+        int olen = indent + clen;
+        out[olen] = '\0';
+        row_replace(y, out, olen);
+
+        if (is_mid) { depth++; continue; }
+
+        /* verifica abertura de bloco */
+        content = E.row[y].chars + indent;
+        clen    = E.row[y].size  - indent;
+        for (int k = 0; bash_open[k]; k++) {
+            int kl = (int)strlen(bash_open[k]);
+            /* procura token em qualquer posição da linha */
+            for (int i = 0; i <= clen-kl; i++) {
+                if (strncmp(content+i, bash_open[k], kl)==0
+                    && (i==0||!isalnum((unsigned char)content[i-1]))
+                    && (i+kl>=clen||!isalnum((unsigned char)content[i+kl])
+                        ||bash_open[k][0]=='{')) {
+                    depth++; break;
+                }
+            }
+            break;
+        }
+    }
+
+    E.dirty++;
+    E.cx = 0;
+    set_status("\x1b[32m✓\x1b[m Código Bash formatado");
+}
+
+/* Dispatcher: escolhe o formatador pela sintaxe ativa */
+static void format_code(void) {
+    if (!E.syntax) {
+        set_status("\x1b[33m⚠ Linguagem não definida — use Ctrl+L para escolher\x1b[m");
+        return;
+    }
+    undo_push();
+    if      (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) format_c();
+    else if (E.syntax == &HLDB[2]) format_lua();
+    else if (E.syntax == &HLDB[3]) format_bash();
+    else set_status("Formatador não disponível para esta linguagem");
+}
+
+/* ════════════════════════════════════════════════════════
+ * VERIFICADOR DE CÓDIGO (Ctrl+E)
+ * ════════════════════════════════════════════════════════
+ * Regra de ouro deste recurso, depois de três reescritas: ele
+ * NUNCA pode bloquear o editor, custe o que custar em
+ * completude.
+ *
+ *   - Proibido chamar processo externo (sem popen/fork/exec/
+ *     system). Uma versão antiga chamava `clang` via popen()
+ *     sem timeout; se o subprocesso travasse, o editor travava
+ *     junto, e como o terminal já está em modo raw, nem Ctrl+C
+ *     ajudava — só matando a sessão do Termux.
+ *   - Toda estrutura de dados é um array de tamanho FIXO,
+ *     alocado estaticamente (sem malloc/realloc).
+ *   - Todo laço é limitado por E.numrows / row->size / um teto
+ *     fixo — os mesmos limites que o editor já respeita pra
+ *     salvar ou colorir sintaxe.
+ *   - Nenhuma das checagens abaixo é um parser de verdade — são
+ *     heurísticas de texto (como um linter leve). Erros reais
+ *     de sintaxe da linguagem ainda só aparecem quando você
+ *     roda o código de fato; isto aqui pega os deslizes mais
+ *     comuns ANTES disso.
+ *
+ * Ctrl+E detecta a linguagem atual (a mesma que Ctrl+L escolhe)
+ * e roda um conjunto de checagens diferente pra cada uma:
+ *   - Universal (todas as linguagens): chaves/parênteses,
+ *     espaço sobrando no fim da linha, linha muito comprida,
+ *     indentação misturada, marcadores TODO/FIXME/XXX/HACK.
+ *   - Lua/ElliotOS: variável local declarada mas nunca usada
+ *     (pulado se o arquivo usa sintaxe Ivar, tipo !1/!!2 — não
+ *     dá pra rastrear uso de forma confiável nesse caso),
+ *     atribuição encadeada (`a = b = 1`, inválido em Lua) e
+ *     expressão solta sem efeito (`a + b`, sem '=' — 99% das
+ *     vezes é um '=' esquecido).
+ *   - C/C++: atribuição dentro de condição (`if (x = y)`),
+ *     um dos bugs mais clássicos da linguagem.
+ * ════════════════════════════════════════════════════════ */
+
+#define EISSUE_MAX     200
+#define EISSUE_MSG_LEN 110
+
+typedef struct {
+    int  line;        /* 1-based; 0 = sem linha específica */
+    char sev;          /* 'E' erro, 'W' aviso, 'I' informativo */
+    char msg[EISSUE_MSG_LEN];
+} EIssue;
+
+static EIssue g_eissues[EISSUE_MAX];
+static int    g_eissue_count  = 0;
+static int    g_eissue_sel    = 0;
+static int    g_eissue_scroll = 0;
+static int    g_eissue_active = 0;
+static char   g_eissue_lang[16] = "Genérico";
+
+/* Adiciona um problema à lista (se ainda houver espaço).
+ * Nunca aloca memória, nunca falha de um jeito que trave —
+ * se a lista já está cheia, simplesmente para de adicionar. */
+static void eissue_add(int line, char sev, const char *fmt, ...) {
+    if (g_eissue_count >= EISSUE_MAX) return;
+    EIssue *is = &g_eissues[g_eissue_count++];
+    is->line = line;
+    is->sev  = sev;
+    va_list ap; va_start(ap, fmt);
+    vsnprintf(is->msg, EISSUE_MSG_LEN, fmt, ap);
+    va_end(ap);
+}
+
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS UNIVERSAIS (todas as linguagens)
+ * ════════════════════════════════════════════════════════ */
+
+#define BRACKET_STACK_MAX 512
+
+/* ── Chaves/parênteses/colchetes balanceados ──
+ * Ignora o que está dentro de strings e comentários (// -- e
+ * bloco, estilo C ou Lua --[[ ]]). '#' só conta como
+ * comentário se for o primeiro caractere não-branco da linha,
+ * pra não confundir com o operador de tamanho '#t' do Lua. */
+static void check_run_brackets(void) {
+    typedef struct { char ch; int line; } BItem;
+    static BItem stack[BRACKET_STACK_MAX];
+    int sp = 0;
+    int block_kind = 0; /* 0=nenhum 1=C 2=Lua --[[ ]] */
+
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        int in_str = 0;
+        char str_q = 0;
+
+        if (!block_kind) {
+            int x0 = 0;
+            while (x0 < row->size && (row->chars[x0]==' ' || row->chars[x0]=='\t')) x0++;
+            if (x0 < row->size && row->chars[x0] == '#') continue;
+        }
+
+        for (int x = 0; x < row->size; x++) {
+            char c = row->chars[x];
+            char c2 = (x + 1 < row->size) ? row->chars[x+1] : 0;
+
+            if (block_kind == 1) {
+                if (c == '*' && c2 == '/') { block_kind = 0; x++; }
+                continue;
+            }
+            if (block_kind == 2) {
+                if (c == ']' && c2 == ']') { block_kind = 0; x++; }
+                continue;
+            }
+
+            if (in_str) {
+                if (c == '\\' && x + 1 < row->size) { x++; continue; }
+                if (c == str_q) in_str = 0;
+                continue;
+            }
+
+            if (c == '/' && c2 == '*') { block_kind = 1; x++; continue; }
+            if (c == '-' && c2 == '-') {
+                if (x + 3 < row->size && row->chars[x+2]=='[' && row->chars[x+3]=='[') {
+                    block_kind = 2; x += 3; continue;
+                }
+                break;
+            }
+            if (c == '/' && c2 == '/') break;
+
+            if (c == '"' || c == '\'') { in_str = 1; str_q = c; continue; }
+
+            if (c=='('||c=='['||c=='{') {
+                if (sp < BRACKET_STACK_MAX) {
+                    stack[sp].ch = c; stack[sp].line = y+1; sp++;
+                } else {
+                    eissue_add(y+1, 'W', "aninhamento passou de %d níveis — parei de checar chaves aqui", BRACKET_STACK_MAX);
+                    return;
+                }
+            } else if (c==')'||c==']'||c=='}') {
+                char want = (c==')') ? '(' : (c==']') ? '[' : '{';
+                if (sp == 0) {
+                    eissue_add(y+1, 'E', "'%c' sem abertura correspondente", c);
+                } else if (stack[sp-1].ch != want) {
+                    eissue_add(y+1, 'E', "'%c' não combina com '%c' aberto na linha %d",
+                                c, stack[sp-1].ch, stack[sp-1].line);
+                    sp--;
+                } else {
+                    sp--;
+                }
+            }
+        }
+    }
+
+    for (int i = 0; i < sp; i++)
+        eissue_add(stack[i].line, 'E', "'%c' aberto aqui nunca foi fechado", stack[i].ch);
+}
+
+/* ── Espaços/tabs sobrando no final da linha ── */
+static void check_run_trailing(void) {
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        if (row->size > 0 &&
+            (row->chars[row->size-1]==' ' || row->chars[row->size-1]=='\t')) {
+            eissue_add(y+1, 'I', "espaço(s)/tab(s) sobrando no final da linha");
+        }
+    }
+}
+
+/* ── Linhas muito compridas ── */
+#define CHECK_MAX_LINE_LEN 120
+static void check_run_line_length(void) {
+    for (int y = 0; y < E.numrows; y++) {
+        if (E.row[y].size > CHECK_MAX_LINE_LEN) {
+            eissue_add(y+1, 'I', "linha com %d colunas (acima de %d)",
+                       E.row[y].size, CHECK_MAX_LINE_LEN);
+        }
+    }
+}
+
+/* ── Indentação misturando tab e espaço ── */
+static void check_run_mixed_indent(void) {
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        int saw_space = 0, saw_tab_after_space = 0;
+        for (int x = 0; x < row->size; x++) {
+            char c = row->chars[x];
+            if (c == ' ') saw_space = 1;
+            else if (c == '\t') {
+                if (saw_space) { saw_tab_after_space = 1; break; }
+            } else break;
+        }
+        if (saw_tab_after_space)
+            eissue_add(y+1, 'W', "indentação mistura espaço antes de tab");
+    }
+}
+
+/* ── Marcadores TODO/FIXME/XXX/HACK ── */
+static void check_run_markers(void) {
+    static const char *markers[] = { "TODO", "FIXME", "XXX", "HACK", NULL };
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        for (int m = 0; markers[m]; m++) {
+            /* busca por substring simples (row->chars é null-terminated) */
+            if (strstr(row->chars, markers[m])) {
+                eissue_add(y+1, 'I', "marcador %s encontrado", markers[m]);
+                break; /* um por linha basta */
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS ESPECÍFICAS DE LUA/ELLIOTOS
+ * ════════════════════════════════════════════════════════ */
+
+static int eis_is_ident_start(char c) { return isalpha((unsigned char)c) || c=='_'; }
+static int eis_is_ident_char(char c)  { return isalnum((unsigned char)c) || c=='_'; }
+
+/* Produz uma cópia "só código" da linha: comentário (-- ou
+ * bloco --[[ ]]) cortado/zerado e conteúdo de strings trocado
+ * por espaços — pra rodar heurísticas de texto sem confundir
+ * com o que está dentro de aspas ou comentado. block_kind
+ * persiste entre chamadas (estado do bloco --[[ ]] entre
+ * linhas). Linhas maiores que outsz-1 são truncadas (seguro,
+ * só limita o alcance da heurística, nunca estoura buffer). */
+static void eis_strip_lua_line(Row *row, char *out, int outsz, int *block_kind) {
+    int n = row->size; if (n >= outsz) n = outsz - 1;
+    int oi = 0;
+    int in_str = 0; char str_q = 0;
+
+    for (int x = 0; x < n; x++) {
+        char c = row->chars[x];
+        char c2 = (x + 1 < n) ? row->chars[x+1] : 0;
+
+        if (*block_kind) {
+            if (c == ']' && c2 == ']') { *block_kind = 0; x++; }
+            continue;
+        }
+        if (in_str) {
+            if (c == '\\' && x + 1 < n) { x++; continue; }
+            if (c == str_q) in_str = 0;
+            continue;
+        }
+        if (c == '-' && c2 == '-') {
+            if (x + 3 < n && row->chars[x+2]=='[' && row->chars[x+3]=='[') {
+                *block_kind = 1; x += 3; continue;
+            }
+            break; /* -- até o fim da linha */
+        }
+        if (c == '"' || c == '\'') { in_str = 1; str_q = c; continue; }
+
+        out[oi++] = c;
+    }
+    out[oi] = '\0';
+}
+
+static void eis_trim(char *s) {
+    int len = (int)strlen(s);
+    int end = len - 1;
+    while (end >= 0 && (s[end]==' '||s[end]=='\t')) s[end--] = '\0';
+    int start = 0;
+    while (s[start]==' '||s[start]=='\t') start++;
+    if (start > 0) memmove(s, s+start, strlen(s+start)+1);
+}
+
+/* Lê um identificador a partir de s[*p]; devolve em buf (até
+ * bufsz-1 chars) e avança *p. Retorna 0 se não há identificador
+ * na posição. */
+static int eis_read_ident(const char *s, int *p, char *buf, int bufsz) {
+    if (!eis_is_ident_start(s[*p])) return 0;
+    int i = 0;
+    while (eis_is_ident_char(s[*p]) && i < bufsz-1) { buf[i++] = s[(*p)++]; }
+    buf[i] = '\0';
+    return 1;
+}
+
+static int eis_is_lua_keyword(const char *w) {
+    static const char *kw[] = {
+        "if","then","else","elseif","end","while","do","for","in",
+        "function","local","return","break","repeat","until",
+        "and","or","not","nil","true","false","goto", NULL
+    };
+    for (int i = 0; kw[i]; i++) if (!strcmp(w,kw[i])) return 1;
+    return 0;
+}
+
+#define EIS_DECL_MAX 200
+typedef struct { char name[40]; int line; char kind; } EisDecl; /* kind: 'L' local, 'G' global */
+static EisDecl eis_decls[EIS_DECL_MAX];
+static int     eis_decl_count = 0;
+
+/* Conjunto de nomes "conhecidos" (declarados no arquivo: locals,
+ * globais, funções, parâmetros, variáveis de loop). Usado pela
+ * checagem de "identificador desconhecido chamado como função"
+ * mais abaixo — junto com a lista de módulos nativos hardcoded
+ * em eis_known_contains(). */
+#define EIS_KNOWN_MAX 400
+static char eis_known[EIS_KNOWN_MAX][40];
+static int  eis_known_count = 0;
+
+static void eis_known_add(const char *name) {
+    if (!name[0] || name[0]=='_') return;
+    for (int i = 0; i < eis_known_count; i++)
+        if (!strcmp(eis_known[i], name)) return;
+    if (eis_known_count < EIS_KNOWN_MAX)
+        snprintf(eis_known[eis_known_count++], sizeof(eis_known[0]), "%s", name);
+}
+
+/* Lista de módulos/funções nativas do Lua padrão + ElliotOS.
+ * Heurística, não exaustiva de propósito: é melhor essa lista
+ * deixar passar um nome nativo raro do que gerar alarme falso
+ * toda hora — por isso a checagem que usa isto é sempre 'I'
+ * (informativo), nunca erro. */
+static int eis_known_contains(const char *name) {
+    static const char *builtins[] = {
+        /* Lua padrão */
+        "print","pairs","ipairs","next","type","tostring","tonumber",
+        "pcall","xpcall","error","assert","select","unpack","setmetatable",
+        "getmetatable","rawget","rawset","rawequal","rawlen","require",
+        "load","loadstring","dofile","collectgarbage","_G","_VERSION","arg",
+        "table","string","math","os","io","coroutine","debug","utf8",
+        /* módulos nativos do ElliotOS */
+        "lg","ui","net","fs","sys","ms","ai","mod","web","str","util",
+        "date","path","re","try","test","color","json","csv","log",
+        "Queue","Stack","ivar","back","main",
+        NULL
+    };
+    for (int i = 0; builtins[i]; i++) if (!strcmp(builtins[i], name)) return 1;
+    for (int i = 0; i < eis_known_count; i++) if (!strcmp(eis_known[i], name)) return 1;
+    return 0;
+}
+
+/* Passagem única sobre o arquivo: extrai declarações `local` e
+ * roda as heurísticas de "atribuição encadeada" e "expressão
+ * sem efeito" linha a linha. */
+static void check_run_lua_pass1(void) {
+    eis_decl_count = 0;
+    eis_known_count = 0;
+    int block_kind = 0;
+
+    for (int y = 0; y < E.numrows; y++) {
+        char code[320];
+        eis_strip_lua_line(&E.row[y], code, sizeof(code), &block_kind);
+        eis_trim(code);
+        if (!code[0]) continue;
+
+        /* ── extrai `local NAME [, NAME2...] [= ...]` ── */
+        if (!strncmp(code, "local ", 6) || !strcmp(code, "local")) {
+            int p = 5;
+            while (code[p]==' ') p++;
+            /* `local function NOME` — não é o alvo desta checagem
+               (funções raramente "não-usadas" por engano da mesma
+               forma que variáveis, e '(' logo depois complicaria
+               a heurística), então pula. */
+            if (strncmp(code+p, "function", 8) != 0 || eis_is_ident_char(code[p+8])) {
+                while (1) {
+                    char name[40];
+                    if (!eis_read_ident(code, &p, name, sizeof(name))) break;
+                    while (code[p]==' ') p++;
+                    /* atributo <const>/<close> do Lua 5.4 — pula */
+                    if (code[p]=='<') {
+                        while (code[p] && code[p]!='>') p++;
+                        if (code[p]=='>') p++;
+                        while (code[p]==' ') p++;
+                    }
+                    eis_known_add(name);
+                    if (name[0]!='_' && eis_decl_count < EIS_DECL_MAX) {
+                        EisDecl *d = &eis_decls[eis_decl_count++];
+                        snprintf(d->name, sizeof(d->name), "%s", name);
+                        d->line = y+1;
+                        d->kind = 'L';
+                    }
+                    if (code[p]==',') { p++; while (code[p]==' ') p++; continue; }
+                    break;
+                }
+            }
+        }
+        /* ── extrai globais no nível superior: `NOME = valor` sem
+           'local' na frente e sem indentação (heurística de "isto
+           é uma atribuição de topo, não conteúdo de função/bloco").
+           Convenção comum em scripts ElliotOS (arg[1], flags, etc
+           em MAIUSCULAS direto, sem 'local'). Fica de fora:
+           `a.b = x` (campo de tabela), `a[i] = x` (índice), `a == x`
+           (comparação), `function NOME(...)` (isso é outra coisa),
+           e qualquer linha indentada (assume-se dentro de bloco). */
+        else if (E.row[y].size > 0 && E.row[y].chars[0] != ' ' && E.row[y].chars[0] != '\t') {
+            int p = 0;
+            char name[40];
+            if (eis_read_ident(code, &p, name, sizeof(name)) && !eis_is_lua_keyword(name)) {
+                int p2 = p;
+                while (code[p2]==' ') p2++;
+                if (code[p2]=='=' && code[p2+1]!='=' ) {
+                    eis_known_add(name);
+                    if (name[0]!='_' && eis_decl_count < EIS_DECL_MAX) {
+                        EisDecl *d = &eis_decls[eis_decl_count++];
+                        snprintf(d->name, sizeof(d->name), "%s", name);
+                        d->line = y+1;
+                        d->kind = 'G';
+                    }
+                }
+            }
+        }
+
+        /* ── extrai `function NOME(...)`, `local function NOME(...)`,
+           `function obj.nome(...)` / `function obj:nome(...)`, e os
+           parâmetros — tudo vira símbolo "conhecido" (não entra na
+           checagem de não-usada; só evita falso positivo na checagem
+           de "identificador desconhecido" logo mais abaixo). ── */
+        {
+            int fp = -1;
+            if (!strncmp(code, "function ", 9)) fp = 9;
+            else if (!strncmp(code, "local function ", 15)) fp = 15;
+            if (fp >= 0) {
+                while (code[fp]==' ') fp++;
+                char fname[40];
+                if (eis_read_ident(code, &fp, fname, sizeof(fname))) {
+                    eis_known_add(fname);
+                    /* obj.nome / obj:nome — o obj já foi registrado
+                       acima; o nome do método não precisa virar
+                       símbolo à parte (nunca é chamado sozinho) */
+                    while (code[fp]=='.' || code[fp]==':') {
+                        fp++;
+                        char sub[40];
+                        if (!eis_read_ident(code, &fp, sub, sizeof(sub))) break;
+                    }
+                    while (code[fp]==' ') fp++;
+                    if (code[fp]=='(') {
+                        fp++;
+                        while (code[fp] && code[fp]!=')') {
+                            while (code[fp]==' '||code[fp]==',') fp++;
+                            char pname[40];
+                            if (eis_read_ident(code, &fp, pname, sizeof(pname))) {
+                                eis_known_add(pname);
+                            } else break;
+                            while (code[fp]==' ') fp++;
+                        }
+                    }
+                }
+            }
+        }
+
+        /* ── extrai variáveis de loop: `for NOME[,NOME2] in ...` e
+           `for NOME = a,b[,c] do` ── */
+        if (!strncmp(code, "for ", 4)) {
+            int p = 4;
+            while (code[p]==' ') p++;
+            while (1) {
+                char name[40];
+                if (!eis_read_ident(code, &p, name, sizeof(name))) break;
+                eis_known_add(name);
+                while (code[p]==' ') p++;
+                if (code[p]==',') { p++; while (code[p]==' ') p++; continue; }
+                break;
+            }
+        }
+
+        /* ── atribuição encadeada: IDENT = IDENT = ... ── */
+        {
+            int p = 0;
+            char lhs[40];
+            if (eis_read_ident(code, &p, lhs, sizeof(lhs)) && !eis_is_lua_keyword(lhs)) {
+                while (code[p]==' ') p++;
+                if (code[p]=='=' && code[p+1]!='=') {
+                    p++; while (code[p]==' ') p++;
+                    char mid[40];
+                    int p2 = p;
+                    if (eis_read_ident(code, &p2, mid, sizeof(mid)) && !eis_is_lua_keyword(mid)) {
+                        int p3 = p2;
+                        while (code[p3]==' ') p3++;
+                        if (code[p3]=='=' && code[p3+1]!='=') {
+                            eissue_add(y+1, 'E',
+                                "atribuição encadeada '%s = %s = ...' não é válida em Lua — você quis dizer '%s = ...'?",
+                                lhs, mid, lhs);
+                        }
+                    }
+                }
+            }
+        }
+
+        /* ── expressão solta sem efeito: IDENT (op IDENT|NUM)+ , sem '=' ── */
+        if (!strchr(code, '=')) {
+            int p = 0;
+            char tok[40];
+            int ok = 0;
+            int consumed_op = 0;
+
+            if (eis_read_ident(code, &p, tok, sizeof(tok))) {
+                ok = !eis_is_lua_keyword(tok);
+            } else if (isdigit((unsigned char)code[p])) {
+                while (isdigit((unsigned char)code[p]) || code[p]=='.') p++;
+                ok = 1;
+            }
+
+            if (ok) {
+                while (code[p]==' ') p++;
+                /* se logo depois do 1º token vem '(' ou '.' ou ':' ou '['
+                   é chamada/indexação — não é o padrão que procuramos */
+                if (code[p]=='(' || code[p]=='.' || code[p]==':' || code[p]=='[') {
+                    ok = 0;
+                }
+            }
+
+            while (ok && code[p]) {
+                while (code[p]==' ') p++;
+                if (!code[p]) break;
+                int is_op = 0;
+                if (code[p]=='+'||code[p]=='*'||code[p]=='/'||code[p]=='%') { p++; is_op=1; }
+                else if (code[p]=='-' && code[p+1]!='-') { p++; is_op=1; }
+                else if (code[p]=='.' && code[p+1]=='.') { p+=2; is_op=1; }
+                if (!is_op) { ok = 0; break; }
+                consumed_op = 1;
+                while (code[p]==' ') p++;
+                char tok2[40];
+                if (eis_read_ident(code, &p, tok2, sizeof(tok2))) {
+                    if (eis_is_lua_keyword(tok2)) { ok = 0; break; }
+                } else if (isdigit((unsigned char)code[p]) || code[p]=='"' || code[p]=='\'') {
+                    if (code[p]=='"'||code[p]=='\'') { ok = 0; break; } /* string já foi zerada, sinal de algo estranho */
+                    while (isdigit((unsigned char)code[p]) || code[p]=='.') p++;
+                } else { ok = 0; break; }
+                while (code[p]==' ') p++;
+                if (code[p]=='(' || code[p]=='.' || code[p]==':' || code[p]=='[') { ok = 0; break; }
+            }
+
+            if (ok && consumed_op && !code[p]) {
+                eissue_add(y+1, 'W',
+                    "expressão '%s' sem atribuição nem chamada — Lua não executa isso; faltou um '='?",
+                    code);
+            }
+        }
+    }
+}
+
+/* Segunda passagem: pra cada declaração coletada (local ou
+ * global de topo), procura uso em qualquer outra linha do
+ * arquivo (comparação simples de palavra inteira). Se não achar
+ * em nenhum lugar, é "não usada". Locais têm mais confiança (só
+ * podem ser usadas neste arquivo mesmo); globais têm menos (um
+ * outro script pode dar `require` nisto), por isso severidades
+ * diferentes. Limitado por EIS_DECL_MAX declarações × E.numrows
+ * linhas — sempre bounded, sempre termina. */
+static void check_run_lua_unused(void) {
+    /* Se o arquivo usa sintaxe Ivar (!1 / !!2 / etc.), as variáveis
+     * globais de topo geralmente são mapeadas para ivars e acessadas
+     * via !N / !!N — impossível rastrear uso por nome nesse caso.
+     * Pula o aviso de "global não lida" para não gerar falsos positivos. */
+    int has_ivar = 0;
+    for (int y = 0; y < E.numrows && !has_ivar; y++) {
+        const char *p = E.row[y].chars;
+        while (*p) {
+            if (*p == '!' && (*(p+1) == '!' || (*(p+1) >= '1' && *(p+1) <= '9'))) {
+                has_ivar = 1;
+                break;
+            }
+            p++;
+        }
+    }
+
+    for (int i = 0; i < eis_decl_count; i++) {
+        const char *name = eis_decls[i].name;
+        int used = 0;
+        for (int y = 0; y < E.numrows && !used; y++) {
+            if (y+1 == eis_decls[i].line) {
+                /* na própria linha de declaração, só conta uso se o
+                   nome aparecer MAIS de uma vez (ex: `local x = x + 1`
+                   — incomum, mas se acontecer o `x` do lado direito
+                   já é "uso"). Simplifica: conta ocorrências. */
+                int count = 0;
+                const char *p = E.row[y].chars;
+                while ((p = strstr(p, name)) != NULL) {
+                    int pre = (p == E.row[y].chars || !eis_is_ident_char(p[-1]));
+                    int pos = !eis_is_ident_char(p[(int)strlen(name)]);
+                    if (pre && pos) count++;
+                    p++;
+                }
+                if (count > 1) used = 1;
+                continue;
+            }
+            if (has_word(E.row[y].chars, name)) used = 1;
+        }
+        if (!used) {
+            if (eis_decls[i].kind == 'L') {
+                eissue_add(eis_decls[i].line, 'W',
+                    "variável local '%s' é declarada mas nunca usada", name);
+            } else if (!has_ivar) {
+                /* Só avisa sobre globais não-lidas se o arquivo NÃO usa
+                 * sintaxe Ivar — caso contrário o acesso é via !N/!!N
+                 * e não aparece como o nome da variável no código. */
+                eissue_add(eis_decls[i].line, 'I',
+                    "'%s' é atribuída mas não parece ser lida neste arquivo (global — confira se outro script usa)", name);
+            }
+        }
+    }
+}
+
+/* ── Chamada a identificador desconhecido ──
+ * Procura padrões "IDENT(" ou "IDENT.campo(" ou "IDENT:metodo("
+ * onde IDENT (a raiz da cadeia) não é: uma palavra-chave, um
+ * módulo nativo conhecido (eis_known_contains — Lua padrão +
+ * ElliotOS), nem algo declarado neste arquivo (local, global,
+ * função, parâmetro, variável de loop — tudo coletado na
+ * passagem anterior). É uma heurística de texto, não sabe tudo
+ * que existe (por isso é sempre 'I', nunca erro) — mas pega
+ * exatamente o caso de "digitei um nome de função que não existe".
+ * Cada raiz só é reportada uma vez por arquivo (evita repetir a
+ * mesma mensagem se o erro de digitação aparece várias vezes). */
+#define EIS_FLAGGED_MAX 100
+static void check_run_lua_undefined_calls(void) {
+    static char flagged[EIS_FLAGGED_MAX][40];
+    int flagged_count = 0;
+    int block_kind = 0;
+
+    for (int y = 0; y < E.numrows; y++) {
+        char code[320];
+        eis_strip_lua_line(&E.row[y], code, sizeof(code), &block_kind);
+        {
+            char trimmed[320]; snprintf(trimmed,sizeof(trimmed),"%s",code);
+            eis_trim(trimmed);
+            if (!strncmp(trimmed, "function ", 9) || !strncmp(trimmed, "local function ", 15))
+                continue; /* linha de definição, não de chamada */
+        }
+
+        int p = 0;
+        while (code[p]) {
+            if (!eis_is_ident_start(code[p])) { p++; continue; }
+
+            int start = p;
+            char root[40];
+            eis_read_ident(code, &p, root, sizeof(root));
+
+            /* se vier logo antes um '.' ou ':', isto não é a raiz da
+               cadeia (é um campo/método no meio) — não é candidato */
+            if (start > 0 && (code[start-1]=='.' || code[start-1]==':')) continue;
+
+            int q = p;
+            while (code[q]=='.' || code[q]==':') {
+                q++;
+                char sub[40];
+                if (!eis_read_ident(code, &q, sub, sizeof(sub))) break;
+            }
+            while (code[q]==' ') q++;
+
+            if (code[q] != '(') continue; /* não é uma chamada, só um identificador solto */
+            if (eis_is_lua_keyword(root)) continue;
+            if (eis_known_contains(root)) continue;
+
+            int already = 0;
+            for (int i = 0; i < flagged_count; i++)
+                if (!strcmp(flagged[i], root)) { already = 1; break; }
+            if (already) continue;
+            if (flagged_count < EIS_FLAGGED_MAX) {
+                snprintf(flagged[flagged_count++], sizeof(flagged[0]), "%s", root);
+            }
+
+            eissue_add(y+1, 'I',
+                "'%s' não é um módulo conhecido nem foi declarado neste arquivo — nome de função digitado errado?",
+                root);
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS ESPECÍFICAS DE C/C++
+ * ════════════════════════════════════════════════════════ */
+
+/* ── Atribuição dentro de condição: if(x = y) / while(x = y) ──
+ * Um dos bugs mais clássicos de C: '=' no lugar de '=='. Só
+ * dispara pra atribuições simples (IDENT = IDENT/NUM), pra não
+ * confundir com o idioma válido e comum `while ((n = read()) > 0)`
+ * (aí o '=' já vem dentro de outro parêntese aninhado). */
+static void check_run_c_assign_in_cond(void) {
+    int block_comment = 0;
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        int in_str = 0; char str_q = 0;
+        for (int x = 0; x < row->size; x++) {
+            char c = row->chars[x];
+            char c2 = (x+1 < row->size) ? row->chars[x+1] : 0;
+
+            if (block_comment) {
+                if (c=='*' && c2=='/') { block_comment=0; x++; }
+                continue;
+            }
+            if (in_str) {
+                if (c=='\\' && x+1<row->size) { x++; continue; }
+                if (c==str_q) in_str=0;
+                continue;
+            }
+            if (c=='/' && c2=='*') { block_comment=1; x++; continue; }
+            if (c=='/' && c2=='/') break;
+            if (c=='"' || c=='\'') { in_str=1; str_q=c; continue; }
+
+            if ((c=='i'&&c2=='f') || (c=='w'&&c2=='h')) {
+                int kwlen = (c=='i') ? 2 : 5; /* "if" ou "while" */
+                if (x+kwlen<=row->size &&
+                    !strncmp(row->chars+x, (c=='i')?"if":"while", kwlen) &&
+                    (x==0 || !eis_is_ident_char(row->chars[x-1])) &&
+                    (x+kwlen>=row->size || !eis_is_ident_char(row->chars[x+kwlen]))) {
+
+                    int p = x + kwlen;
+                    while (p<row->size && row->chars[p]==' ') p++;
+                    if (p<row->size && row->chars[p]=='(') {
+                        p++;
+                        /* só olha pro conteúdo imediatamente dentro do
+                           primeiro nível de parênteses (sem parênteses
+                           aninhados no meio) */
+                        int depth = 1;
+                        int start = p;
+                        while (p<row->size && depth>0) {
+                            if (row->chars[p]=='(') depth++;
+                            else if (row->chars[p]==')') { depth--; if(depth==0) break; }
+                            p++;
+                        }
+                        if (depth==0) {
+                            /* verifica se dentro de [start,p) existe um
+                               '(' — se existir, é aninhado, abortamos
+                               (evita falso positivo em `while((n=read())>0)`) */
+                            int has_nested = 0;
+                            for (int q=start; q<p; q++) if (row->chars[q]=='(') { has_nested=1; break; }
+                            if (!has_nested) {
+                                /* procura IDENT [espaço] '=' [espaço] IDENT/NUM, sem == */
+                                int q = start;
+                                while (q<start+40 && q<p && row->chars[q]==' ') q++;
+                                char lhs[40]; int qi=q;
+                                if (eis_is_ident_start(row->chars[qi])) {
+                                    int li=0;
+                                    while (qi<p && eis_is_ident_char(row->chars[qi]) && li<39) lhs[li++]=row->chars[qi++];
+                                    lhs[li]='\0';
+                                    while (qi<p && row->chars[qi]==' ') qi++;
+                                    if (qi<p && row->chars[qi]=='=' &&
+                                        !(qi+1<p && row->chars[qi+1]=='=') &&
+                                        (qi==start || row->chars[qi-1]!='!' ) &&
+                                        (qi==start || row->chars[qi-1]!='<' ) &&
+                                        (qi==start || row->chars[qi-1]!='>' )) {
+                                        eissue_add(y+1, 'W',
+                                            "atribuição '%s =' dentro de %s(...) — você quis dizer '=='?",
+                                            lhs, (c=='i')?"if":"while");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * DESPACHO POR LINGUAGEM + ENTRADA (Ctrl+E)
+ * ════════════════════════════════════════════════════════ */
+
+static void check_run_all(void) {
+    g_eissue_count = 0;
+
+    check_run_brackets();
+    check_run_trailing();
+    check_run_line_length();
+    check_run_mixed_indent();
+    check_run_markers();
+
+    int is_c   = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
+    int is_lua = (E.syntax == &HLDB[2]);
+
+    if (is_lua) {
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Lua/ElliotOS");
+        check_run_lua_pass1();
+        check_run_lua_unused();
+        check_run_lua_undefined_calls();
+    } else if (is_c) {
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "%s",
+                 (E.syntax == &HLDB[1]) ? "C++" : "C");
+        check_run_c_assign_in_cond();
+    } else if (E.syntax == &HLDB[3]) {
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Bash");
+    } else {
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Genérico");
+    }
+}
+
+/* Pula o cursor para a linha do issue selecionado, centralizando a view */
+static void eissue_jump(int idx) {
+    if (idx < 0 || idx >= g_eissue_count) return;
+    int line = g_eissues[idx].line;
+    if (line < 1) return;
+    E.cy = line - 1;
+    if (E.cy >= E.numrows) E.cy = E.numrows - 1;
+    E.cx = 0;
+    E.rowoff = E.cy - E.rows/2;
+    if (E.rowoff < 0) E.rowoff = 0;
+}
+
+/* Entrada: Ctrl+E */
+static void check_code(void) {
+    check_run_all();
+
+    if (g_eissue_count == 0) {
+        set_status("\x1b[32m✓ nenhum problema encontrado (%s)\x1b[m", g_eissue_lang);
+        return;
+    }
+
+    g_eissue_sel = 0;
+    g_eissue_scroll = 0;
+    g_eissue_active = 1;
+    eissue_jump(0);
+
+    int errs = 0, warns = 0, infos = 0;
+    for (int i = 0; i < g_eissue_count; i++) {
+        if (g_eissues[i].sev == 'E') errs++;
+        else if (g_eissues[i].sev == 'W') warns++;
+        else infos++;
+    }
+    set_status("Ctrl+E [%s]: ↑↓ navegar  Enter ir  Esc fechar  [%d erro(s), %d aviso(s), %d info]",
+               g_eissue_lang, errs, warns, infos);
+}
+
+/* Desenha o painel de resultados — mesmo estilo visual do
+ * painel de snippets (Ctrl+I): título, lista com badge colorido
+ * por severidade, separador, preview da linha de código
+ * apontada, e rodapé com dicas de navegação. */
+static void draw_check_panel(Abuf *ab) {
+    if (!g_eissue_active || g_eissue_count == 0) return;
+
+    int panel_w  = 58;
+    int list_h   = g_eissue_count < 10 ? g_eissue_count : 10;
+    int prev_h   = 3;
+    int total_h  = 1 + list_h + 1 + prev_h + 1;
+
+    int panel_col = (E.cols - panel_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = (E.rows - total_h) / 2;
+    if (panel_row < 1) panel_row = 1;
+
+    const char *C_TITLE_BG  = "\x1b[48;5;53m";   /* roxo escuro */
+    const char *C_TITLE_FG  = "\x1b[38;5;215m";  /* dourado */
+    const char *C_SEL_BG    = "\x1b[48;5;88m";   /* vinho */
+    const char *C_SEL_FG    = "\x1b[38;5;255m";
+    const char *C_ROW_BG    = "\x1b[48;5;235m";
+    const char *C_ROW_FG    = "\x1b[38;5;250m";
+    const char *C_SEP       = "\x1b[38;5;240m";
+    const char *C_PREV_BG   = "\x1b[48;5;233m";
+    const char *C_PREV_FG   = "\x1b[38;5;243m";
+    const char *C_PREV_CODE = "\x1b[38;5;150m";
+    const char *C_FOOT_BG   = "\x1b[48;5;53m";
+    const char *C_FOOT_FG   = "\x1b[38;5;217m";
+    const char *C_BOLD      = "\x1b[1m";
+    const char *C_RST       = "\x1b[m";
+
+    /* título */
+    {
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,C_TITLE_BG,strlen(C_TITLE_BG));
+        ab_append(ab,C_TITLE_FG,strlen(C_TITLE_FG));
+        ab_append(ab,C_BOLD,strlen(C_BOLD));
+        char title[96];
+        int tl = snprintf(title,sizeof(title)," ⚑ Verificação (%s) · %d problema(s) ",
+                           g_eissue_lang, g_eissue_count);
+        if (tl>panel_w) tl=panel_w;
+        ab_append(ab,title,tl);
+        for(int s=tl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,C_RST,strlen(C_RST));
+    }
+
+    if (g_eissue_sel < g_eissue_scroll) g_eissue_scroll = g_eissue_sel;
+    if (g_eissue_sel >= g_eissue_scroll + list_h) g_eissue_scroll = g_eissue_sel - list_h + 1;
+
+    for (int i = 0; i < list_h; i++) {
+        int idx = g_eissue_scroll + i;
+        if (idx >= g_eissue_count) break;
+        int row = panel_row + 1 + i;
+        int sel = (idx == g_eissue_sel);
+
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+
+        ab_append(ab, sel?C_SEL_BG:C_ROW_BG, sel?strlen(C_SEL_BG):strlen(C_ROW_BG));
+
+        char sev = g_eissues[idx].sev;
+        const char *badge = (sev=='E') ? "ERR" : (sev=='W') ? "AVISO" : "INFO";
+        const char *badgecolor = sel ? "\x1b[38;5;255m" :
+                                  (sev=='E') ? "\x1b[38;5;203m" :
+                                  (sev=='W') ? "\x1b[38;5;221m" : "\x1b[38;5;110m";
+
+        ab_append(ab," ",1);
+        ab_append(ab,badgecolor,strlen(badgecolor));
+        ab_append(ab,C_BOLD,strlen(C_BOLD));
+        char badge_field[8]; snprintf(badge_field,sizeof(badge_field),"%-5s",badge);
+        ab_append(ab,badge_field,5);
+        ab_append(ab,C_RST,strlen(C_RST));
+
+        ab_append(ab, sel?C_SEL_BG:C_ROW_BG, sel?strlen(C_SEL_BG):strlen(C_ROW_BG));
+        ab_append(ab, sel ? "\x1b[38;5;217m" : C_SEP, sel ? 14 : strlen(C_SEP));
+        ab_append(ab,"│",3);
+
+        ab_append(ab, sel?C_SEL_FG:C_ROW_FG, sel?strlen(C_SEL_FG):strlen(C_ROW_FG));
+        if (sel) ab_append(ab,C_BOLD,strlen(C_BOLD));
+        char msg_field[44];
+        snprintf(msg_field,sizeof(msg_field)," %-42s",g_eissues[idx].msg);
+        msg_field[43]='\0';
+        ab_append(ab,msg_field,strlen(msg_field));
+
+        ab_append(ab, sel ? "\x1b[38;5;245m" : "\x1b[2m", sel?14:4);
+        char line_field[10];
+        if (g_eissues[idx].line > 0)
+            snprintf(line_field,sizeof(line_field),"L%-4d",g_eissues[idx].line);
+        else
+            snprintf(line_field,sizeof(line_field),"     ");
+        ab_append(ab,line_field,strlen(line_field));
+
+        ab_append(ab,C_RST,strlen(C_RST));
+    }
+
+    /* separador antes do preview */
+    {
+        int row = panel_row + 1 + list_h;
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,C_PREV_BG,strlen(C_PREV_BG));
+        ab_append(ab,C_SEP,strlen(C_SEP));
+        const char *sep_label = " linha apontada ";
+        int sl = (int)strlen(sep_label);
+        int dashes_l = (panel_w - sl) / 2;
+        int dashes_r = panel_w - sl - dashes_l;
+        for (int s=0;s<dashes_l;s++) ab_append(ab,"─",3);
+        ab_append(ab,sep_label,sl);
+        for (int s=0;s<dashes_r;s++) ab_append(ab,"─",3);
+        ab_append(ab,C_RST,strlen(C_RST));
+    }
+
+    /* preview: a linha de código apontada pelo issue selecionado */
+    {
+        int line = g_eissues[g_eissue_sel].line;
+        for (int i = 0; i < prev_h; i++) {
+            int row = panel_row + 2 + list_h + i;
+            if (row >= E.rows) break;
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,C_PREV_BG,strlen(C_PREV_BG));
+
+            if (i == 0 && line >= 1 && line <= E.numrows) {
+                Row *r = &E.row[line-1];
+                char clean[64];
+                int cl = r->size; if (cl >= (int)sizeof(clean)) cl = sizeof(clean)-1;
+                memcpy(clean, r->chars, cl); clean[cl]='\0';
+                ab_append(ab,C_PREV_CODE,strlen(C_PREV_CODE));
+                char pline[80];
+                int pl = snprintf(pline,sizeof(pline)," %-*s",panel_w-1,clean);
+                if (pl>panel_w) pl=panel_w;
+                ab_append(ab,pline,pl);
+            } else if (i == 1) {
+                ab_append(ab,C_PREV_FG,strlen(C_PREV_FG));
+                char hint[80];
+                int hl = snprintf(hint,sizeof(hint)," %-*s",panel_w-1,g_eissues[g_eissue_sel].msg);
+                if (hl>panel_w) hl=panel_w;
+                ab_append(ab,hint,hl);
+            } else {
+                ab_append(ab,C_PREV_FG,strlen(C_PREV_FG));
+                for(int s=0;s<panel_w;s++) ab_append(ab," ",1);
+            }
+            ab_append(ab,C_RST,strlen(C_RST));
+        }
+    }
+
+    /* rodapé */
+    {
+        int row = panel_row + 2 + list_h + prev_h;
+        if (row < E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,C_FOOT_BG,strlen(C_FOOT_BG));
+            ab_append(ab,C_FOOT_FG,strlen(C_FOOT_FG));
+            char foot[80];
+            int fl=snprintf(foot,sizeof(foot),
+                " ↑↓ navegar   Enter ir   Esc fechar   %d/%d ",
+                g_eissue_sel+1, g_eissue_count);
+            if(fl>panel_w)fl=panel_w;
+            ab_append(ab,foot,fl);
+            for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,C_RST,strlen(C_RST));
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * SNIPPETS (Ctrl+I)
+ * ════════════════════════════════════════════════════════ */
+
+/*
+ * Cada snippet tem:
+ *   name    — nome exibido no painel
+ *   lang    — 0=C/C++  1=Lua  2=Bash  3=qualquer
+ *   lines[] — linhas do template
+ *   cursor_line / cursor_col — onde posicionar o cursor (0-based, relativo ao insert)
+ *
+ * Marcador especial nas linhas: "█" (U+2588) indica a posição exata do cursor.
+ * Substituímos por string vazia e posicionamos o cursor lá.
+ */
+
+#define SNIP_MAX_LINES 24
+#define SNIP_COUNT     48
+
+typedef struct {
+    const char *name;
+    int         lang;       /* 0=C 1=Lua 2=Bash 3=all */
+    const char *lines[SNIP_MAX_LINES];
+    int         nlines;
+} Snippet;
+
+/* ─── Catálogo de snippets ─────────────────────────────── */
+static Snippet g_snips[] = {
+
+/* ── LUA ── */
+{ "if / then / end",           1, {
+    "if █ then",
+    "    ",
+    "end",
+}, 3 },
+
+{ "if / elseif / else / end",  1, {
+    "if █ then",
+    "    ",
+    "elseif  then",
+    "    ",
+    "else",
+    "    ",
+    "end",
+}, 7 },
+
+{ "while / do / end",          1, {
+    "while █ do",
+    "    ",
+    "end",
+}, 3 },
+
+{ "for numérico",              1, {
+    "for i = █1, 10 do",
+    "    ",
+    "end",
+}, 3 },
+
+{ "for genérico (ipairs)",     1, {
+    "for i, v in ipairs(█) do",
+    "    ",
+    "end",
+}, 3 },
+
+{ "for genérico (pairs)",      1, {
+    "for k, v in pairs(█) do",
+    "    ",
+    "end",
+}, 3 },
+
+{ "function",                  1, {
+    "local function █()",
+    "    ",
+    "end",
+}, 3 },
+
+{ "function com return",       1, {
+    "local function █()",
+    "    return ",
+    "end",
+}, 3 },
+
+{ "repeat / until",            1, {
+    "repeat",
+    "    █",
+    "until ",
+}, 3 },
+
+{ "pcall (tratamento de erro)",1, {
+    "local ok, err = pcall(function()",
+    "    █",
+    "end)",
+    "if not ok then",
+    "    print(\"erro: \" .. tostring(err))",
+    "end",
+}, 6 },
+
+{ "table / inserir",           1, {
+    "local █t = {}",
+    "table.insert(t, )",
+}, 2 },
+
+{ "ElliotOS: mod completo",    1, {
+    "local M = {}",
+    "",
+    "function M.run(args)",
+    "    █",
+    "end",
+    "",
+    "return M",
+}, 7 },
+
+{ "ElliotOS: tui.main",         1, {
+    "tui.main(\"5x5\", \"█Título\")",
+    "tui.func({",
+    "    {[\"Op\xc3\xa7\xc3\xa3o 1\"] = function()",
+    "        ",
+    "    end},",
+    "    {[\"Op\xc3\xa7\xc3\xa3o 2\"] = function()",
+    "        ",
+    "    end},",
+    "})",
+}, 9 },
+
+{ "ElliotOS: net.scan",        1, {
+    "local result = net.scan(\"█host\", portInicio, portFim)",
+    "for _, p in ipairs(result) do",
+    "    print(\"porta aberta: \" .. p)",
+    "end",
+}, 4 },
+
+/* ── MOD — Pentest Scanners ── */
+{ "mod.xss",                   1, {
+    "local r = mod.xss(\"█http://alvo.com/search?q=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.sqli",                  1, {
+    "local r = mod.sqli(\"█http://alvo.com/page?id=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.lfi",                   1, {
+    "local r = mod.lfi(\"█http://alvo.com/page?file=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.rce",                   1, {
+    "local r = mod.rce(\"█http://alvo.com/exec?cmd=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.ssrf",                  1, {
+    "local r = mod.ssrf(\"█http://alvo.com/fetch?url=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.ssti",                  1, {
+    "local r = mod.ssti(\"█http://alvo.com/render?tpl=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.headers",               1, {
+    "local r = mod.headers(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.waf",                   1, {
+    "local r = mod.waf(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.cors",                  1, {
+    "local r = mod.cors(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.csrf",                  1, {
+    "local r = mod.csrf(\"█http://alvo.com/form\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.jwt",                   1, {
+    "local r = mod.jwt(\"█eyJhbGciOiJub25lIn0...\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.idor",                  1, {
+    "local r = mod.idor(\"█http://alvo.com/user\", \"id\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.xxe",                   1, {
+    "local r = mod.xxe(\"█http://alvo.com/xml\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.nosql",                 1, {
+    "local r = mod.nosql(\"█http://alvo.com/login\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.redir",                 1, {
+    "local r = mod.redir(\"█http://alvo.com/go?url=\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.dirs",                  1, {
+    "local r = mod.dirs(\"█http://alvo.com\")",
+    "if r then",
+    "    for _, d in ipairs(r) do print(d) end",
+    "end",
+}, 4 },
+
+{ "mod.secrets",               1, {
+    "local r = mod.secrets(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.subdomains",            1, {
+    "local r = mod.subdomains(\"█alvo.com\")",
+    "if r then",
+    "    for _, s in ipairs(r) do print(s) end",
+    "end",
+}, 4 },
+
+{ "mod.params",                1, {
+    "local r = mod.params(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.backup",                1, {
+    "local r = mod.backup(\"█http://alvo.com\")",
+    "if r then print(r) end",
+}, 2 },
+
+{ "mod.spider",                1, {
+    "local links = mod.spider(\"█http://alvo.com\", 50)",
+    "for _, l in ipairs(links) do",
+    "    print(l)",
+    "end",
+}, 4 },
+
+{ "mod.chain (pipeline)",      1, {
+    "mod.chain(\"█http://alvo.com\")",
+}, 1 },
+
+{ "ms.scan-all (shell)",       1, {
+    "sys.sh(\"ms --scan-all █http://alvo.com 50\")",
+}, 1 },
+
+/* ── NET — Rede raw ── */
+{ "net.get",                   1, {
+    "local resp = net.get(\"█http://alvo.com\")",
+    "print(resp)",
+}, 2 },
+
+{ "net.post",                  1, {
+    "local resp = net.post(\"█http://alvo.com/login\",",
+    "    \"user=admin&pass=1234\")",
+    "print(resp)",
+}, 3 },
+
+{ "net.tcp (socket raw)",      1, {
+    "local sock = net.tcp(\"█host\", 80)",
+    "net.send(sock, \"GET / HTTP/1.0\\r\\n\\r\\n\")",
+    "local data = net.recv(sock)",
+    "print(data)",
+    "net.close(sock)",
+}, 5 },
+
+{ "net.dns",                   1, {
+    "local ip = net.dns(\"█alvo.com\")",
+    "print(ip)",
+}, 2 },
+
+{ "net.ping",                  1, {
+    "local ms = net.ping(\"█host\")",
+    "print(ms .. \" ms\")",
+}, 2 },
+
+{ "net.os (banner grab)",      1, {
+    "local info = net.os(\"█host\")",
+    "print(info)",
+}, 2 },
+
+{ "net.hosts (IPs locais)",    1, {
+    "local hosts = net.hosts()",
+    "for _, h in ipairs(hosts) do",
+    "    print(h)",
+    "end",
+}, 4 },
+
+/* ── CRYPTO ── */
+{ "crypto.sha256",             1, {
+    "local hash = crypto.sha256(\"█texto\")",
+    "print(hash)",
+}, 2 },
+
+{ "crypto.md5",                1, {
+    "local hash = crypto.md5(\"█texto\")",
+    "print(hash)",
+}, 2 },
+
+{ "crypto.b64enc / b64dec",    1, {
+    "local enc = crypto.b64enc(\"█texto\")",
+    "local dec = crypto.b64dec(enc)",
+    "print(enc, dec)",
+}, 3 },
+
+{ "crypto.aes enc/dec",        1, {
+    "local enc = crypto.aes_enc(\"█dado\", \"chave16bytes!!!!\")",
+    "local dec = crypto.aes_dec(enc,  \"chave16bytes!!!!\")",
+    "print(dec)",
+}, 3 },
+
+{ "crypto.hmac",               1, {
+    "local h = crypto.hmac(\"sha256\", \"█chave\", \"mensagem\")",
+    "print(h)",
+}, 2 },
+
+/* ── UI ── */
+{ "ui.box",                    1, {
+    "ui.box(\"█Titulo\", \"Conteudo da caixa\")",
+}, 1 },
+
+{ "ui.color",                  1, {
+    "ui.color(\"█texto\", \"green\")",
+}, 1 },
+
+{ "ui.input",                  1, {
+    "local resp = ui.input(\"█Pergunta: \")",
+    "print(resp)",
+}, 2 },
+
+{ "ui.fig (banner)",           1, {
+    "ui.fig(\"█TEXTO\")",
+}, 1 },
+
+{ "ui.sleep",                  1, {
+    "ui.sleep(█1)",
+}, 1 },
+
+/* ── SYS ── */
+{ "sys.sh (rodar comando)",    1, {
+    "local out = sys.sh(\"█ls -la\")",
+    "print(out)",
+}, 2 },
+
+{ "sys.thread",                1, {
+    "local tid = sys.thread(function()",
+    "    █",
+    "end)",
+    "sys.join(tid)",
+}, 4 },
+
+{ "sys.list (processos)",      1, {
+    "local procs = sys.list()",
+    "for _, p in ipairs(procs) do",
+    "    print(p)",
+    "end",
+}, 4 },
+
+/* ── MS — alias e automacao ── */
+{ "ms.alias (criar)",          1, {
+    "ms.alias(\"█NOME\", \"net.scan('alvo.com', 1, 9999)\")",
+    "-- uso: NOME()",
+}, 2 },
+
+{ "ms.alias (listar)",         1, {
+    "ms.alias()",
+}, 1 },
+
+{ "ms.b64.enc / dec",          1, {
+    "local e = ms.b64.enc(\"█texto\")",
+    "local d = ms.b64.dec(e)",
+    "print(e, d)",
+}, 3 },
+
+/* ── AI ── */
+{ "ai.ask",                    1, {
+    "local r = ai.ask(\"█pergunta\")",
+    "print(r)",
+}, 2 },
+
+{ "ai.code",                   1, {
+    "local code = ai.code(\"█escreva um scanner de portas em Lua\")",
+    "print(code)",
+}, 2 },
+
+/* ── C ── */
+{ "if / else",                 0, {
+    "if (█) {",
+    "    ",
+    "} else {",
+    "    ",
+    "}",
+}, 5 },
+
+{ "if simples",                0, {
+    "if (█) {",
+    "    ",
+    "}",
+}, 3 },
+
+{ "for loop",                  0, {
+    "for (int i = 0; i < █; i++) {",
+    "    ",
+    "}",
+}, 3 },
+
+{ "while loop",                0, {
+    "while (█) {",
+    "    ",
+    "}",
+}, 3 },
+
+{ "switch / case",             0, {
+    "switch (█) {",
+    "    case :",
+    "        break;",
+    "    default:",
+    "        break;",
+    "}",
+}, 6 },
+
+{ "função",                    0, {
+    "static void █(void) {",
+    "    ",
+    "}",
+}, 3 },
+
+{ "função com retorno int",    0, {
+    "static int █(void) {",
+    "    return 0;",
+    "}",
+}, 3 },
+
+{ "malloc + free",             0, {
+    "█type *ptr = malloc(sizeof(type) * n);",
+    "if (!ptr) { /* erro */ }",
+    "/* uso */",
+    "free(ptr);",
+}, 4 },
+
+{ "struct",                    0, {
+    "typedef struct {",
+    "    █",
+    "} NomeStruct;",
+}, 3 },
+
+{ "snprintf seguro",           0, {
+    "char buf[█256];",
+    "snprintf(buf, sizeof(buf), \"%s\", );",
+}, 2 },
+
+{ "popen / pclose",            0, {
+    "FILE *fp = popen(\"█comando\", \"r\");",
+    "if (!fp) return;",
+    "char line[256];",
+    "while (fgets(line, sizeof(line), fp)) {",
+    "    /* processa line */",
+    "}",
+    "pclose(fp);",
+}, 7 },
+
+/* ── BASH ── */
+{ "if / then / fi",            2, {
+    "if █; then",
+    "    ",
+    "fi",
+}, 3 },
+
+{ "if / else / fi",            2, {
+    "if █; then",
+    "    ",
+    "else",
+    "    ",
+    "fi",
+}, 5 },
+
+{ "for loop",                  2, {
+    "for █item in lista; do",
+    "    ",
+    "done",
+}, 3 },
+
+{ "while loop",                2, {
+    "while █; do",
+    "    ",
+    "done",
+}, 3 },
+
+{ "função",                    2, {
+    "█nome() {",
+    "    ",
+    "}",
+}, 3 },
+
+{ "case / esac",               2, {
+    "case \"$█1\" in",
+    "    opcao1)",
+    "        ;;",
+    "    *)",
+    "        ;;",
+    "esac",
+}, 6 },
+
+{ "verificar argumento",       2, {
+    "if [ $# -lt █1 ]; then",
+    "    echo \"Uso: $0 <arg>\" >&2",
+    "    exit 1",
+    "fi",
+}, 4 },
+
+/* ── HTML ── */
+{ "! → template HTML5",        4, {
+    "!",
+}, 1 },
+
+{ "div com classe",             4, {
+    "<div class=\"█\">",
+    "    ",
+    "</div>",
+}, 3 },
+
+{ "link (âncora)",             4, {
+    "<a href=\"█\">texto</a>",
+}, 1 },
+
+{ "imagem",                    4, {
+    "<img src=\"█\" alt=\"\" width=\"\" height=\"\">",
+}, 1 },
+
+{ "formulário POST",           4, {
+    "<form action=\"█\" method=\"POST\">",
+    "    <input type=\"text\" name=\"\" placeholder=\"\">",
+    "    <button type=\"submit\">Enviar</button>",
+    "</form>",
+}, 4 },
+
+{ "input + label",             4, {
+    "<label for=\"█campo\">Label</label>",
+    "<input type=\"text\" id=\"campo\" name=\"campo\" placeholder=\"\">",
+}, 2 },
+
+{ "tabela",                    4, {
+    "<table>",
+    "    <thead>",
+    "        <tr><th>█Col 1</th><th>Col 2</th></tr>",
+    "    </thead>",
+    "    <tbody>",
+    "        <tr><td></td><td></td></tr>",
+    "    </tbody>",
+    "</table>",
+}, 8 },
+
+{ "lista não-ordenada",        4, {
+    "<ul>",
+    "    <li>█Item 1</li>",
+    "    <li>Item 2</li>",
+    "</ul>",
+}, 4 },
+
+{ "<style> inline",            4, {
+    "<style>",
+    "    .█classe {",
+    "        ",
+    "    }",
+    "</style>",
+}, 5 },
+
+{ "<script> inline",           4, {
+    "<script>",
+    "    █",
+    "</script>",
+}, 3 },
+
+{ "fetch() básico",            4, {
+    "fetch('█url')",
+    "    .then(r => r.json())",
+    "    .then(data => {",
+    "        console.log(data);",
+    "    })",
+    "    .catch(err => console.error(err));",
+}, 6 },
+
+{ "fetch + atualizar DOM",     4, {
+    "fetch('█/api/endpoint')",
+    "    .then(r => r.json())",
+    "    .then(data => {",
+    "        document.getElementById('resultado').textContent = data.msg;",
+    "    });",
+}, 5 },
+
+{ "web.serve (Lua — rodar servidor)",4, {
+    "-- Salve este HTML e rode no REPL do ElliotOS:",
+    "web.serve('█index.html', 8080)",
+    "-- Acesse: http://localhost:8080",
+}, 3 },
+
+};
+
+#define SNIP_TOTAL ((int)(sizeof(g_snips)/sizeof(g_snips[0])))
+
+/* Estado do painel de snippets */
+static int g_snip_active = 0;
+static int g_snip_sel    = 0;
+static int g_snip_scroll = 0;   /* primeira linha visível da lista */
+
+/* Insere o snippet selecionado na posição do cursor */
+static void snip_insert(int idx) {
+    if (idx < 0 || idx >= SNIP_TOTAL) return;
+    Snippet *sn = &g_snips[idx];
+
+    undo_push();
+
+    /* FIX: se buffer vazio, cria linha inicial antes de qualquer acesso a E.row */
+    if (E.numrows == 0) {
+        insert_row(0, "", 0);
+        E.cy = 0; E.cx = 0;
+    }
+
+    /* detecta indent da linha atual — lê por índice, não guarda ponteiro
+       (insert_newline() pode realloc E.row tornando qualquer Row* inválido) */
+    int ind = 0;
+    {
+        Row *cur = &E.row[E.cy];
+        while (ind < cur->size && (cur->chars[ind]==' '||cur->chars[ind]=='\t')) ind++;
+    }
+    char indent[64] = {0};
+    if (ind > 63) ind = 63;
+    memset(indent, ' ', ind);
+
+    int cursor_row = E.cy; /* linha absoluta onde ficará o cursor */
+    int cursor_col = ind;
+    int cursor_set = 0;
+
+    /* FIX: relê o tamanho da linha por índice após undo_push (que também pode
+       realloc via rows_to_string/insert_row) — nunca usa ponteiro cacheado */
+    if (E.row[E.cy].size > 0) {
+        /* vai para o fim da linha e insere newline */
+        E.cx = E.row[E.cy].size;
+        insert_newline();
+        /* após insert_newline E.row pode ter sido realocado; E.cy já foi
+           incrementado pela própria função — não precisamos de 'cur' aqui */
+    }
+
+    int insert_start = E.cy; /* primeira linha do snippet */
+
+    for (int i = 0; i < sn->nlines; i++) {
+        const char *tmpl = sn->lines[i];
+        int tlen = (int)strlen(tmpl);
+
+        /* FIX: tlen-2 underflowa para INT_MAX quando tlen < 2 (string curta
+           ou vazia); usa tlen >= 3 como guarda antes do loop */
+        int mark = -1;
+        if (tlen >= 3) {
+            for (int j = 0; j <= tlen-3; j++) {
+                if ((unsigned char)tmpl[j]==0xE2 &&
+                    (unsigned char)tmpl[j+1]==0x96 &&
+                    (unsigned char)tmpl[j+2]==0x88) {
+                    mark = j; break;
+                }
+            }
+        }
+
+        /* monta linha: indent + template sem marcador */
+        char buf[512];
+        int blen = 0;
+        memcpy(buf, indent, ind); blen = ind;
+        if (mark < 0) {
+            /* sem marcador — copia tudo */
+            int cp = tlen < (int)sizeof(buf)-ind-1 ? tlen : (int)sizeof(buf)-ind-1;
+            memcpy(buf+blen, tmpl, cp); blen += cp;
+        } else {
+            /* copia antes do marcador */
+            int before = mark < (int)sizeof(buf)-ind-1 ? mark : (int)sizeof(buf)-ind-1;
+            memcpy(buf+blen, tmpl, before); blen += before;
+            /* salva posição do cursor */
+            if (!cursor_set) {
+                cursor_row = insert_start + i;
+                cursor_col = blen;
+                cursor_set = 1;
+            }
+            /* copia depois do marcador (pula 3 bytes do █) */
+            const char *after = tmpl + mark + 3;
+            int alen = (int)strlen(after);
+            int cp = alen < (int)sizeof(buf)-blen-1 ? alen : (int)sizeof(buf)-blen-1;
+            memcpy(buf+blen, after, cp); blen += cp;
+        }
+        buf[blen] = '\0';
+
+        if (i == 0) {
+            /* FIX: relê ponteiro após possível realloc causado por insert_newline */
+            Row *r = &E.row[E.cy];
+            free(r->chars);
+            r->chars = malloc(blen+1);
+            if (!r->chars) { r->chars = malloc(1); r->chars[0]='\0'; r->size=0; continue; }
+            memcpy(r->chars, buf, blen);
+            r->chars[blen] = '\0';
+            r->size = blen;
+            update_row(r); E.dirty++;
+        } else {
+            /* linhas seguintes: insere após a linha atual */
+            insert_row(insert_start + i, buf, blen);
+        }
+    }
+
+    /* posiciona cursor */
+    E.cy = cursor_row;
+    E.cx = cursor_col;
+    if (E.cy >= E.numrows) E.cy = E.numrows > 0 ? E.numrows - 1 : 0;
+    if (E.cy < 0) E.cy = 0;
+    if (E.numrows > 0 && E.cx > E.row[E.cy].size) E.cx = E.row[E.cy].size;
+}
+
+/* Filtra snippets pela linguagem atual */
+static int snip_visible[SNIP_COUNT];
+static int snip_vis_count = 0;
+
+static void snip_build_list(void) {
+    snip_vis_count = 0;
+    int lang = -1;
+    if (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) lang = 0;
+    else if (E.syntax == &HLDB[2]) lang = 1;
+    else if (E.syntax == &HLDB[3]) lang = 2;
+    else if (E.syntax == &HLDB[4]) lang = 4;
+
+    for (int i = 0; i < SNIP_TOTAL && snip_vis_count < SNIP_COUNT; i++) {
+        if (g_snips[i].lang == 3 || g_snips[i].lang == lang)
+            snip_visible[snip_vis_count++] = i;
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════
+ * EXPLORADOR DE ARQUIVOS (Ctrl+P)
+ * ════════════════════════════════════════════════════════ */
+
+#define FEXP_MAX   2048  /* max entradas por diretório */
+#define FEXP_SHOW  16    /* linhas visíveis */
+#define FEXP_NAMELEN 64
+
+typedef struct {
+    char name[FEXP_NAMELEN];
+    int  is_dir;
+} FEntry;
+
+static FEntry  g_fexp_entries[FEXP_MAX];
+static int     g_fexp_count  = 0;
+static int     g_fexp_sel    = 0;
+static int     g_fexp_scroll = 0;
+static int     g_fexp_active = 0;
+static char    g_fexp_cwd[512];
+
+/* ── campo de texto para digitar caminho ── */
+#define FEXP_INPUT_MAX 256
+static char g_fexp_input[FEXP_INPUT_MAX]; /* texto digitado */
+static int  g_fexp_input_len = 0;
+static int  g_fexp_input_mode = 0;        /* 1 = usuário está digitando */
+
+/* Compara entradas: diretórios primeiro, depois alfabético */
+static int fexp_cmp(const void *a, const void *b) {
+    const FEntry *fa = (const FEntry *)a;
+    const FEntry *fb = (const FEntry *)b;
+    if (fa->is_dir != fb->is_dir) return fb->is_dir - fa->is_dir;
+    return strcmp(fa->name, fb->name);
+}
+
+/* Carrega entradas do diretório atual */
+static void fexp_load(const char *path) {
+    /* resolve caminho real — segue symlinks, resolve .. */
+    char resolved[512];
+    if (!realpath(path, resolved))
+        snprintf(resolved, sizeof(resolved), "%s", path);
+
+    DIR *d = opendir(resolved);
+    if (!d) {
+        set_status("\x1b[31m\u2716 Sem permissao: %s\x1b[m", resolved);
+        return;
+    }
+
+    snprintf(g_fexp_cwd, sizeof(g_fexp_cwd), "%s", resolved);
+    g_fexp_count  = 0;
+    g_fexp_sel    = 0;
+    g_fexp_scroll = 0;
+
+    /* entrada ".." sempre primeiro (exceto na raiz) */
+    if (strcmp(resolved, "/") != 0) {
+        snprintf(g_fexp_entries[g_fexp_count].name, FEXP_NAMELEN, "..");
+        g_fexp_entries[g_fexp_count].is_dir = 1;
+        g_fexp_count++;
+    }
+
+    struct dirent *de;
+    while ((de = readdir(d)) && g_fexp_count < FEXP_MAX) {
+        if (de->d_name[0] == '.') continue;
+        FEntry *fe = &g_fexp_entries[g_fexp_count];
+        snprintf(fe->name, FEXP_NAMELEN, "%s", de->d_name);
+        char full[640];
+        snprintf(full, sizeof(full), "%s/%s", resolved, de->d_name);
+        struct stat st;
+        fe->is_dir = (stat(full, &st) == 0) ? S_ISDIR(st.st_mode)
+                                             : (de->d_type == DT_DIR);
+        g_fexp_count++;
+    }
+    closedir(d);
+
+    if (g_fexp_count > 1) {
+        int start = (strcmp(g_fexp_entries[0].name, "..") == 0) ? 1 : 0;
+        qsort(g_fexp_entries + start, g_fexp_count - start,
+              sizeof(FEntry), fexp_cmp);
+    }
+}
+
+/* Sobe um nível usando realpath para resolver symlinks corretamente */
+static void fexp_go_parent(void) {
+    char parent[640];
+    snprintf(parent, sizeof(parent), "%s/..", g_fexp_cwd);
+    char resolved[512];
+    if (!realpath(parent, resolved)) {
+        char *slash = strrchr(g_fexp_cwd, '/');
+        if (slash && slash != g_fexp_cwd) {
+            snprintf(resolved, sizeof(resolved), "%.*s",
+                     (int)(slash - g_fexp_cwd), g_fexp_cwd);
+        } else {
+            snprintf(resolved, sizeof(resolved), "/");
+        }
+    }
+    fexp_load(resolved);
+}
+
+/* Abre o explorador no diretório do arquivo atual ou HOME */
+static void fexp_open(void) {
+    char start[512];
+    if (E.filename) {
+        /* pega o diretório do arquivo aberto */
+        snprintf(start, sizeof(start), "%s", E.filename);
+        char *slash = strrchr(start, '/');
+        if (slash && slash != start) { *slash = '\0'; }
+        else { snprintf(start, sizeof(start), "."); }
+    } else {
+        const char *h = getenv("HOME");
+        snprintf(start, sizeof(start), "%s", h ? h : ".");
+    }
+    fexp_load(start);
+    g_fexp_active = 1;
+    g_fexp_input[0]   = '\0';
+    g_fexp_input_len  = 0;
+    g_fexp_input_mode = 0;
+    set_status("Ctrl+P: \u2191\u2193 navegar  Enter abrir  Tab digitar caminho  Esc fechar");
+}
+
+/* Abre o arquivo selecionado ou entra no diretório */
+/* Abre ou cria arquivo a partir do caminho digitado ou selecionado */
+static void fexp_open_path(const char *path) {
+    if (!path || !path[0]) return;
+
+    /* expande ~ para HOME */
+    char expanded[640];
+    if (path[0] == '~') {
+        const char *h = getenv("HOME");
+        snprintf(expanded, sizeof(expanded), "%s%s", h ? h : "", path + 1);
+    } else {
+        snprintf(expanded, sizeof(expanded), "%s", path);
+    }
+
+    /* verifica se e diretorio */
+    struct stat st;
+    if (stat(expanded, &st) == 0 && S_ISDIR(st.st_mode)) {
+        fexp_load(expanded);
+        g_fexp_input[0]   = '\0';
+        g_fexp_input_len  = 0;
+        g_fexp_input_mode = 0;
+        return;
+    }
+
+    /* e arquivo (existente ou novo) — abre */
+    g_fexp_active     = 0;
+    g_fexp_input_mode = 0;
+
+    if (E.dirty) {
+        set_status("\x1b[33m\u26a0 Salve antes (Ctrl+S) ou abra novamente\x1b[m");
+        return;
+    }
+
+    /* limpa estado atual */
+    for (int i = 0; i < E.numrows; i++) {
+        free(E.row[i].chars);
+        free(E.row[i].render);
+        free(E.row[i].hl);
+    }
+    free(E.row);
+    E.row = NULL; E.numrows = 0;
+    free(E.filename); E.filename = NULL;
+    E.cx = 0; E.cy = 0; E.rowoff = 0; E.coloff = 0; E.dirty = 0;
+
+    if (stat(expanded, &st) != 0) {
+        /* arquivo nao existe — cria vazio */
+        FILE *fp = fopen(expanded, "w");
+        if (!fp) { set_status("\x1b[31m\u2716 Nao foi possivel criar: %s\x1b[m", expanded); return; }
+        fclose(fp);
+        set_status("Arquivo criado: %s", expanded);
+    }
+
+    open_file(expanded);
+}
+
+static void fexp_confirm(void) {
+    /* modo digitacao: Enter confirma o caminho digitado */
+    if (g_fexp_input_mode) {
+        fexp_open_path(g_fexp_input);
+        return;
+    }
+
+    if (g_fexp_count == 0) return;
+    FEntry *fe = &g_fexp_entries[g_fexp_sel];
+
+    if (strcmp(fe->name, "..") == 0) {
+        fexp_go_parent();
+        return;
+    }
+
+    char full[640];
+    snprintf(full, sizeof(full), "%s/%s", g_fexp_cwd, fe->name);
+
+    if (fe->is_dir) {
+        fexp_load(full);
+        return;
+    }
+
+    fexp_open_path(full);
+}
+
+/* Desenha o painel do explorador */
+static void draw_fexp_panel(Abuf *ab) {
+    if (!g_fexp_active) return;
+
+    int panel_h  = FEXP_SHOW;
+    int panel_w  = 54;
+    int panel_col = (E.cols - panel_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = (E.rows - panel_h - 3) / 2;
+    if (panel_row < 2) panel_row = 2;
+
+    /* título com path atual */
+    {
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,"\x1b[48;5;17m\x1b[38;5;117m\x1b[1m",25);
+        char title[64];
+        /* trunca cwd pela direita se muito longo */
+        const char *cwd = g_fexp_cwd;
+        int cwdlen = (int)strlen(cwd);
+        int avail  = panel_w - 4;
+        if (cwdlen > avail) cwd += cwdlen - avail;
+        int tl = snprintf(title,sizeof(title)," 📁 %s ",cwd);
+        if (tl > panel_w) tl = panel_w;
+        ab_append(ab,title,tl);
+        for (int s=tl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+
+    /* ajusta scroll */
+    if (g_fexp_sel < g_fexp_scroll) g_fexp_scroll = g_fexp_sel;
+    if (g_fexp_sel >= g_fexp_scroll + panel_h) g_fexp_scroll = g_fexp_sel - panel_h + 1;
+
+    for (int i = 0; i < panel_h; i++) {
+        int idx = g_fexp_scroll + i;
+        int row = panel_row + 1 + i;
+        if (row >= E.rows) break;
+
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+
+        if (idx >= g_fexp_count) {
+            /* linha vazia */
+            ab_append(ab,"\x1b[48;5;17m",10);
+            for (int s=0;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+            continue;
+        }
+
+        FEntry *fe = &g_fexp_entries[idx];
+        int selected = (idx == g_fexp_sel);
+
+        if (selected)
+            ab_append(ab,"\x1b[48;5;27m\x1b[38;5;255m\x1b[1m",25);
+        else
+            ab_append(ab,"\x1b[48;5;17m\x1b[38;5;153m",21);
+
+        /* ícone */
+        const char *icon;
+        if (strcmp(fe->name,"..") == 0)       icon = "↑ ";
+        else if (fe->is_dir)                   icon = "▸ ";
+        else {
+            /* ícone por extensão */
+            const char *ext = strrchr(fe->name,'.');
+            if      (!ext)                      icon = "  ";
+            else if (!strcmp(ext,".lua"))        icon = "L ";
+            else if (!strcmp(ext,".c")||
+                     !strcmp(ext,".h"))          icon = "C ";
+            else if (!strcmp(ext,".sh"))         icon = "$ ";
+            else if (!strcmp(ext,".txt")||
+                     !strcmp(ext,".md"))         icon = "T ";
+            else                                 icon = "· ";
+        }
+
+        char line[80];
+        int ll = snprintf(line,sizeof(line)," %s%-*s ",
+                          icon, panel_w-4, fe->name);
+        if (ll > panel_w) ll = panel_w;
+        ab_append(ab,line,ll);
+        for (int s=ll;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+
+    /* campo de input */
+    {
+        int irow = panel_row + 1 + panel_h;
+        if (irow < E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",irow,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            if (g_fexp_input_mode)
+                ab_append(ab,"\x1b[48;5;19m\x1b[38;5;255m\x1b[1m",28);
+            else
+                ab_append(ab,"\x1b[48;5;17m\x1b[38;5;240m",21);
+            char ibuf[FEXP_INPUT_MAX+8];
+            int il;
+            if (g_fexp_input_mode) {
+                il = snprintf(ibuf,sizeof(ibuf)," ▸ %s█ ", g_fexp_input);
+            } else {
+                il = snprintf(ibuf,sizeof(ibuf)," Tab: digitar caminho / novo arquivo ");
+            }
+            if (il>panel_w) il=panel_w;
+            ab_append(ab,ibuf,il);
+            for (int s=il;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+        }
+    }
+
+    /* rodapé */
+    {
+        int row = panel_row + 2 + panel_h;
+        if (row < E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,"\x1b[48;5;17m\x1b[38;5;117m",21);
+            char foot[64];
+            int fl;
+            if (g_fexp_input_mode)
+                fl = snprintf(foot,sizeof(foot)," Enter confirmar  Esc cancelar digitacao ");
+            else
+                fl = snprintf(foot,sizeof(foot)," %d/%d  ↑↓ navegar  Enter abrir  Tab caminho ",
+                    g_fexp_count>0 ? g_fexp_sel+1 : 0, g_fexp_count);
+            if (fl>panel_w) fl=panel_w;
+            ab_append(ab,foot,fl);
+            for (int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+        }
+    }
+}
+
+/* Abre o painel de snippets */
+static void snip_open(void) {
+    snip_build_list();
+    if (snip_vis_count == 0) {
+        set_status("\x1b[33m⚠ Nenhum snippet para esta linguagem\x1b[m");
+        return;
+    }
+    g_snip_sel    = 0;
+    g_snip_scroll = 0;
+    g_snip_active = 1;
+    set_status("Ctrl+I: ↑↓ navegar  Enter inserir  Esc fechar");
+}
+
+/* Desenha o painel de snippets */
+/* ── helpers do painel de snippets ─────────────────────────────────────────
+ *
+ * Cada snippet tem um nome que segue o padrão:
+ *   "PREFIXO: nome descritivo"   → origem ElliotOS  (ex: "ElliotOS: tui.main")
+ *   "mod.xss"                    → origem ElliotOS  (começa com mod./net./crypto./
+ *                                                     ui./sys./ms./ai./tui./fs.)
+ *   "if / then / end"            → estrutura da linguagem
+ *
+ * A função snip_badge() extrai:
+ *   badge  — sigla curta (NET, MOD, CRYPTO, SYS, AI, IF, FOR, …)
+ *   origin — "ElliotOS" ou nome da linguagem
+ * ─────────────────────────────────────────────────────────────────────────── */
+static void snip_badge(int si, char *badge, int bsz, char *origin, int osz) {
+    const char *name = g_snips[si].name;
+    int lang         = g_snips[si].lang;
+
+    /* origem da linguagem base */
+    const char *lang_str = (lang==0)?"C":(lang==1)?"Lua":(lang==2)?"Bash":
+                           (lang==4)?"HTML":"*";
+
+    /* prefixos ElliotOS explícitos: "ElliotOS: ..." ou "ElliotOS: mod..." */
+    if (strncmp(name,"ElliotOS:",9)==0) {
+        /* extrai badge do que vem depois do "ElliotOS: " */
+        const char *after = name + 9;
+        while (*after==' ') after++;
+        /* pega primeira palavra ou token antes de '(' ou '.' ou ' ' */
+        char tmp[32]; int ti=0;
+        while (*after && *after!='(' && *after!='.' && *after!=' ' && ti<(int)sizeof(tmp)-1)
+            tmp[ti++]=*after++;
+        tmp[ti]='\0';
+        /* converte para maiúsculas */
+        for(int i=0;tmp[i];i++) if(tmp[i]>='a'&&tmp[i]<='z') tmp[i]-=32;
+        snprintf(badge,bsz,"%s",tmp[0]?tmp:"EOS");
+        snprintf(origin,osz,"ElliotOS");
+        return;
+    }
+
+    /* módulos ElliotOS pelo prefixo do nome: mod. net. crypto. ui. sys. ms. ai. tui. fs. */
+    struct { const char *pfx; const char *bdg; } mods[] = {
+        {"mod.",    "MOD"   },
+        {"net.",    "NET"   },
+        {"crypto.", "CRYPT" },
+        {"ui.",     "UI"    },
+        {"sys.",    "SYS"   },
+        {"ms.",     "MS"    },
+        {"ai.",     "AI"    },
+        {"tui.",    "TUI"   },
+        {"fs.",     "FS"    },
+        {"web.",    "WEB"   },
+        {"db.",     "DB"    },
+        {NULL,      NULL    }
+    };
+    for (int m=0; mods[m].pfx; m++) {
+        if (strncmp(name, mods[m].pfx, strlen(mods[m].pfx))==0) {
+            snprintf(badge,  bsz, "%s", mods[m].bdg);
+            snprintf(origin, osz, "ElliotOS");
+            return;
+        }
+    }
+
+    /* estruturas da linguagem: pega primeira palavra em maiúsculas */
+    char tmp[16]; int ti=0;
+    const char *p = name;
+    while (*p && *p!=' ' && *p!='/' && ti<(int)sizeof(tmp)-1)
+        tmp[ti++]=*p++;
+    tmp[ti]='\0';
+    for(int i=0;tmp[i];i++) if(tmp[i]>='a'&&tmp[i]<='z') tmp[i]-=32;
+    snprintf(badge,  bsz, "%s", tmp[0]?tmp:"?");
+    snprintf(origin, osz, "%s", lang_str);
+}
+
+/* Remove marcador de cursor █ (UTF-8: E2 96 88) e retorna string limpa */
+static void snip_strip_cursor(const char *tmpl, char *out, int outsz) {
+    int ob=0;
+    for (int j=0; tmpl[j] && ob<outsz-1; j++) {
+        if ((unsigned char)tmpl[j]==0xE2 &&
+            (unsigned char)tmpl[j+1]==0x96 &&
+            (unsigned char)tmpl[j+2]==0x88) {
+            j+=2; /* pula os 3 bytes do █ */
+        } else {
+            out[ob++]=tmpl[j];
+        }
+    }
+    out[ob]='\0';
+}
+
+static void draw_snip_panel(Abuf *ab) {
+    if (!g_snip_active || snip_vis_count == 0) return;
+
+    /* ── dimensões ── */
+    int panel_w   = 54;
+    int list_h    = snip_vis_count < 10 ? snip_vis_count : 10;
+    int prev_h    = 4;   /* linhas de preview fixas */
+    int total_h   = 1    /* título */
+                  + list_h
+                  + 1    /* separador */
+                  + prev_h
+                  + 1;   /* rodapé */
+
+    int panel_col = (E.cols - panel_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = (E.rows - total_h) / 2;
+    if (panel_row < 1) panel_row = 1;
+
+    /* cores base */
+    const char *C_TITLE_BG  = "\x1b[48;5;17m";   /* azul escuro */
+    const char *C_TITLE_FG  = "\x1b[38;5;123m";  /* ciano claro */
+    const char *C_SEL_BG    = "\x1b[48;5;24m";   /* azul médio */
+    const char *C_SEL_FG    = "\x1b[38;5;255m";  /* branco */
+    const char *C_ROW_BG    = "\x1b[48;5;235m";  /* cinza muito escuro */
+    const char *C_ROW_FG    = "\x1b[38;5;250m";  /* cinza claro */
+    const char *C_BADGE_EOS = "\x1b[38;5;214m";  /* laranja — ElliotOS */
+    const char *C_BADGE_LNG = "\x1b[38;5;75m";   /* azul — linguagem */
+    const char *C_SEP       = "\x1b[38;5;240m";
+    const char *C_PREV_BG   = "\x1b[48;5;233m";
+    const char *C_PREV_FG   = "\x1b[38;5;243m";
+    const char *C_PREV_CODE = "\x1b[38;5;150m";  /* verde claro p/ código */
+    const char *C_FOOT_BG   = "\x1b[48;5;17m";
+    const char *C_FOOT_FG   = "\x1b[38;5;117m";
+    const char *C_BOLD      = "\x1b[1m";
+    const char *C_DIM       = "\x1b[2m";
+    const char *C_RST       = "\x1b[m";
+
+    /* ── título ── */
+    {
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,C_TITLE_BG,strlen(C_TITLE_BG));
+        ab_append(ab,C_TITLE_FG,strlen(C_TITLE_FG));
+        ab_append(ab,C_BOLD,strlen(C_BOLD));
+        char title[80];
+        int tl = snprintf(title,sizeof(title)," ✦ Snippets  ·  %d disponíveis ",snip_vis_count);
+        if (tl>panel_w) tl=panel_w;
+        ab_append(ab,title,tl);
+        for (int s=tl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,C_RST,strlen(C_RST));
+    }
+
+    /* ── scroll ── */
+    if (g_snip_sel < g_snip_scroll) g_snip_scroll = g_snip_sel;
+    if (g_snip_sel >= g_snip_scroll + list_h) g_snip_scroll = g_snip_sel - list_h + 1;
+
+    /* ── lista ── */
+    for (int i = 0; i < list_h; i++) {
+        int idx = g_snip_scroll + i;
+        if (idx >= snip_vis_count) break;
+        int si  = snip_visible[idx];
+        int row = panel_row + 1 + i;
+        int sel = (idx == g_snip_sel);
+
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+
+        /* fundo da linha */
+        ab_append(ab, sel ? C_SEL_BG : C_ROW_BG,
+                      sel ? strlen(C_SEL_BG) : strlen(C_ROW_BG));
+
+        /* obtém badge e origem */
+        char badge[12], origin[12];
+        snip_badge(si, badge, sizeof(badge), origin, sizeof(origin));
+
+        int is_eos = (strcmp(origin,"ElliotOS")==0);
+
+        /* ── badge colorido ── */
+        /* ex: " NET " em laranja ou " IF " em azul */
+        ab_append(ab," ",1);
+        if (sel) {
+            ab_append(ab,"\x1b[38;5;220m",13); /* amarelo no selecionado */
+        } else {
+            ab_append(ab, is_eos ? C_BADGE_EOS : C_BADGE_LNG,
+                          is_eos ? strlen(C_BADGE_EOS) : strlen(C_BADGE_LNG));
+        }
+        ab_append(ab,C_BOLD,strlen(C_BOLD));
+        /* badge alinhado em 6 chars */
+        char badge_field[8]; snprintf(badge_field,sizeof(badge_field),"%-5s",badge);
+        ab_append(ab,badge_field,5);
+        ab_append(ab,C_RST,strlen(C_RST));
+
+        /* separador │ */
+        ab_append(ab, sel ? C_SEL_BG : C_ROW_BG,
+                      sel ? strlen(C_SEL_BG) : strlen(C_ROW_BG));
+        ab_append(ab, sel ? "\x1b[38;5;117m" : C_SEP, sel ? 14 : strlen(C_SEP));
+        ab_append(ab,"│",3);
+
+        /* ── nome do snippet ── */
+        ab_append(ab, sel ? C_SEL_FG : C_ROW_FG,
+                      sel ? strlen(C_SEL_FG) : strlen(C_ROW_FG));
+        if (sel) ab_append(ab,C_BOLD,strlen(C_BOLD));
+        /* nome: até 33 chars */
+        char name_field[40];
+        snprintf(name_field,sizeof(name_field)," %-33s",g_snips[si].name);
+        name_field[35]='\0';
+        ab_append(ab,name_field,strlen(name_field));
+
+        /* ── origem à direita ── */
+        /* ex: "ElliotOS" ou "Lua" */
+        ab_append(ab, sel ? "\x1b[38;5;245m" : C_DIM,
+                      sel ? 14 : strlen(C_DIM));
+        char org_field[12]; snprintf(org_field,sizeof(org_field),"%-8s ",origin);
+        ab_append(ab,org_field,strlen(org_field));
+
+        ab_append(ab,C_RST,strlen(C_RST));
+        /* preenche resto */
+        /* calcula chars escritos: 1(sp)+5(badge)+3(│)+35(nome)+9(origem) = 53 */
+        /* panel_w=54: já OK */
+    }
+
+    /* ── separador antes do preview ── */
+    {
+        int row = panel_row + 1 + list_h;
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,C_PREV_BG,strlen(C_PREV_BG));
+        ab_append(ab,C_SEP,strlen(C_SEP));
+        /* linha: "─── preview ──────" */
+        const char *sep_label = " preview ";
+        int sl = strlen(sep_label);
+        int dashes_l = (panel_w - sl) / 2;
+        int dashes_r = panel_w - sl - dashes_l;
+        for (int s=0;s<dashes_l;s++) ab_append(ab,"─",3);
+        ab_append(ab,sep_label,sl);
+        for (int s=0;s<dashes_r;s++) ab_append(ab,"─",3);
+        ab_append(ab,C_RST,strlen(C_RST));
+    }
+
+    /* ── preview: primeiras linhas do snippet ── */
+    {
+        int si  = snip_visible[g_snip_sel];
+        Snippet *sn = &g_snips[si];
+        for (int i = 0; i < prev_h; i++) {
+            int row = panel_row + 2 + list_h + i;
+            if (row >= E.rows) break;
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,C_PREV_BG,strlen(C_PREV_BG));
+
+            if (i < sn->nlines) {
+                char clean[80];
+                snip_strip_cursor(sn->lines[i], clean, sizeof(clean));
+                ab_append(ab,C_PREV_CODE,strlen(C_PREV_CODE));
+                char pline[80];
+                int pl=snprintf(pline,sizeof(pline)," %-*s ",panel_w-2,clean);
+                if(pl>panel_w)pl=panel_w;
+                ab_append(ab,pline,pl);
+            } else {
+                /* linha vazia de padding */
+                ab_append(ab,C_PREV_FG,strlen(C_PREV_FG));
+                for(int s=0;s<panel_w;s++) ab_append(ab," ",1);
+            }
+            ab_append(ab,C_RST,strlen(C_RST));
+        }
+    }
+
+    /* ── rodapé ── */
+    {
+        int row = panel_row + 2 + list_h + prev_h;
+        if (row < E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,C_FOOT_BG,strlen(C_FOOT_BG));
+            ab_append(ab,C_FOOT_FG,strlen(C_FOOT_FG));
+            char foot[80];
+            int fl=snprintf(foot,sizeof(foot),
+                " ↑↓ navegar   Enter inserir   Esc fechar   %d/%d ",
+                g_snip_sel+1, snip_vis_count);
+            if(fl>panel_w)fl=panel_w;
+            ab_append(ab,foot,fl);
+            for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,C_RST,strlen(C_RST));
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * SELETOR DE LINGUAGEM (Ctrl+L)
+ * ════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════
+ * IR PARA DEFINIÇÃO (Ctrl+J)
+ * ════════════════════════════════════════════════════════ */
+
+/* Extrai a palavra sob o cursor */
+static int word_under_cursor(char *out, int outsz) {
+    if (E.cy >= E.numrows) return 0;
+    Row *row = &E.row[E.cy];
+    char *s  = row->chars;
+    int   n  = row->size;
+    int   cx = E.cx < n ? E.cx : n-1;
+    if (cx < 0) return 0;
+
+    /* expande para esquerda */
+    int start = cx;
+    while (start > 0 && (isalnum((unsigned char)s[start-1]) || s[start-1]=='_' || s[start-1]=='.'))
+        start--;
+    /* expande para direita */
+    int end = cx;
+    while (end < n && (isalnum((unsigned char)s[end]) || s[end]=='_' || s[end]=='.'))
+        end++;
+
+    int len = end - start;
+    if (len <= 0 || len >= outsz) return 0;
+    memcpy(out, s+start, len);
+    out[len] = '\0';
+    return len;
+}
+
+/* ── Utilitários usados por goto_find() (Ctrl+J) ─────────────────────
+ * Estas duas funções eram usadas pelo antigo verificador de código
+ * (removido) mas também são usadas por goto_find() logo abaixo, então
+ * continuam existindo aqui. */
+
+/* Retorna ponteiro para primeiro char não-espaço da linha y, ou NULL se vazia */
+static char *chk_line_content(int y) {
+    if (y < 0 || y >= E.numrows) return NULL;
+    char *s = E.row[y].chars;
+    int n   = E.row[y].size;
+    int i = 0;
+    while (i < n && (s[i]==' '||s[i]=='\t')) i++;
+    if (i >= n) return NULL;
+    return s + i;
+}
+
+/* Verifica se a string s contém tok como palavra isolada */
+static int has_word(const char *s, const char *tok) {
+    int tlen = (int)strlen(tok);
+    const char *p = s;
+    while ((p = strstr(p, tok)) != NULL) {
+        int pre = (p == s || (!isalnum((unsigned char)p[-1]) && p[-1]!='_'));
+        int pos = (!isalnum((unsigned char)p[tlen]) && p[tlen]!='_');
+        if (pre && pos) return 1;
+        p++;
+    }
+    return 0;
+}
+
+/* Resultado do goto: lista de matches */
+#define GOTO_MAX 32
+typedef struct { int line; char preview[80]; } GotoMatch;
+static GotoMatch g_goto_matches[GOTO_MAX];
+static int       g_goto_count  = 0;
+static int       g_goto_sel    = 0;
+static int       g_goto_active = 0;
+static char      g_goto_word[64];
+
+/* Procura definições do símbolo no arquivo */
+static void goto_find(const char *word) {
+    g_goto_count = 0;
+    int is_lua  = (E.syntax == &HLDB[2]);
+    int is_c    = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
+    int is_bash = (E.syntax == &HLDB[3]);
+
+    for (int y = 0; y < E.numrows && g_goto_count < GOTO_MAX; y++) {
+        char *s = E.row[y].chars;
+        int   n = E.row[y].size;
+        int   found = 0;
+
+        if (is_lua) {
+            /* function nome / local function nome / nome = function */
+            char pat1[80], pat2[80], pat3[80];
+            snprintf(pat1,sizeof(pat1),"function %s",word);
+            snprintf(pat2,sizeof(pat2),"function %s(",word);
+            snprintf(pat3,sizeof(pat3),"%s = function",word);
+            if (strstr(s,pat1)||strstr(s,pat2)||strstr(s,pat3)) found=1;
+            /* local word = */
+            if (!found) {
+                char pat4[80]; snprintf(pat4,sizeof(pat4),"local %s",word);
+                if (strstr(s,pat4)) found=1;
+            }
+        } else if (is_c) {
+            /* tipo nome( — heurística: linha tem palavra seguida de ( sem espaço de keyword */
+            char pat[80]; snprintf(pat,sizeof(pat),"%s(",word);
+            if (strstr(s,pat)) {
+                /* verifica que não é chamada — linha tem tipo de retorno antes */
+                char *p2 = chk_line_content(y);
+                if (p2 && !has_word(p2,"if") && !has_word(p2,"while") &&
+                    !has_word(p2,"for") && !has_word(p2,"return") &&
+                    !has_word(p2,"switch")) found=1;
+            }
+            /* #define word */
+            char pat2[80]; snprintf(pat2,sizeof(pat2),"#define %s",word);
+            if (strstr(s,pat2)) found=1;
+            /* typedef ... word; */
+            if (has_word(s,"typedef") && strstr(s,word)) found=1;
+        } else if (is_bash) {
+            /* nome() { */
+            char pat[80]; snprintf(pat,sizeof(pat),"%s()",word);
+            if (strstr(s,pat)) found=1;
+            /* function nome */
+            char pat2[80]; snprintf(pat2,sizeof(pat2),"function %s",word);
+            if (strstr(s,pat2)) found=1;
+        }
+
+        if (found) {
+            GotoMatch *m = &g_goto_matches[g_goto_count++];
+            m->line = y+1;
+            /* preview: trim whitespace */
+            int i=0; while(i<n&&(s[i]==' '||s[i]=='\t')) i++;
+            int pl=0;
+            while(pl<79&&i<n&&s[i]!='\n') m->preview[pl++]=s[i++];
+            m->preview[pl]='\0';
+        }
+    }
+}
+
+/* Salta para o match selecionado */
+static void goto_jump(int idx) {
+    if (idx < 0 || idx >= g_goto_count) return;
+    E.cy = g_goto_matches[idx].line - 1;
+    if (E.cy >= E.numrows) E.cy = E.numrows-1;
+    E.cx = 0;
+    /* centra a view */
+    E.rowoff = E.cy - E.rows/2;
+    if (E.rowoff < 0) E.rowoff = 0;
+}
+
+/* Abre o goto_def */
+static void goto_definition(void) {
+    char word[64];
+    if (!word_under_cursor(word, sizeof(word))) {
+        set_status("\x1b[33m⚠ Nenhuma palavra sob o cursor\x1b[m");
+        return;
+    }
+    snprintf(g_goto_word, sizeof(g_goto_word), "%s", word);
+    goto_find(word);
+
+    if (g_goto_count == 0) {
+        set_status("\x1b[33m⚠ Definição de '%s' não encontrada\x1b[m", word);
+        return;
+    }
+    if (g_goto_count == 1) {
+        /* só um resultado — pula direto */
+        goto_jump(0);
+        set_status("Definição de '%s' → linha %d", word, g_goto_matches[0].line);
+        return;
+    }
+    /* múltiplos resultados — abre painel de seleção */
+    g_goto_sel    = 0;
+    g_goto_active = 1;
+    set_status("Ctrl+J: ↑↓ navegar  Enter ir  Esc fechar  [%d definições de '%s']",
+               g_goto_count, word);
+}
+
+/* Desenha o painel de goto */
+static void draw_goto_panel(Abuf *ab) {
+    if (!g_goto_active || g_goto_count == 0) return;
+
+    int panel_h  = g_goto_count < 8 ? g_goto_count : 8;
+    int panel_w  = 56;
+    int panel_col = (E.cols - panel_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = 2;
+
+    /* título */
+    {
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,"\x1b[48;5;52m\x1b[38;5;215m\x1b[1m",25);
+        char title[80];
+        int tl=snprintf(title,sizeof(title)," ⊕ Definições de '%s' (%d) ",
+                        g_goto_word,g_goto_count);
+        if(tl>panel_w)tl=panel_w;
+        ab_append(ab,title,tl);
+        for(int s=tl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+
+    for (int i=0;i<panel_h;i++) {
+        int idx = i;
+        int row = panel_row+1+i;
+        if (row >= E.rows) break;
+
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+
+        if (idx==g_goto_sel)
+            ab_append(ab,"\x1b[48;5;88m\x1b[38;5;255m\x1b[1m",25);
+        else
+            ab_append(ab,"\x1b[48;5;52m\x1b[38;5;209m",21);
+
+        char line[80];
+        int ll=snprintf(line,sizeof(line)," L%-4d %s",
+                        g_goto_matches[idx].line,g_goto_matches[idx].preview);
+        if(ll>panel_w)ll=panel_w;
+        ab_append(ab,line,ll);
+        for(int s=ll;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+
+    /* rodapé */
+    {
+        int row=panel_row+1+panel_h;
+        if(row<E.rows){
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,"\x1b[48;5;52m\x1b[38;5;215m",21);
+            char foot[64];
+            int fl=snprintf(foot,sizeof(foot)," %d/%d  Enter ir  Esc fechar ",
+                            g_goto_sel+1,g_goto_count);
+            if(fl>panel_w)fl=panel_w;
+            ab_append(ab,foot,fl);
+            for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+        }
+    }
+}
+
+static void choose_language(void) {
+    /* Nomes e índices no HLDB */
+    const char *names[] = { "C", "C++", "Lua/ElliotOS", "Bash", "HTML", NULL };
+    int n = 5;
+    int sel = 0;
+
+    /* descobre seleção atual */
+    for (int i = 0; i < n; i++)
+        if (E.syntax == &HLDB[i]) { sel = i; break; }
+
+    /* loop de menu inline na status bar */
+    while (1) {
+        /* Monta string de menu */
+        char menu[512];
+        int mi = 0;
+        mi += snprintf(menu+mi, sizeof(menu)-mi, "Linguagem: ");
+        for (int i = 0; i < n; i++) {
+            if (i == sel)
+                mi += snprintf(menu+mi, sizeof(menu)-mi,
+                               "\x1b[48;5;99m\x1b[38;5;255m\x1b[1m %s \x1b[m", names[i]);
+            else
+                mi += snprintf(menu+mi, sizeof(menu)-mi,
+                               "\x1b[38;5;141m %s \x1b[m", names[i]);
+            if (i < n-1)
+                mi += snprintf(menu+mi, sizeof(menu)-mi, "│");
+        }
+        mi += snprintf(menu+mi, sizeof(menu)-mi,
+                       "  \x1b[38;5;141m← → mover  Enter confirmar  Esc cancelar\x1b[m");
+
+        snprintf(E.statusmsg, sizeof(E.statusmsg), "%s", menu);
+        E.statusmsg_time = time(NULL) + 9999; /* mantém visível */
+        refresh_screen();
+
+        int c = read_key();
+        if (c == ARROW_LEFT  || c == CTRL('h')) { sel = (sel - 1 + n) % n; }
+        else if (c == ARROW_RIGHT || c == '\t') { sel = (sel + 1) % n;     }
+        else if (c == '\r') {
+            E.syntax = &HLDB[sel];
+            for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+            snprintf(E.statusmsg, sizeof(E.statusmsg),
+                     "\x1b[32m✓\x1b[m Linguagem: %s", names[sel]);
+            E.statusmsg_time = time(NULL);
+            return;
+        }
+        else if (c == '\x1b') {
+            set_status("Seleção cancelada");
+            return;
+        }
+    }
+}
+
+
+
+
+/* ════════════════════════════════════════════════════════
+ * PERSISTÊNCIA DE POSIÇÃO DO CURSOR
+ * ════════════════════════════════════════════════════════ */
+
+static void save_cursor_pos(void) {
+    const char *home = getenv("HOME");
+    if (!home || !E.filename) return;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.ee_positions", home);
+    /* lê entradas existentes exceto a do arquivo atual */
+    FILE *f = fopen(path, "r");
+    char *buf = NULL; size_t buflen = 0;
+    if (f) {
+        char line[768];
+        while (fgets(line, sizeof(line), f)) {
+            char *tab = strchr(line, '\t');
+            if (tab) { char save = *tab; *tab = '\0';
+                if (strcmp(line, E.filename) == 0) { *tab = save; continue; }
+                *tab = save; }
+            size_t ll = strlen(line);
+            buf = realloc(buf, buflen + ll + 1);
+            memcpy(buf + buflen, line, ll); buflen += ll;
+        }
+        fclose(f);
+    }
+    char entry[768];
+    int el = snprintf(entry, sizeof(entry), "%s\t%d\t%d\n", E.filename, E.cx, E.cy);
+    buf = realloc(buf, buflen + el + 1);
+    memcpy(buf + buflen, entry, el); buflen += el;
+    f = fopen(path, "w");
+    if (f) { fwrite(buf, 1, buflen, f); fclose(f); }
+    free(buf);
+}
+
+static void restore_cursor_pos(void) {
+    const char *home = getenv("HOME");
+    if (!home || !E.filename) return;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.ee_positions", home);
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+    char line[768];
+    while (fgets(line, sizeof(line), f)) {
+        char *tab1 = strchr(line, '\t'); if (!tab1) continue;
+        *tab1 = '\0';
+        if (strcmp(line, E.filename) != 0) { *tab1 = '\t'; continue; }
+        int cx = atoi(tab1 + 1);
+        char *tab2 = strchr(tab1 + 1, '\t');
+        int cy = tab2 ? atoi(tab2 + 1) : 0;
+        if (cy >= 0 && cy < E.numrows) {
+            E.cy = cy;
+            if (cx >= 0 && cx <= E.row[cy].size) E.cx = cx;
+        }
+        break;
+    }
+    fclose(f);
+}
+
+
+/* ════════════════════════════════════════════════════════
+ * MULTI-BUFFER
+ * ════════════════════════════════════════════════════════ */
+
+static void buf_save_state(void) {
+    if (E.buf_idx < 0 || E.buf_idx >= 8) return;
+    E.buf_cx[E.buf_idx] = E.cx;  E.buf_cy[E.buf_idx] = E.cy;
+    E.buf_ro[E.buf_idx] = E.rowoff; E.buf_co[E.buf_idx] = E.coloff;
+}
+
+static void buf_register(const char *fname) {
+    for (int i=0; i<E.buf_count; i++)
+        if (strcmp(E.buf_list[i], fname)==0) { buf_save_state(); E.buf_idx=i; return; }
+    if (E.buf_count < 8) {
+        buf_save_state();
+        strncpy(E.buf_list[E.buf_count], fname, 255);
+        E.buf_list[E.buf_count][255]='\0';
+        E.buf_cx[E.buf_count]=0; E.buf_cy[E.buf_count]=0;
+        E.buf_ro[E.buf_count]=0; E.buf_co[E.buf_count]=0;
+        E.buf_idx = E.buf_count++;
+    }
+}
+
+static void buf_switch(int idx) {
+    if (idx < 0 || idx >= E.buf_count || idx == E.buf_idx) return;
+    /* salva estado atual */
+    save_cursor_pos();
+    if (E.dirty) save_file();
+    buf_save_state();
+    /* libera linhas */
+    for (int i=0; i<E.numrows; i++) free_row(&E.row[i]);
+    free(E.row); E.row=NULL; E.numrows=0;
+    E.dirty=0;
+    /* abre próximo */
+    E.buf_idx = idx;
+    open_file(E.buf_list[idx]);
+    E.cx=E.buf_cx[idx]; E.cy=E.buf_cy[idx];
+    E.rowoff=E.buf_ro[idx]; E.coloff=E.buf_co[idx];
+    if (E.cy>=E.numrows) E.cy=E.numrows>0?E.numrows-1:0;
+    set_status("Buffer %d/%d: %s", idx+1, E.buf_count, E.buf_list[idx]);
+}
+
+static void buf_next(void) { buf_switch((E.buf_idx+1) % E.buf_count); }
+static void buf_prev(void) { buf_switch((E.buf_idx+E.buf_count-1) % E.buf_count); }
+
+static void open_file(const char *fname) {
+    free(E.filename); E.filename = strdup(fname);
+    FILE *fp = fopen(fname, "r");
+    if (!fp) { if (errno == ENOENT) { select_syntax(); return; } die("fopen"); }
+    char *line = NULL; size_t cap = 0; ssize_t len;
+    while ((len = getline(&line, &cap, fp)) != -1) {
+        while (len > 0 && (line[len-1] == '\r' || line[len-1] == '\n')) len--;
+        insert_row(E.numrows, line, len);
+    }
+    free(line); fclose(fp);
+    E.dirty = 0;
+    select_syntax();
+    restore_cursor_pos();
+    buf_register(fname);
+}
+
+static void save_file(void) {
+    if (!E.filename) return;
+    int len; char *buf = rows_to_string(&len);
+    int fd = open(E.filename, O_RDWR|O_CREAT|O_TRUNC, 0644);
+    if (fd == -1 || write(fd, buf, len) != len) {
+        if (fd != -1) close(fd);
+        free(buf);
+        snprintf(E.statusmsg, sizeof(E.statusmsg), "Erro ao salvar: %s", strerror(errno));
+        E.statusmsg_time = time(NULL); return;
+    }
+    close(fd); free(buf); E.dirty = 0;
+    save_cursor_pos();
+    for (int _si = 0; _si < E.numrows; _si++) E.row[_si].is_dirty = 0;
+    snprintf(E.statusmsg, sizeof(E.statusmsg),
+        "\x1b[32m✓\x1b[m %d bytes salvos em \"%s\"", len, E.filename);
+    E.statusmsg_time = time(NULL);
+}
+
+/* ════════════════════════════════════════════════════════
+ * BUSCA
+ * ════════════════════════════════════════════════════════ */
+
+static void search_cb(char *query, int key) {
+    static int last = -1, dir = 1;
+    static int hl_line = -1;
+    static unsigned char *saved_hl = NULL;
+
+    if (saved_hl) {
+        memcpy(E.row[hl_line].hl, saved_hl, E.row[hl_line].rsize);
+        free(saved_hl); saved_hl = NULL;
+    }
+    if (key == '\r' || key == '\x1b') { last = -1; dir = 1; return; }
+    if (key == ARROW_RIGHT || key == ARROW_DOWN) dir = 1;
+    else if (key == ARROW_LEFT || key == ARROW_UP) dir = -1;
+    else { last = -1; dir = 1; }
+    if (last == -1) dir = 1;
+
+    int cur = last;
+    for (int i = 0; i < E.numrows; i++) {
+        cur += dir;
+        if (cur < 0) cur = E.numrows-1;
+        else if (cur >= E.numrows) cur = 0;
+        Row *row = &E.row[cur];
+        char *m = strstr(row->render, query);
+        if (m) {
+            last = cur; E.cy = cur;
+            E.cx = rx_to_cx(row, (int)(m - row->render));
+            E.rowoff = E.numrows;
+            hl_line = cur;
+            saved_hl = malloc(row->rsize);
+            memcpy(saved_hl, row->hl, row->rsize);
+            memset(&row->hl[m - row->render], HL_MATCH, strlen(query));
+            break;
+        }
+    }
+}
+
+void refresh_screen(void);
+
+static char *prompt(const char *fmt, void (*cb)(char*,int)) {
+    size_t sz = 128, len = 0;
+    char *buf = malloc(sz); buf[0] = '\0';
+    while (1) {
+        snprintf(E.statusmsg, sizeof(E.statusmsg), fmt, buf);
+        E.statusmsg_time = time(NULL);
+        refresh_screen();
+        int c = read_key();
+        if (c == DEL_KEY || c == CTRL('h') || c == BACKSPACE) {
+            if (len) buf[--len] = '\0';
+        } else if (c == '\x1b') {
+            E.statusmsg[0] = '\0';
+            if (cb) cb(buf, c);
+            free(buf); return NULL;
+        } else if (c == '\r') {
+            E.statusmsg[0] = '\0'; if (cb) cb(buf, c); return buf;
+        } else if (!iscntrl(c) && c < 128) {
+            if (len == sz-1) { sz *= 2; buf = realloc(buf, sz); }
+            buf[len++] = c; buf[len] = '\0';
+        }
+        if (cb) cb(buf, c);
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════
+ * BUSCA E SUBSTITUIÇÃO
+ * ════════════════════════════════════════════════════════ */
+
+
+/* ════════════════════════════════════════════════════════
+ * SELEÇÃO E CLIPBOARD
+ * ════════════════════════════════════════════════════════ */
+
+/* normaliza âncora e cursor em (sy1,sx1) → (sy2,sx2) */
+static void sel_normalize(int *sy1,int *sx1,int *sy2,int *sx2) {
+    *sy1=E.sel_ay; *sx1=E.sel_ax; *sy2=E.cy; *sx2=E.cx;
+    if (*sy1 > *sy2 || (*sy1 == *sy2 && *sx1 > *sx2)) {
+        int t; t=*sy1;*sy1=*sy2;*sy2=t; t=*sx1;*sx1=*sx2;*sx2=t;
+    }
+}
+
+
+/* ════════════════════════════════════════════════════════
+ * CÓPIA POR INTERVALO DE LINHAS (Ctrl+C sem seleção)
+ * ════════════════════════════════════════════════════════ */
+static void copy_range_prompt(void) {
+    /* pede input "De linha até linha: " e copia o intervalo */
+    char *input = prompt("Copiar — de linha até linha: %s  (ex: 1 5, ESC cancela)", NULL);
+    if (!input) return;
+
+    int from = 0, to = 0;
+    if (sscanf(input, "%d %d", &from, &to) == 2) {
+        /* converte para 0-based e clampeia */
+        from--; to--;
+        if (from < 0) from = 0;
+        if (to >= E.numrows) to = E.numrows - 1;
+        if (from > to) { int t = from; from = to; to = t; }
+
+        int cap = 4096;
+        char *buf = malloc(cap);
+        int pos = 0;
+        for (int y = from; y <= to; y++) {
+            Row *row = &E.row[y];
+            if (pos + row->size + 2 >= cap) {
+                cap = (pos + row->size + 2) * 2;
+                buf = realloc(buf, cap);
+            }
+            memcpy(buf + pos, row->chars, row->size);
+            pos += row->size;
+            buf[pos++] = '\n';
+        }
+        buf[pos] = '\0';
+        free(E.clipboard);
+        E.clipboard = buf;
+        E.clipboard_len = pos;
+        int nlines = to - from + 1;
+        set_status("\x1b[32m✓\x1b[m Copiado: linhas %d–%d (%d linha%s, %d char%s)",
+                   from+1, to+1,
+                   nlines, nlines == 1 ? "" : "s",
+                   pos,    pos   == 1 ? "" : "s");
+    } else if (sscanf(input, "%d", &from) == 1) {
+        /* apenas um número: copia aquela linha */
+        from--;
+        if (from < 0) from = 0;
+        if (from >= E.numrows) from = E.numrows - 1;
+        Row *r = &E.row[from];
+        free(E.clipboard);
+        E.clipboard = malloc(r->size + 2);
+        memcpy(E.clipboard, r->chars, r->size);
+        E.clipboard[r->size] = '\n';
+        E.clipboard[r->size + 1] = '\0';
+        E.clipboard_len = r->size + 1;
+        set_status("\x1b[32m✓\x1b[m Linha %d copiada (%d chars)", from+1, r->size);
+    } else {
+        set_status("\x1b[31m✖\x1b[m Formato inválido — use: 1 5  ou  3");
+    }
+    free(input);
+}
+
+static void sel_copy(void) {
+    if (!E.sel_active) {
+        /* sem seleção: copia linha inteira */
+        if (E.cy >= E.numrows) return;
+        Row *r = &E.row[E.cy];
+        free(E.clipboard);
+        E.clipboard = malloc(r->size + 2);
+        memcpy(E.clipboard, r->chars, r->size);
+        E.clipboard[r->size] = '\n'; E.clipboard[r->size+1] = '\0';
+        E.clipboard_len = r->size + 1;
+        set_status("Linha copiada (%d chars)", r->size);
+        return;
+    }
+    int sy1,sx1,sy2,sx2; sel_normalize(&sy1,&sx1,&sy2,&sx2);
+    int cap=4096; char *buf=malloc(cap); int pos=0;
+    for (int y=sy1; y<=sy2; y++) {
+        if (y>=E.numrows) break;
+        Row *row=&E.row[y];
+        int s=(y==sy1)?sx1:0, e=(y==sy2)?sx2:row->size;
+        if (s>row->size) s=row->size;
+        if (e>row->size) e=row->size;
+        int ll=e-s;
+        if (pos+ll+2>=cap){cap=(pos+ll+2)*2;buf=realloc(buf,cap);}
+        memcpy(buf+pos,row->chars+s,ll); pos+=ll;
+        if (y<sy2) buf[pos++]='\n';
+    }
+    buf[pos]='\0';
+    free(E.clipboard); E.clipboard=buf; E.clipboard_len=pos;
+    set_status("Copiado: %d char(s)", pos);
+}
+
+static void sel_cut(void) {
+    if (!E.sel_active) {
+        /* sem seleção: corta linha inteira */
+        if (E.cy >= E.numrows) return;
+        Row *r = &E.row[E.cy];
+        free(E.clipboard);
+        E.clipboard = malloc(r->size + 2);
+        memcpy(E.clipboard, r->chars, r->size);
+        E.clipboard[r->size]='\n'; E.clipboard[r->size+1]='\0';
+        E.clipboard_len = r->size + 1;
+        undo_push(); del_line(); E.sel_active = 0;
+        set_status("Linha cortada — Ctrl+U desfaz");
+        return;
+    }
+    sel_copy();
+    int sy1,sx1,sy2,sx2; sel_normalize(&sy1,&sx1,&sy2,&sx2);
+    undo_push();
+    /* apaga do fim para o início para não invalidar índices */
+    if (sy1 == sy2) {
+        E.cy=sy1; E.cx=sx2;
+        for (int i=sx2; i>sx1; i--) del_char();
+    } else {
+        /* apaga linhas intermediárias + fragmentos */
+        E.cy=sy2; E.cx=sx2;
+        while (E.cx>0) del_char();
+        for (int y=sy2; y>sy1; y--) {
+            E.cy=y; E.cx=0; del_char(); /* une linha com anterior */
+        }
+        E.cy=sy1; E.cx=E.row[sy1].size;
+        while (E.cx>sx1) del_char();
+    }
+    E.sel_active=0;
+    set_status("Cortado — Ctrl+U desfaz");
+}
+
+static void sel_paste(void) {
+    if (!E.clipboard || E.clipboard_len==0) { set_status("Clipboard vazio."); return; }
+    undo_push();
+    char *p=E.clipboard, *end=E.clipboard+E.clipboard_len;
+    while (p<end) {
+        if (*p=='\n') { insert_newline(); }
+        else { insert_char((unsigned char)*p); }
+        p++;
+    }
+    set_status("Colado: %d char(s)", E.clipboard_len);
+}
+
+static void sel_clear(void) { E.sel_active=0; }
+
+static void find_replace(void) {
+    char *query = prompt("Buscar: %s  (ESC cancela)", NULL);
+    if (!query || !query[0]) { free(query); return; }
+    char *replacement = prompt("Substituir por: %s  (ESC cancela)", NULL);
+    if (!replacement) { free(query); return; }
+
+    int qlen = (int)strlen(query);
+    int rlen = (int)strlen(replacement);
+    int count = 0;
+
+    {
+        /* substituir tudo diretamente */
+        undo_push();
+        for (int y = 0; y < E.numrows; y++) {
+            Row *row = &E.row[y];
+            char *p = row->chars;
+            while ((p = strstr(p, query)) != NULL) {
+                int col = (int)(p - row->chars);
+                for (int i = 0; i < qlen; i++) row_del_char(row, col);
+                for (int i = 0; i < rlen; i++) row_insert_char(row, col + i, (unsigned char)replacement[i]);
+                update_row(row);
+                p = row->chars + col + rlen;
+                count++;
+            }
+        }
+        if (count) set_status("%d substituição(ões) — Ctrl+U desfaz", count);
+        else       set_status("Não encontrado: %s", query);
+    }
+    free(query); free(replacement);
+}
+
+static void find(void) {
+    int sx = E.cx, sy = E.cy, sco = E.coloff, sro = E.rowoff;
+    char *q = prompt("Buscar (setas nav, ESC cancela): %s", search_cb);
+    if (q) free(q);
+    else { E.cx = sx; E.cy = sy; E.coloff = sco; E.rowoff = sro; }
+}
+
+/* ════════════════════════════════════════════════════════
+ * SCROLL / CURSOR
+ * ════════════════════════════════════════════════════════ */
+
+static void scroll(void) {
+    E.rx = (E.cy < E.numrows) ? cx_to_rx(&E.row[E.cy], E.cx) : 0;
+    if (E.cy < E.rowoff) E.rowoff = E.cy;
+    if (E.cy >= E.rowoff + E.rows) E.rowoff = E.cy - E.rows + 1;
+    /* scroll horizontal: área visível é cols - GUTTER */
+    int vw = E.cols - GUTTER;
+    if (E.rx < E.coloff) E.coloff = E.rx;
+    if (E.rx >= E.coloff + vw) E.coloff = E.rx - vw + 1;
+}
+
+static void move_cursor(int k) {
+    Row *row = (E.cy < E.numrows) ? &E.row[E.cy] : NULL;
+    switch (k) {
+        case ARROW_LEFT:
+            if (E.cx > 0) E.cx--;
+            else if (E.cy > 0) { E.cy--; E.cx = E.row[E.cy].size; }
+            break;
+        case ARROW_RIGHT:
+            if (row && E.cx < row->size) E.cx++;
+            else if (row && E.cx == row->size && E.cy < E.numrows-1) { E.cy++; E.cx = 0; }
+            break;
+        case ARROW_UP:   if (E.cy > 0) E.cy--;         break;
+        case ARROW_DOWN: if (E.cy < E.numrows) E.cy++;  break;
+    }
+    row = (E.cy < E.numrows) ? &E.row[E.cy] : NULL;
+    int rlen = row ? row->size : 0;
+    if (E.cx > rlen) E.cx = rlen;
+}
+
+/* ════════════════════════════════════════════════════════
+ * RENDER
+ * ════════════════════════════════════════════════════════ */
+
+static void draw_rows(Abuf *ab) {
+    for (int y = 0; y < E.rows; y++) {
+        int fr = y + E.rowoff;
+
+        if (fr >= E.numrows) {
+            /* tela vazia */
+            if (E.numrows == 0 && y == E.rows / 3) {
+                char msg[256];
+                int ml = snprintf(msg, sizeof(msg),
+                    "ElliotOS Editor v%s  |  Ctrl+S salvar  Ctrl+Q sair  Tab completar  Ctrl+N snippets  Ctrl+O símbolos  Ctrl+V checar  Ctrl+R formatar",
+                    EDITOR_VERSION);
+                if (ml > E.cols - GUTTER) ml = E.cols - GUTTER;
+                int pad = (E.cols - ml) / 2;
+                ab_append(ab, "\x1b[90m~\x1b[0m", 10);
+                for (int i = 1; i < pad; i++) ab_append(ab, " ", 1);
+                ab_append(ab, "\x1b[1;35m", 7);
+                ab_append(ab, msg, ml);
+                ab_append(ab, "\x1b[0m", 4);
+            } else {
+                ab_append(ab, "\x1b[90m~\x1b[0m", 10);
+            }
+        } else {
+            /* número de linha */
+            char lbuf[32]; int ll;
+            if (fr == E.cy)
+                ll = snprintf(lbuf, sizeof(lbuf), "\x1b[1;33m%4d \x1b[0m", fr+1);
+            else if (E.row[fr].is_dirty)
+                ll = snprintf(lbuf, sizeof(lbuf), "\x1b[38;5;97m%4d\x1b[32m\xe2\x94\x82\x1b[0m", fr+1);
+            else
+                ll = snprintf(lbuf, sizeof(lbuf), "\x1b[38;5;97m%4d \x1b[0m", fr+1);
+            ab_append(ab, lbuf, ll);
+
+            Row *row = &E.row[fr];
+            int len = row->rsize - E.coloff;
+            if (len < 0) len = 0;
+            if (len > E.cols - GUTTER) len = E.cols - GUTTER;
+
+            /* normaliza seleção para highlight */
+            int sel_sy1=-1,sel_sx1=0,sel_sy2=-1,sel_sx2=0;
+            if (E.sel_active) {
+                sel_sy1=E.sel_ay; sel_sx1=E.sel_ax;
+                sel_sy2=E.cy;     sel_sx2=E.cx;
+                if (sel_sy1>sel_sy2||(sel_sy1==sel_sy2&&sel_sx1>sel_sx2)){
+                    int t; t=sel_sy1;sel_sy1=sel_sy2;sel_sy2=t;
+                    t=sel_sx1;sel_sx1=sel_sx2;sel_sx2=t; }
+            }
+
+            char *ch = &row->render[E.coloff];
+            unsigned char *hl = &row->hl[E.coloff];
+            int cur_color = -1;
+            int in_sel_prev = 0;
+
+            for (int j = 0; j < len; j++) {
+                /* highlight de seleção */
+                int abs_col = j + E.coloff;
+                int in_sel = 0;
+                if (E.sel_active && fr>=sel_sy1 && fr<=sel_sy2) {
+                    int ls = (fr==sel_sy1)?sel_sx1:0;
+                    int le = (fr==sel_sy2)?sel_sx2:row->size;
+                    /* converte cx para rx */
+                    in_sel = (abs_col>=ls && abs_col<le);
+                }
+                if (in_sel && !in_sel_prev) { ab_append(ab,"\x1b[48;5;24m",11); cur_color=-99; }
+                if (!in_sel && in_sel_prev) { ab_append(ab,"\x1b[49m",5); cur_color=-1; }
+                in_sel_prev=in_sel;
+                if (iscntrl((unsigned char)ch[j])) {
+                    char sym = (ch[j] <= 26) ? '@' + ch[j] : '?';
+                    ab_append(ab, "\x1b[7m", 4);
+                    ab_append(ab, &sym, 1);
+                    ab_append(ab, "\x1b[m", 3);
+                    if (cur_color != -1) {
+                        char cb[24]; int bl;
+                        if (cur_color < 0)
+                            bl = snprintf(cb, sizeof(cb), "\x1b[%dm", -cur_color);
+                        else if (cur_color > 37)
+                            bl = snprintf(cb, sizeof(cb), "\x1b[38;5;%dm", cur_color);
+                        else
+                            bl = snprintf(cb, sizeof(cb), "\x1b[%dm", cur_color);
+                        ab_append(ab, cb, bl);
+                    }
+                } else if (hl[j] == HL_NORMAL) {
+                    if (cur_color != -1) { ab_append(ab, "\x1b[39m", 5); cur_color = -1; }
+                    ab_append(ab, &ch[j], 1);
+                } else {
+                    int color = hl_to_color(hl[j]);
+                    if (color != cur_color) {
+                        cur_color = color;
+                        char cbuf[24]; int bl;
+                        if (color < 0)
+                            bl = snprintf(cbuf, sizeof(cbuf), "\x1b[%dm", -color);
+                        else if (color > 37)
+                            bl = snprintf(cbuf, sizeof(cbuf), "\x1b[38;5;%dm", color);
+                        else
+                            bl = snprintf(cbuf, sizeof(cbuf), "\x1b[%dm", color);
+                        ab_append(ab, cbuf, bl);
+                    }
+                    ab_append(ab, &ch[j], 1);
+                }
+            }
+            if (in_sel_prev) ab_append(ab,"\x1b[49m",5);
+            ab_append(ab, "\x1b[39m", 5);
+        }
+        ab_append(ab, "\x1b[K\r\n", 5);
+    }
+}
+
+static void draw_status(Abuf *ab) {
+    /* fundo roxo escuro + texto lavanda */
+    ab_append(ab, "\x1b[48;5;54m\x1b[38;5;189m", 21);
+    char left[160], right[64];
+    const char *ft = E.syntax ? E.syntax->filetype : "plain";
+    /* tab info */
+    char tab_info[64] = "";
+    if (E.buf_count > 1)
+        snprintf(tab_info, sizeof(tab_info), " [%d/%d]", E.buf_idx+1, E.buf_count);
+    int ll, rl;
+
+    if (E.dirty)
+        ll = snprintf(left, sizeof(left),
+            "  \x1b[38;5;220m●\x1b[38;5;189m %s  \x1b[38;5;141m[%s]\x1b[38;5;189m",
+            E.filename ? E.filename : "sem nome", ft);
+    else
+        ll = snprintf(left, sizeof(left),
+            "  \x1b[38;5;114m✓\x1b[38;5;189m %s  \x1b[38;5;141m[%s]\x1b[38;5;189m",
+            E.filename ? E.filename : "sem nome", ft);
+
+    rl = snprintf(right, sizeof(right),
+        "  Ln %d/%d  Col %d  ", E.cy+1, E.numrows, E.rx+1);
+
+    /* conta chars visíveis (sem escapes ANSI) de left */
+    int visible = 0;
+    int in_esc = 0;
+    for (int i = 0; left[i]; i++) {
+        if (left[i] == '\x1b') { in_esc = 1; continue; }
+        if (in_esc) { if (isalpha((unsigned char)left[i])) in_esc = 0; continue; }
+        visible++;
+    }
+
+    ab_append(ab, left, ll);
+    int pad = E.cols - visible - rl;
+    while (pad-- > 0) ab_append(ab, " ", 1);
+    if (rl > 0) ab_append(ab, right, rl);
+    ab_append(ab, "\x1b[m\r\n", 5);
+}
+
+static void draw_msg(Abuf *ab) {
+    ab_append(ab, "\x1b[K", 3);
+    int ml = strlen(E.statusmsg);
+    /* Não truncar por E.cols — o statusmsg pode conter sequências de escape
+     * que não ocupam colunas visuais (ex: menu de linguagem). O terminal
+     * cuida do clipping. Só limitamos pelo tamanho real do buffer. */
+    if (ml && time(NULL) - E.statusmsg_time < STATUS_MSG_TIME)
+        ab_append(ab, E.statusmsg, ml);
+}
+
+/* ════════════════════════════════════════════════════════
+ * GOTO SYMBOL (Ctrl+O)
+ * ════════════════════════════════════════════════════════
+ *
+ * Lista todos os símbolos definidos no arquivo (funções, variáveis,
+ * structs, macros, tags HTML) filtráveis por digitação incremental.
+ * Atalhos no painel:
+ *   ↑↓       navegar
+ *   Enter    pular para o símbolo
+ *   letra/Backspace  filtrar lista
+ *   Esc      fechar
+ * ════════════════════════════════════════════════════════ */
+
+#define SYM_MAX   256
+#define SYM_PREV  60
+
+typedef struct {
+    int  line;
+    char kind;    /* 'f'=função  'm'=macro  's'=struct/typedef  'h'=html */
+    char name[64];
+    char preview[SYM_PREV];
+} Symbol;
+
+static Symbol g_syms[SYM_MAX];
+static int    g_sym_count  = 0;
+static int    g_sym_sel    = 0;
+static int    g_sym_scroll = 0;
+static int    g_sym_active = 0;
+static char   g_sym_query[48] = {0};
+static int    g_sym_qlen      = 0;
+static int    g_sym_vis[SYM_MAX];
+static int    g_sym_vis_count = 0;
+
+static int sym_icontains(const char *hay, const char *needle) {
+    if (!needle[0]) return 1;
+    int nl = (int)strlen(needle);
+    for (int i = 0; hay[i]; i++) {
+        int ok = 1;
+        for (int j = 0; j < nl; j++) {
+            if (tolower((unsigned char)hay[i+j]) !=
+                tolower((unsigned char)needle[j])) { ok=0; break; }
+        }
+        if (ok) return 1;
+    }
+    return 0;
+}
+
+static void sym_build_vis(void) {
+    g_sym_vis_count = 0;
+    for (int i = 0; i < g_sym_count; i++)
+        if (sym_icontains(g_syms[i].name, g_sym_query))
+            g_sym_vis[g_sym_vis_count++] = i;
+    if (g_sym_sel >= g_sym_vis_count)
+        g_sym_sel = g_sym_vis_count > 0 ? g_sym_vis_count-1 : 0;
+}
+
+static int sym_extract_name(const char *s, int skip,
+                             char *out, int outsz) {
+    const char *p = s + skip;
+    while (*p==' '||*p=='\t') p++;
+    int i=0;
+    while (i<outsz-1 && (isalnum((unsigned char)p[i])||p[i]=='_'))
+        { out[i]=p[i]; i++; }
+    out[i]='\0'; return i;
+}
+
+static void sym_collect(void) {
+    g_sym_count = 0;
+    int is_c    = (E.syntax==&HLDB[0]||E.syntax==&HLDB[1]);
+    int is_lua  = (E.syntax==&HLDB[2]);
+    int is_bash = (E.syntax==&HLDB[3]);
+    int is_html = (E.syntax==&HLDB[4]);
+
+    for (int y = 0; y < E.numrows && g_sym_count < SYM_MAX; y++) {
+        char *s = E.row[y].chars;
+        int   n = E.row[y].size;
+        int   ts = 0;
+        while (ts<n && (s[ts]==' '||s[ts]=='\t')) ts++;
+        char *p = s + ts;
+        char name[64]; char kind = 0;
+
+        if (is_lua) {
+            if (strncmp(p,"function ",9)==0) {
+                if (sym_extract_name(p,9,name,sizeof(name))>0) kind='f';
+            } else if (strncmp(p,"local function ",15)==0) {
+                if (sym_extract_name(p,15,name,sizeof(name))>0) kind='f';
+            } else {
+                const char *eq=strstr(p,"= function");
+                if (eq) {
+                    const char *q=p;
+                    if (strncmp(q,"local ",6)==0) q+=6;
+                    int i=0;
+                    while(i<63&&(isalnum((unsigned char)q[i])||q[i]=='_'||q[i]=='.'))
+                        { name[i]=q[i]; i++; }
+                    name[i]='\0';
+                    if (i>0) kind='f';
+                }
+            }
+        } else if (is_c) {
+            if (strncmp(p,"#define ",8)==0) {
+                if (sym_extract_name(p,8,name,sizeof(name))>0) kind='m';
+            } else if (strncmp(p,"struct ",7)==0||strncmp(p,"enum ",5)==0||
+                       strncmp(p,"union ",6)==0||strncmp(p,"class ",6)==0) {
+                int sk=(strncmp(p,"struct ",7)==0)?7:
+                       (strncmp(p,"enum ",5)==0)?5:
+                       (strncmp(p,"union ",6)==0)?6:6;
+                if (sym_extract_name(p,sk,name,sizeof(name))>0) kind='s';
+            } else if (strncmp(p,"typedef ",8)==0) {
+                int tl=(int)strlen(p),i=tl-1;
+                while(i>0&&(p[i]==';'||p[i]==' '||p[i]=='\t')) i--;
+                int end=i+1,si2=i;
+                while(si2>0&&(isalnum((unsigned char)p[si2-1])||p[si2-1]=='_')) si2--;
+                int len=end-si2; if(len>0&&len<63) {
+                    memcpy(name,p+si2,len); name[len]='\0'; kind='s';
+                }
+            } else {
+                char *lp=strchr(p,'(');
+                if (lp&&lp>p) {
+                    int bad=(strncmp(p,"if ",3)==0||strncmp(p,"if(",3)==0||
+                             strncmp(p,"for ",4)==0||strncmp(p,"for(",4)==0||
+                             strncmp(p,"while ",6)==0||strncmp(p,"while(",6)==0||
+                             strncmp(p,"return ",7)==0||strncmp(p,"switch",6)==0||
+                             strncmp(p,"//",2)==0||strncmp(p,"/*",2)==0||
+                             p[0]=='*');
+                    if (!bad) {
+                        int ei=(int)(lp-p);
+                        while(ei>0&&(p[ei-1]==' '||p[ei-1]=='\t')) ei--;
+                        int si2=ei;
+                        while(si2>0&&(isalnum((unsigned char)p[si2-1])||p[si2-1]=='_')) si2--;
+                        int len=ei-si2;
+                        if(len>0&&len<63) { memcpy(name,p+si2,len); name[len]='\0'; kind='f'; }
+                    }
+                }
+            }
+        } else if (is_bash) {
+            if (strncmp(p,"function ",9)==0) {
+                if (sym_extract_name(p,9,name,sizeof(name))>0) kind='f';
+            } else {
+                char *lp=strstr(p,"()");
+                if(lp&&lp>p) {
+                    int ei=(int)(lp-p),si2=ei;
+                    while(si2>0&&(isalnum((unsigned char)p[si2-1])||p[si2-1]=='_')) si2--;
+                    int len=ei-si2;
+                    if(len>0&&len<63){ memcpy(name,p+si2,len); name[len]='\0'; kind='f'; }
+                }
+            }
+        } else if (is_html) {
+            static const char *htags[]={"<h1","<h2","<h3","<h4","<h5","<h6",
+                "<section","<article","<nav","<main","<footer","<header","<aside",NULL};
+            for(int t=0;htags[t];t++) {
+                if(strncasecmp(p,htags[t],strlen(htags[t]))==0) {
+                    int i=0;
+                    while(i<63&&p[i]&&p[i]!='>'&&p[i]!=' ') { name[i]=p[i]; i++; }
+                    name[i]='\0'; kind='h'; break;
+                }
+            }
+        }
+
+        if (kind && name[0]) {
+            Symbol *sym = &g_syms[g_sym_count++];
+            sym->line = y+1; sym->kind = kind;
+            snprintf(sym->name,sizeof(sym->name),"%s",name);
+            int pl=0, i2=ts;
+            while(pl<SYM_PREV-1&&i2<n&&s[i2]!='\n') sym->preview[pl++]=s[i2++];
+            sym->preview[pl]='\0';
+        }
+    }
+}
+
+static void sym_open(void) {
+    sym_collect();
+    if (g_sym_count == 0) {
+        set_status("\x1b[33m⚠ Nenhum símbolo encontrado neste arquivo\x1b[m");
+        return;
+    }
+    g_sym_query[0]='\0'; g_sym_qlen=0;
+    g_sym_sel=0; g_sym_scroll=0; g_sym_active=1;
+    sym_build_vis();
+    set_status("Ctrl+O: \xe2\x86\x91\xe2\x86\x93 navegar  Enter ir  Digite para filtrar  Esc fechar  [%d s\xc3\xadmbolos]",
+               g_sym_count);
+}
+
+static void sym_jump(int vi) {
+    if (vi<0||vi>=g_sym_vis_count) return;
+    int si=g_sym_vis[vi];
+    E.cy=g_syms[si].line-1;
+    if(E.cy>=E.numrows) E.cy=E.numrows-1;
+    E.cx=0;
+    E.rowoff=E.cy-E.rows/2;
+    if(E.rowoff<0) E.rowoff=0;
+}
+
+static const char *sym_icon(char k) {
+    switch(k) {
+        case 'f': return "\xc6\x92 ";   /* ƒ */
+        case 'm': return "# ";
+        case 's': return "\xe2\x97\x86 "; /* ◆ */
+        case 'h': return "\xe2\x80\xa2 "; /* • */
+        default:  return "~ ";
+    }
+}
+
+static void draw_sym_panel(Abuf *ab) {
+    if (!g_sym_active) return;
+
+    int list_h   = g_sym_vis_count < 12 ? g_sym_vis_count : 12;
+    int panel_w  = 62;
+    int panel_col = (E.cols - panel_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = 1;
+
+    /* título */
+    {
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,"\x1b[48;5;17m\x1b[38;5;123m\x1b[1m",25);
+        char title[80];
+        int tl=snprintf(title,sizeof(title),
+            " \xe2\x97\x88 S\xc3\xadmbolos  \xc2\xb7  %d/%d ",
+            g_sym_vis_count, g_sym_count);
+        if(tl>panel_w) tl=panel_w;
+        ab_append(ab,title,tl);
+        for(int s=tl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+    /* filtro */
+    {
+        int row=panel_row+1;
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        ab_append(ab,"\x1b[48;5;18m\x1b[38;5;255m",21);
+        char fline[80];
+        int fl=snprintf(fline,sizeof(fline)," \xf0\x9f\x94\x8d %s_",g_sym_query);
+        if(fl>panel_w) fl=panel_w;
+        ab_append(ab,fline,fl);
+        for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+    /* scroll */
+    if(g_sym_sel<g_sym_scroll) g_sym_scroll=g_sym_sel;
+    if(g_sym_sel>=g_sym_scroll+list_h) g_sym_scroll=g_sym_sel-list_h+1;
+    /* itens */
+    for(int i=0;i<list_h;i++) {
+        int idx=g_sym_scroll+i;
+        if(idx>=g_sym_vis_count) break;
+        int si=g_sym_vis[idx];
+        int row=panel_row+2+i;
+        if(row>=E.rows) break;
+        char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+        ab_append(ab,pos,strlen(pos));
+        if(idx==g_sym_sel)
+            ab_append(ab,"\x1b[48;5;19m\x1b[38;5;255m\x1b[1m",25);
+        else
+            ab_append(ab,"\x1b[48;5;17m\x1b[38;5;153m",21);
+        char line[80];
+        int ll=snprintf(line,sizeof(line)," %sL%-4d  %-30s",
+                        sym_icon(g_syms[si].kind),
+                        g_syms[si].line, g_syms[si].name);
+        if(ll>panel_w) ll=panel_w;
+        ab_append(ab,line,ll);
+        for(int s=ll;s<panel_w;s++) ab_append(ab," ",1);
+        ab_append(ab,"\x1b[m",3);
+    }
+    /* preview */
+    if(g_sym_vis_count>0) {
+        int si=g_sym_vis[g_sym_sel];
+        int row=panel_row+2+list_h;
+        if(row<E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,"\x1b[48;5;235m\x1b[38;5;244m",21);
+            char prev[80];
+            int pl=snprintf(prev,sizeof(prev)," > %s",g_syms[si].preview);
+            if(pl>panel_w) pl=panel_w;
+            ab_append(ab,prev,pl);
+            for(int s=pl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3); row++;
+        } else { int row2=row+1;
+        /* rodapé */
+        if(row2<E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row2,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,"\x1b[48;5;17m\x1b[38;5;123m",21);
+            char foot[80];
+            int fl=snprintf(foot,sizeof(foot)," %d/%d  Enter ir  Esc fechar ",
+                            g_sym_vis_count>0?g_sym_sel+1:0,g_sym_vis_count);
+            if(fl>panel_w) fl=panel_w;
+            ab_append(ab,foot,fl);
+            for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+        }}
+        /* rodapé (caso normal) */
+        if(row<E.rows) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",row,panel_col);
+            ab_append(ab,pos,strlen(pos));
+            ab_append(ab,"\x1b[48;5;17m\x1b[38;5;123m",21);
+            char foot[80];
+            int fl=snprintf(foot,sizeof(foot)," %d/%d  Enter ir  Esc fechar ",
+                            g_sym_vis_count>0?g_sym_sel+1:0,g_sym_vis_count);
+            if(fl>panel_w) fl=panel_w;
+            ab_append(ab,foot,fl);
+            for(int s=fl;s<panel_w;s++) ab_append(ab," ",1);
+            ab_append(ab,"\x1b[m",3);
+        }
+    }
+}
+
+/* Popup de completion desenhado sobre o texto */
+static void draw_completion(Abuf *ab) {
+    if (!E.comp.active || E.comp.count == 0) return;
+
+    int popup_row = (E.cy - E.rowoff) + 2;  /* linha abaixo do cursor */
+    int trigger_rx = (E.cy < E.numrows) ? cx_to_rx(&E.row[E.cy], E.comp.trigger_cx) : E.rx;
+    /* +GUTTER+1: converte rx (0-indexed) para coluna de terminal (1-indexed) com gutter.
+     * -1: o espaço de padding antes do item ocupa 1 col, então recuamos para não cortar o 1º char. */
+    int popup_col = (trigger_rx - E.coloff) + GUTTER;
+    if (popup_col + 34 > E.cols) popup_col = E.cols - 34;
+    if (popup_col < 1) popup_col = 1;
+
+    int show  = (E.comp.count < COMPLETION_SHOW) ? E.comp.count : COMPLETION_SHOW;
+    int start = E.comp.selected - show/2;
+    if (start < 0) start = 0;
+    if (start + show > E.comp.count) start = E.comp.count - show;
+    if (start < 0) start = 0;
+
+    for (int i = 0; i < show; i++) {
+        int idx = start + i;
+        int row = popup_row + i;
+        if (row >= E.rows + 1) break;
+
+        char pos[32];
+        snprintf(pos, sizeof(pos), "\x1b[%d;%dH", row, popup_col);
+        ab_append(ab, pos, strlen(pos));
+
+        if (idx == E.comp.selected)
+            ab_append(ab, "\x1b[48;5;99m\x1b[38;5;255m\x1b[1m", 25);  /* selecionado: roxo vivo + branco bold */
+        else
+            ab_append(ab, "\x1b[48;5;53m\x1b[38;5;183m", 21);          /* normal: roxo escuro + lilás */
+
+        const char *item = E.comp.items[idx];
+        int ilen = (int)strlen(item);
+        if (ilen > 32) ilen = 32;
+        ab_append(ab, " ", 1);
+        ab_append(ab, item, ilen);
+        for (int s = ilen; s < 32; s++) ab_append(ab, " ", 1);
+        ab_append(ab, " \x1b[m", 4);
+    }
+    /* rodapé do popup */
+    char footer[128];
+    int fl = snprintf(footer, sizeof(footer),
+        "\x1b[%d;%dH\x1b[48;5;55m\x1b[38;5;141m ↑↓ navegar  Enter/Tab aplicar  Esc fechar \x1b[m",
+        popup_row + show, popup_col);
+    ab_append(ab, footer, fl);
+}
+
+void refresh_screen(void) {
+    scroll();
+    Abuf ab = ABUF_INIT;
+    ab_append(&ab, "\x1b[?25l\x1b[H", 9);  /* esconde cursor, vai para home */
+    draw_rows(&ab);
+    draw_status(&ab);
+    draw_msg(&ab);
+    draw_completion(&ab);
+    draw_check_panel(&ab);
+    draw_snip_panel(&ab);
+    draw_fexp_panel(&ab);
+    draw_goto_panel(&ab);
+    draw_sym_panel(&ab);
+    /* posiciona cursor */
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH",
+        (E.cy - E.rowoff) + 1,
+        (E.rx - E.coloff) + GUTTER + 1);
+    ab_append(&ab, buf, strlen(buf));
+    ab_append(&ab, "\x1b[?25h", 6);  /* mostra cursor */
+    write(STDOUT_FILENO, ab.b, ab.len);
+    ab_free(&ab);
+}
+
+/* ════════════════════════════════════════════════════════
+ * PROCESSAMENTO DE TECLAS
+ * ════════════════════════════════════════════════════════ */
+
+static void set_status(const char *fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    vsnprintf(E.statusmsg, sizeof(E.statusmsg), fmt, ap);
+    va_end(ap);
+    E.statusmsg_time = time(NULL);
+}
+
+static void process_key(void) {
+    static int quit_times = 1;
+    int c = read_key();
+    if (c == 0) return; /* timeout de 100ms — só redesenha, sem input */
+
+    /* ── painel de checagem ativo (Ctrl+E): intercepta navegação ──
+       mesmo padrão do painel de goto (Ctrl+J): navegação com setas,
+       Enter confirma e fecha, Esc ou qualquer outra tecla fecha.
+       Nenhuma leitura de teclado própria — usa o read_key() acima. ── */
+    if (g_eissue_active) {
+        switch (c) {
+            case ARROW_DOWN:
+                g_eissue_sel++;
+                if (g_eissue_sel >= g_eissue_count) g_eissue_sel = 0;
+                eissue_jump(g_eissue_sel);
+                return;
+            case ARROW_UP:
+                g_eissue_sel--;
+                if (g_eissue_sel < 0) g_eissue_sel = g_eissue_count - 1;
+                eissue_jump(g_eissue_sel);
+                return;
+            case '\r':
+                eissue_jump(g_eissue_sel);
+                g_eissue_active = 0;
+                set_status("Linha %d", g_eissues[g_eissue_sel].line);
+                return;
+            case '\x1b':
+            case CTRL('e'):
+                g_eissue_active = 0;
+                set_status("Verificação fechada");
+                return;
+            default:
+                g_eissue_active = 0;
+                break;
+        }
+    }
+
+    /* ── painel de snippets ativo: intercepta navegação ── */
+    if (g_snip_active) {
+        switch (c) {
+            case ARROW_DOWN:
+                g_snip_sel++;
+                if (g_snip_sel >= snip_vis_count) g_snip_sel = 0;
+                return;
+            case ARROW_UP:
+                g_snip_sel--;
+                if (g_snip_sel < 0) g_snip_sel = snip_vis_count - 1;
+                return;
+            case '\r': {
+                int si = snip_visible[g_snip_sel];
+                g_snip_active = 0;
+                snip_insert(si);
+                set_status("Snippet '%s' inserido — cursor no ponto de edição",
+                           g_snips[si].name);
+                return;
+            }
+            case '\x1b':
+            case CTRL('n'):
+                g_snip_active = 0;
+                set_status("Snippets fechado");
+                return;
+            default:
+                g_snip_active = 0;
+                break;
+        }
+    }
+
+    /* ── explorador de arquivos ativo: intercepta navegação ── */
+    if (g_fexp_active) {
+        /* modo digitacao: captura caracteres para o campo de input */
+        if (g_fexp_input_mode) {
+            if (c == '\r') {
+                fexp_confirm();
+            } else if (c == '\x1b') {
+                /* Esc cancela digitacao, volta para navegacao */
+                g_fexp_input[0]   = '\0';
+                g_fexp_input_len  = 0;
+                g_fexp_input_mode = 0;
+                set_status("Ctrl+P: \u2191\u2193 navegar  Enter abrir  Tab digitar caminho  Esc fechar");
+            } else if (c == BACKSPACE || c == 127 || c == CTRL('h')) {
+                if (g_fexp_input_len > 0) {
+                    /* backspace respeita UTF-8 */
+                    g_fexp_input_len--;
+                    /* volta bytes de continuacao UTF-8 */
+                    while (g_fexp_input_len > 0 &&
+                           (g_fexp_input[g_fexp_input_len] & 0xC0) == 0x80)
+                        g_fexp_input_len--;
+                    g_fexp_input[g_fexp_input_len] = '\0';
+                }
+            } else if (c >= 32 && g_fexp_input_len < FEXP_INPUT_MAX - 4) {
+                /* caractere imprimivel */
+                g_fexp_input[g_fexp_input_len++] = (char)c;
+                g_fexp_input[g_fexp_input_len]   = '\0';
+            }
+            return;
+        }
+
+        /* modo navegacao normal */
+        switch (c) {
+            case ARROW_DOWN:
+                g_fexp_sel++;
+                if (g_fexp_sel >= g_fexp_count) g_fexp_sel = 0;
+                return;
+            case ARROW_UP:
+                g_fexp_sel--;
+                if (g_fexp_sel < 0) g_fexp_sel = g_fexp_count - 1;
+                return;
+            case '\r':
+                fexp_confirm();
+                return;
+            case '\t':
+                /* Tab ativa modo digitacao */
+                g_fexp_input_mode = 1;
+                g_fexp_input[0]   = '\0';
+                g_fexp_input_len  = 0;
+                set_status("Digite o caminho e pressione Enter (~ para home)");
+                return;
+            case '\x1b':
+            case CTRL('p'):
+                g_fexp_active = 0;
+                set_status("Explorador fechado");
+                return;
+            default:
+                /* letra digitada ativa input automaticamente */
+                if (c >= 32 && c < 127) {
+                    g_fexp_input_mode = 1;
+                    g_fexp_input_len  = 0;
+                    g_fexp_input[g_fexp_input_len++] = (char)c;
+                    g_fexp_input[g_fexp_input_len]   = '\0';
+                    set_status("Digite o caminho e pressione Enter (~ para home)");
+                } else {
+                    g_fexp_active = 0;
+                }
+                break;
+        }
+        return;
+    }
+
+    /* ── painel goto definição ativo ── */
+    if (g_goto_active) {
+        switch (c) {
+            case ARROW_DOWN:
+                g_goto_sel++;
+                if (g_goto_sel >= g_goto_count) g_goto_sel = 0;
+                goto_jump(g_goto_sel);
+                return;
+            case ARROW_UP:
+                g_goto_sel--;
+                if (g_goto_sel < 0) g_goto_sel = g_goto_count-1;
+                goto_jump(g_goto_sel);
+                return;
+            case '\r':
+                goto_jump(g_goto_sel);
+                g_goto_active = 0;
+                set_status("Linha %d", g_goto_matches[g_goto_sel].line);
+                return;
+            case '\x1b':
+            case CTRL('j'):
+                g_goto_active = 0;
+                set_status("Goto fechado");
+                return;
+            default:
+                g_goto_active = 0;
+                break;
+        }
+    }
+
+    /* ── painel de símbolos ativo: intercepta navegação e filtro ── */
+    if (g_sym_active) {
+        switch (c) {
+            case ARROW_DOWN:
+                g_sym_sel++;
+                if (g_sym_sel >= g_sym_vis_count) g_sym_sel = 0;
+                return;
+            case ARROW_UP:
+                g_sym_sel--;
+                if (g_sym_sel < 0) g_sym_sel = g_sym_vis_count > 0 ? g_sym_vis_count-1 : 0;
+                return;
+            case '\r':
+                sym_jump(g_sym_sel);
+                g_sym_active = 0;
+                if (g_sym_vis_count > 0) {
+                    int si = g_sym_vis[g_sym_sel];
+                    set_status("\x1b[32m✓\x1b[m Símbolo '%s' → linha %d",
+                               g_syms[si].name, g_syms[si].line);
+                }
+                return;
+            case '\x1b':
+            case CTRL('o'):
+                g_sym_active = 0;
+                set_status("Símbolos fechado");
+                return;
+            case BACKSPACE:
+            case CTRL('h'):
+                if (g_sym_qlen > 0) {
+                    g_sym_query[--g_sym_qlen] = '\0';
+                    g_sym_sel = 0; g_sym_scroll = 0;
+                    sym_build_vis();
+                }
+                return;
+            default:
+                /* qualquer caractere imprimível filtra a lista */
+                if (!iscntrl(c) && g_sym_qlen < (int)sizeof(g_sym_query)-1) {
+                    g_sym_query[g_sym_qlen++] = (char)c;
+                    g_sym_query[g_sym_qlen]   = '\0';
+                    g_sym_sel = 0; g_sym_scroll = 0;
+                    sym_build_vis();
+                }
+                return;
+        }
+    }
+
+    /* ── completion ativa: intercepta navegação ── */
+    if (E.comp.active) {
+        switch (c) {
+            case ARROW_DOWN:
+                E.comp.selected++;
+                if (E.comp.selected >= E.comp.count) E.comp.selected = 0;
+                return;
+            case ARROW_UP:
+                E.comp.selected--;
+                if (E.comp.selected < 0) E.comp.selected = E.comp.count-1;
+                return;
+            case '\r':
+            case '\t':
+                undo_push(); comp_apply(); return;
+            case '\x1b':
+                comp_close(); return;
+            default:
+                comp_close(); /* qualquer outra tecla fecha */
+                break;
+        }
+    }
+
+    switch (c) {
+
+        /* ── Enter ── */
+        case '\r': {
+            /* HTML: se linha atual é apenas "!" → expande para template HTML5 */
+            if (E.syntax == &HLDB[4] && E.cy < E.numrows) {
+                Row *cur = &E.row[E.cy];
+                /* trim espaços */
+                int ts = 0, te = cur->size - 1;
+                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
+                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
+                if (te - ts == 0 && cur->chars[ts] == '!') {
+                    /* Detecta nome do arquivo para o <title> */
+                    char title_str[64] = "Meu Site";
+                    if (E.filename) {
+                        const char *base = strrchr(E.filename, '/');
+                        base = base ? base+1 : E.filename;
+                        snprintf(title_str, sizeof(title_str), "%s", base);
+                        /* remove extensão */
+                        char *dot2 = strrchr(title_str, '.');
+                        if (dot2) *dot2 = '\0';
+                    }
+                    /* Monta template HTML5 — array sem NULL no meio */
+                    char title_line[128];
+                    snprintf(title_line, sizeof(title_line), "    <title>%s</title>", title_str);
+                    const char *html_tpl[24];
+                    int hti = 0;
+                    html_tpl[hti++] = "<!DOCTYPE html>";
+                    html_tpl[hti++] = "<html lang=\"pt-BR\">";
+                    html_tpl[hti++] = "<head>";
+                    html_tpl[hti++] = "    <meta charset=\"UTF-8\">";
+                    html_tpl[hti++] = "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">";
+                    html_tpl[hti++] = title_line;
+                    html_tpl[hti++] = "    <style>";
+                    html_tpl[hti++] = "        * { box-sizing: border-box; margin: 0; padding: 0; }";
+                    html_tpl[hti++] = "        body { font-family: sans-serif; background: #0f0f0f; color: #e0e0e0; }";
+                    html_tpl[hti++] = "        main { max-width: 900px; margin: 2rem auto; padding: 1rem; }";
+                    html_tpl[hti++] = "        h1 { color: #7c6af5; margin-bottom: 1rem; }";
+                    html_tpl[hti++] = "    </style>";
+                    html_tpl[hti++] = "</head>";
+                    html_tpl[hti++] = "<body>";
+                    html_tpl[hti++] = "    <main>";
+                    html_tpl[hti++] = "        <h1>\xf0\x9f\x94\xae ElliotOS</h1>";
+                    html_tpl[hti++] = "        <p><!-- conteudo aqui --></p>";
+                    html_tpl[hti++] = "    </main>";
+                    html_tpl[hti++] = "    <script>";
+                    html_tpl[hti++] = "        // JavaScript aqui";
+                    html_tpl[hti++] = "    </script>";
+                    html_tpl[hti++] = "</body>";
+                    html_tpl[hti++] = "</html>";
+                    /* Deleta a linha "!" original e insere template */
+                    int orig_cy = E.cy;
+                    del_row(orig_cy);
+                    for (int ti = 0; ti < hti; ti++) {
+                        insert_row(orig_cy + ti, html_tpl[ti], (int)strlen(html_tpl[ti]));
+                    }
+                    /* posiciona cursor no <h1> (linha 15, index 14) */
+                    E.cy = orig_cy + 14;
+                    E.rowoff = orig_cy;  /* scroll para o topo do template */
+                    if (E.cy >= E.numrows) E.cy = E.numrows - 1;
+                    E.cx = 12; /* dentro do comentário */
+                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+                    E.dirty = 1;
+                    set_status("\x1b[32m✓\x1b[m Template HTML5 inserido — edite o conteúdo e Ctrl+S para salvar");
+                    break;
+                }
+            }
+            /* C: linha "!" → template main() */
+            if ((E.syntax == &HLDB[0]) && E.cy < E.numrows) {
+                Row *cur = &E.row[E.cy];
+                int ts = 0, te = cur->size - 1;
+                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
+                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
+                if (te - ts == 0 && cur->chars[ts] == '!') {
+                    const char *tpl[] = {
+                        "#include <stdio.h>",
+                        "#include <stdlib.h>",
+                        "#include <string.h>",
+                        "",
+                        "int main(void) {",
+                        "    printf(\"\xf0\x9f\x94\xae ElliotOS\\n\");",
+                        "    return 0;",
+                        "}",
+                        NULL
+                    };
+                    int orig_cy = E.cy; del_row(orig_cy);
+                    int ti = 0;
+                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
+                    E.cy = orig_cy + 5; E.cx = 12; E.rowoff = orig_cy;
+                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+                    E.dirty = 1;
+                    set_status("\x1b[32m✓\x1b[m Template C inserido — Ctrl+S para salvar");
+                    break;
+                }
+            }
+            /* C++: linha "!" → template main() C++ */
+            if ((E.syntax == &HLDB[1]) && E.cy < E.numrows) {
+                Row *cur = &E.row[E.cy];
+                int ts = 0, te = cur->size - 1;
+                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
+                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
+                if (te - ts == 0 && cur->chars[ts] == '!') {
+                    const char *tpl[] = {
+                        "#include <iostream>",
+                        "#include <string>",
+                        "#include <vector>",
+                        "",
+                        "int main() {",
+                        "    std::cout << \"\xf0\x9f\x94\xae ElliotOS\" << std::endl;",
+                        "    return 0;",
+                        "}",
+                        NULL
+                    };
+                    int orig_cy = E.cy; del_row(orig_cy);
+                    int ti = 0;
+                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
+                    E.cy = orig_cy + 5; E.cx = 16; E.rowoff = orig_cy;
+                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+                    E.dirty = 1;
+                    set_status("\x1b[32m✓\x1b[m Template C++ inserido — Ctrl+S para salvar");
+                    break;
+                }
+            }
+            /* Lua/ElliotOS: linha "!" → template script Lua */
+            if ((E.syntax == &HLDB[2]) && E.cy < E.numrows) {
+                Row *cur = &E.row[E.cy];
+                int ts = 0, te = cur->size - 1;
+                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
+                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
+                if (te - ts == 0 && cur->chars[ts] == '!') {
+                    const char *tpl[] = {
+                        "-- \xf0\x9f\x94\xae ElliotOS — Script Lua",
+                        "",
+                        "local function main()",
+                        "    print(\"\xf0\x9f\x94\xae ElliotOS\")",
+                        "end",
+                        "",
+                        "main()",
+                        NULL
+                    };
+                    int orig_cy = E.cy; del_row(orig_cy);
+                    int ti = 0;
+                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
+                    E.cy = orig_cy + 3; E.cx = 11; E.rowoff = orig_cy;
+                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+                    E.dirty = 1;
+                    set_status("\x1b[32m✓\x1b[m Template Lua inserido — Ctrl+S para salvar");
+                    break;
+                }
+            }
+            /* Bash: linha "!" → template script shell */
+            if ((E.syntax == &HLDB[3]) && E.cy < E.numrows) {
+                Row *cur = &E.row[E.cy];
+                int ts = 0, te = cur->size - 1;
+                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
+                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
+                if (te - ts == 0 && cur->chars[ts] == '!') {
+                    const char *tpl[] = {
+                        "#!/usr/bin/env bash",
+                        "# \xf0\x9f\x94\xae ElliotOS — Script Bash",
+                        "set -euo pipefail",
+                        "",
+                        "main() {",
+                        "    echo \"\xf0\x9f\x94\xae ElliotOS\"",
+                        "}",
+                        "",
+                        "main \"$@\"",
+                        NULL
+                    };
+                    int orig_cy = E.cy; del_row(orig_cy);
+                    int ti = 0;
+                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
+                    E.cy = orig_cy + 5; E.cx = 10; E.rowoff = orig_cy;
+                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+                    E.dirty = 1;
+                    set_status("\x1b[32m✓\x1b[m Template Bash inserido — Ctrl+S para salvar");
+                    break;
+                }
+            }
+            undo_push(); insert_newline();
+            break;
+        }
+
+        /* ── Sair ── */
+        case CTRL('q'):
+            if (E.dirty && quit_times > 0) {
+                set_status("\x1b[31m⚠ Arquivo não salvo! "
+                           "Ctrl+Q novamente para sair sem salvar.\x1b[m");
+                quit_times--; return;
+            }
+            save_cursor_pos();
+            write(STDOUT_FILENO, "\x1b[2J\x1b[H", 7);
+            exit(0);
+
+        /* ── Salvar ── */
+        case CTRL('s'):
+            if (!E.filename) {
+                char *fn = prompt("Salvar como: %s  (ESC cancela)", NULL);
+                if (!fn) { set_status("Salvar cancelado."); return; }
+                free(E.filename); E.filename = fn; select_syntax();
+            }
+            save_file();
+            break;
+
+        /* ── Buscar ── */
+        case CTRL('f'):
+            find();
+            break;
+
+        /* ── Buscar+Substituir: Ctrl+A ── */
+        case CTRL('a'):
+            find_replace();
+            break;
+
+        /* ── Ir para linha ── */
+        case CTRL('g'): {
+            char *ln = prompt("Ir para linha: %s", NULL);
+            if (ln) {
+                int n = atoi(ln) - 1; free(ln);
+                if (n < 0) n = 0;
+                if (n >= E.numrows) n = E.numrows-1;
+                E.cy = n; E.cx = 0;
+            }
+            break;
+        }
+
+        /* ── Deletar linha ── */
+        case CTRL('k'):
+            undo_push(); del_line();
+            set_status("Linha deletada  (Ctrl+U desfaz)");
+            break;
+
+        /* ── Limpar arquivo inteiro: Ctrl+T ── */
+        case CTRL('t'):
+            undo_push();
+            for (int i = E.numrows - 1; i >= 0; i--) del_row(i);
+            if (E.numrows == 0) insert_row(0, "", 0);
+            E.cx = 0; E.cy = 0; E.rowoff = 0; E.coloff = 0;
+            E.dirty++;
+            set_status("\x1b[31m✖ Arquivo limpo! (Ctrl+U desfaz)\x1b[m");
+            return;
+
+        /* ── Duplicar linha ── */
+        case CTRL('d'):
+            undo_push(); dup_line();
+            set_status("Linha duplicada");
+            break;
+
+        /* ── Desfazer ── */
+        case CTRL('u'):
+            undo_pop();
+            set_status("Desfeito");
+            break;
+
+        /* ── Refazer: Ctrl+Y ── */
+        case CTRL('y'):
+            redo_pop();
+            set_status("Refeito");
+            break;
+
+        /* ── Mover linha: Alt+Up / Alt+Down ── */
+        case ALT_UP:
+            undo_push(); move_line_up();
+            break;
+        case ALT_DOWN:
+            undo_push(); move_line_down();
+            break;
+
+        /* ── Comentar/descomentar: Ctrl+/ ── */
+        case 31:  /* Ctrl+/ em muitos terminais / Ctrl+_ */
+            undo_push(); toggle_comment();
+            break;
+
+        /* ── Escolher linguagem: Ctrl+L ── */
+        case CTRL('l'):
+            choose_language();
+            break;
+
+        /* ── Formatar código: Ctrl+R ── */
+        case CTRL('r'):
+            format_code();
+            break;
+
+        /* ── Verificar código: Ctrl+E ── */
+        case CTRL('e'):
+            check_code();
+            break;
+
+        /* ── Colar: Ctrl+V (universal) ── */
+        case CTRL('v'):
+            sel_paste();
+            break;
+
+        /* ── Copiar: Ctrl+C ── */
+        case CTRL('c'):
+            if (E.sel_active)
+                sel_copy();
+            else
+                copy_range_prompt();
+            break;
+
+        /* ── Cortar: Ctrl+X ── */
+        case CTRL('x'):
+            sel_cut();
+            break;
+
+        /* ── Colar (alias): Ctrl+B (mantido por compatibilidade) ── */
+        case CTRL('b'):
+            sel_paste();
+            break;
+
+        /* ── Snippets: Ctrl+N ── */
+        case CTRL('n'):
+            snip_open();
+            break;
+
+        /* ── Explorador de arquivos: Ctrl+P ── */
+        case CTRL('p'):
+            fexp_open();
+            break;
+
+        /* ── Ir para definição: Ctrl+J ── */
+        case CTRL('j'):
+            goto_definition();
+            break;
+
+        /* ── Próximo buffer: F2 ── */
+        case F2:
+            if (E.buf_count > 1) buf_next();
+            else set_status("Apenas 1 buffer aberto.");
+            break;
+
+        /* ── Buffer anterior: F3 ── */
+        case F3:
+            if (E.buf_count > 1) buf_prev();
+            else set_status("Apenas 1 buffer aberto.");
+            break;
+
+        /* ── Goto Symbol: Ctrl+O ── */
+        case CTRL('o'):
+            sym_open();
+            break;
+
+        /* ── Tab: completion ou indent ── */
+        case '\t': {
+            /* contextos especiais: #include e require() */
+            if ((E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) && comp_open_include()) return;
+            if (E.syntax == &HLDB[2] && comp_open_require()) return;
+            char prefix[128];
+            int plen = get_prefix(prefix, sizeof(prefix));
+            if (plen >= 2) {
+                int cx_before = E.cx;
+                comp_open();
+                if (E.comp.active) return;    /* popup aberto */
+                if (E.cx != cx_before) return; /* match único aplicado */
+            }
+            /* Só indenta se o cursor está no início da linha (nenhum texto antes) */
+            if (E.cy < E.numrows) {
+                Row *_r = &E.row[E.cy];
+                int _all_space = 1;
+                for(int _i=0;_i<E.cx;_i++)
+                    if(_r->chars[_i]!=' '&&_r->chars[_i]!='\t'){_all_space=0;break;}
+                if(!_all_space) break; /* tem texto antes → ignora Tab */
+            }
+            undo_push(); indent_line();
+            break;
+        }
+
+        /* ── Shift+Tab: deindent ── */
+        case SHIFT_TAB:
+            undo_push(); deindent_line();
+            break;
+
+        /* ── Navegação ── */
+        case HOME_KEY: E.cx = 0; break;
+        case END_KEY:
+            if (E.cy < E.numrows) E.cx = E.row[E.cy].size;
+            break;
+
+        /* ── Ajuda (atalhos): Ctrl+W ── */
+        case CTRL('w'):
+            set_status(HELP_MSG);
+            break;
+
+        /* ── Backspace ── */
+        case BACKSPACE:
+        case CTRL('h'):
+            if (!try_smart_backspace()) {
+                undo_push(); del_char();
+            }
+            comp_open_live();
+            break;
+
+        /* ── Delete ── */
+        case DEL_KEY:
+            undo_push(); move_cursor(ARROW_RIGHT); del_char();
+            break;
+
+        /* ── Page Up/Down ── */
+        case PAGE_UP:
+        case PAGE_DOWN: {
+            if (c == PAGE_UP) E.cy = E.rowoff;
+            else {
+                E.cy = E.rowoff + E.rows - 1;
+                if (E.cy > E.numrows) E.cy = E.numrows;
+            }
+            int t = E.rows;
+            while (t--) move_cursor(c == PAGE_UP ? ARROW_UP : ARROW_DOWN);
+            break;
+        }
+
+        /* ── Setas ── */
+        case ARROW_UP: case ARROW_DOWN:
+        case ARROW_LEFT: case ARROW_RIGHT:
+            sel_clear();
+            move_cursor(c);
+            break;
+
+        /* ── Setas com Shift: seleção ── */
+        case SHIFT_UP:
+        case SHIFT_DOWN:
+        case SHIFT_LEFT:
+        case SHIFT_RIGHT:
+            if (!E.sel_active) { E.sel_active=1; E.sel_ax=E.cx; E.sel_ay=E.cy; }
+            move_cursor(c==SHIFT_UP?ARROW_UP:c==SHIFT_DOWN?ARROW_DOWN:
+                        c==SHIFT_LEFT?ARROW_LEFT:ARROW_RIGHT);
+            break;
+
+        /* ── Ignorados ── */
+        case '\x1b':
+            break;
+
+        /* ── Caractere normal ── */
+        default:
+            if (iscntrl(c)) break;
+
+            /* ── Contexto #include em C/C++: '<' abre completion E faz auto-pair ── */
+            if (c == '<' && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {
+                if (E.cy < E.numrows) {
+                    Row *row = &E.row[E.cy];
+                    char *line = row->chars;
+                    int ii = 0;
+                    while (ii < row->size && (line[ii]==' '||line[ii]=='\t')) ii++;
+                    if (strncmp(line+ii, "#include", 8) == 0) {
+                        /* auto-pair <> e abre completion */
+                        undo_push();
+                        try_auto_pair('<');
+                        if (comp_open_include()) return;
+                        break;
+                    }
+                }
+            }
+
+            /* ── Contexto require() em Lua: '"' ou '\'' abre completion ── */
+            if ((c == '"' || c == '\'') && E.syntax == &HLDB[2]) {
+                if (E.cy < E.numrows) {
+                    undo_push();
+                    try_auto_pair(c);          /* insere o par e posiciona cursor */
+                    if (comp_open_require()) return;
+                    break;
+                }
+            }
+
+            /* auto-pair normal: ( [ { " ' `
+             * '<' NÃO entra aqui — só é fechado automaticamente dentro de
+             * #include <...> (tratado acima em comp_open_include) */
+            if (c == '(' || c == '[' || c == '{' ||
+                c == '"' || c == '\'' || c == '`') {
+                undo_push();
+                try_auto_pair(c);
+                break;
+            }
+            /* skip closing: ) ] } > */
+            if (try_skip_close(c)) break;
+
+            undo_push();
+            insert_char(c);
+
+            /* completion ao vivo — popup aparece enquanto digita */
+            if (isalnum(c) || c == '_' || c == '.') {
+                comp_open_live();
+            } else {
+                comp_close();
+            }
+
+            /* completion após '.' removido — só via Tab */
+            if (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) {
+                char pfx[128]; int ua;
+                if (detect_include_ctx(pfx, sizeof(pfx), &ua)) {
+                    comp_open_include();
+                }
+            }
+            /* require completion: só via Tab */
+            break;
+    }
+    quit_times = 1;
+}
+
+/* ════════════════════════════════════════════════════════
+ * INIT / MAIN
+ * ════════════════════════════════════════════════════════ */
+
+static void init(void) {
+    E.cx = E.cy = E.rx = 0;
+    E.rowoff = E.coloff = 0;
+    E.numrows = 0; E.row = NULL;
+    E.dirty = 0; E.filename = NULL;
+    E.statusmsg[0] = '\0'; E.statusmsg_time = 0;
+    E.syntax = NULL; E.undo_top = 0; E.use_tabs = 0;
+    memset(&E.comp, 0, sizeof(E.comp));
+    memset(E.undo, 0, sizeof(E.undo));
+    if (get_winsz(&E.rows, &E.cols) == -1) die("get_winsz");
+    E.rows -= 2;  /* reserva status bar + msg */
+}
+
+int main(int argc, char *argv[]) {
+
+    /* ── flags que não entram no modo TUI ─────────────────────────────── */
+    if (argc >= 2) {
+        const char *a = argv[1];
+        if (strcmp(a,"-h")==0 || strcmp(a,"--help")==0 || strcmp(a,"-?")==0) {
+            printf(
+"ee — ElliotOS Editor v" EDITOR_VERSION "\n"
+"\n"
+"USO\n"
+"  ee [arquivo]          Abre arquivo (cria se não existir)\n"
+"  ee -p                 Abre explorador de arquivos direto\n"
+"  ee -h | --help        Este help\n"
+"  ee --version          Versão\n"
+"\n"
+"ATALHOS DE TECLADO\n"
+"  Ctrl+S   Salvar                   Ctrl+Q   Sair\n"
+"  Ctrl+F   Buscar                   Ctrl+G   Ir para linha\n"
+"  Ctrl+K   Deletar linha            Ctrl+D   Duplicar linha\n"
+"  Ctrl+U   Desfazer                 Ctrl+Y   Refazer\n"
+"  Ctrl+/   Comentar/descomentar       Ctrl+\\\\  Buscar+Substituir\n"
+"  Ctrl+R   Formatar código          Ctrl+V   Verificar código\n"
+"  Ctrl+J   Ir para definição        Ctrl+N   Inserir snippet\n"
+"  Ctrl+P   Explorador de arquivos   Ctrl+O   Lista de símbolos\n"
+"  Ctrl+L   Escolher linguagem       Ctrl+T   Limpar tela\n"
+"  Ctrl+W   Ajuda rápida (status)    Ctrl+E   Executar linha\n"
+"  Tab      Completar / indentar     Shift+Tab  Deindentar\n"
+"  Shift+↑↓←→  Selecionar texto        Ctrl+C   Copiar seleção / linha\n"
+"  Ctrl+X  Cortar seleção / linha   Ctrl+B   Colar\n"
+"  Alt+↑    Mover linha acima        Alt+↓    Mover linha abaixo\n"
+"  F2       Próximo buffer            F3       Buffer anterior\n"
+"\n"
+"AUTO-COMPLETAR\n"
+"  Tab após qualificador (net. sys. ui. ai. fs. sh. crypto. mod.)\n"
+"  sugere métodos ElliotOS automaticamente.\n"
+"  Tab no meio de um identificador completa palavras do arquivo.\n"
+"\n"
+"AUTO-PAIR\n"
+"  (  [  {  \"  '  `   Fecha par automaticamente\n"
+"  )  ]  }             Pula se o caractere já está fechado\n"
+"  Backspace           Apaga par vazio inteiro\n"
+"\n"
+"VERIFICAÇÃO DE CÓDIGO  (Ctrl+V)\n"
+"  .lua   luac -p          .sh/.bash   análise de boas práticas\n"
+"  .c/.h  clang -fsyntax   .html       estrutura de tags\n"
+"  .cpp   clang -fsyntax\n"
+"\n"
+"LINGUAGENS SUPORTADAS\n"
+"  C, C++, Lua/ElliotOS, Bash, HTML\n"
+"  (detecção automática pela extensão do arquivo)\n"
+"\n"
+"SNIPPETS  (Ctrl+N)\n"
+"  Abre menu de snippets prontos para a linguagem atual.\n"
+"\n"
+"PERSISTÊNCIA\n"
+"  Último arquivo aberto salvo em ~/.ee_last\n"
+"  Histórico de busca: ~/.ee_search_history\n"
+"\n"
+"EXEMPLOS\n"
+"  ee main.lua       Edita main.lua com highlight Lua/ElliotOS\n"
+"  ee script.sh      Edita script Bash com verificação automática\n"
+"  ms -e main.lua    Abre ee diretamente do runner ms\n"
+            );
+            return 0;
+        }
+        if (strcmp(a,"--version")==0 || strcmp(a,"-V")==0) {
+            printf("ee %s\n", EDITOR_VERSION);
+            return 0;
+        }
+    }
+
+    /* entra no buffer alternativo — ao sair volta exatamente como estava */
+    write(STDOUT_FILENO, "\x1b[?1049h\x1b[2J\x1b[H", 15);
+
+    raw_on();
+    signal(SIGWINCH, handle_resize);
+    init();
+
+    /* ── Warm-up do cache de autocompletar ─────────────────────────────
+     * Se o arquivo aberto é .lua, dispara lua-net em background para que
+     * ele popule ~/.elliot_ac_cache com o snapshot de _G.
+     * O editor lê esse cache em comp_open() / comp_open_live().        */
+    if (argc >= 2 && argv[1][0] != '-') {
+        const char *_fn = argv[1];
+        int _fnl = (int)strlen(_fn);
+        if (_fnl > 4 && strcmp(_fn + _fnl - 4, ".lua") == 0) {
+            pid_t _cpid = fork();
+            if (_cpid == 0) {
+                int _devnull = open("/dev/null", O_RDWR);
+                if (_devnull >= 0) {
+                    dup2(_devnull, 0);
+                    dup2(_devnull, 1);
+                    dup2(_devnull, 2);
+                    close(_devnull);
+                }
+                execlp("lua-net", "lua-net", "-e", "", (char *)NULL);
+                _exit(0);
+            }
+        }
+    }
+
+    if (argc >= 2 && argv[1][0]=='-' && argv[1][1]=='p' && argv[1][2]=='\0') {
+        /* ee -p — abre explorador direto */
+        set_status(HELP_MSG);
+        fexp_open();
+    } else if (argc >= 2) {
+        open_file(argv[1]);
+        set_status(HELP_MSG);
+    } else {
+        set_status(
+            "ElliotOS Editor  —  sem arquivo  "
+            "Ctrl+S para salvar  Ctrl+Q para sair  Ctrl+P explorador");
+    }
+
+    while (1) {
+        refresh_screen();
+        process_key();
+    }
+    return 0;
+}
+
+EDITOR_C_EOF
     if [ "$INSTALL_SQ" = "1" ]; then
         printf "\n\033[1;36m── Compilando editor.c ──────────────────────────────────────\033[0m\n"
         clang -O2 -o "$_EE_BIN" "$_EE_SRC" 2>&1 || \
@@ -122384,18 +125959,25 @@ case "${1:-}" in
             install_elliotos
         fi
         ;;
+    --update-ee|--ee)
+        printf "\n\033[1;35m── Recompilando editor ee ───────────────────────────────────────\033[0m\n\n"
+        _install_editor
+        ;;
     --update)
         printf "\n\033[1;35m── ElliotOS --update ────────────────────────────────────────────\033[0m\n\n"
         printf "  \033[0;90mRecompila binário, atualiza scripts e binários — pula dependências.\033[0m\n"
-        [ "${INSTALL_EDITOR:-0}" = "1" ] && printf "  \033[0;90m+ editor ee será recompilado\033[0m\n"
-        [ "${INSTALL_GUI:-0}"    = "1" ] && printf "  \033[0;90m+ GUI será reinstalado\033[0m\n"
         printf "\n"
         if [ "${INSTALL_GUI:-0}" = "1" ]; then
             _install_gui
         else
             install_elliotos
-            # Sobrescreve binários GUI se já estiverem instalados
-            if [ -f "${PREFIX:-/data/data/com.termux/files/usr}/bin/elliot-gui" ]; then
+            # Sempre recompila o editor se já estiver instalado
+            _TPFX="${PREFIX:-/data/data/com.termux/files/usr}"
+            if [ -f "$_TPFX/bin/ee" ]; then
+                _step "🔄" "Atualizando editor ee..."
+                INSTALL_EDITOR=1 _install_editor
+            fi
+            if [ -f "${_TPFX}/bin/elliot-gui" ]; then
                 _step "🔄" "Atualizando binários GUI (elliot-gui, rungui)..."
                 INSTALL_UPDATE=1 _install_gui
             fi
