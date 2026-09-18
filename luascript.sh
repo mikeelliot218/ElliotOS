@@ -78620,7 +78620,7 @@ static void user_files_scan(const char *suffix) {
 
         /* Filtra pelo prefixo digitado */
         if(file_prefix[0] &&
-           strncmp(ent->d_name, file_prefix, strlen(file_prefix))!=0) continue;
+           strncasecmp(ent->d_name, file_prefix, strlen(file_prefix))!=0) continue;
 
         /* Verifica se é diretório ou arquivo .lua */
         char full_path[1024];
@@ -78700,10 +78700,11 @@ static void lua_scan_table(lua_State *L, const char *prefix) {
         }
         lua_pop(L,1); /* remove value, mantém key */
     }
-    /* tabela: só adiciona "prefix." (com ponto) como hint de navegação.
-     * nunca adiciona "prefix" sem ponto — tabelas não são valores diretos. */
-    snprintf(entry,sizeof(entry),"%s.",prefix);
-    lua_compl_add(entry);
+    /* Não adiciona "prefix." — o readline calcula o prefixo comum
+     * corretamente a partir dos entries "prefix.método(" sem esse hint.
+     * Adicioná-lo causava que Tab em "void" completasse para "void" (sem ponto)
+     * pois o prefixo comum de {"void.","void.tcp(","void.udp("} é "void."
+     * mas o entry "void." idêntico ao prefixo fazia readline não inserir nada. */
 }
 
 /*
@@ -78738,7 +78739,9 @@ static void lua_scan(void) {
             } else if(vtype==LUA_TTABLE) {
                 /* varre a tabela para adicionar mod.fn( */
                 lua_scan_table(L, k);
-                /* tabela já adicionada pelo scan_table */
+                /* adiciona o nome base (sem ponto) para Tab completar "voi" → "void"
+                 * antes do usuário digitar o ponto */
+                lua_compl_add(k);
             } else {
                 /* variável simples: string, number, bool, etc. */
                 lua_compl_add(k);
@@ -78860,6 +78863,7 @@ static const char *req_mods[] = {
  *  2. texto com "." → só entradas do mesmo prefixo (G_completions + G_lua)
  *  3. resto         → G_completions estáticos + G_lua adaptativo + G_dyn disco
  * ═══════════════════════════════════════════════════════════════════ */
+static int elliot_lua_scan_done = 0;  /* evita duplo lua_scan por Tab */
 static char *elliot_completer(const char *text, int state) {
     static int   idx, dyn_idx, lua_idx, hint_idx, user_idx, kw_idx, tlen;
     static char  prefix[128];
@@ -78903,7 +78907,8 @@ static char *elliot_completer(const char *text, int state) {
 
         /* ── Snapshot Lua adaptativo (sempre, a cada Tab) ── */
         if(!require_mode) {
-            lua_scan();
+            if(!elliot_lua_scan_done) lua_scan();
+            elliot_lua_scan_done = 0;
             if(!prefix[0]) dyn_load();
         }
     }
@@ -79039,12 +79044,55 @@ static int elliot_event_hook(void) {
     return 0;
 }
 
+/* Retorna 1 se TODOS os matches (exceto [0]=prefixo comum) começam com pfx */
+/* Verifica antecipadamente se 'word' é um módulo (tabela Lua com métodos)
+ * consultando G_lua: retorna 1 se existir entry "word.algo" no pool */
+static int is_module_name(const char *word, size_t wlen) {
+    char dot_pfx[260];
+    if (wlen + 2 >= sizeof(dot_pfx)) return 0;
+    memcpy(dot_pfx, word, wlen);
+    dot_pfx[wlen]   = '.';
+    dot_pfx[wlen+1] = '\0';
+    /* Varre G_lua em busca de qualquer entry que comece com "word." */
+    for (int i = 0; i < G_lua_count; i++)
+        if (strncmp(G_lua[i], dot_pfx, wlen + 1) == 0) return 1;
+    return 0;
+}
+
 static char **elliot_completion(const char *text, int start, int end) {
-    (void)start; (void)end;
+    (void)end;
     rl_attempted_completion_over = 1;
     g_pair_needed = 0;
 
-    char **matches = rl_completion_matches(text, elliot_completer);
+    /* ── Detecção antecipada de módulo ──────────────────────────────────────
+     * Se text não tem ponto E é um módulo conhecido (tem entries "text.x" em
+     * G_lua), inserimos "." no buffer ANTES de chamar rl_completion_matches.
+     * Assim o readline já recebe text="void." e calcula o prefixo comum
+     * correto — sem nunca mostrar "void" na lista.
+     * ──────────────────────────────────────────────────────────────────── */
+    const char *effective_text = text;
+    char dot_buf[260];
+    if (!strchr(text, '.')) {
+        /* Primeiro garante que G_lua está atualizado (lua_scan não foi chamado
+         * ainda pois state==0 só acontece dentro de elliot_completer) */
+        lua_scan();
+        elliot_lua_scan_done = 1;
+        size_t tlen = strlen(text);
+        if (tlen > 0 && is_module_name(text, tlen)) {
+            /* Insere o ponto diretamente no rl_line_buffer via API readline,
+             * ANTES de qualquer rl_completion_matches — assim 'text' (que
+             * aponta para dentro do buffer) ficará inválido após o insert,
+             * por isso usamos dot_buf como novo texto efetivo. */
+            memcpy(dot_buf, text, tlen);
+            dot_buf[tlen]   = '.';
+            dot_buf[tlen+1] = '\0';
+            effective_text = dot_buf;
+            /* Insere o ponto no buffer (move cursor também) */
+            rl_insert_text(".");
+        }
+    }
+
+    char **matches = rl_completion_matches(effective_text, elliot_completer);
     if(!matches) return NULL;
 
     if(matches[0] && !matches[1]){
@@ -79056,10 +79104,8 @@ static char **elliot_completion(const char *text, int start, int end) {
             if(mlen > 0 && matches[0][mlen-1] == '('){
                 rl_completion_suppress_append = 1;
                 if(strcmp(matches[0],"require(") == 0){
-                    /* require( → insere require("") com cursor entre as aspas */
                     g_require_pair = 1;
                 } else {
-                    /* demais funções → insere ) com cursor no meio: nome(|) */
                     g_pair_needed = 1;
                 }
                 rl_event_hook = elliot_event_hook;
@@ -79293,60 +79339,72 @@ static int hl2_colorize(const char *src, int slen, char *out, int outmax) {
     return olen;
 }
 
-static int hl2_event_hook(void) {
-    /* Delega lógica de auto-pair (hook temporário) se rl_event_hook foi
-     * trocado por outra coisa — não deve acontecer, mas blindagem extra. */
+static int  hl2_cached_pvis = -1;    /* cache do comprimento visual do prompt */
+static char hl2_out[20480];           /* buffer de saída único — evita múltiplas syscalls */
 
+static int hl2_event_hook(void) {
     if (!hl2_active || !elliot_rl_interactive) return 0;
     if (!rl_line_buffer) return 0;
 
     int cur_len   = rl_end;
     int cur_point = rl_point;
 
-    /* Detecta mudança no buffer ou no cursor */
-    int buf_changed = (strncmp(hl2_last_buf, rl_line_buffer, 4095) != 0);
-    int cur_changed = (cur_point != hl2_last_point);
-    if (!buf_changed && !cur_changed) return 0;
+    /* Detecta mudança no buffer ou no cursor — sai rápido se nada mudou */
+    if (cur_len > 0) {
+        if (memcmp(hl2_last_buf, rl_line_buffer, (size_t)cur_len) == 0
+            && hl2_last_buf[cur_len] == '\0'
+            && cur_point == hl2_last_point) return 0;
+    } else {
+        if (hl2_last_buf[0] == '\0' && cur_point == hl2_last_point) return 0;
+    }
 
     /* Atualiza snapshot */
-    strncpy(hl2_last_buf, rl_line_buffer, 4095);
-    hl2_last_buf[4095] = '\0';
+    memcpy(hl2_last_buf, rl_line_buffer, (size_t)cur_len);
+    hl2_last_buf[cur_len] = '\0';
     hl2_last_point = cur_point;
 
-    /* Linha vazia: nada a colorir */
+    /* Linha vazia: apaga colorização anterior e sai */
     if (cur_len == 0) return 0;
 
-    /* Comprimento visual do prompt na última linha */
-    int pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
+    /* Comprimento visual do prompt — calcula uma vez, depois usa cache */
+    if (hl2_cached_pvis < 0)
+        hl2_cached_pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
+    int pvis = hl2_cached_pvis;
 
     /* Gera buffer colorizado */
     int clen = hl2_colorize(rl_line_buffer, cur_len, hl2_colored, (int)sizeof(hl2_colored));
     if (clen <= 0) return 0;
 
-    /* Calcula posição visual do cursor no buffer original */
-    int vis_cur = 0;
-    for (int i = 0; i < cur_point && i < cur_len; i++) {
-        /* conta só bytes visíveis (não temos escapes no buffer bruto) */
-        if ((unsigned char)rl_line_buffer[i] >= 0x20) vis_cur++;
+    /* Calcula posição visual do cursor (bytes visíveis até cur_point) */
+    int vis_cur = cur_point;   /* sem escapes no buffer bruto: 1 byte = 1 coluna */
+
+    /* Monta tudo num único buffer e faz write() atômico:
+     *   \r            — início da linha
+     *   \033[<pvis>C  — avança sobre o prompt
+     *   \033[K        — apaga até fim
+     *   <colorizado>  — conteúdo com cores
+     *   \r            — volta ao início
+     *   \033[<col>C   — reposiciona cursor */
+    char   esc[32];
+    int    olen = 0;
+#define HL_APPEND(s, n) do { if (olen+(n) < (int)sizeof(hl2_out)) { memcpy(hl2_out+olen,(s),(n)); olen+=(n); } } while(0)
+
+    hl2_out[olen++] = '\r';
+    if (pvis > 0) {
+        int n = snprintf(esc, sizeof(esc), "\033[%dC", pvis);
+        HL_APPEND(esc, n);
     }
-
-    /* Reescreve a linha:
-     *   \r                  — início da linha
-     *   \033[<pvis>C        — avança sobre o prompt (sem reimprimí-lo)
-     *   \033[K              — apaga até fim da linha
-     *   <colorizado>        — buffer com cores
-     *   \r + \033[<pvis+vis_cur>C — reposiciona cursor */
-    fputs("\r", stdout);
-    if (pvis > 0) fprintf(stdout, "\033[%dC", pvis);
-    fputs("\033[K", stdout);
-    fwrite(hl2_colored, 1, clen, stdout);
-
-    /* Reposiciona cursor: volta ao início e avança pvis + vis_cur */
+    HL_APPEND("\033[K", 4);
+    HL_APPEND(hl2_colored, clen);
+    hl2_out[olen++] = '\r';
     int final_col = pvis + vis_cur;
-    fputs("\r", stdout);
-    if (final_col > 0) fprintf(stdout, "\033[%dC", final_col);
-    fflush(stdout);
+    if (final_col > 0) {
+        int n = snprintf(esc, sizeof(esc), "\033[%dC", final_col);
+        HL_APPEND(esc, n);
+    }
+#undef HL_APPEND
 
+    write(STDOUT_FILENO, hl2_out, (size_t)olen);
     return 0;
 }
 
@@ -79354,9 +79412,14 @@ static int hl2_event_hook(void) {
 static void hl2_init(void) {
     memset(hl2_last_buf, 0, sizeof(hl2_last_buf));
     hl2_last_point = -1;
+    hl2_cached_pvis = -1;   /* recalcula pvis na próxima chamada */
     hl2_active = 1;
     rl_event_hook = hl2_event_hook;
 }
+
+/* Forward declarations do histórico persistente v2 */
+static void ehist_open(void);
+static void ehist_load(void);
 
 /* Inicializa readline: completion, histórico, auto-pair, bindings
  * NÃO é static — chamada via extern do lua.c patch */
@@ -79383,10 +79446,12 @@ void elliot_readline_init(void) {
     /* Histórico */
     const char *home=getenv("HOME");
     if(!home) home="/data/data/com.termux/files/home";
-    char hist_path[512]; snprintf(hist_path,sizeof(hist_path),"%s/.elliot_history",home);
     using_history();
-    read_history(hist_path);
-    stifle_history(2000);
+    stifle_history(ELLIOT_HIST_MAX);
+    /* Abre fd O_APPEND e instala handlers de sinal imediatamente —
+     * garante que ehist_writeline() funciona desde o primeiro comando */
+    ehist_open();
+    ehist_load();
 
     /* Navegação pelo histórico */
     rl_bind_keyseq("\\C-r", (rl_command_func_t*)rl_reverse_search_history);
@@ -79427,11 +79492,95 @@ static int elliot_ap_dquote (int c, int k) { (void)c;(void)k; return elliot_ap_d
 static int elliot_ap_squote (int c, int k) { (void)c;(void)k; return elliot_ap_do("'", "'"); }
 
 /* Salva histórico — chamado ao sair do REPL */
-static void elliot_history_save(void) {
-    const char *home=getenv("HOME");
-    if(!home) home="/data/data/com.termux/files/home";
-    char hist_path[512]; snprintf(hist_path,sizeof(hist_path),"%s/.elliot_history",home);
-    write_history(hist_path);
+/* ==========================================================================
+ * Histórico persistente v2 — mecanismo independente de atexit/readline API
+ *
+ * Estratégia:
+ *   - elliot_hist_open()  : abre ~/.elliot_history em O_APPEND na inicialização
+ *   - elliot_hist_writeline(line): escreve cada linha diretamente via write(),
+ *     atômica e imediata — persiste mesmo com Ctrl+C, SIGKILL, crash
+ *   - elliot_hist_load()  : carrega o arquivo no readline via add_history()
+ *     respeitando o limite de 2000 entradas (lê as últimas)
+ *   - Handlers de sinal (SIGINT, SIGTERM, SIGHUP): fecham o fd antes de sair
+ *
+ * Não usa write_history/append_history/atexit — completamente independente.
+ * ========================================================================== */
+
+#include <signal.h>
+#include <fcntl.h>
+
+#define ELLIOT_HIST_MAX  2000   /* entradas máximas carregadas no readline   */
+#define ELLIOT_HIST_FILE ".elliot_history"
+
+static int    ehist_fd   = -1;          /* fd aberto em O_APPEND              */
+static char   ehist_path[512] = {0};    /* caminho absoluto do arquivo        */
+
+/* Fecha o fd do histórico (chamado nos handlers de sinal) */
+static void ehist_close(void) {
+    if (ehist_fd >= 0) { close(ehist_fd); ehist_fd = -1; }
+}
+
+/* Handlers de sinal: fecha fd e re-envia o sinal para comportamento padrão */
+static void ehist_sig_handler(int sig) {
+    ehist_close();
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+/* Abre o arquivo em O_CREAT|O_APPEND|O_WRONLY — chamado em elliot_readline_init */
+static void ehist_open(void) {
+    const char *home = getenv("HOME");
+    if (!home) home = "/data/data/com.termux/files/home";
+    snprintf(ehist_path, sizeof(ehist_path), "%s/" ELLIOT_HIST_FILE, home);
+    ehist_fd = open(ehist_path, O_CREAT | O_APPEND | O_WRONLY, 0600);
+    /* Instala handlers para fechar o fd antes do processo encerrar */
+    signal(SIGINT,  ehist_sig_handler);
+    signal(SIGTERM, ehist_sig_handler);
+    signal(SIGHUP,  ehist_sig_handler);
+}
+
+/* Persiste uma linha imediatamente: escreve "linha\n" via write() atômico.
+ * Chamado do pushline() patchado, após cada comando digitado no REPL. */
+void ehist_writeline(const char *line) {
+    if (ehist_fd < 0 || !line || !line[0]) return;
+    /* Ignora linhas duplicadas consecutivas */
+    static char last[4096] = {0};
+    if (strcmp(line, last) == 0) return;
+    strncpy(last, line, sizeof(last) - 1);
+
+    size_t n = strlen(line);
+    /* Buffer: line + '\n' — write() único para atomicidade */
+    char buf[4098];
+    if (n > 4096) n = 4096;
+    memcpy(buf, line, n);
+    buf[n] = '\n';
+    write(ehist_fd, buf, n + 1);
+}
+
+/* Carrega histórico no readline: lê o arquivo linha a linha,
+ * mantém só as últimas ELLIOT_HIST_MAX entradas. */
+static void ehist_load(void) {
+    FILE *f = fopen(ehist_path, "r");
+    if (!f) return;
+
+    /* Primeira passagem: descobre quantas linhas tem o arquivo */
+    int total = 0;
+    char buf[4098];
+    while (fgets(buf, sizeof(buf), f)) total++;
+
+    /* Quantas linhas pular para ficar só com as últimas ELLIOT_HIST_MAX */
+    int skip = (total > ELLIOT_HIST_MAX) ? (total - ELLIOT_HIST_MAX) : 0;
+
+    /* Segunda passagem: carrega as linhas desejadas */
+    rewind(f);
+    int lineno = 0;
+    while (fgets(buf, sizeof(buf), f)) {
+        if (lineno++ < skip) continue;
+        size_t l = strlen(buf);
+        if (l > 0 && buf[l-1] == '\n') buf[l-1] = '\0';
+        if (buf[0]) add_history(buf);
+    }
+    fclose(f);
 }
 
 
@@ -97990,8 +98139,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L, l_back_impl);
     lua_setglobal(L, "back");
 
-    /* ── Histórico persistente ── */
-    atexit(elliot_history_save);
+    /* ── Histórico persistente v2: iniciado em elliot_readline_init() ── */
 
     /* ── Variáveis indexadas (experimental) ── */
     elliot_ivar_init(L);
@@ -100851,6 +100999,8 @@ LIBNET_EOF
             print "  /* ElliotOS: sinaliza que o REPL interativo esta ativo */"
             print "  elliot_rl_interactive = 1;"
             print $0
+            print "  /* ElliotOS hist v2: persiste cada linha imediatamente via fd O_APPEND */"
+            print "  if (b && b[0]) { extern void ehist_writeline(const char *); ehist_writeline(b); }"
             print "  /* ElliotOS ivar: pre-processa !N e intercepta :help/help */"
             print "  if (b) { char *_p = elliot_ivar_preprocess_block(b);"
             print "    if (_p) {"
@@ -100865,6 +101015,22 @@ LIBNET_EOF
             print "        else { memcpy(b, _p, _orig); b[_orig] = 0; }"
             print "      }"
             print "      free(_p); } }"
+            next
+        }
+        in_fn && /^\}/ { in_fn=0 }
+        { print }
+        ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
+    fi
+
+    # ── Patch hist v2: injeta ehist_writeline() em pushline() ───────────────
+    # Guard próprio — roda mesmo se o patch do ivar já foi aplicado
+    if ! grep -q "ehist_writeline" lua.c 2>/dev/null; then
+        awk '
+        /^static int pushline[[:space:]]*\(/ { in_fn=1 }
+        in_fn && /lua_readline/ {
+            print $0
+            print "  /* ElliotOS hist v2: persiste linha imediatamente via fd O_APPEND */"
+            print "  if (b && b[0]) { extern void ehist_writeline(const char *); ehist_writeline(b); }"
             next
         }
         in_fn && /^\}/ { in_fn=0 }
