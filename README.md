@@ -33,7 +33,7 @@
 - [ms — Referência de flags](#ms--referência-de-flags)
 - [REPL ms — Recursos avançados](#repl-ms--recursos-avançados)
 - [Comandos especiais do REPL](#comandos-especiais-do-repl)
-- [Módulos da API](#módulos-da-api-globais-no-repl--nunca-use-require)
+- [Módulos da API](#módulos-da-api)
   - [net.\*](#net--rede)
   - [mod.\*](#mod--pentest-scanners)
   - [exploit.\*](#exploit--repls-de-pós-exploração-interativa)
