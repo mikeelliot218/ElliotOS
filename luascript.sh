@@ -79163,10 +79163,10 @@ static void sh_colorize(const char *src, int slen,
                         char *out, int *olen, int outmax,
                         int cursor_at, int *vis_before_cursor) {
     int i = 0, o = 0, vis = 0, vcur = -1;
-    const char *cur_col = NULL;
+    const char *cur_col = "";
 
 #define SH_COL(col) do { \
-    if (cur_col != (col)) { \
+    if (strcmp(cur_col, (col)) != 0) { \
         int _cl = (int)strlen(col); \
         if (o+_cl < outmax) { memcpy(out+o, col, _cl); o += _cl; } \
         cur_col = (col); \
@@ -79197,7 +79197,7 @@ static void sh_colorize(const char *src, int slen,
                 if (d == '\\' && i < slen) { SH_MARK(); SH_CH(src[i]); i++; continue; }
                 if (d == q) break;
             }
-            cur_col = NULL; continue;
+            cur_col = ""; continue;
         }
         /* @std/... @user/... */
         if (c == '@') {
@@ -79206,7 +79206,7 @@ static void sh_colorize(const char *src, int slen,
                    src[i]=='@'||src[i]=='/'||src[i]=='_'||src[i]=='.')) {
                 SH_MARK(); SH_CH(src[i]); i++;
             }
-            cur_col = NULL; continue;
+            cur_col = ""; continue;
         }
         /* numero */
         if (isdigit((unsigned char)c) ||
@@ -79216,7 +79216,7 @@ static void sh_colorize(const char *src, int slen,
                    src[i]=='.'||src[i]=='x'||src[i]=='X')) {
                 SH_MARK(); SH_CH(src[i]); i++;
             }
-            cur_col = NULL; continue;
+            cur_col = ""; continue;
         }
         /* identificador / keyword */
         if (isalpha((unsigned char)c) || c == '_') {
@@ -79232,12 +79232,12 @@ static void sh_colorize(const char *src, int slen,
                 if (j == cursor_at && vcur < 0) vcur = vis;
                 SH_CH(src[j]);
             }
-            cur_col = NULL; continue;
+            cur_col = ""; continue;
         }
         /* operadores */
         if (c != ' ' && c != '\t' && strchr("+-*/%^#&|~<>=(){}[];:,.", c)) {
             SH_COL(SHC_OP); SH_MARK(); SH_CH(src[i]); i++;
-            cur_col = NULL; continue;
+            cur_col = ""; continue;
         }
         /* espaco / outros */
         SH_COL(SHC_DFLT); SH_MARK(); SH_CH(src[i]); i++;
@@ -79282,32 +79282,58 @@ static int sh_prompt_last_line_len(const char *s) {
 
 static void (*sh_orig_redisplay)(void) = NULL;
 
+/* Buffer de saída único para o redisplay — evita múltiplas syscalls */
+static char sh_out[32768];
+
 static void elliot_sh_redisplay(void) {
-    /* Estrategia: deixa o readline fazer o redisplay normal (estado interno
-     * intacto, _rl_last_c_pos correto, newline funciona). Depois:
-     *   1. Salva posicao do cursor (DECSC \0337)
-     *   2. Move para inicio do input (apos prompt na ultima linha)
-     *   3. Sobrescreve com buffer colorizado
-     *   4. Restaura cursor (DECRC \0338)
-     * O readline nunca ve o cursor ser movido e continua em sincronia. */
-    if (sh_orig_redisplay) sh_orig_redisplay(); else rl_redisplay();
-
-    /* Nao colore linha vazia ou quando readline esta finalizando */
-    if (!elliot_rl_interactive || !rl_line_buffer || rl_end == 0 || rl_done)
+    /* Linha vazia, readline finalizando, ou fora do REPL: redisplay normal */
+    if (!elliot_rl_interactive || !rl_line_buffer || rl_end == 0 || rl_done) {
+        if (sh_orig_redisplay) sh_orig_redisplay(); else rl_redisplay();
         return;
+    }
 
+    /* Gera buffer colorizado */
     char colored[16384]; int clen = 0, vis_end = 0;
     sh_colorize(rl_line_buffer, rl_end, colored, &clen,
-                (int)sizeof(colored), rl_end, &vis_end);
+                (int)sizeof(colored), rl_point, &vis_end);
 
-    int pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
+    /* Comprimento visual do prompt (cache) */
+    static int pvis_cache = -1;
+    static const char *last_prompt = NULL;
+    const char *prompt = rl_prompt ? rl_prompt : "";
+    if (pvis_cache < 0 || prompt != last_prompt) {
+        pvis_cache = sh_prompt_last_line_len(prompt);
+        last_prompt = prompt;
+    }
+    int pvis = pvis_cache;
 
-    fputs("\0337", stdout);                    /* DECSC: salva cursor     */
-    fprintf(stdout, "\r\x1b[%dC", pvis);      /* move para apos prompt   */
-    fputs("\x1b[K", stdout);                   /* limpa ate fim da linha  */
-    fputs(colored, stdout);                     /* buffer colorizado       */
-    fputs("\0338", stdout);                    /* DECRC: restaura cursor  */
-    fflush(stdout);
+    /* Monta tudo num único buffer:
+     *   \r\033[K      — limpa linha atual
+     *   prompt         — reimprime prompt (sem escapes \001/\002)
+     *   colored        — conteúdo colorizado
+     *   \r\033[<n>C   — reposiciona cursor em pvis + vis_end */
+    int o = 0;
+#define OUT(s,n) do{ if(o+(n)<(int)sizeof(sh_out)){memcpy(sh_out+o,(s),(n));o+=(n);}}while(0)
+#define OUTS(s)  OUT((s),strlen(s))
+
+    /* Limpa linha e redesenha do zero — sem flash */
+    OUTS("\r\033[K");
+    /* Prompt sem RL_PROMPT_START_IGNORE/END_IGNORE */
+    for (const char *p = prompt; *p; p++) {
+        if (*p == '\001' || *p == '\002') continue;
+        sh_out[o++] = *p;
+    }
+    OUT(colored, clen);
+    /* Reposiciona cursor */
+    char esc[24];
+    int ecol = pvis + vis_end;
+    int en = (ecol > 0) ? snprintf(esc, sizeof(esc), "\r\033[%dC", ecol) : 0;
+    if (en > 0) OUT(esc, en);
+
+#undef OUT
+#undef OUTS
+
+    write(STDOUT_FILENO, sh_out, (size_t)o);
 }
 
 /* ==========================================================================
@@ -79417,8 +79443,10 @@ static void hl2_init(void) {
     rl_event_hook = hl2_event_hook;
 }
 
-/* Forward declarations do histórico persistente v2 */
-static void ehist_open(void);
+#define ELLIOT_HIST_MAX  2000
+#define ELLIOT_HIST_FILE ".elliot_history"
+
+/* Forward declaration do histórico persistente v3 */
 static void ehist_load(void);
 
 /* Inicializa readline: completion, histórico, auto-pair, bindings
@@ -79448,10 +79476,7 @@ void elliot_readline_init(void) {
     if(!home) home="/data/data/com.termux/files/home";
     using_history();
     stifle_history(ELLIOT_HIST_MAX);
-    /* Abre fd O_APPEND e instala handlers de sinal imediatamente —
-     * garante que ehist_writeline() funciona desde o primeiro comando */
-    ehist_open();
-    ehist_load();
+    ehist_load();  /* carrega entradas anteriores — persistência via add_history override */
 
     /* Navegação pelo histórico */
     rl_bind_keyseq("\\C-r", (rl_command_func_t*)rl_reverse_search_history);
@@ -79493,92 +79518,107 @@ static int elliot_ap_squote (int c, int k) { (void)c;(void)k; return elliot_ap_d
 
 /* Salva histórico — chamado ao sair do REPL */
 /* ==========================================================================
- * Histórico persistente v2 — mecanismo independente de atexit/readline API
+ * Histórico persistente v3 — override de add_history()
  *
- * Estratégia:
- *   - elliot_hist_open()  : abre ~/.elliot_history em O_APPEND na inicialização
- *   - elliot_hist_writeline(line): escreve cada linha diretamente via write(),
- *     atômica e imediata — persiste mesmo com Ctrl+C, SIGKILL, crash
- *   - elliot_hist_load()  : carrega o arquivo no readline via add_history()
- *     respeitando o limite de 2000 entradas (lê as últimas)
- *   - Handlers de sinal (SIGINT, SIGTERM, SIGHUP): fecham o fd antes de sair
- *
- * Não usa write_history/append_history/atexit — completamente independente.
+ * Como funciona:
+ *   Nossa add_history() em libnet.o é linkada ANTES de -lreadline, então
+ *   o linker usa ela. Ela salva a linha em ~/.elliot_history via write()
+ *   O(APPEND) imediato, depois chama a add_history real via dlsym(RTLD_NEXT).
+ *   Resultado: cada linha é persistida no momento em que é aceita pelo
+ *   readline — sem patches em lua.c, sem atexit, sem handlers de sinal.
+ *   Funciona com Ctrl+C, SIGKILL, crash — o kernel já escreveu no disco.
  * ========================================================================== */
 
-#include <signal.h>
 #include <fcntl.h>
+#include <dlfcn.h>
 
-#define ELLIOT_HIST_MAX  2000   /* entradas máximas carregadas no readline   */
-#define ELLIOT_HIST_FILE ".elliot_history"
+static int   ehist_fd   = -1;
 
-static int    ehist_fd   = -1;          /* fd aberto em O_APPEND              */
-static char   ehist_path[512] = {0};    /* caminho absoluto do arquivo        */
-
-/* Fecha o fd do histórico (chamado nos handlers de sinal) */
-static void ehist_close(void) {
-    if (ehist_fd >= 0) { close(ehist_fd); ehist_fd = -1; }
-}
-
-/* Handlers de sinal: fecha fd e re-envia o sinal para comportamento padrão */
-static void ehist_sig_handler(int sig) {
-    ehist_close();
-    signal(sig, SIG_DFL);
-    raise(sig);
-}
-
-/* Abre o arquivo em O_CREAT|O_APPEND|O_WRONLY — chamado em elliot_readline_init */
-static void ehist_open(void) {
+static void ehist_ensure_open(void) {
+    if (ehist_fd >= 0) return;
     const char *home = getenv("HOME");
     if (!home) home = "/data/data/com.termux/files/home";
-    snprintf(ehist_path, sizeof(ehist_path), "%s/" ELLIOT_HIST_FILE, home);
-    ehist_fd = open(ehist_path, O_CREAT | O_APPEND | O_WRONLY, 0600);
-    /* Instala handlers para fechar o fd antes do processo encerrar */
-    signal(SIGINT,  ehist_sig_handler);
-    signal(SIGTERM, ehist_sig_handler);
-    signal(SIGHUP,  ehist_sig_handler);
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.elliot_history", home);
+    ehist_fd = open(path, O_CREAT | O_APPEND | O_WRONLY, 0600);
 }
 
-/* Persiste uma linha imediatamente: escreve "linha\n" via write() atômico.
- * Chamado do pushline() patchado, após cada comando digitado no REPL. */
-void ehist_writeline(const char *line) {
-    if (ehist_fd < 0 || !line || !line[0]) return;
-    /* Ignora linhas duplicadas consecutivas */
-    static char last[4096] = {0};
-    if (strcmp(line, last) == 0) return;
-    strncpy(last, line, sizeof(last) - 1);
-
-    size_t n = strlen(line);
-    /* Buffer: line + '\n' — write() único para atomicidade */
-    char buf[4098];
-    if (n > 4096) n = 4096;
-    memcpy(buf, line, n);
-    buf[n] = '\n';
-    write(ehist_fd, buf, n + 1);
+/* Retorna handle da libreadline (dlopen lazy) */
+static void *ehist_rl_handle(void) {
+    static void *h = NULL;
+    if (!h) {
+        /* Tenta nomes comuns da libreadline no Termux/Android/Linux */
+        const char *names[] = {
+            "libreadline.so.8", "libreadline.so.7", "libreadline.so",
+            "libreadline.so.6", NULL
+        };
+        for (int i = 0; names[i] && !h; i++)
+            h = dlopen(names[i], RTLD_LAZY | RTLD_GLOBAL);
+    }
+    return h;
 }
 
-/* Carrega histórico no readline: lê o arquivo linha a linha,
- * mantém só as últimas ELLIOT_HIST_MAX entradas. */
+/* Override de add_history — linkado antes de -lreadline.
+ * Persiste via write() O_APPEND e delega ao readline via dlopen. */
+void add_history(const char *line) {
+    if (!line || !line[0]) return;
+
+    /* 1. Persiste imediatamente */
+    ehist_ensure_open();
+    if (ehist_fd >= 0) {
+        static char last[4096];
+        if (strncmp(last, line, 4095) != 0) {
+            strncpy(last, line, 4095);
+            size_t n = strlen(line);
+            if (n > 4095) n = 4095;
+            char buf[4097];
+            memcpy(buf, line, n);
+            buf[n] = '\n';
+            write(ehist_fd, buf, n + 1);
+        }
+    }
+
+    /* 2. Delega ao readline real via dlopen */
+    typedef void (*ah_t)(const char *);
+    static ah_t real_fn = NULL;
+    if (!real_fn) {
+        void *h = ehist_rl_handle();
+        if (h) real_fn = (ah_t)dlsym(h, "add_history");
+    }
+    if (real_fn) real_fn(line);
+}
+
+/* Carrega histórico na inicialização do readline */
 static void ehist_load(void) {
-    FILE *f = fopen(ehist_path, "r");
+    const char *home = getenv("HOME");
+    if (!home) home = "/data/data/com.termux/files/home";
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.elliot_history", home);
+
+    FILE *f = fopen(path, "r");
     if (!f) return;
 
-    /* Primeira passagem: descobre quantas linhas tem o arquivo */
     int total = 0;
     char buf[4098];
     while (fgets(buf, sizeof(buf), f)) total++;
 
-    /* Quantas linhas pular para ficar só com as últimas ELLIOT_HIST_MAX */
     int skip = (total > ELLIOT_HIST_MAX) ? (total - ELLIOT_HIST_MAX) : 0;
-
-    /* Segunda passagem: carrega as linhas desejadas */
     rewind(f);
-    int lineno = 0;
+    int n = 0;
     while (fgets(buf, sizeof(buf), f)) {
-        if (lineno++ < skip) continue;
+        if (n++ < skip) continue;
         size_t l = strlen(buf);
         if (l > 0 && buf[l-1] == '\n') buf[l-1] = '\0';
-        if (buf[0]) add_history(buf);
+        if (buf[0]) {
+            /* Chama readline real diretamente via dlopen */
+            typedef void (*ah_t)(const char *);
+            static ah_t real_ah = NULL;
+            if (!real_ah) {
+                void *h = ehist_rl_handle();
+                if (h) real_ah = (ah_t)dlsym(h, "add_history");
+            }
+            if (real_ah) real_ah(buf);
+        }
     }
     fclose(f);
 }
@@ -98139,7 +98179,7 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L, l_back_impl);
     lua_setglobal(L, "back");
 
-    /* ── Histórico persistente v2: iniciado em elliot_readline_init() ── */
+    /* ── Histórico persistente v3: add_history override em libnet.o ── */
 
     /* ── Variáveis indexadas (experimental) ── */
     elliot_ivar_init(L);
@@ -100999,8 +101039,11 @@ LIBNET_EOF
             print "  /* ElliotOS: sinaliza que o REPL interativo esta ativo */"
             print "  elliot_rl_interactive = 1;"
             print $0
-            print "  /* ElliotOS hist v2: persiste cada linha imediatamente via fd O_APPEND */"
-            print "  if (b && b[0]) { extern void ehist_writeline(const char *); ehist_writeline(b); }"
+            next
+        }
+        in_fn && /lua_saveline/ {
+            print $0
+
             print "  /* ElliotOS ivar: pre-processa !N e intercepta :help/help */"
             print "  if (b) { char *_p = elliot_ivar_preprocess_block(b);"
             print "    if (_p) {"
@@ -101022,21 +101065,6 @@ LIBNET_EOF
         ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
     fi
 
-    # ── Patch hist v2: injeta ehist_writeline() em pushline() ───────────────
-    # Guard próprio — roda mesmo se o patch do ivar já foi aplicado
-    if ! grep -q "ehist_writeline" lua.c 2>/dev/null; then
-        awk '
-        /^static int pushline[[:space:]]*\(/ { in_fn=1 }
-        in_fn && /lua_readline/ {
-            print $0
-            print "  /* ElliotOS hist v2: persiste linha imediatamente via fd O_APPEND */"
-            print "  if (b && b[0]) { extern void ehist_writeline(const char *); ehist_writeline(b); }"
-            next
-        }
-        in_fn && /^\}/ { in_fn=0 }
-        { print }
-        ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
-    fi
 
     # Garante que libnet.o entre no Makefile
     sed -i '/^LIB_O=/ s/$/ libnet.o/' Makefile
