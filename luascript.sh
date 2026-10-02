@@ -29,7 +29,7 @@ _run_uninstall() {
 
     printf "  \033[1;36m[*] Removendo binários...\033[0m\n"
     rm -f "$_TPFX/bin/lua-net" "$_TPFX/bin/lua" "$_TPFX/bin/lua5.4" \
-          "$_TPFX/bin/ms" "$_TPFX/bin/luar" "$_TPFX/bin/lpm" "$_TPFX/bin/xpm" \
+          "$_TPFX/bin/ms" "$_TPFX/bin/luar" "$_TPFX/bin/lpm" "$_TPFX/bin/xpm" "$_TPFX/bin/pst" \
           "$_TPFX/bin/cxx" "$_TPFX/bin/ee" "$_TPFX/bin/xtun" \
           "$_TPFX/bin/elliot-gui" "$_TPFX/bin/rungui" \
           "$_TPFX/lib/liblua-net.so" "$_TPFX/lib/lua-net.so"
@@ -28029,78 +28029,6 @@ install_elliotos() {
 
     # ── Patch Lua + prompt ───────────────────────────────────────────────
     _section "ETAPA 3 / 4 — Aplicando patches no Lua"
-    _step "🎨" "Injetando banner e prompt colorido..."
-
-    # Banner customizado
-    cat > $HOME/_pv_patch.c << 'PVEOF'
-
-static void _elliot_logo_banner(void) {
-  const char *P="\033[1;35m",*Y="\033[1;33m",*B="\033[1;34m",*C="\033[1;36m",*W="\033[1;37m",*R="\033[0m";
-  printf("\n");
-  printf("  %s ███████╗%s██╗     %s██╗     %s██╗%s ██████╗ %s████████╗%s\n",P,B,B,Y,P,C,W);
-  printf("  %s ██╔════╝%s██║     %s██║     %s██║%s██╔═══██╗%s╚══██╔══╝%s\n",P,B,B,Y,P,C,W);
-  printf("  %s █████╗  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n",P,B,B,Y,P,C,W);
-  printf("  %s ██╔══╝  %s██║     %s██║     %s██║%s██║   ██║%s   ██║   %s\n",P,B,B,Y,P,C,W);
-  printf("  %s ███████╗%s███████╗%s███████╗%s██║%s╚██████╔╝%s   ██║   %s\n",P,B,B,Y,P,C,W);
-  printf("  %s ╚══════╝%s╚══════╝%s╚══════╝%s╚═╝%s ╚═════╝ %s   ╚═╝   %s\n",P,B,B,Y,P,C,W);
-  printf("\n");
-  printf("  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n",P,B,B,Y,P,C,W);
-  printf("  %s  ◆  %sOS v17.0%s  •  %sLua 5.4 + C + Bash%s  •  %sTermux / Linux%s  ◆\n",Y,W,Y,B,Y,P,R);
-  printf("  %s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌╌%s╌╌╌╌╌╌╌%s\n\n",P,B,B,Y,P,C,R);
-  fflush(stdout);
-}
-static void print_version (void) {
-  _elliot_logo_banner();
-PVEOF
-    printf '%s\n' '  { char _bip[64]="sem rede";' >> $HOME/_pv_patch.c
-    printf '%s\n' '    FILE *_bf=popen("ifconfig 2>/dev/null | grep '\''inet '\'' | grep -v '\''127\\.0\\.0\\.1'\'' | head -1 | awk '\''{f=$2;gsub(/addr:/,\"\",f);gsub(/[^0-9.]/,\"\",f);print f}'\''","r");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    if(_bf){char _bl[64]={0};if(fgets(_bl,sizeof(_bl),_bf)){' >> $HOME/_pv_patch.c
-    printf '%s\n' '      size_t _l=strlen(_bl);while(_l>0&&(_bl[_l-1]=='\''\n'\''||_bl[_l-1]=='\''\r'\''||_bl[_l-1]=='\'' '\''))_l--;_bl[_l]=0;' >> $HOME/_pv_patch.c
-    printf '%s\n' '      if(_l>0)strncpy(_bip,_bl,63);}pclose(_bf);}' >> $HOME/_pv_patch.c
-    printf '%s\n' '    const char *_tips[]={' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "net.tcp(host,port) -- conecta TCP direto",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "sys.sh(cmd) -- executa shell e retorna saida",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "fs.read(path) -- le arquivo inteiro como string",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "ai.ask(prompt) -- consulta CYN inline no REPL",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "ms.help() -- lista todos os modulos e funcoes",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "net.scan(host,p1,p2) -- port scan rapido",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "crypto.md5(s) / crypto.sha256(s) -- hash inline",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "db.open(path) -- SQLite sem dependencias externas",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "web.serve(\".\",8080) -- HTTP estatico em background",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "lpm install <mod> -- instala modulo Lua extra",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "lmod.new(\"nome\") -- cria modulo em ~/.lua-modules/",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "net.dns(host) -- resolucao DNS direto no REPL",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "fs.ls(path) -- lista diretorio como tabela Lua",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "back() -- volta ao shell sem sair do ElliotOS",' >> $HOME/_pv_patch.c
-    printf '%s\n' '      "sys.env(\"VAR\") -- le variavel de ambiente"' >> $HOME/_pv_patch.c
-    printf '%s\n' '    };' >> $HOME/_pv_patch.c
-    printf '%s\n' '    int _nt=sizeof(_tips)/sizeof(_tips[0]);' >> $HOME/_pv_patch.c
-    printf '%s\n' '    srand((unsigned)time(NULL));' >> $HOME/_pv_patch.c
-    printf '%s\n' '    const char *_tip=_tips[rand()%_nt];' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[1;35mElliotOS v17.0\033[0m  \033[0;90mLua 5.4 + IA nativa\033[0m\n");' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[1;36mIP:\033[0m \033[1;37m%s\033[0m\n",_bip);' >> $HOME/_pv_patch.c
-    printf '%s\n' '    printf("\033[0;33mDica:\033[0m \033[0;90m%s\033[0m\n\n",_tip);' >> $HOME/_pv_patch.c
-    printf '%s\n' '  }' >> $HOME/_pv_patch.c
-    printf '%s\n' '}' >> $HOME/_pv_patch.c
-    # Remover print_version original e inserir nova ANTES de pmain (que a chama)
-    # Isso resolve o "call to undeclared function" porque pmain() aparece antes de main()
-    awk '/^static void print_version/{skip=1} skip&&/^}/{skip=0;next} !skip{print}' lua.c > lua.c.tmp
-    # Tentar inserir antes de pmain; fallback: antes de main; ultimo fallback: no topo
-    _anchor=$(grep -n '^static int pmain' lua.c.tmp | head -1 | cut -d: -f1)
-    if [ -z "$_anchor" ]; then
-        _anchor=$(grep -n '^int main' lua.c.tmp | head -1 | cut -d: -f1)
-    fi
-    if [ -n "$_anchor" ]; then
-        { head -n $((_anchor-1)) lua.c.tmp; cat $HOME/_pv_patch.c; tail -n +$_anchor lua.c.tmp; } > lua.c
-    else
-        cat $HOME/_pv_patch.c lua.c.tmp > lua.c
-    fi
-    rm -f lua.c.tmp $HOME/_pv_patch.c
-
-
-    printf '\n#undef LUA_PROMPT\n#undef LUA_PROMPT2\n#define LUA_PROMPT "\001\033[1;34m\002Elliot0S # \001\033[0m\002"\n#define LUA_PROMPT2 "\001\033[1;34m\002.. >> .. \001\033[0m\002"\n' >> luaconf.h
-
-    _ok "Prompt Elliot∅S injetado em luaconf.h"
 
     # Patch loslib.c — /tmp nao existe no Termux, usa TMPDIR (sed puro, sem)
     _step "📌" "Patchando os.tmpname() para Termux..."
@@ -28127,17 +28055,17 @@ my %T = (
         ["attempt to %s a %s value%s",                     "tentativa de %s um valor %s%s"],
         ["attempt to compare two %s values",               "tentativa de comparar dois valores %s"],
         ["attempt to compare %s with %s",                  "tentativa de comparar %s com %s"],
-        ["attempt to compare string with number",          "tentativa de comparar string com numero"],
-        ["attempt to compare number with string",          "tentativa de comparar numero com string"],
-        ["number%s has no integer representation",         "numero%s nao tem representacao inteira"],
+        ["attempt to compare string with number",          "tentativa de comparar string com n\xc3\xbamero"],
+        ["attempt to compare number with string",          "tentativa de comparar n\xc3\xbamero com string"],
+        ["number%s has no integer representation",         "n\xc3\xbamero%s n\xc3\xa3o tem representa\xc3\xa7\xc3\xa3o inteira"],
         ["stack overflow",                                 "estouro de pilha"],
-        ["'__index' chain too long; possible loop",        "cadeia '__index' longa demais; possivel loop"],
-        ["'__newindex' chain too long; possible loop",     "cadeia '__newindex' longa demais; possivel loop"],
+        ["'__index' chain too long; possible loop",        "cadeia '__index' longa demais; poss\xc3\xadvel loop"],
+        ["'__newindex' chain too long; possible loop",     "cadeia '__newindex' longa demais; poss\xc3\xadvel loop"],
         ["(null)",       "(nulo)"],
         ["(vararg)",     "(vararg)"],
-        ["(temporary)",  "(temporario)"],
-        ["(C temporary)","(temporario C)"],
-        ["'for' %s must be a number",                      "o %s do 'for' deve ser um numero"],
+        ["(temporary)",  "(tempor\xc3\xa1rio)"],
+        ["(C temporary)","(tempor\xc3\xa1rio C)"],
+        ["'for' %s must be a number",                      "o %s do 'for' deve ser um n\xc3\xbamero"],
     ],
     # lvm.c — opnames que alimentam luaG_typeerror
     "lvm.c" => [
@@ -28147,148 +28075,148 @@ my %T = (
         ['luaG_forerror(L, init, "initial value")', 'luaG_forerror(L, init, "valor inicial")'],
         ['luaG_forerror(L, pstep, "step")',        'luaG_forerror(L, pstep, "passo")'],
         ["attempt to concatenate a %s value",      "tentativa de concatenar um valor %s"],
-        ["attempt to get length of a %s value",    "tentativa de obter tamanho de um valor %s"],
+        ["attempt to get length of a %s value",    "tentativa de obter o tamanho de um valor %s"],
     ],
     # ldo.c
     "ldo.c" => [
         ["stack overflow",                                          "estouro de pilha"],
         ["C stack overflow",                                        "estouro de pilha C"],
-        ["attempt to yield from outside a coroutine",              "tentativa de yield fora de uma coroutine"],
-        ["attempt to yield across a C-call boundary",              "tentativa de yield atraves de chamada C"],
-        ["attempt to yield across metamethod/C-call boundary",     "tentativa de yield atraves de metamethod/chamada C"],
+        ["attempt to yield from outside a coroutine",              "tentativa de yield fora de uma corrotina"],
+        ["attempt to yield across a C-call boundary",              "tentativa de yield atrav\xc3\xa9s de chamada C"],
+        ["attempt to yield across metamethod/C-call boundary",     "tentativa de yield atrav\xc3\xa9s de metamethod/chamada C"],
         ["attempt to yield a main thread",                         "tentativa de yield na thread principal"],
-        ["cannot resume dead coroutine",                           "nao e possivel retomar coroutine morta"],
-        ["cannot resume non-suspended coroutine",                  "nao e possivel retomar coroutine nao suspensa"],
-        ["cannot resume running coroutine",                        "nao e possivel retomar coroutine em execucao"],
-        ["no waiting coroutine",                                   "nenhuma coroutine aguardando"],
-        ["unable to dump given function",                          "impossivel serializar a funcao fornecida"],
+        ["cannot resume dead coroutine",                           "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina encerrada"],
+        ["cannot resume non-suspended coroutine",                  "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina n\xc3\xa3o suspensa"],
+        ["cannot resume running coroutine",                        "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina em execu\xc3\xa7\xc3\xa3o"],
+        ["no waiting coroutine",                                   "nenhuma corrotina aguardando"],
+        ["unable to dump given function",                          "imposs\xc3\xadvel serializar a fun\xc3\xa7\xc3\xa3o fornecida"],
     ],
     # lcorolib.c
     "lcorolib.c" => [
-        ["cannot resume dead coroutine",          "nao e possivel retomar coroutine morta"],
-        ["cannot resume running coroutine",       "nao e possivel retomar coroutine em execucao"],
-        ["cannot resume non-suspended coroutine", "nao e possivel retomar coroutine nao suspensa"],
-        ["coroutine failed",                      "coroutine falhou"],
+        ["cannot resume dead coroutine",          "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina encerrada"],
+        ["cannot resume running coroutine",       "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina em execu\xc3\xa7\xc3\xa3o"],
+        ["cannot resume non-suspended coroutine", "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar corrotina n\xc3\xa3o suspensa"],
+        ["coroutine failed",                      "corrotina falhou"],
     ],
     # lauxlib.c
     "lauxlib.c" => [
-        ["bad argument #%d to '%s' (%s expected, got %s)", "argumento #%d invalido em '%s' (esperado %s, obtido %s)"],
-        ["bad argument #%d (%s expected, got %s)",         "argumento #%d invalido (esperado %s, obtido %s)"],
-        ["bad argument #%d (%s)",                          "argumento #%d invalido: %s"],
+        ["bad argument #%d to '%s' (%s expected, got %s)", "argumento #%d inv\xc3\xa1lido em '%s' (esperado %s, obtido %s)"],
+        ["bad argument #%d (%s expected, got %s)",         "argumento #%d inv\xc3\xa1lido (esperado %s, obtido %s)"],
+        ["bad argument #%d (%s)",                          "argumento #%d inv\xc3\xa1lido: %s"],
         ["no value",                                       "nenhum valor"],
-        ["not enough memory",                              "memoria insuficiente"],
-        ["cannot open %s: %s",                             "nao foi possivel abrir %s: %s"],
-        ["error loading module '%s' from file '%s':\n\t%s","erro ao carregar modulo '%s' do arquivo '%s':\n\t%s"],
-        ["module '%s' not found:\n%s",                    "modulo '%s' nao encontrado:\n%s"],
-        ["invalid option '%%%c' to 'format'",             "opcao '%%%c' invalida em 'format'"],
-        ["invalid use of '%s' in replacement string",     "uso invalido de '%s' na string de substituicao"],
+        ["not enough memory",                              "mem\xc3\xb3ria insuficiente"],
+        ["cannot open %s: %s",                             "n\xc3\xa3o foi poss\xc3\xadvel abrir %s: %s"],
+        ["error loading module '%s' from file '%s':\n\t%s","erro ao carregar m\xc3\xb3dulo '%s' do arquivo '%s':\n\t%s"],
+        ["module '%s' not found:\n%s",                    "m\xc3\xb3dulo '%s' n\xc3\xa3o encontrado:\n%s"],
+        ["invalid option '%%%c' to 'format'",             "op\xc3\xa7\xc3\xa3o '%%%c' inv\xc3\xa1lida em 'format'"],
+        ["invalid use of '%s' in replacement string",     "uso inv\xc3\xa1lido de '%s' na string de substitui\xc3\xa7\xc3\xa3o"],
     ],
     # lbaselib.c
     "lbaselib.c" => [
-        ["assertion failed!",                                          "falha na assercao!"],
-        ["number has no integer representation",                       "numero nao tem representacao inteira"],
-        ["bad argument #%d to 'select' (index out of range)",          "argumento #%d invalido em 'select' (indice fora do intervalo)"],
-        ["bad argument #1 to 'select' (number or string expected)",    "argumento #1 invalido em 'select' (esperado numero ou string)"],
-        ["invalid level",                                              "nivel invalido"],
-        ["too many results to unpack",                                 "resultados demais para unpack"],
-        ["attempt to load a text chunk (mode is 'b')",                 "tentativa de carregar chunk de texto (modo e 'b')"],
-        ["attempt to load a binary chunk (mode is 't')",               "tentativa de carregar chunk binario (modo e 't')"],
-        ["cannot use '...' outside a vararg function",                 "nao e possivel usar '...' fora de funcao vararg"],
+        ["assertion failed!",                                          "asser\xc3\xa7\xc3\xa3o falhou!"],
+        ["number has no integer representation",                       "n\xc3\xbamero n\xc3\xa3o tem representa\xc3\xa7\xc3\xa3o inteira"],
+        ["bad argument #%d to 'select' (index out of range)",          "argumento #%d inv\xc3\xa1lido em 'select' (\xc3\xadndice fora do intervalo)"],
+        ["bad argument #1 to 'select' (number or string expected)",    "argumento #1 inv\xc3\xa1lido em 'select' (esperado n\xc3\xbamero ou string)"],
+        ["invalid level",                                              "n\xc3\xadvel inv\xc3\xa1lido"],
+        ["too many results to unpack",                                 "resultados demais para desempacotar"],
+        ["attempt to load a text chunk (mode is 'b')",                 "tentativa de carregar trecho de texto (modo \xc3\xa9 'b')"],
+        ["attempt to load a binary chunk (mode is 't')",               "tentativa de carregar trecho bin\xc3\xa1rio (modo \xc3\xa9 't')"],
+        ["cannot use '...' outside a vararg function",                 "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel usar '...' fora de fun\xc3\xa7\xc3\xa3o vararg"],
     ],
     # lstrlib.c
     "lstrlib.c" => [
-        ["invalid pattern capture index %%%d",          "indice de captura de padrao invalido %%%d"],
-        ["invalid use of '%c' in pattern",              "uso invalido de '%c' no padrao"],
-        ["missing '[' after '%%f' in pattern",          "faltando '[' apos '%%f' no padrao"],
-        ["malformed pattern (ends with '%%')",          "padrao malformado (termina com '%%')"],
-        ["malformed pattern (missing ')')",             "padrao malformado (faltando ')')"],
-        ["pattern too complex",                         "padrao complexo demais"],
+        ["invalid pattern capture index %%%d",          "\xc3\xadndice de captura de padr\xc3\xa3o inv\xc3\xa1lido %%%d"],
+        ["invalid use of '%c' in pattern",              "uso inv\xc3\xa1lido de '%c' no padr\xc3\xa3o"],
+        ["missing '[' after '%%f' in pattern",          "faltando '[' ap\xc3\xb3s '%%f' no padr\xc3\xa3o"],
+        ["malformed pattern (ends with '%%')",          "padr\xc3\xa3o malformado (termina com '%%')"],
+        ["malformed pattern (missing ')')",             "padr\xc3\xa3o malformado (faltando ')')"],
+        ["pattern too complex",                         "padr\xc3\xa3o complexo demais"],
         ["too many captures",                           "capturas demais"],
         ["unfinished capture",                          "captura incompleta"],
-        ["string length overflow",                      "overflow no tamanho da string"],
-        ["invalid option '%%%c' to 'format'",          "opcao '%%%c' invalida em 'format'"],
+        ["string length overflow",                      "overflow no comprimento da string"],
+        ["invalid option '%%%c' to 'format'",          "op\xc3\xa7\xc3\xa3o '%%%c' inv\xc3\xa1lida em 'format'"],
     ],
     # liolib.c
     "liolib.c" => [
-        ["file is already closed",             "arquivo ja fechado"],
-        ["cannot close standard file",         "nao e possivel fechar arquivo padrao"],
-        ["invalid mode",                       "modo invalido"],
-        ["cannot read from a write-only file", "nao e possivel ler de arquivo somente-escrita"],
-        ["cannot write to a read-only file",   "nao e possivel escrever em arquivo somente-leitura"],
+        ["file is already closed",             "arquivo j\xc3\xa1 est\xc3\xa1 fechado"],
+        ["cannot close standard file",         "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel fechar arquivo padr\xc3\xa3o"],
+        ["invalid mode",                       "modo inv\xc3\xa1lido"],
+        ["cannot read from a write-only file", "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel ler de arquivo somente-escrita"],
+        ["cannot write to a read-only file",   "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel escrever em arquivo somente-leitura"],
         ["attempt to use a closed file",       "tentativa de usar arquivo fechado"],
     ],
     # lmathlib.c
     "lmathlib.c" => [
-        ["bad argument #1 to 'random' (interval is empty)",  "argumento #1 invalido em 'random' (intervalo vazio)"],
-        ["bad argument #2 to 'random' (interval too large)", "argumento #2 invalido em 'random' (intervalo muito grande)"],
+        ["bad argument #1 to 'random' (interval is empty)",  "argumento #1 inv\xc3\xa1lido em 'random' (intervalo vazio)"],
+        ["bad argument #2 to 'random' (interval too large)", "argumento #2 inv\xc3\xa1lido em 'random' (intervalo grande demais)"],
     ],
     # ltablib.c
     "ltablib.c" => [
-        ["bad argument #1 to 'insert' (position out of bounds)", "argumento #1 invalido em 'insert' (posicao fora dos limites)"],
-        ["bad argument #2 to 'insert' (position out of bounds)", "argumento #2 invalido em 'insert' (posicao fora dos limites)"],
-        ["wrong number of arguments to 'insert'",                "numero errado de argumentos em 'insert'"],
-        ["invalid order function for sorting",                   "funcao de ordenacao invalida para sort"],
-        ["invalid value (table) at index %d in table for 'sort'","valor invalido (table) no indice %d da table para 'sort'"],
+        ["bad argument #1 to 'insert' (position out of bounds)", "argumento #1 inv\xc3\xa1lido em 'insert' (posi\xc3\xa7\xc3\xa3o fora dos limites)"],
+        ["bad argument #2 to 'insert' (position out of bounds)", "argumento #2 inv\xc3\xa1lido em 'insert' (posi\xc3\xa7\xc3\xa3o fora dos limites)"],
+        ["wrong number of arguments to 'insert'",                "n\xc3\xbamero incorreto de argumentos em 'insert'"],
+        ["invalid order function for sorting",                   "fun\xc3\xa7\xc3\xa3o de ordena\xc3\xa7\xc3\xa3o inv\xc3\xa1lida para 'sort'"],
+        ["invalid value (table) at index %d in table for 'sort'","valor inv\xc3\xa1lido (tabela) no \xc3\xadndice %d da tabela para 'sort'"],
     ],
     # loslib.c
     "loslib.c" => [
-        ["time result cannot be represented in this installation", "resultado de tempo nao representavel nesta instalacao"],
+        ["time result cannot be represented in this installation", "resultado de tempo n\xc3\xa3o represent\xc3\xa1vel nesta instala\xc3\xa7\xc3\xa3o"],
         ["field 'day' missing in date table",                      "campo 'day' ausente na tabela de data"],
     ],
     # lutf8lib.c
     "lutf8lib.c" => [
-        ["invalid UTF-8 code",              "codigo UTF-8 invalido"],
-        ["UTF-8 value too large",           "valor UTF-8 muito grande"],
+        ["invalid UTF-8 code",              "c\xc3\xb3digo UTF-8 inv\xc3\xa1lido"],
+        ["UTF-8 value too large",           "valor UTF-8 grande demais"],
         ["missing argument",               "argumento ausente"],
-        ["initial position out of bounds", "posicao inicial fora dos limites"],
-        ["final position out of bounds",   "posicao final fora dos limites"],
+        ["initial position out of bounds", "posi\xc3\xa7\xc3\xa3o inicial fora dos limites"],
+        ["final position out of bounds",   "posi\xc3\xa7\xc3\xa3o final fora dos limites"],
     ],
     # loadlib.c
     "loadlib.c" => [
-        ["module '%s' not found:\n%s",              "modulo '%s' nao encontrado:\n%s"],
+        ["module '%s' not found:\n%s",              "m\xc3\xb3dulo '%s' n\xc3\xa3o encontrado:\n%s"],
         ["no field package.preload['%s']",          "nenhum campo em package.preload para '%s'"],
         ["circular require",                        "require circular detectado"],
-        ["error loading module '%s'",               "erro ao carregar modulo '%s'"],
+        ["error loading module '%s'",               "erro ao carregar m\xc3\xb3dulo '%s'"],
     ],
     # ldblib.c
     "ldblib.c" => [
-        ["cannot change a protected metamethod",  "nao e possivel alterar um metamethod protegido"],
-        ["bad argument #%d (level out of range)", "argumento #%d invalido (nivel fora do intervalo)"],
-        ["no active function",                    "nenhuma funcao ativa"],
+        ["cannot change a protected metamethod",  "n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel alterar um metamethod protegido"],
+        ["bad argument #%d (level out of range)", "argumento #%d inv\xc3\xa1lido (n\xc3\xadvel fora do intervalo)"],
+        ["no active function",                    "nenhuma fun\xc3\xa7\xc3\xa3o ativa"],
     ],
     # llex.c
     "llex.c" => [
-        ["lexical element too long",                 "elemento lexico longo demais"],
+        ["lexical element too long",                 "elemento l\xc3\xa9xico longo demais"],
         ["unfinished string",                        "string incompleta (falta fechamento de aspas)"],
         ["unfinished long string",                   "string longa incompleta (falta ]])"],
-        ["unfinished long comment",                  "comentario longo incompleto (falta --]])"],
-        ["malformed number",                         "numero malformado"],
-        ["invalid escape sequence",                  "sequencia de escape invalida"],
-        ["decimal escape too large",                 "escape decimal muito grande"],
-        ["hexadecimal digit expected",               "digito hexadecimal esperado"],
-        ["UTF-8 value too large",                    "valor UTF-8 muito grande"],
+        ["unfinished long comment",                  "coment\xc3\xa1rio longo incompleto (falta --]])"],
+        ["malformed number",                         "n\xc3\xbamero malformado"],
+        ["invalid escape sequence",                  "sequ\xc3\xaancia de escape inv\xc3\xa1lida"],
+        ["decimal escape too large",                 "escape decimal grande demais"],
+        ["hexadecimal digit expected",               "d\xc3\xadgito hexadecimal esperado"],
+        ["UTF-8 value too large",                    "valor UTF-8 grande demais"],
     ],
     # lparser.c
     "lparser.c" => [
         ["%s expected (to close %s at line %d)",     "%s esperado (para fechar %s na linha %d)"],
         ["%s expected",                              "%s esperado"],
-        ["too many %s (limit is %d) in %s",          "muitos %s (limite e %d) em %s"],
-        ["main function",                            "funcao principal"],
-        ["function at line %d",                      "funcao na linha %d"],
-        ["<goto %s> at line %d jumps into the scope of local '%s'", "<goto %s> na linha %d salta para o escopo da variavel local '%s'"],
-        ["no visible label '%s' for 'goto'",         "sem rotulo visivel '%s' para 'goto'"],
-        ["break outside loop",                       "'break' fora de um laco"],
-        ["label '%s' already defined on line %d",    "rotulo '%s' ja definido na linha %d"],
-        ["local variables",                          "variaveis locais"],
+        ["too many %s (limit is %d) in %s",          "muitos %s (limite \xc3\xa9 %d) em %s"],
+        ["main function",                            "fun\xc3\xa7\xc3\xa3o principal"],
+        ["function at line %d",                      "fun\xc3\xa7\xc3\xa3o na linha %d"],
+        ["<goto %s> at line %d jumps into the scope of local '%s'", "<goto %s> na linha %d salta para o escopo da vari\xc3\xa1vel local '%s'"],
+        ["no visible label '%s' for 'goto'",         "sem r\xc3\xb3tulo vis\xc3\xadvel '%s' para 'goto'"],
+        ["break outside loop",                       "'break' fora de um la\xc3\xa7o"],
+        ["label '%s' already defined on line %d",    "r\xc3\xb3tulo '%s' j\xc3\xa1 definido na linha %d"],
+        ["local variables",                          "vari\xc3\xa1veis locais"],
         ["upvalues",                                 "upvalues"],
-        ["labels",                                   "rotulos"],
+        ["labels",                                   "r\xc3\xb3tulos"],
         ["constants",                                "constantes"],
         ["registers",                                "registradores"],
-        ["instructions",                             "instrucoes"],
+        ["instructions",                             "instru\xc3\xa7\xc3\xb5es"],
     ],
     # lmem.c
     "lmem.c" => [
-        ["not enough memory", "memoria insuficiente"],
+        ["not enough memory", "mem\xc3\xb3ria insuficiente"],
     ],
 );
 
@@ -28314,6 +28242,1541 @@ PLEOF
     _step "⚙ " "Gerando libnet.c — todos os módulos..."
     PROFILE_DEFINES="-DELLIOT_GOD=1"
 
+    # ── Gera o motor de REPL próprio (substitui GNU Readline) ──────────────
+    # Ver elliot_repl_engine.c para a documentação completa do design; em
+    # resumo: editor de linha em modo raw de terminal com scroll horizontal
+    # (nunca wrap multi-linha), que elimina a classe de bug visual que o
+    # hook em cima do GNU Readline tinha. Compilado junto com libnet.c no
+    # próximo passo e linkado no mesmo binário.
+    cat > elliot_repl_engine.c << 'ENGINE_EOF'
+/* ========================================================================
+ * elliot_repl_engine.c — Motor de REPL completo (gerado por concatenação
+ * dos módulos elliot_repl.c, elliot_highlight.c, elliot_autopair.c,
+ * elliot_complete.c, elliot_history.c, elliot_repl_main.c).
+ * ======================================================================== */
+
+#define _DEFAULT_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <termios.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+#include <ctype.h>
+
+typedef struct elliot_repl_state elliot_repl_state;
+
+/* Códigos de tecla especiais retornados por elliot_repl_read_key().
+ * Ficam fora da faixa 0-255 para nunca colidir com um byte real. */
+enum {
+    ELLIOT_KEY_EOF = -1,
+    ELLIOT_KEY_ESC = 256,
+    ELLIOT_KEY_UP,
+    ELLIOT_KEY_DOWN,
+    ELLIOT_KEY_LEFT,
+    ELLIOT_KEY_RIGHT,
+    ELLIOT_KEY_HOME,
+    ELLIOT_KEY_END,
+    ELLIOT_KEY_DELETE,
+};
+
+/* Callbacks para plugar as features (completion, auto-pair, highlight)
+ * sem que o motor central precise conhecer a lógica de cada uma.
+ * Todos são opcionais (podem ser NULL). */
+struct elliot_repl_callbacks {
+    /* Coloriza src[0..srclen) para out (buffer de saída, capacidade
+     * outmax), com códigos de escape ANSI embutidos. Retorna o
+     * comprimento escrito em out. Chamado a cada redraw, só sobre a
+     * JANELA visível (não a linha inteira) — mais barato e mais simples
+     * de acertar (nunca precisa calcular offsets de wrap). */
+    int (*colorize)(const char *src, int srclen, char *out, int outmax, void *ud);
+
+    /* Chamado quando o usuário aperta Tab. Deve inspecionar o buffer
+     * (via elliot_repl_get_buffer/get_pos) e, se houver uma única
+     * conclusão, aplicar com elliot_repl_replace_word(); se houver
+     * várias, é responsável por listar as opções na tela (pode
+     * escrever direto com printf, desde que termine chamando
+     * elliot_repl_refresh_line() de novo antes de retornar, ou deixe
+     * o motor redesenhar sozinho ao final — o motor sempre redesenha
+     * após qualquer tecla, incluindo Tab). */
+    void (*complete)(elliot_repl_state *s, void *ud);
+
+    /* Chamado logo depois de um caractere ser inserido no buffer —
+     * usado para auto-pair (inserir o fechamento de "(", "[", etc). */
+    void (*on_char_inserted)(elliot_repl_state *s, char c, void *ud);
+
+    /* Chamado ANTES de um backspace remover o caractere à esquerda do
+     * cursor (buffer ainda intacto nesse momento) — usado por auto-pair
+     * para decidir, vendo o buffer como está agora, se o caractere que
+     * está prestes a ser removido forma um par vazio com o que está
+     * logo à direita do cursor, e remover o fechamento também. */
+    void (*on_pair_delete)(elliot_repl_state *s, void *ud);
+};
+
+/* Cria uma sessão de edição com o prompt e callbacks dados. O prompt é
+ * texto puro (sem cores) — este motor assume 1 byte = 1 coluna para o
+ * prompt; se quiser prompt colorido, aplique a cor dentro do callback
+ * colorize, ou trate isso numa versão futura deste motor. */
+elliot_repl_state *elliot_repl_new(const char *prompt,
+                                    const struct elliot_repl_callbacks *cb,
+                                    void *cb_ud);
+void elliot_repl_free(elliot_repl_state *s);
+
+/* Lê uma linha completa do usuário (com edição interativa). Retorna
+ * string malloc'ada (chamador deve free()) ou NULL em EOF (Ctrl+D com
+ * linha vazia). Pode ser chamada repetidamente na mesma sessão (reusa
+ * o histórico acumulado). */
+char *elliot_repl_read_line(elliot_repl_state *s);
+
+/* Adiciona uma linha ao histórico em memória desta sessão (não grava em
+ * arquivo — isso é responsabilidade de quem chama, como já era antes). */
+void elliot_repl_history_add(elliot_repl_state *s, const char *line);
+
+/* Força um redesenho da linha atual (raramente necessário chamar direto
+ * — o motor já redesenha sozinho após cada tecla). */
+void elliot_repl_refresh_line(elliot_repl_state *s);
+
+/* Acesso ao estado, para uso dentro dos callbacks (completion/auto-pair). */
+const char *elliot_repl_get_buffer(elliot_repl_state *s);
+size_t elliot_repl_get_len(elliot_repl_state *s);
+size_t elliot_repl_get_pos(elliot_repl_state *s);
+void   elliot_repl_set_pos(elliot_repl_state *s, size_t pos);
+void   elliot_repl_insert_text(elliot_repl_state *s, const char *txt);
+/* Substitui o texto entre word_start e a posição atual do cursor pelo
+ * texto de replacement, e deixa o cursor logo após o texto inserido —
+ * usado por completion (ex.: trocar "pri" por "print"). */
+void   elliot_repl_replace_word(elliot_repl_state *s, size_t word_start, const char *replacement);
+
+/* Remove 1 caractere na posição `at` do buffer, sem mover o cursor
+ * (a menos que `at` seja antes da posição atual do cursor, caso em que
+ * o cursor recua 1 para continuar apontando para o mesmo texto lógico).
+ * Usado pelo auto-pair para remover o fechamento de um par vazio. */
+void   elliot_repl_delete_char_at(elliot_repl_state *s, size_t at);
+
+/* Funções de baixo nível, expostas para quem quiser um controle mais
+ * fino (ex.: um warmup ou um modo não-interativo). Uso normal não
+ * precisa chamar estas diretamente — elliot_repl_read_line já cuida. */
+int  elliot_repl_enable_raw(void);
+void elliot_repl_disable_raw(void);
+int  elliot_repl_term_width(void);
+int  elliot_repl_read_key(void);
+
+
+/* ==================== elliot_repl.c ==================== */
+/* ==========================================================================
+ * elliot_repl.c — Motor de linha de comando (REPL) do ElliotOS
+ * ==========================================================================
+ * Substitui o GNU Readline por um editor de linha próprio, em modo raw de
+ * terminal. Design baseado no algoritmo do linenoise (antirez/linenoise),
+ * referência clássica e madura para esse tipo de editor.
+ *
+ * POR QUE ESSE ARQUIVO EXISTE:
+ * O GNU Readline, combinado com nosso hook de highlight de sintaxe, tinha
+ * um bug visual intermitente e nunca totalmente diagnosticado: quando uma
+ * linha dava wrap (passava da largura do terminal) pela primeira vez na
+ * sessão, o conteúdo da linha anterior "clonava" visualmente na tela,
+ * como fantasma (o buffer lógico do Lua nunca era afetado — só a tela).
+ * Depois de várias tentativas de contornar isso por fora do Readline sem
+ * sucesso, a decisão foi parar de depender do redisplay do Readline e
+ * escrever nosso próprio motor, onde CADA byte que vai para a tela é
+ * decidido por nós, de forma previsível e depurável.
+ *
+ * DESIGN GERAL (para quem for mexer aqui no futuro):
+ *
+ *   1. O terminal é colocado em "modo raw" (termios): sem eco automático,
+ *      sem espera de Enter, byte a byte. Cada tecla chega crua para nós.
+ *
+ *   2. Mantemos o texto da linha em um buffer simples (elliot_repl_state),
+ *      com um "cursor" (posição de edição) dentro dele.
+ *
+ *   3. Em vez de deixar a linha DAR WRAP (quebrar em várias linhas de
+ *      terminal) — que é onde mora a complexidade e os bugs — usamos
+ *      SCROLL HORIZONTAL: se a linha for maior que a largura disponível,
+ *      mostramos só uma "janela" de texto ao redor do cursor. É a mesma
+ *      escolha de design do linenoise em modo padrão (não-multiline), e
+ *      evita 100% da classe de bug que tínhamos (nunca há uma "segunda
+ *      linha física" para ficar dessincronizada).
+ *
+ *   4. A cada tecla, chamamos elliot_repl_refresh_line(), que:
+ *        a) calcula a janela visível (recalcula do zero, sem depender de
+ *           nenhum estado "anterior" que possa estar sujo — elimina a
+ *           classe inteira de bug que tínhamos com cache/estado do
+ *           Readline);
+ *        b) monta um ÚNICO buffer com todos os códigos de escape ANSI
+ *           necessários (\r, apaga linha, texto colorizado, reposiciona
+ *           cursor) e escreve tudo de uma vez com um único write().
+ *      Isso é: sempre um "quadro" completo, nunca incremental — mais
+ *      simples de raciocinar e de depurar (dá pra logar o buffer inteiro
+ *      antes de cada write() se precisar investigar algo no futuro).
+ *
+ *   5. Funcionalidades (completion, auto-pair, highlight, histórico) são
+ *      plugadas via ponteiros de função (elliot_repl_callbacks), para que
+ *      a LÓGICA de cada uma continue a mesma que já existia — só a forma
+ *      de desenhar na tela mudou.
+ *
+ * COMO DEPURAR NO FUTURO:
+ *   - Definir ELLIOT_REPL_DEBUG=1 (variável de ambiente) faz o motor
+ *     logar cada refresh (buffer, cursor, janela) em
+ *     $TMPDIR/elliot_repl_debug.log — sem precisar recompilar nada.
+ *   - Todo o estado do editor vive em UMA struct (elliot_repl_state),
+ *     nunca em variáveis globais soltas — mais fácil de inspecionar.
+ * ========================================================================== */
+
+
+
+/* -------------------------------------------------------------------- */
+/* Estado global do terminal (modo raw) — mínimo necessário, seguindo o */
+/* mesmo padrão do linenoise: salva o termios original para restaurar.  */
+/* -------------------------------------------------------------------- */
+static struct termios g_orig_termios;
+static int g_raw_active = 0;
+static int g_debug = -1; /* -1 = ainda não checado; 0/1 = resultado do getenv */
+static FILE *g_debug_fp = NULL;
+
+static int elliot_repl_debug_on(void) {
+    if (g_debug < 0) {
+        const char *e = getenv("ELLIOT_REPL_DEBUG");
+        g_debug = (e && *e && strcmp(e, "0") != 0) ? 1 : 0;
+        if (g_debug) {
+            const char *tmp = getenv("TMPDIR");
+            char path[512];
+            snprintf(path, sizeof(path), "%s/elliot_repl_debug.log",
+                     tmp && *tmp ? tmp : "/tmp");
+            g_debug_fp = fopen(path, "a");
+        }
+    }
+    return g_debug;
+}
+
+#define ELLIOT_DBG(...) do { \
+    if (elliot_repl_debug_on() && g_debug_fp) { \
+        fprintf(g_debug_fp, __VA_ARGS__); \
+        fflush(g_debug_fp); \
+    } \
+} while (0)
+
+/* Entra em modo raw. Retorna 0 em sucesso, -1 em erro (ex.: stdin não é
+ * um terminal — nesse caso o chamador deve cair para leitura de linha
+ * simples, sem edição interativa). */
+int elliot_repl_enable_raw(void) {
+    if (!isatty(STDIN_FILENO)) return -1;
+    if (tcgetattr(STDIN_FILENO, &g_orig_termios) == -1) return -1;
+
+    struct termios raw = g_orig_termios;
+    /* Mesma configuração clássica de "modo raw" usada pelo linenoise: */
+    raw.c_iflag &= ~(unsigned)(BRKINT | ICRNL | INPCK | ISTRIP | IXON);
+    raw.c_oflag &= ~(unsigned)(OPOST);
+    raw.c_cflag |= (unsigned)(CS8);
+    /* Mantemos ISIG ligado (não desligamos) de propósito: assim Ctrl+C
+     * continua gerando SIGINT normalmente, em vez de virar um byte 0x03
+     * que teríamos que tratar manualmente — mais simples e previsível. */
+    raw.c_lflag &= ~(unsigned)(ECHO | ICANON | IEXTEN);
+    raw.c_cc[VMIN]  = 1; /* bloqueia até ter pelo menos 1 byte */
+    raw.c_cc[VTIME] = 0; /* sem timeout */
+
+    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) < 0) return -1;
+    g_raw_active = 1;
+    return 0;
+}
+
+void elliot_repl_disable_raw(void) {
+    if (g_raw_active) {
+        tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_orig_termios);
+        g_raw_active = 0;
+    }
+}
+
+/* Largura do terminal em colunas. Fallback 80 se ioctl falhar. */
+int elliot_repl_term_width(void) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0)
+        return ws.ws_col;
+    return 80;
+}
+
+/* -------------------------------------------------------------------- */
+/* Leitura de tecla: lê 1 byte cru do stdin e, se for ESC, tenta         */
+/* reconhecer sequências de seta/home/end/delete. Retorna um dos         */
+/* códigos ELLIOT_KEY_* (definidos no .h) ou o próprio byte se for       */
+/* imprimível/controle simples.                                          */
+/* -------------------------------------------------------------------- */
+static int elliot_repl_read_byte(void) {
+    char c;
+    for (;;) {
+        ssize_t n = read(STDIN_FILENO, &c, 1);
+        if (n == 1) return (unsigned char)c;
+        if (n == 0) return -1; /* EOF real (pipe/arquivo fechado) */
+        if (n == -1 && errno != EAGAIN && errno != EINTR) return -1;
+        /* EAGAIN/EINTR: tenta de novo */
+    }
+}
+
+int elliot_repl_read_key(void) {
+    int c = elliot_repl_read_byte();
+    if (c < 0) return ELLIOT_KEY_EOF;
+    if (c != 27 /* ESC */) return c;
+
+    /* Pode ser um ESC "puro" (usuário apertou Esc) ou o início de uma
+     * sequência \x1b[... / \x1bO... — usamos VMIN=1/VTIME=0, então um
+     * read() aqui bloquearia esperando mais bytes se for ESC puro.
+     * Para não travar o programa esperando indefinidamente num ESC
+     * solitário, trocamos brevemente para VTIME>0 (timeout) só nesta
+     * leitura de desambiguação — técnica padrão (usada pelo kilo e por
+     * várias reimplementações de readline). */
+    struct termios cur, tmp;
+    tcgetattr(STDIN_FILENO, &cur);
+    tmp = cur;
+    tmp.c_cc[VMIN] = 0;
+    tmp.c_cc[VTIME] = 1; /* 100ms */
+    tcsetattr(STDIN_FILENO, TCSANOW, &tmp);
+
+    char seq[3] = {0, 0, 0};
+    ssize_t n1 = read(STDIN_FILENO, &seq[0], 1);
+    ssize_t n2 = (n1 == 1) ? read(STDIN_FILENO, &seq[1], 1) : 0;
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &cur); /* restaura modo normal (VMIN=1) */
+
+    if (n1 != 1) return ELLIOT_KEY_ESC;
+    if (n2 != 1) return ELLIOT_KEY_ESC;
+
+    if (seq[0] == '[') {
+        if (seq[1] >= '0' && seq[1] <= '9') {
+            /* sequência estendida tipo \x1b[3~ (Delete), \x1b[1;2A (shift+seta) */
+            char seq3;
+            if (read(STDIN_FILENO, &seq3, 1) != 1) return ELLIOT_KEY_ESC;
+            if (seq3 == '~') {
+                switch (seq[1]) {
+                    case '1': return ELLIOT_KEY_HOME;
+                    case '3': return ELLIOT_KEY_DELETE;
+                    case '4': return ELLIOT_KEY_END;
+                    default:  return ELLIOT_KEY_ESC;
+                }
+            }
+            /* \x1b[1;2A / \x1b[1;2B etc (shift+seta) — lê até a letra final
+             * e trata como a seta correspondente, ignorando o modificador. */
+            if (seq[1] == '1' && seq3 == ';') {
+                char mod, final;
+                if (read(STDIN_FILENO, &mod, 1) != 1) return ELLIOT_KEY_ESC;
+                if (read(STDIN_FILENO, &final, 1) != 1) return ELLIOT_KEY_ESC;
+                (void)mod;
+                switch (final) {
+                    case 'A': return ELLIOT_KEY_UP;
+                    case 'B': return ELLIOT_KEY_DOWN;
+                    case 'C': return ELLIOT_KEY_RIGHT;
+                    case 'D': return ELLIOT_KEY_LEFT;
+                    default:  return ELLIOT_KEY_ESC;
+                }
+            }
+            return ELLIOT_KEY_ESC;
+        }
+        switch (seq[1]) {
+            case 'A': return ELLIOT_KEY_UP;
+            case 'B': return ELLIOT_KEY_DOWN;
+            case 'C': return ELLIOT_KEY_RIGHT;
+            case 'D': return ELLIOT_KEY_LEFT;
+            case 'H': return ELLIOT_KEY_HOME;
+            case 'F': return ELLIOT_KEY_END;
+            default:  return ELLIOT_KEY_ESC;
+        }
+    }
+    if (seq[0] == 'O') {
+        switch (seq[1]) {
+            case 'H': return ELLIOT_KEY_HOME;
+            case 'F': return ELLIOT_KEY_END;
+            default:  return ELLIOT_KEY_ESC;
+        }
+    }
+    return ELLIOT_KEY_ESC;
+}
+
+/* -------------------------------------------------------------------- */
+/* Estado de uma sessão de edição de linha.                              */
+/* -------------------------------------------------------------------- */
+struct elliot_repl_state {
+    char   *buf;        /* texto da linha (sempre \0-terminado) */
+    size_t  buflen;     /* capacidade alocada de buf */
+    size_t  len;        /* comprimento atual do texto (sem contar \0) */
+    size_t  pos;        /* posição do cursor dentro de buf, em bytes */
+    const char *prompt; /* prompt fixo (ex.: "ms> ") */
+    int     pvis;       /* comprimento visual do prompt (calculado 1x) */
+    const struct elliot_repl_callbacks *cb;
+    void   *cb_ud;      /* userdata livre para os callbacks */
+
+    /* histórico: array de strings malloc'adas, mais índice de navegação */
+    char  **hist;
+    int     hist_len;
+    int     hist_cap;
+    int     hist_idx;      /* -1 = não navegando; senão índice em hist[] */
+    char   *hist_stash;    /* guarda a linha em edição ao começar a navegar */
+
+    /* Linhas de terminal ocupadas pelo último redraw — necessário para
+     * o wrap multi-linha de verdade (algoritmo linenoise): antes de
+     * redesenhar, precisamos saber quantas linhas subir para voltar ao
+     * início do prompt. Sempre recalculado do zero a cada chamada (não
+     * incremental), então nunca fica "sujo" entre chamadas. */
+    int     last_rows;
+    int     total_rows; /* linhas que o TEXTO INTEIRO ocupa (pode ser >
+                          * last_rows quando o cursor não está no fim) */
+};
+
+static void ensure_cap(elliot_repl_state *s, size_t need) {
+    if (need + 1 <= s->buflen) return;
+    size_t newcap = s->buflen ? s->buflen * 2 : 256;
+    while (newcap < need + 1) newcap *= 2;
+    s->buf = realloc(s->buf, newcap);
+    s->buflen = newcap;
+}
+
+/* Comprimento VISUAL de uma string que pode conter sequências de escape
+ * ANSI (\033[...m, que não ocupam coluna nenhuma) e caracteres UTF-8
+ * multi-byte (emoji, acentos — cada "code point" ocupa pelo menos 1
+ * coluna, não 1 por byte). Usado para calcular s->pvis corretamente
+ * quando o prompt tem cor e/ou emoji, em vez de assumir ingenuamente
+ * que strlen(prompt) == largura visual (que só é verdade para ASCII
+ * puro sem cor — a suposição antiga, que quebraria com emoji/cor).
+ *
+ * Emojis frequentes (variation selectors, ZWJ sequences, emojis de
+ * "largura dupla" no terminal) são um problema conhecidamente mal
+ * padronizado entre terminais — este cálculo cobre o caso comum (cada
+ * code point UTF-8 = 1 coluna), que é o que a maioria dos terminais
+ * Android/Termux faz na prática para emojis simples. Emojis compostos
+ * (ex.: família com ZWJ) podem contar errado por 1-2 colunas em alguns
+ * terminais — fora do escopo desta correção, mas não trava nem corrompe
+ * nada, só pode deixar o cursor 1-2 colunas fora do emoji em casos raros. */
+static int visual_width(const char *s) {
+    int width = 0;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        if (*p == 0x1b) { /* \033 — sequência de escape ANSI */
+            p++;
+            if (*p == '[') {
+                p++;
+                while (*p && *p != 'm') p++;
+                if (*p) p++;
+            }
+            continue;
+        }
+        /* Decodifica 1 code point UTF-8 e conta como 1 coluna —
+         * determina o comprimento em bytes pelo byte líder. */
+        int bytes;
+        if ((*p & 0x80) == 0x00) bytes = 1;       /* 0xxxxxxx: ASCII */
+        else if ((*p & 0xE0) == 0xC0) bytes = 2;  /* 110xxxxx */
+        else if ((*p & 0xF0) == 0xE0) bytes = 3;  /* 1110xxxx */
+        else if ((*p & 0xF8) == 0xF0) bytes = 4;  /* 11110xxx (emoji) */
+        else bytes = 1; /* byte de continuação solto/inválido: avança 1 */
+        p += bytes;
+        width++;
+    }
+    return width;
+}
+
+elliot_repl_state *elliot_repl_new(const char *prompt,
+                                    const struct elliot_repl_callbacks *cb,
+                                    void *cb_ud) {
+    elliot_repl_state *s = calloc(1, sizeof(*s));
+    s->buf = malloc(256);
+    s->buf[0] = '\0';
+    s->buflen = 256;
+    s->len = 0;
+    s->pos = 0;
+    s->prompt = prompt;
+    s->pvis = visual_width(prompt); /* conta cor ANSI como 0 e UTF-8 multi-byte como 1 coluna */
+    s->cb = cb;
+    s->cb_ud = cb_ud;
+    s->hist = NULL;
+    s->hist_len = 0;
+    s->hist_cap = 0;
+    s->hist_idx = -1;
+    s->hist_stash = NULL;
+    s->last_rows = 0;
+    s->total_rows = 1;
+    return s;
+}
+
+void elliot_repl_free(elliot_repl_state *s) {
+    if (!s) return;
+    free(s->buf);
+    free(s->hist_stash);
+    for (int i = 0; i < s->hist_len; i++) free(s->hist[i]);
+    free(s->hist);
+    free(s);
+}
+
+void elliot_repl_history_add(elliot_repl_state *s, const char *line) {
+    if (!line || !*line) return;
+    if (s->hist_len > 0 && strcmp(s->hist[s->hist_len - 1], line) == 0)
+        return; /* evita duplicata consecutiva, igual ao Readline/linenoise */
+    if (s->hist_len == s->hist_cap) {
+        s->hist_cap = s->hist_cap ? s->hist_cap * 2 : 64;
+        s->hist = realloc(s->hist, (size_t)s->hist_cap * sizeof(char *));
+    }
+    s->hist[s->hist_len++] = strdup(line);
+}
+
+/* -------------------------------------------------------------------- */
+/* Redesenho — o coração do motor. Sempre recalcula do zero (nenhum      */
+/* estado "anterior" é assumido confiável), sempre 1 único write().      */
+/* -------------------------------------------------------------------- */
+void elliot_repl_refresh_line(elliot_repl_state *s) {
+    int tw = elliot_repl_term_width();
+    if (tw < 1) tw = 80;
+
+    /* Coloriza a linha RAW inteira de uma vez — o buffer resultante tem
+     * sequências de escape ANSI intercaladas com o texto original, na
+     * MESMA ORDEM relativa (nenhum highlight reordena caracteres, só
+     * insere cores ao redor deles). Isso permite percorrer s->buf (raw,
+     * sem cores) e colored[] (com cores) EM PARALELO com dois índices,
+     * avançando os dois juntos a cada caractere real e só o de colored
+     * nas sequências de escape — assim toda a aritmética de "onde
+     * quebrar linha" e "onde fica o cursor" usa só s->buf (1 byte = 1
+     * coluna, sem ambiguidade nenhuma), e colored é usado só para saber
+     * O QUE escrever, nunca para decidir POSIÇÃO. */
+    char colored[16384];
+    int  clen;
+    if (s->cb && s->cb->colorize) {
+        clen = s->cb->colorize(s->buf, (int)s->len, colored, (int)sizeof(colored), s->cb_ud);
+    } else {
+        clen = (int)s->len;
+        if (clen > (int)sizeof(colored) - 1) clen = (int)sizeof(colored) - 1;
+        memcpy(colored, s->buf, (size_t)clen);
+    }
+
+    /* Linhas de terminal que o conteúdo todo ocupa (prompt + s->len
+     * colunas, já que 1 byte do buffer raw = 1 coluna sempre). */
+    int total_vis = s->pvis + (int)s->len;
+    int rows = (total_vis > 0) ? ((total_vis - 1) / tw + 1) : 1;
+
+    static char out[32768];
+    int olen = 0;
+#define OAPP(p, n) do { \
+    if (olen + (int)(n) < (int)sizeof(out)) { memcpy(out+olen, (p), (n)); olen += (int)(n); } \
+} while (0)
+#define OAPPSTR(str) OAPP((str), strlen(str))
+
+    /* 1) Sobe até a 1a linha visual (o redraw anterior sempre deixa o
+     * cursor físico na linha onde o CURSOR LÓGICO estava, não
+     * necessariamente a última linha do texto — por isso subimos pelo
+     * número de linhas que o CURSOR ocupava da vez passada, não pelo
+     * total de linhas do texto; ver o cálculo de last_cursor_row no
+     * final desta função). */
+    if (s->last_rows > 1) {
+        char esc[24];
+        int n = snprintf(esc, sizeof(esc), "\033[%dA", s->last_rows - 1);
+        OAPP(esc, (size_t)n);
+    }
+    out[olen++] = '\r';
+    OAPPSTR("\033[J"); /* limpa da posição atual até o fim da tela */
+
+    /* 2) Reescreve prompt + conteúdo, percorrendo s->buf e colored em
+     * paralelo. raw_i indexa s->buf (posição lógica, usada para achar
+     * onde o cursor cai); col_i indexa colored (o que escrever). */
+    OAPP(s->prompt, strlen(s->prompt)); /* bytes reais do prompt (inclui cor/UTF-8); pvis (colunas) só é usado para aritmética de wrap/cursor abaixo */
+    {
+        int col = s->pvis;      /* coluna visual atual na linha física */
+        int raw_i = 0;           /* índice no buffer RAW (s->buf) */
+        int col_i = 0;           /* índice no buffer COLORIZADO */
+        int cursor_row = 0, cursor_col = s->pvis; /* linha/coluna onde o CURSOR deve ficar */
+        int found_cursor = (s->pos == 0);
+        if (found_cursor) { cursor_row = 0; cursor_col = s->pvis; }
+
+        while (col_i < clen) {
+            if (colored[col_i] == '\033') {
+                /* sequência de escape: copia inteira, não avança raw_i
+                 * nem conta coluna (invisível no terminal) */
+                int start = col_i;
+                while (col_i < clen && colored[col_i] != 'm') col_i++;
+                if (col_i < clen) col_i++;
+                OAPP(colored + start, (size_t)(col_i - start));
+                continue;
+            }
+            /* caractere real: existe tanto em colored[col_i] quanto em
+             * s->buf[raw_i] (mesmo byte, já que highlight não reordena) */
+            OAPP(colored + col_i, 1);
+            col_i++;
+            raw_i++;
+            col++;
+
+            if (!found_cursor && raw_i == (int)s->pos) {
+                found_cursor = 1;
+                cursor_row = (col >= tw && raw_i < (int)s->len) ? -1 : -1; /* set below */
+                cursor_col = col;
+            }
+
+            if (col >= tw && col_i < clen) {
+                OAPPSTR("\r\n");
+                col = 0;
+                if (found_cursor && cursor_col == tw) {
+                    /* cursor caiu exatamente na borda onde acabamos de
+                     * quebrar: pertence à linha NOVA, coluna 0 */
+                    cursor_col = 0;
+                }
+            }
+        }
+        /* Recalcula cursor_row corretamente a partir da posição visual
+         * absoluta do cursor (mais simples e sem ambiguidade do que
+         * tentar contar durante o loop acima). */
+        int cursor_abs = s->pvis + (int)s->pos;
+        cursor_row = (cursor_abs > 0) ? ((cursor_abs) / tw) : 0;
+        cursor_col = cursor_abs - cursor_row * tw;
+        /* ajuste de borda: se a posição cai exatamente no múltiplo de
+         * tw E não é o fim do texto, ela pertence ao início da PRÓXIMA
+         * linha (coluna 0), não ao fim da linha anterior (coluna tw) */
+        if (cursor_col == 0 && cursor_row > 0 && (size_t)s->pos < s->len) {
+            /* já está correto (coluna 0 da linha seguinte) */
+        }
+
+        int end_abs = s->pvis + (int)s->len;
+        int end_row = (end_abs > 0) ? ((end_abs - 1) / tw) : 0;
+        s->total_rows = end_row + 1;
+
+        /* 3) Reposiciona: estamos no fim do texto (end_row); subimos/
+         * descemos até cursor_row e ajustamos coluna. */
+        if (end_row > cursor_row) {
+            char esc[24];
+            int n = snprintf(esc, sizeof(esc), "\033[%dA", end_row - cursor_row);
+            OAPP(esc, (size_t)n);
+        } else if (cursor_row > end_row) {
+            char esc[24];
+            int n = snprintf(esc, sizeof(esc), "\033[%dB", cursor_row - end_row);
+            OAPP(esc, (size_t)n);
+        }
+        out[olen++] = '\r';
+        if (cursor_col > 0) {
+            char esc[24];
+            int n = snprintf(esc, sizeof(esc), "\033[%dC", cursor_col);
+            OAPP(esc, (size_t)n);
+        }
+
+        /* Guarda quantas linhas o CURSOR ocupa a partir do topo (não o
+         * texto inteiro) — é a partir daqui que a próxima chamada vai
+         * subir, já que é onde o cursor físico fica ao final desta
+         * função. */
+        s->last_rows = cursor_row + 1;
+    }
+#undef OAPPSTR
+#undef OAPP
+
+    if (elliot_repl_debug_on()) {
+        ELLIOT_DBG("refresh: len=%zu pos=%zu tw=%d rows=%d last_rows=%d\n",
+                   s->len, s->pos, tw, rows, s->last_rows);
+    }
+    (void)rows;
+
+    write(STDOUT_FILENO, out, (size_t)olen);
+}
+
+/* -------------------------------------------------------------------- */
+/* Edição básica do buffer.                                              */
+/* -------------------------------------------------------------------- */
+static void insert_char(elliot_repl_state *s, char c) {
+    ensure_cap(s, s->len + 1);
+    memmove(s->buf + s->pos + 1, s->buf + s->pos, s->len - s->pos + 1);
+    s->buf[s->pos] = c;
+    s->len++;
+    s->pos++;
+}
+
+static void insert_text(elliot_repl_state *s, const char *txt, size_t n) {
+    ensure_cap(s, s->len + n);
+    memmove(s->buf + s->pos + n, s->buf + s->pos, s->len - s->pos + 1);
+    memcpy(s->buf + s->pos, txt, n);
+    s->len += n;
+    s->pos += n;
+}
+
+static void delete_at_cursor(elliot_repl_state *s) {
+    /* apaga o caractere à ESQUERDA do cursor (backspace) */
+    if (s->pos == 0) return;
+    memmove(s->buf + s->pos - 1, s->buf + s->pos, s->len - s->pos + 1);
+    s->pos--;
+    s->len--;
+}
+
+static void delete_forward(elliot_repl_state *s) {
+    /* apaga o caractere À DIREITA do cursor (Delete) */
+    if (s->pos >= s->len) return;
+    memmove(s->buf + s->pos, s->buf + s->pos + 1, s->len - s->pos);
+    s->len--;
+}
+
+static void load_history_entry(elliot_repl_state *s, const char *entry) {
+    size_t n = strlen(entry);
+    ensure_cap(s, n);
+    memcpy(s->buf, entry, n + 1);
+    s->len = n;
+    s->pos = n;
+}
+
+/* -------------------------------------------------------------------- */
+/* Loop principal: lê teclas até Enter (retorna a linha, malloc'ada) ou   */
+/* EOF/Ctrl+D em linha vazia (retorna NULL).                              */
+/* -------------------------------------------------------------------- */
+char *elliot_repl_read_line(elliot_repl_state *s) {
+    s->len = 0;
+    s->pos = 0;
+    s->buf[0] = '\0';
+    s->hist_idx = -1;
+    free(s->hist_stash);
+    s->hist_stash = NULL;
+    s->last_rows = 0;
+    s->total_rows = 1;
+
+    int raw_ok = (elliot_repl_enable_raw() == 0);
+
+    elliot_repl_refresh_line(s);
+
+    for (;;) {
+        int k = raw_ok ? elliot_repl_read_key() : elliot_repl_read_byte();
+
+        if (k == ELLIOT_KEY_EOF) {
+            if (s->len == 0) {
+                if (raw_ok) elliot_repl_disable_raw();
+                return NULL; /* Ctrl+D em linha vazia: EOF, sai do REPL */
+            }
+            continue;
+        }
+
+        if (k == '\r' || k == '\n') {
+            /* O cursor pode estar no MEIO do texto (não na última
+             * linha de wrap) — desce até a última linha do conteúdo
+             * antes do \r\n final, senão a próxima saída (ex.: "nil"
+             * do Lua) aparece grudada no meio de uma linha de wrap
+             * anterior, desalinhada. */
+            if (s->total_rows > s->last_rows) {
+                char esc[24];
+                int n = snprintf(esc, sizeof(esc), "\033[%dB", s->total_rows - s->last_rows);
+                write(STDOUT_FILENO, esc, (size_t)n);
+            }
+            write(STDOUT_FILENO, "\r\n", 2);
+            break;
+        }
+
+        if (k == 3 /* Ctrl+C, só chega aqui se ISIG estiver desligado —
+                     * não é o caso aqui, mas tratamos por segurança */) {
+            s->len = 0; s->pos = 0; s->buf[0] = '\0';
+            write(STDOUT_FILENO, "^C\n", 3);
+            elliot_repl_refresh_line(s);
+            continue;
+        }
+
+        if (k == 4 /* Ctrl+D com linha não-vazia: alguns terminais mandam
+                     * isso em vez de EOF real */ && s->len == 0) {
+            if (raw_ok) elliot_repl_disable_raw();
+            return NULL;
+        }
+
+        if (k == 127 || k == 8 /* Backspace (DEL ou BS, conforme terminal) */) {
+            /* on_pair_delete roda ANTES: precisa ver o buffer intacto
+             * para decidir se o caractere prestes a ser removido forma
+             * um par vazio com o que está à direita do cursor. */
+            if (s->cb && s->cb->on_pair_delete) s->cb->on_pair_delete(s, s->cb_ud);
+            delete_at_cursor(s);
+        }
+        else if (k == ELLIOT_KEY_DELETE) {
+            delete_forward(s);
+        }
+        else if (k == ELLIOT_KEY_LEFT) {
+            if (s->pos > 0) s->pos--;
+        }
+        else if (k == ELLIOT_KEY_RIGHT) {
+            if (s->pos < s->len) s->pos++;
+        }
+        else if (k == ELLIOT_KEY_HOME || k == 1 /* Ctrl+A */) {
+            s->pos = 0;
+        }
+        else if (k == ELLIOT_KEY_END || k == 5 /* Ctrl+E */) {
+            s->pos = s->len;
+        }
+        else if (k == ELLIOT_KEY_UP || k == 16 /* Ctrl+P */) {
+            if (s->hist_len > 0) {
+                if (s->hist_idx == -1) {
+                    free(s->hist_stash);
+                    s->hist_stash = strdup(s->buf);
+                    s->hist_idx = s->hist_len - 1;
+                    load_history_entry(s, s->hist[s->hist_idx]);
+                } else if (s->hist_idx > 0) {
+                    s->hist_idx--;
+                    load_history_entry(s, s->hist[s->hist_idx]);
+                }
+            }
+        }
+        else if (k == ELLIOT_KEY_DOWN || k == 14 /* Ctrl+N */) {
+            if (s->hist_idx != -1) {
+                if (s->hist_idx < s->hist_len - 1) {
+                    s->hist_idx++;
+                    load_history_entry(s, s->hist[s->hist_idx]);
+                } else {
+                    s->hist_idx = -1;
+                    load_history_entry(s, s->hist_stash ? s->hist_stash : "");
+                }
+            }
+        }
+        else if (k == 9 /* Tab: completion */) {
+            if (s->cb && s->cb->complete) {
+                s->cb->complete(s, s->cb_ud);
+                /* Se o completer imprimiu uma lista de opções (match
+                 * múltiplo), o cursor físico desceu várias linhas por
+                 * fora do controle do motor — zera last_rows para que
+                 * o próximo refresh_line trate a posição ATUAL (abaixo
+                 * da lista) como a nova base, em vez de tentar "subir"
+                 * de volta para onde o cursor estava antes do Tab
+                 * (que apagaria/bagunçaria a lista recém-impressa). */
+                s->last_rows = 0;
+            }
+        }
+        else if (k == 21 /* Ctrl+U: apaga a linha inteira */) {
+            s->len = 0; s->pos = 0; s->buf[0] = '\0';
+        }
+        else if (k == 11 /* Ctrl+K: apaga do cursor até o fim */) {
+            s->buf[s->pos] = '\0';
+            s->len = s->pos;
+        }
+        else if (k >= 32 && k < 127) {
+            /* caractere imprimível — insere e deixa o callback de
+             * auto-pair decidir se insere um par de fechamento junto */
+            insert_char(s, (char)k);
+            if (s->cb && s->cb->on_char_inserted)
+                s->cb->on_char_inserted(s, (char)k, s->cb_ud);
+        }
+        /* outros códigos de controle são ignorados silenciosamente */
+
+        elliot_repl_refresh_line(s);
+    }
+
+    if (raw_ok) elliot_repl_disable_raw();
+
+    char *result = malloc(s->len + 1);
+    memcpy(result, s->buf, s->len + 1);
+    return result;
+}
+
+/* API auxiliar para callbacks de completion/auto-pair mexerem no buffer
+ * sem precisar conhecer a struct por dentro (elliot_repl.h só expõe um
+ * ponteiro opaco). */
+const char *elliot_repl_get_buffer(elliot_repl_state *s) { return s->buf; }
+size_t elliot_repl_get_len(elliot_repl_state *s)          { return s->len; }
+size_t elliot_repl_get_pos(elliot_repl_state *s)          { return s->pos; }
+
+void elliot_repl_set_pos(elliot_repl_state *s, size_t pos) {
+    if (pos > s->len) pos = s->len;
+    s->pos = pos;
+}
+
+void elliot_repl_insert_text(elliot_repl_state *s, const char *txt) {
+    insert_text(s, txt, strlen(txt));
+}
+
+void elliot_repl_delete_char_at(elliot_repl_state *s, size_t at) {
+    if (at >= s->len) return;
+    memmove(s->buf + at, s->buf + at + 1, s->len - at); /* inclui o \0 */
+    s->len--;
+    if (at < s->pos) s->pos--;
+}
+
+void elliot_repl_replace_word(elliot_repl_state *s, size_t word_start, const char *replacement) {
+    if (word_start > s->pos) return;
+    size_t oldn = s->pos - word_start;
+    size_t newn = strlen(replacement);
+    ensure_cap(s, s->len - oldn + newn);
+    memmove(s->buf + word_start + newn, s->buf + word_start + oldn,
+            s->len - (word_start + oldn) + 1);
+    memcpy(s->buf + word_start, replacement, newn);
+    s->len = s->len - oldn + newn;
+    s->pos = word_start + newn;
+}
+
+/* ==================== elliot_highlight.c ==================== */
+/* ==========================================================================
+ * elliot_highlight.c — Colorização de sintaxe Lua para o REPL.
+ * ==========================================================================
+ * Lógica de tokenização PORTADA (não reescrita) do hook antigo que rodava
+ * em cima do GNU Readline — só a "casca" mudou (agora é uma função pura,
+ * chamada pelo motor novo via o callback `colorize`), a lógica de token
+ * por token continua igual, incluindo tokens: keywords Lua (azul),
+ * trif/try* (ciano), strings (verde), números (amarelo), comentários
+ * (cinza), @std/@user (magenta), módulo.método (azul claro), operadores
+ * (amarelo), default (branco).
+ *
+ * Diferença importante em relação à versão antiga: como o motor novo já
+ * recorta a JANELA visível (scroll horizontal) antes de chamar esta
+ * função, aqui só colorizamos o texto que já chega — não precisamos mais
+ * calcular "posição visual do cursor dentro do highlight" (isso agora é
+ * responsabilidade só do motor central, em elliot_repl.c). Isso elimina
+ * boa parte da complexidade que existia na versão antiga.
+ * ========================================================================== */
+
+
+#define SHC_RESET "\x1b[0m"
+#define SHC_KW    "\x1b[1;34m"
+#define SHC_TRY   "\x1b[1;36m"
+#define SHC_STR   "\x1b[0;32m"
+#define SHC_NUM   "\x1b[0;33m"
+#define SHC_CMT   "\x1b[2;90m"
+#define SHC_OP    "\x1b[0;33m"
+#define SHC_MOD   "\x1b[0;35m"
+#define SHC_FUNC  "\x1b[0;96m"
+#define SHC_DFLT  "\x1b[0;37m"
+
+static const char *sh_lua_kw[] = {
+    "and","break","do","else","elseif","end","false","for",
+    "function","goto","if","in","local","nil","not","or",
+    "repeat","return","then","true","until","while",NULL
+};
+static const char *sh_try_kw[] = {
+    "trif","tryelse","tryelseif","tryend",NULL
+};
+
+static int sh_kw_match(const char *s, int len, const char **kws) {
+    for (int i = 0; kws[i]; i++) {
+        int kl = (int)strlen(kws[i]);
+        if (kl == len && memcmp(s, kws[i], kl) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Símbolos de libnet.c usados para verificar se um identificador é um
+ * módulo/função REAL conhecido, antes de colori-lo como tal — sem
+ * isso, qualquer palavra seguida de "." ou "(" ficava azul mesmo sendo
+ * inexistente (ex.: "tht." ficava colorido como se fosse um módulo
+ * válido, só por ter um "." depois). */
+extern char *G_lua[];
+extern int   G_lua_count;
+extern void  lua_scan(void);
+extern int   is_module_name(const char *word, size_t wlen);
+
+/* Verifica se src[0..wlen) é EXATAMENTE um nome conhecido em G_lua
+ * (função, módulo, ou "modulo.metodo" completo) — usado para decidir
+ * se um identificador antes de "(" é uma chamada de função real.
+ * sh_known_exact compara o nome puro; sh_known_prefix (usada para o
+ * caso "nome." sem parênteses ainda) reaproveita is_module_name, que já
+ * varre G_lua procurando entradas que comecem com "nome.". */
+static int sh_known_exact(const char *word, int wlen) {
+    for (int i = 0; i < G_lua_count; i++) {
+        const char *entry = G_lua[i];
+        int elen = (int)strlen(entry);
+        /* entradas de função em G_lua terminam em "(" (ex.: "print(")
+         * — compara ignorando esse sufixo quando presente. */
+        if (elen > 0 && entry[elen - 1] == '(') elen--;
+        if (elen == wlen && memcmp(entry, word, (size_t)wlen) == 0) return 1;
+    }
+    return 0;
+}
+
+/* Coloriza src[0..slen) para out (capacidade outmax). Retorna o
+ * comprimento escrito em out (sem contar o \0 final, que também é
+ * escrito por segurança, mas não contado no retorno). */
+int elliot_hl_colorize(const char *src, int slen, char *out, int outmax) {
+    int i = 0, o = 0;
+    const char *cur_col = "";
+
+#define SH_COL(col) do { \
+    if (strcmp(cur_col, (col)) != 0) { \
+        int _cl = (int)strlen(col); \
+        if (o+_cl < outmax) { memcpy(out+o, col, _cl); o += _cl; } \
+        cur_col = (col); \
+    } \
+} while(0)
+#define SH_CH(c) do { if (o < outmax-1) out[o++] = (c); } while(0)
+#define SH_BLK(s,l) do { int _l=(l); if(o+_l<outmax){memcpy(out+o,s,_l);o+=_l;} } while(0)
+
+    while (i < slen) {
+        char c = src[i];
+        /* comentario -- */
+        if (c == '-' && i+1 < slen && src[i+1] == '-') {
+            SH_COL(SHC_CMT);
+            while (i < slen) { SH_CH(src[i]); i++; }
+            break;
+        }
+        /* string */
+        if (c == '"' || c == '\'') {
+            char q = c; SH_COL(SHC_STR); SH_CH(src[i]); i++;
+            while (i < slen) {
+                char d = src[i]; SH_CH(d); i++;
+                if (d == '\\' && i < slen) { SH_CH(src[i]); i++; continue; }
+                if (d == q) break;
+            }
+            cur_col = ""; continue;
+        }
+        /* @std/... @user/... */
+        if (c == '@') {
+            SH_COL(SHC_MOD);
+            while (i < slen && (isalnum((unsigned char)src[i]) ||
+                   src[i]=='@'||src[i]=='/'||src[i]=='_'||src[i]=='.')) {
+                SH_CH(src[i]); i++;
+            }
+            cur_col = ""; continue;
+        }
+        /* numero */
+        if (isdigit((unsigned char)c) ||
+            (c=='.' && i+1<slen && isdigit((unsigned char)src[i+1]))) {
+            SH_COL(SHC_NUM);
+            while (i < slen && (isalnum((unsigned char)src[i]) ||
+                   src[i]=='.'||src[i]=='x'||src[i]=='X')) {
+                SH_CH(src[i]); i++;
+            }
+            cur_col = ""; continue;
+        }
+        /* identificador / keyword */
+        if (isalpha((unsigned char)c) || c == '_') {
+            int start = i;
+            while (i < slen && (isalnum((unsigned char)src[i]) || src[i]=='_')) i++;
+            int wlen = i - start;
+
+            /* Só considera "chamada/módulo real" se o identificador
+             * EXISTIR de verdade — antes, qualquer nome seguido de "."
+             * ou "(" ficava azul mesmo inexistente (ex.: "tht." virava
+             * azul só por ter o ponto, sem "tht" ser um módulo real).
+             * lua_scan() atualiza G_lua a cada chamada (já é chamado
+             * normalmente pelo autocomplete; aqui garante que está
+             * atualizado mesmo se highlight rodar antes de qualquer
+             * Tab ter sido apertado na sessão). */
+            lua_scan();
+            int next_is_dot_or_paren = (i < slen && (src[i]=='.'||src[i]=='('));
+            int is_call = 0;
+            if (next_is_dot_or_paren) {
+                if (sh_known_exact(src+start, wlen)) {
+                    is_call = 1; /* "print(" , "pairs(" etc — nome exato conhecido */
+                } else if (src[i]=='.' && is_module_name(src+start, (size_t)wlen)) {
+                    is_call = 1; /* "string." — prefixo de módulo real (tem entradas "string.algo" em G_lua) */
+                }
+                /* senão: nome desconhecido seguido de "." ou "(" — cor
+                 * padrão, não azul (é o caso do "tht." do exemplo) */
+            }
+
+            if      (sh_kw_match(src+start, wlen, sh_try_kw)) SH_COL(SHC_TRY);
+            else if (sh_kw_match(src+start, wlen, sh_lua_kw)) SH_COL(SHC_KW);
+            else if (is_call)                                   SH_COL(SHC_FUNC);
+            else                                                SH_COL(SHC_DFLT);
+            for (int j = start; j < i; j++) SH_CH(src[j]);
+            cur_col = ""; continue;
+        }
+        /* operadores */
+        if (c != ' ' && c != '\t' && strchr("+-*/%^#&|~<>=(){}[];:,.", c)) {
+            SH_COL(SHC_OP); SH_CH(src[i]); i++;
+            cur_col = ""; continue;
+        }
+        /* espaco / outros */
+        SH_COL(SHC_DFLT); SH_CH(src[i]); i++;
+    }
+    SH_BLK(SHC_RESET, (int)strlen(SHC_RESET));
+    if (o < outmax) out[o] = '\0';
+    return o;
+#undef SH_COL
+#undef SH_CH
+#undef SH_BLK
+}
+
+/* ==================== elliot_autopair.c ==================== */
+/* ==========================================================================
+ * elliot_autopair.c — Auto-fechamento de (), [], {}, "", ''
+ * ==========================================================================
+ * Lógica portada do hook antigo (elliot_ap_*), adaptada à API do motor
+ * novo. Comportamento idêntico ao anterior: ao digitar um caractere de
+ * abertura, insere automaticamente o par de fechamento e deixa o cursor
+ * entre os dois. Ao apertar backspace logo após um par vazio recém-
+ * inserido (ex.: "()" com o cursor entre eles), remove os dois de uma
+ * vez, para não deixar um "(" ou ")" sozinho penduns — comportamento
+ * comum em editores modernos (VSCode, etc.), que o hook antigo não tinha
+ * implementado explicitamente mas é o esperado por quem já usa esse tipo
+ * de recurso.
+ * ========================================================================== */
+
+
+static char closing_for(char open) {
+    switch (open) {
+        case '(': return ')';
+        case '[': return ']';
+        case '{': return '}';
+        case '"': return '"';
+        case '\'': return '\'';
+        default: return 0;
+    }
+}
+
+/* Callback on_char_inserted: chamado logo depois que `c` já foi inserido
+ * no buffer (cursor já avançou 1 posição, para depois de `c`). Se `c` é
+ * um caractere de abertura, insere o par de fechamento e recua o cursor
+ * para ficar entre os dois. */
+void elliot_ap_on_char_inserted(elliot_repl_state *s, char c, void *ud) {
+    (void)ud;
+    char close = closing_for(c);
+    if (!close) return;
+
+    /* Para aspas, só faz auto-pair se o caractere JÁ ESTIVER seguido de
+     * nada (fim da linha) ou espaço/pontuação — evita fechar aspas no
+     * meio de uma palavra ao digitar um apóstrofo dentro de texto, por
+     * exemplo. Parênteses/colchetes/chaves sempre fazem auto-pair. */
+    size_t pos = elliot_repl_get_pos(s);
+    size_t len = elliot_repl_get_len(s);
+    if ((c == '"' || c == '\'') && pos < len) {
+        char next = elliot_repl_get_buffer(s)[pos];
+        if (next != ' ' && next != '\t' && next != ')' && next != ']' &&
+            next != '}' && next != ',' && next != '\0') {
+            return; /* não faz auto-pair no meio de uma palavra */
+        }
+    }
+
+    char closestr[2] = { close, 0 };
+    elliot_repl_insert_text(s, closestr);
+    elliot_repl_set_pos(s, pos); /* recua o cursor para ENTRE os dois */
+}
+
+/* Callback on_pair_delete: chamado ANTES do backspace remover o
+ * caractere à esquerda do cursor (diferente da versão anterior, que
+ * rodava depois — tarde demais para saber com certeza qual caractere
+ * tinha acabado de sair). Aqui, com o buffer ainda intacto, verificamos
+ * se buf[pos-1] (o que está prestes a ser apagado) é uma abertura e
+ * buf[pos] (logo à direita, inalterado) é o fechamento correspondente
+ * — ou seja, um par vazio "()" com o cursor entre eles. Se for o caso,
+ * removemos o fechamento também, ANTES do motor central remover a
+ * abertura — assim cada remoção mexe só no que já sabe que precisa
+ * remover, sem depender de reconstituir o que "já foi apagado". */
+void elliot_ap_on_pair_delete(elliot_repl_state *s, void *ud) {
+    (void)ud;
+    size_t pos = elliot_repl_get_pos(s);
+    size_t len = elliot_repl_get_len(s);
+    if (pos == 0 || pos >= len) return;
+
+    const char *buf = elliot_repl_get_buffer(s);
+    char about_to_be_deleted = buf[pos - 1];
+    char right_after         = buf[pos];
+    char expected_close = closing_for(about_to_be_deleted);
+    if (expected_close && right_after == expected_close) {
+        /* Remove o fechamento (posição `pos`, ainda não afetada pelo
+         * backspace que vai rodar em seguida). O backspace do motor
+         * central remove `pos-1` normalmente logo depois. */
+        elliot_repl_delete_char_at(s, pos);
+    }
+}
+
+/* ==================== elliot_complete.c ==================== */
+/* ==========================================================================
+ * elliot_complete.c — Autocomplete (Tab) para o REPL.
+ * ==========================================================================
+ * A LÓGICA de matching (varrer _G via lua_scan, detectar require(...),
+ * @user/..., prefixo de módulo com ".", keywords Lua) é a mesma de
+ * antes — só a "casca" mudou: em vez da API state-based do GNU Readline
+ * (elliot_completer chamado repetidamente com state=0,1,2...), aqui
+ * geramos todos os matches de uma vez num array, o que é mais simples de
+ * integrar com o motor novo e mais fácil de testar (dá pra chamar a
+ * função e conferir o array inteiro, sem simular múltiplas chamadas).
+ *
+ * elliot_ac_get_matches() por si só depende de funções que já existem em
+ * libnet.o (lua_scan, G_lua, G_dyn, G_user_files, req_mods, dyn_load,
+ * user_files_scan, parse_require_hints, is_module_name) — este arquivo
+ * só orquestra a ordem de busca, replicando exatamente a prioridade que
+ * o completer antigo usava: require(...) > @user/ > prefixo.método >
+ * snapshot de _G > keywords > hints de módulo > libs em disco.
+ * ========================================================================== */
+
+
+/* Símbolos vindos de libnet.c (definidos lá, linkados junto no mesmo
+ * binário — ver seção de build). */
+extern char *G_lua[];
+extern int   G_lua_count;
+extern void  lua_scan(void);
+extern int   is_module_name(const char *word, size_t wlen);
+extern int   elliot_repl_term_width(void); /* definido em elliot_repl.c — usado para alinhar a grade de matches do Tab */
+
+extern char *G_dyn[];
+extern int   G_dyn_count;
+extern void  dyn_load(void);
+
+extern char *G_user_files[];
+extern int   G_user_files_count;
+extern void  user_files_scan(const char *prefix);
+
+extern void  parse_require_hints(const char *line);
+extern char *G_hints[];
+extern int   G_hints_count;
+
+static const char *req_mods_list[] = {
+    "@std/net","@std/fs","@std/json","@std/http","@std/sys",
+    "@std/time","@std/crypto","@std/db","@std/web",
+    "string","table","math","os","io","coroutine","utf8",
+    NULL
+};
+
+#define AC_MAX_MATCHES 512
+
+/* Encontra o início da "palavra atual" no buffer, olhando para trás a
+ * partir do cursor — mesmos caracteres de quebra de palavra que o
+ * Readline usava (rl_completer_word_break_characters), MENOS "@" e "/"
+ * (de propósito, para "@user/caminho" chegar inteiro como uma palavra
+ * só, igual ao comportamento antigo). */
+static size_t word_start_at_cursor(const char *buf, size_t pos) {
+    static const char *breakers = " \t\n\"'`;|&(=+*[]{}\\<>";
+    size_t start = pos;
+    while (start > 0) {
+        char c = buf[start - 1];
+        if (strchr(breakers, c)) break;
+        start--;
+    }
+    return start;
+}
+
+/* Preenche `matches` (capacidade max_matches) com os candidatos para
+ * `text` (a palavra atual, já isolada) e retorna quantos foram
+ * encontrados. Cada string retornada é malloc'ada (chamador libera). */
+static int ac_collect(const char *text, const char *full_line, size_t cursor_pos,
+                       char **matches, int max_matches) {
+    int n = 0;
+    size_t tlen = strlen(text);
+
+#define AC_ADD(s) do { \
+    if (n < max_matches && strncmp((s), text, tlen) == 0) matches[n++] = strdup(s); \
+} while (0)
+
+    /* ── Detecta require("... ── */
+    const char *rq = strstr(full_line, "require(");
+    int require_mode = 0;
+    if (rq) {
+        const char *q = rq + 8;
+        if (*q == '"' || *q == '\'') q++;
+        if ((size_t)(q - full_line) <= cursor_pos) {
+            require_mode = 1;
+            if (strncmp(text, "@user", 5) == 0) {
+                const char *sfx = text + 5;
+                if (*sfx == '/') sfx++;
+                user_files_scan(sfx);
+                require_mode = 2;
+            } else {
+                dyn_load();
+                parse_require_hints(full_line);
+            }
+        }
+    }
+
+    if (require_mode == 2) {
+        for (int i = 0; i < G_user_files_count && n < max_matches; i++)
+            matches[n++] = strdup(G_user_files[i]);
+        return n;
+    }
+    if (require_mode == 1) {
+        for (int i = 0; req_mods_list[i] && n < max_matches; i++) AC_ADD(req_mods_list[i]);
+        for (int i = 0; i < G_dyn_count && n < max_matches; i++) AC_ADD(G_dyn[i]);
+        return n;
+    }
+
+    /* ── prefixo de módulo (texto contém ".") ── */
+    char prefix[128] = {0};
+    const char *dot = strrchr(text, '.');
+    if (dot && dot > text) {
+        size_t plen = (size_t)(dot - text) + 1;
+        if (plen < sizeof(prefix)) { memcpy(prefix, text, plen); prefix[plen] = '\0'; }
+    }
+
+    lua_scan(); /* snapshot adaptativo de _G, igual ao comportamento antigo */
+
+    /* 1. snapshot de _G */
+    for (int i = 0; i < G_lua_count && n < max_matches; i++) {
+        const char *c = G_lua[i];
+        if (strncmp(c, text, tlen) != 0) continue;
+        if (prefix[0] && strncmp(c, prefix, strlen(prefix)) != 0) continue;
+        if (prefix[0] && strcmp(c, prefix) == 0) continue;
+        matches[n++] = strdup(c);
+    }
+
+    /* 2. keywords Lua */
+    {
+        static const char *KW[] = {
+            "repeat","until","while","for","do","end","then","else","elseif",
+            "local","function","return","break","goto","in",
+            "nil","true","false","not","and","or", NULL
+        };
+        for (int i = 0; KW[i] && n < max_matches; i++) AC_ADD(KW[i]);
+    }
+
+    /* 3. hints de require() já digitado na linha */
+    parse_require_hints(full_line);
+    for (int i = 0; i < G_hints_count && n < max_matches; i++) AC_ADD(G_hints[i]);
+
+    /* 4. libs em disco (só sem prefixo de módulo) */
+    if (!prefix[0]) {
+        for (int i = 0; i < G_dyn_count && n < max_matches; i++) AC_ADD(G_dyn[i]);
+    }
+
+#undef AC_ADD
+    return n;
+}
+
+/* Maior prefixo comum entre os matches — mesmo papel que o Readline
+ * calculava sozinho internamente; agora fazemos explicitamente. */
+static void common_prefix(char **matches, int n, char *out, size_t outcap) {
+    if (n == 0) { out[0] = '\0'; return; }
+    size_t maxlen = strlen(matches[0]);
+    if (maxlen >= outcap) maxlen = outcap - 1;
+    memcpy(out, matches[0], maxlen);
+    out[maxlen] = '\0';
+    for (int i = 1; i < n; i++) {
+        size_t j = 0;
+        while (out[j] && matches[i][j] == out[j]) j++;
+        out[j] = '\0';
+    }
+}
+
+/* Callback `complete` do motor: chamado quando o usuário aperta Tab. */
+void elliot_ac_complete(elliot_repl_state *s, void *ud) {
+    (void)ud;
+    const char *buf = elliot_repl_get_buffer(s);
+    size_t pos = elliot_repl_get_pos(s);
+    size_t wstart = word_start_at_cursor(buf, pos);
+
+    char text[256];
+    size_t tlen = pos - wstart;
+    if (tlen >= sizeof(text)) tlen = sizeof(text) - 1;
+    memcpy(text, buf + wstart, tlen);
+    text[tlen] = '\0';
+
+    /* Detecção antecipada de módulo: se `text` (sem ponto) já é um
+     * módulo conhecido (tem entries "text.algo" em G_lua), insere "."
+     * antes de coletar — igual ao comportamento antigo, para o prefixo
+     * comum já sair calculado como "modulo." em vez de "modulo". */
+    if (!strchr(text, '.')) {
+        lua_scan();
+        if (tlen > 0 && is_module_name(text, tlen)) {
+            elliot_repl_insert_text(s, ".");
+            text[tlen] = '.'; text[tlen+1] = '\0'; tlen++;
+            pos = elliot_repl_get_pos(s);
+            wstart = pos - tlen;
+        }
+    }
+
+    char *matches[AC_MAX_MATCHES];
+    int n = ac_collect(text, buf, pos, matches, AC_MAX_MATCHES);
+
+    if (n == 0) return;
+
+    if (n == 1) {
+        /* Match único: completa direto. Se termina em "(", o auto-pair
+         * (on_char_inserted não dispara aqui pois inserimos via
+         * replace_word, não via digitação) precisa ser replicado
+         * manualmente: inserimos o "(" já com o ")" correspondente. */
+        size_t mlen = strlen(matches[0]);
+        if (mlen > 0 && matches[0][mlen - 1] == '(') {
+            char base[256];
+            size_t blen = mlen - 1;
+            if (blen >= sizeof(base)) blen = sizeof(base) - 1;
+            memcpy(base, matches[0], blen);
+            base[blen] = '\0';
+
+            if (strcmp(base, "require") == 0) {
+                /* require(_) -> require("|") com aspas já inseridas,
+                 * igual ao comportamento antigo (g_require_pair). */
+                char full[300];
+                snprintf(full, sizeof(full), "%s(\"\")", base);
+                elliot_repl_replace_word(s, wstart, full);
+                elliot_repl_set_pos(s, wstart + blen + 2); /* entre as aspas */
+            } else {
+                char full[300];
+                snprintf(full, sizeof(full), "%s()", base);
+                elliot_repl_replace_word(s, wstart, full);
+                elliot_repl_set_pos(s, wstart + blen + 1); /* entre os parenteses */
+            }
+        } else {
+            elliot_repl_replace_word(s, wstart, matches[0]);
+        }
+        free(matches[0]);
+        return;
+    }
+
+    /* Múltiplos matches: completa até o maior prefixo comum (se maior
+     * que o texto já digitado) e lista as opções abaixo da linha —
+     * mesmo comportamento clássico de Tab-completion. */
+    char cp[256];
+    common_prefix(matches, n, cp, sizeof(cp));
+    if (strlen(cp) > tlen) {
+        elliot_repl_replace_word(s, wstart, cp);
+    }
+
+    /* Imprime a lista de matches numa grade. Calcula a largura de
+     * coluna a partir do MAIOR nome real entre os matches (em vez de
+     * um valor fixo de 20) e quantas colunas cabem na largura real do
+     * terminal — nomes mais longos que o valor fixo anterior
+     * (ex.: "string.removeprefix(", 21 caracteres) empurravam a
+     * coluna seguinte e, sem \r entre linhas, produziam o efeito de
+     * desalinhamento em cascata visto na prática. Cada \n agora vem
+     * acompanhado de \r (volta à coluna 0) pelo mesmo motivo já
+     * corrigido no tratamento do Enter: nosso motor nunca deixa o
+     * terminal decidir a posição do cursor sozinho. */
+    int maxw = 0;
+    for (int i = 0; i < n; i++) {
+        int l = (int)strlen(matches[i]);
+        if (l > maxw) maxw = l;
+    }
+    int colw = maxw + 2; /* 2 espaços de respiro entre colunas */
+    int tw = elliot_repl_term_width();
+    if (tw < 1) tw = 80;
+    int cols = tw / colw;
+    if (cols < 1) cols = 1;
+
+    printf("\r\n");
+    for (int i = 0; i < n; i++) {
+        printf("%-*s", colw, matches[i]);
+        if ((i + 1) % cols == 0) printf("\r\n");
+    }
+    if (n % cols != 0) printf("\r\n");
+    fflush(stdout);
+
+    for (int i = 0; i < n; i++) free(matches[i]);
+}
+
+/* ==================== elliot_history.c ==================== */
+/* ==========================================================================
+ * elliot_history.c — Histórico persistente do REPL.
+ * ==========================================================================
+ * Versão bem mais simples que a antiga: a versão anterior usava dlopen/
+ * dlsym para chamar add_history() do GNU Readline por fora, contornando
+ * um conflito de símbolos entre nossa própria add_history() (usada para
+ * também logar num arquivo) e a do Readline. Como este motor novo não usa
+ * Readline, essa complicação desaparece por completo — o histórico vive
+ * só no array elliot_repl_state->hist (gerenciado por elliot_repl.c), e
+ * este arquivo só lê/escreve o arquivo em disco.
+ * ========================================================================== */
+
+
+#define ELLIOT_HIST_MAX 2000
+
+static void hist_path(char *out, size_t outcap) {
+    const char *home = getenv("HOME");
+    if (!home) home = "/data/data/com.termux/files/home";
+    snprintf(out, outcap, "%s/.elliot_history", home);
+}
+
+/* Carrega o arquivo de histórico para dentro da sessão (chamado uma vez,
+ * ao iniciar o REPL). Mantém só as últimas ELLIOT_HIST_MAX linhas, igual
+ * ao comportamento antigo (stifle_history). */
+void elliot_hist_load(elliot_repl_state *s) {
+    char path[512];
+    hist_path(path, sizeof(path));
+
+    FILE *f = fopen(path, "r");
+    if (!f) return;
+
+    int total = 0;
+    char buf[4098];
+    while (fgets(buf, sizeof(buf), f)) total++;
+
+    int skip = (total > ELLIOT_HIST_MAX) ? (total - ELLIOT_HIST_MAX) : 0;
+    rewind(f);
+    int n = 0;
+    while (fgets(buf, sizeof(buf), f)) {
+        if (n++ < skip) continue;
+        size_t l = strlen(buf);
+        if (l > 0 && buf[l - 1] == '\n') buf[l - 1] = '\0';
+        if (buf[0]) elliot_repl_history_add(s, buf);
+    }
+    fclose(f);
+}
+
+/* Acrescenta 1 linha ao arquivo em disco (chamado a cada Enter, além de
+ * elliot_repl_history_add, que só guarda em memória para a sessão). Evita
+ * duplicata consecutiva, igual ao comportamento antigo. */
+void elliot_hist_append_file(const char *line) {
+    if (!line || !*line) return;
+
+    static char last[4096];
+    if (strncmp(last, line, sizeof(last) - 1) == 0) return;
+    strncpy(last, line, sizeof(last) - 1);
+    last[sizeof(last) - 1] = '\0';
+
+    char path[512];
+    hist_path(path, sizeof(path));
+    FILE *f = fopen(path, "a");
+    if (!f) return;
+    fprintf(f, "%s\n", line);
+    fclose(f);
+}
+
+/* ==================== elliot_repl_main.c ==================== */
+/* ==========================================================================
+ * elliot_repl_main.c — Ponto de integração do novo motor com o Lua.
+ * ==========================================================================
+ * Substitui por completo a função pushline() do lua.c original (que
+ * chamava GNU Readline). Esta versão nunca toca em nenhuma API do
+ * Readline — cria uma sessão do nosso motor (elliot_repl.c) uma vez,
+ * conecta todos os callbacks (highlight, completion, auto-pair) e usa
+ * elliot_repl_read_line() em loop.
+ *
+ * Mantém o mesmo contrato que pushline() original tinha com o resto do
+ * lua.c: recebe o nível de aninhamento (para prompt secundário, se
+ * algum dia precisarmos de multiline de novo — hoje não usamos, scroll
+ * horizontal resolve isso) e retorna 1 se leu uma linha (deixando o
+ * texto em *out, malloc'ado) ou 0 em EOF.
+ * ========================================================================== */
+
+
+extern char *elliot_ivar_preprocess_block(const char *code);
+extern int   elliot_rl_interactive; /* mantido pelo resto do código que já lê essa flag */
+
+int  elliot_hl_colorize(const char *src, int slen, char *out, int outmax);
+void elliot_ac_complete(elliot_repl_state *s, void *ud);
+void elliot_ap_on_char_inserted(elliot_repl_state *s, char c, void *ud);
+void elliot_ap_on_pair_delete(elliot_repl_state *s, void *ud);
+void elliot_hist_load(elliot_repl_state *s);
+void elliot_hist_append_file(const char *line);
+
+static int colorize_adapter(const char *src, int srclen, char *out, int outmax, void *ud) {
+    (void)ud;
+    return elliot_hl_colorize(src, srclen, out, outmax);
+}
+
+static elliot_repl_state *g_repl = NULL;
+
+/* Chamada uma vez, na inicialização (substitui elliot_readline_init() +
+ * hl2_init() + rl_bind_keyseq(...) de completion/histórico de antes). */
+void elliot_repl_engine_init(void) {
+    static struct elliot_repl_callbacks cb;
+    cb.colorize         = colorize_adapter;
+    cb.complete          = elliot_ac_complete;
+    cb.on_char_inserted  = elliot_ap_on_char_inserted;
+    cb.on_pair_delete    = elliot_ap_on_pair_delete;
+
+    g_repl = elliot_repl_new(
+        "\033[1;36mLua\033[0m@\033[1;35mElliotOS\033[0m \033[1;33m➜\033[0m ",
+        &cb, NULL);
+    elliot_hist_load(g_repl);
+    elliot_rl_interactive = 1;
+}
+
+/* Substitui pushline() por completo. `firstline` indica se é o início
+ * de um novo comando (sempre 1 agora — não há mais prompt secundário de
+ * continuação multiline, já que optamos por scroll horizontal em vez de
+ * wrap; se um dia quisermos trazer de volta multiline de verdade, é
+ * aqui que entraria a lógica de decidir o prompt "...>" em vez de
+ * "ms> "). Retorna a linha (malloc'ada, já pré-processada por
+ * elliot_ivar_preprocess_block) em *out, ou NULL em EOF. */
+char *elliot_repl_engine_readline(int firstline) {
+    (void)firstline;
+    if (!g_repl) elliot_repl_engine_init();
+
+    char *raw = elliot_repl_read_line(g_repl);
+    if (!raw) return NULL; /* EOF (Ctrl+D) */
+
+    if (*raw) {
+        elliot_repl_history_add(g_repl, raw);
+        elliot_hist_append_file(raw);
+    }
+
+    /* Mesmo pré-processamento que já rodava antes (patch corrigido no
+     * início desta sessão de trabalho): normaliza blocos trif/try*
+     * antes do Lua tentar compilar a linha. */
+    char *processed = elliot_ivar_preprocess_block(raw);
+    if (processed) {
+        free(raw);
+        return processed;
+    }
+    return raw;
+}
+
+void elliot_repl_engine_shutdown(void) {
+    if (g_repl) { elliot_repl_free(g_repl); g_repl = NULL; }
+}
+
+ENGINE_EOF
+
     cat > libnet.c << 'LIBNET_EOF'
 #include "lua.h"
 #include "lauxlib.h"
@@ -28332,6 +29795,7 @@ PLEOF
 #include <time.h>
 #include <errno.h>
 #include <termios.h>
+#include <sys/ioctl.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdatomic.h>
@@ -35710,6 +37174,71 @@ static int l_lg(lua_State *L) {
     (void)L;
     _elliot_print_logo();
     return 0;
+}
+
+/* _elliot_print_repl_banner — banner exibido ao entrar no REPL (ms) */
+void _elliot_print_repl_banner(lua_State *L) {
+    const char *P = "\033[1;35m";
+    const char *Y = "\033[1;33m";
+    const char *C = "\033[1;36m";
+    const char *G = "\033[0;90m";
+    const char *W = "\033[1;37m";
+    const char *R = "\033[0m";
+    const char *B = "\033[1;34m";
+
+    _elliot_print_logo();
+    printf("  %s Lua 5.4.8%s  •  %sElliotOS v17.0%s  •  %sTermux / Linux%s\n",
+           C, G, W, G, P, R);
+    printf("  %s╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌%s\n", G, R);
+    printf("  %slg%s          logo          %ssys.info()%s   sistema\n",   Y,G,Y,R);
+    printf("  %shelp%s        ajuda         %smod.list()%s   módulos\n",   Y,G,Y,R);
+    printf("  %sai.chat()%s   IA            %snet.get()%s    HTTP\n",     Y,G,Y,R);
+    printf("  %spent.run()%s  pentest       %sfs.read()%s    arquivo\n",  Y,G,Y,R);
+    printf("  %s╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌%s\n", G, R);
+    printf("  %s \xe2\x84\xb9" "  Os m\xc3\xb3" "dulos n\xc3\xa3" "o s\xc3\xa3" "o globais \xe2\x80\x94" " use require(\"@std/nome\") para m\xc3\xb3" "dulos do sistema\n     ou require(\"@user/nome\") para m\xc3\xb3" "dulos personalizados.%s\n", C, R);
+
+    /* dicas rotativas baseadas no tempo (muda a cada sessão) */
+    static const char *tips[][3] = {
+        { "net", "net.get(url)",            "faz um GET HTTP e retorna o body" },
+        { "net", "net.dns(host)",           "resolve DNS de um domínio" },
+        { "net", "net.scan(ip, ports)",     "escaneia portas TCP" },
+        { "fs",  "fs.read(path)",           "lê arquivo como string" },
+        { "fs",  "fs.write(path, data)",    "escreve string em arquivo" },
+        { "fs",  "fs.ls(dir)",              "lista diretório" },
+        { "sys", "sys.sh(cmd)",             "executa comando shell" },
+        { "sys", "sys.env(var)",            "lê variável de ambiente" },
+        { "sys", "sys.sleep(n)",            "pausa N segundos" },
+        { "ai",  "ai.ask(prompt)",          "pergunta à IA" },
+        { "ai",  "ai.chat()",               "abre chat interativo com IA" },
+        { "ai",  "ai.code(prompt)",         "gera código com IA" },
+        { "mod", "mod.xss(url)",            "testa XSS em URL" },
+        { "mod", "mod.sqli(url)",           "testa SQL injection" },
+        { "mod", "mod.recon(domain)",       "reconhecimento de domínio" },
+        { "mod", "mod.fuzz(url)",           "fuzz de parâmetros" },
+        { "crypto", "crypto.md5(s)",        "hash MD5 de string" },
+        { "crypto", "crypto.sha256(s)",     "hash SHA-256 de string" },
+        { "crypto", "crypto.rand(n)",       "gera N bytes aleatórios" },
+        { "db",  "db.open(path)",           "abre banco SQLite" },
+        { "json","json.encode(t)",          "tabela → JSON string" },
+        { "json","json.decode(s)",          "JSON string → tabela" },
+        { "str", "str.split(s, sep)",       "divide string por separador" },
+        { "str", "str.trim(s)",             "remove espaços das bordas" },
+        { "ms",  "ms.b64.enc(s)",           "codifica string em base64" },
+        { "ms",  "ms.b64.dec(s)",           "decodifica base64" },
+        { "tui", "tui.menu(opts)",          "exibe menu interativo" },
+        { "pent","pent.run(target)",        "executa suite de pentest" },
+        { "web", "web.serve(port, handler)","sobe servidor HTTP" },
+        { "cc",  "cc.compile(code)",        "compila C em tempo real" },
+    };
+    int ntips = (int)(sizeof(tips)/sizeof(tips[0]));
+    /* usa tempo atual como seed para variar a cada sessão */
+    int idx = (int)(time(NULL) / 60) % ntips;  /* muda a cada minuto */
+    printf("  %s💡 Dica:%s %s%s%s  %s%s%s\n",
+           Y, R,
+           B, tips[idx][1], R,
+           G, tips[idx][2], R);
+    printf("  %s╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌%s\n\n", G, R);
+    fflush(stdout);
 }
 
 /* ic() — exibe o logo PNG do ElliotOS via timg */
@@ -78481,8 +80010,8 @@ static const char *G_completions[] = {
 
 /* ── Pool de libs instaladas (disco) ─────────────────────────────── */
 #define DYN_MAX 512
-static char *G_dyn[DYN_MAX];
-static int   G_dyn_count  = 0;
+char *G_dyn[DYN_MAX];
+int   G_dyn_count  = 0;
 static int   G_dyn_loaded = 0;
 
 static void dyn_free(void) {
@@ -78512,7 +80041,7 @@ static void dyn_scan(const char *dirpath) {
     closedir(d);
 }
 
-static void dyn_load(void) {
+void dyn_load(void) {
     if(G_dyn_loaded) return;
     G_dyn_loaded=1;
     const char *home=getenv("HOME");
@@ -78532,8 +80061,8 @@ static void dyn_load(void) {
 
 /* ── Pool de arquivos @user/ (arquivos .lua do home) ────────────── */
 #define USER_FILE_MAX 256
-static char *G_user_files[USER_FILE_MAX];
-static int   G_user_files_count = 0;
+char *G_user_files[USER_FILE_MAX];
+int   G_user_files_count = 0;
 static char  G_user_files_dir[512] = {0};  /* diretório escaneado */
 
 static void user_files_free(void) {
@@ -78583,7 +80112,7 @@ static void user_resolve_path(const char *base, const char *rel, char *out, size
 /* Escaneia diretório por arquivos .lua não ocultos.
  * text = texto completo após a aspa: ex "@user/../files/meu"
  *        Tudo após "@user/" é o path relativo ao HOME. */
-static void user_files_scan(const char *suffix) {
+void user_files_scan(const char *suffix) {
     const char *home = getenv("HOME");
     if(!home) return;
 
@@ -78653,8 +80182,8 @@ static void user_files_scan(const char *suffix) {
 
 /* ── Pool Lua adaptativo (snapshot de _G) ────────────────────────── */
 #define LUA_COMPL_MAX 2048
-static char *G_lua[LUA_COMPL_MAX];
-static int   G_lua_count = 0;
+char *G_lua[LUA_COMPL_MAX];
+int   G_lua_count = 0;
 
 static void lua_compl_free(void) {
     for(int i=0;i<G_lua_count;i++){free(G_lua[i]);G_lua[i]=NULL;}
@@ -78715,7 +80244,7 @@ static void lua_scan_table(lua_State *L, const char *prefix) {
  * Chamado a cada Tab (state==0) — rápido porque _G tem ≤ alguns centenas
  * de entradas no REPL típico.
  */
-static void lua_scan(void) {
+void lua_scan(void) {
     lua_State *L = _elliot_L;
     if(!L) return;
 
@@ -78805,8 +80334,8 @@ static const ElliotModHint G_mod_hints[] = {
 /* Pool de hints ativos (quando módulo foi detectado no require mas L ainda
  * não tem a tabela — ex: primeira instalação) */
 #define HINT_MAX 256
-static char *G_hints[HINT_MAX];
-static int   G_hints_count=0;
+char *G_hints[HINT_MAX];
+int   G_hints_count=0;
 
 static void hints_free(void){
     for(int i=0;i<G_hints_count;i++){free(G_hints[i]);G_hints[i]=NULL;}
@@ -78828,7 +80357,7 @@ static void hints_for_mod(const char *modname) {
 }
 
 /* Detecta require("...") na linha atual e extrai nome do módulo */
-static void parse_require_hints(const char *line) {
+void parse_require_hints(const char *line) {
     hints_free();
     if(!line) return;
     const char *p = line;
@@ -79047,7 +80576,7 @@ static int elliot_event_hook(void) {
 /* Retorna 1 se TODOS os matches (exceto [0]=prefixo comum) começam com pfx */
 /* Verifica antecipadamente se 'word' é um módulo (tabela Lua com métodos)
  * consultando G_lua: retorna 1 se existir entry "word.algo" no pool */
-static int is_module_name(const char *word, size_t wlen) {
+int is_module_name(const char *word, size_t wlen) {
     char dot_pfx[260];
     if (wlen + 2 >= sizeof(dot_pfx)) return 0;
     memcpy(dot_pfx, word, wlen);
@@ -79367,6 +80896,14 @@ static int hl2_colorize(const char *src, int slen, char *out, int outmax) {
 
 static int  hl2_cached_pvis = -1;    /* cache do comprimento visual do prompt */
 static char hl2_out[20480];           /* buffer de saída único — evita múltiplas syscalls */
+static int  hl2_last_wrapped_rows = 0; /* linhas de terminal ocupadas na última chamada */
+
+/* Largura do terminal (colunas). Fallback 80 se ioctl falhar. */
+static int hl2_term_width(void) {
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) return ws.ws_col;
+    return 80;
+}
 
 static int hl2_event_hook(void) {
     if (!hl2_active || !elliot_rl_interactive) return 0;
@@ -79389,28 +80926,55 @@ static int hl2_event_hook(void) {
     hl2_last_buf[cur_len] = '\0';
     hl2_last_point = cur_point;
 
-    /* Linha vazia: apaga colorização anterior e sai */
-    if (cur_len == 0) return 0;
+    /* Linha vazia: apaga colorização anterior, reativa o hook para a
+     * próxima linha (caso tenha sido desativado por wrap) e sai. */
+    if (cur_len == 0) {
+        hl2_last_wrapped_rows = 0;
+        if (hl2_active && rl_event_hook != hl2_event_hook) rl_event_hook = hl2_event_hook;
+        return 0;
+    }
 
     /* Comprimento visual do prompt — calcula uma vez, depois usa cache */
     if (hl2_cached_pvis < 0)
         hl2_cached_pvis = sh_prompt_last_line_len(rl_prompt ? rl_prompt : "");
     int pvis = hl2_cached_pvis;
 
-    /* Gera buffer colorizado */
-    int clen = hl2_colorize(rl_line_buffer, cur_len, hl2_colored, (int)sizeof(hl2_colored));
-    if (clen <= 0) return 0;
+    int tw = hl2_term_width();
+    if (tw < 1) tw = 80;
+
+    /* Se prompt+linha excede a largura do terminal, a linha vai dar
+     * wrap de verdade (comportamento padrão desejado, igual Python).
+     * Nosso redraw manual via write() bruto nunca atualiza o estado
+     * interno do readline (_rl_last_c_pos etc.), então na TRANSIÇÃO
+     * entre "cabia em 1 linha" (redraw manual) e "excede" (redraw
+     * nativo) o readline usa uma posição de cursor desatualizada e
+     * desenha por cima sem limpar — o "clone fantasma". A única forma
+     * segura de evitar isso é parar de chamar nosso hook por completo
+     * assim que a linha ultrapassar a largura, devolvendo o controle
+     * 100% ao redisplay nativo do readline (que nunca mais vai ler um
+     * estado que nós escrevemos por fora dele). Ele volta a ser
+     * chamado só quando a linha for zerada (Enter / Ctrl+U), acima. */
+    int total_vis_now = pvis + cur_len;
+    if (total_vis_now > tw) {
+        rl_event_hook = NULL;
+        rl_forced_update_display();
+        return 0;
+    }
 
     /* Calcula posição visual do cursor (bytes visíveis até cur_point) */
     int vis_cur = cur_point;   /* sem escapes no buffer bruto: 1 byte = 1 coluna */
 
-    /* Monta tudo num único buffer e faz write() atômico:
+    /* Gera buffer colorizado */
+    int clen = hl2_colorize(rl_line_buffer, cur_len, hl2_colored, (int)sizeof(hl2_colored));
+    if (clen <= 0) return 0;
+
+    /* Monta tudo num único buffer e faz write() atômico — só usado
+     * quando cabe em 1 linha física de terminal:
      *   \r            — início da linha
      *   \033[<pvis>C  — avança sobre o prompt
-     *   \033[K        — apaga até fim
+     *   \033[K        — apaga até fim da linha
      *   <colorizado>  — conteúdo com cores
-     *   \r            — volta ao início
-     *   \033[<col>C   — reposiciona cursor */
+     *   reposiciona cursor */
     char   esc[32];
     int    olen = 0;
 #define HL_APPEND(s, n) do { if (olen+(n) < (int)sizeof(hl2_out)) { memcpy(hl2_out+olen,(s),(n)); olen+=(n); } } while(0)
@@ -79439,8 +81003,110 @@ static void hl2_init(void) {
     memset(hl2_last_buf, 0, sizeof(hl2_last_buf));
     hl2_last_point = -1;
     hl2_cached_pvis = -1;   /* recalcula pvis na próxima chamada */
+    hl2_last_wrapped_rows = 0;
     hl2_active = 1;
     rl_event_hook = hl2_event_hook;
+}
+
+/* elliot_rl_warmup: consome, silenciosamente, a 1a chamada de readline()
+ * — a única que nasce com condições diferentes das chamadas seguintes,
+ * causando o "clone fantasma" só no 1o prompt visível. Em vez de tentar
+ * adivinhar e corrigir a causa exata, simplesmente absorvemos essa 1a
+ * chamada inteira (incluindo o highlight rodando de verdade sobre texto
+ * digitado) numa chamada de readline() extra, escondida do usuário via
+ * DEC save/restore cursor + clear-to-end-of-screen. O 1o readline() que
+ * o usuário efetivamente vê passa a ser, na prática, o 2o. */
+/* elliot_rl_warmup: o 1o readline() da sessão nasce em condições
+ * diferentes das seguintes. Tentativas anteriores de simular a
+ * digitação via rl_getc_function funcionavam, mas o próprio
+ * readline() BLOQUEIA num select()/poll() de baixo nível esperando o
+ * terminal reportar dado disponível — só "acordava" quando o usuário
+ * apertava uma tecla real. Mexer diretamente em rl_line_buffer/rl_end
+ * fora de uma sessão de readline() ativa (tentativa anterior) é
+ * inseguro: essas variáveis são gerenciadas internamente pelo
+ * readline com malloc/realloc próprios, e sobrescrevê-las por fora
+ * pode corromper estado ou travar a próxima chamada real.
+ *
+ * A forma segura de fazer o readline() de warmup "acordar" sozinho,
+ * sem esperar uma tecla real do usuário, é injetar um byte real no
+ * buffer de entrada do terminal via ioctl(TIOCSTI) — isso insere o
+ * caractere como se tivesse sido digitado no terminal (TTY), fazendo
+ * o select()/poll() interno do readline detectar dado disponível
+ * imediatamente, sem esperar você tocar em nada. */
+static const char *g_warmup_feed = NULL;
+static int elliot_warmup_getc(FILE *stream) {
+    (void)stream;
+    if (g_warmup_feed && *g_warmup_feed) return (unsigned char)*g_warmup_feed++;
+    return '\r';
+}
+
+void elliot_rl_warmup(void) {
+    elliot_rl_interactive = 1;
+    hl2_active = 1;
+
+    /* Redireciona o descritor real de stdout para /dev/null durante
+     * toda a chamada — cobre o prompt "ms> ", o highlight (que
+     * escreve via write(STDOUT_FILENO,...), ignorando rl_outstream)
+     * e qualquer newline que o Enter simulado gere. */
+    int saved_fd = dup(STDOUT_FILENO);
+    int devnull_fd = open("/dev/null", O_WRONLY);
+    if (saved_fd >= 0 && devnull_fd >= 0) dup2(devnull_fd, STDOUT_FILENO);
+
+    rl_getc_func_t *old_getc = rl_getc_function;
+    rl_getc_function = elliot_warmup_getc;
+
+    int tw = hl2_term_width();
+    if (tw < 1) tw = 80;
+    static char pad[256];
+    int padlen = tw + 10;
+    if (padlen > (int)sizeof(pad) - 1) padlen = sizeof(pad) - 1;
+    memset(pad, 'x', (size_t)padlen);
+    pad[padlen] = '\0';
+
+    /* 1a chamada: simula, TECLA POR TECLA (via rl_getc_function, que
+     * deixa o ciclo natural do readline processar cada caractere com
+     * seu próprio redisplay incremental automático — diferente de
+     * inserir tudo de uma vez), uma linha mais longa que a largura do
+     * terminal. Isso força a linha a dar wrap de verdade, através do
+     * readline nativo, pela 1a vez na sessão — escondido (stdout
+     * redirecionado) — em vez de ser a 1a vez que o usuário mesmo
+     * digita algo longo, que é exatamente quando o clone aparecia. */
+    rl_reset_line_state();
+    g_warmup_feed = pad;
+    char *w1 = readline("ms> ");
+    if (w1) free(w1);
+    rl_reset_line_state();
+
+    /* 2a chamada: "nil" de verdade, cujo resultado será executado no
+     * Lua ao final — sessão nova de readline(), já depois do wrap
+     * "gasto" acima. */
+    g_warmup_feed = "nil";
+    char *w = readline("ms> ");
+    rl_reset_line_state();
+
+    rl_getc_function = old_getc;
+    g_warmup_feed = NULL;
+
+    if (saved_fd >= 0) { dup2(saved_fd, STDOUT_FILENO); close(saved_fd); }
+    if (devnull_fd >= 0) close(devnull_fd);
+
+    /* Executa "nil" de verdade no estado Lua real, sem imprimir nada —
+     * o pedido é totalmente invisível, sem print do resultado. */
+    if (w) {
+        if (*w && _elliot_L) {
+            lua_settop(_elliot_L, 0);
+            luaL_loadstring(_elliot_L, "return nil");
+            lua_pcall(_elliot_L, 0, LUA_MULTRET, 0);
+            lua_settop(_elliot_L, 0);
+        }
+        free(w);
+    }
+
+    /* Estado 100% limpo para o 1o prompt que o usuário realmente vê. */
+    hl2_cached_pvis = -1;
+    hl2_last_buf[0] = '\0';
+    hl2_last_point = -1;
+    hl2_last_wrapped_rows = 0;
 }
 
 #define ELLIOT_HIST_MAX  2000
@@ -79622,6 +81288,7 @@ static void ehist_load(void) {
     }
     fclose(f);
 }
+
 
 
 // ============================================================================
@@ -95682,7 +97349,7 @@ static void elliot_load_prelude(lua_State *L) {
 "    db=true, mod=true, ms=true, ui=true, tui=true, web=true,\n"
 "    pent=true, exploit=true, lmod=true, agent=true, adb=true,\n"
 "    util=true, json=true, re=true, cc=true, ivar=true,\n"
-"    dow=true, back=true, str=true,\n"
+"    dow=true, back=true, str=true, lx=true,\n"
 "    log=true, csv=true, num=true, color=true, test=true, try=true,\n"
 "  }\n"
 "  local _orig_require = require\n"
@@ -95707,6 +97374,33 @@ static void elliot_load_prelude(lua_State *L) {
 "      for p in std_path:gmatch(\"[^/]+\") do parts[#parts+1]=p end\n"
 "      local _std = _G._elliot_std\n"
 "      local m = _std and _std[parts[1]]\n"
+"      -- fallback: tenta carregar do disco (ex: lx instalado via lpm)\n"
+"      if m == nil then\n"
+"        local home   = os.getenv(\"HOME\") or \".\"\n"
+"        local prefix = os.getenv(\"PREFIX\") or \"/data/data/com.termux/files/usr\"\n"
+"        local mod    = parts[1]\n"
+"        local paths  = {\n"
+"          home   .. \"/.lua-modules/\"              .. mod .. \".lua\",\n"
+"          home   .. \"/.luarocks/share/lua/5.4/\"   .. mod .. \".lua\",\n"
+"          prefix .. \"/share/lua/5.4/\"             .. mod .. \".lua\",\n"
+"        }\n"
+"        for _, p in ipairs(paths) do\n"
+"          local fh = io.open(p, \"r\")\n"
+"          if fh then\n"
+"            local src = fh:read(\"*a\"); fh:close()\n"
+"            local chunk, err = load(src, \"@\"..p)\n"
+"            if chunk then\n"
+"              local ok2, result = pcall(chunk)\n"
+"              if ok2 then\n"
+"                m = result\n"
+"                if not _G._elliot_std then _G._elliot_std = {} end\n"
+"                _G._elliot_std[mod] = m\n"
+"                break\n"
+"              end\n"
+"            end\n"
+"          end\n"
+"        end\n"
+"      end\n"
 "      if m == nil then\n"
 "        error(\"[ElliotOS] @std/\"..parts[1]..\": modulo nao encontrado\", 2)\n"
 "      end\n"
@@ -95720,14 +97414,26 @@ static void elliot_load_prelude(lua_State *L) {
 "        end\n"
 "        m = nxt\n"
 "      end\n"
+"      -- auto-importa nome curto em _G\n"
+"      local _short = parts[#parts]\n"
+"      if rawget(_G, _short) == nil then _G[_short] = m end\n"
 "      return m\n"
 "    end\n"
 "    local user_path = name:match(\"^@user/(.+)$\")\n"
 "    if user_path then\n"
 "      local home = os.getenv(\"HOME\") or \".\"\n"
 "      local rel  = user_path:gsub(\"%.lua$\", \"\")\n"
-"      local abs_path = home .. \"/\" .. rel .. \".lua\"\n"
-"      local f = io.open(abs_path, \"r\")\n"
+"      -- busca em ordem: ~/.lua-modules/, ~/.luarocks/share/lua/5.4/, ~/\n"
+"      local candidates = {\n"
+"        home .. \"/.lua-modules/\" .. rel .. \".lua\",\n"
+"        home .. \"/.luarocks/share/lua/5.4/\" .. rel .. \".lua\",\n"
+"        home .. \"/\" .. rel .. \".lua\",\n"
+"      }\n"
+"      local abs_path, f\n"
+"      for _, p in ipairs(candidates) do\n"
+"        local fh = io.open(p, \"r\")\n"
+"        if fh then abs_path = p; f = fh; break end\n"
+"      end\n"
 "      if not f then\n"
 "        error(\"[ElliotOS] @user/\" .. user_path .. \": arquivo não encontrado\", 2)\n"
 "      end\n"
@@ -95745,11 +97451,63 @@ static void elliot_load_prelude(lua_State *L) {
 "      if not ok2 then\n"
 "        error(\"[ElliotOS] @user/\" .. user_path .. \": \" .. tostring(result), 2)\n"
 "      end\n"
+"      -- auto-importa nome curto em _G\n"
+"      local _s = user_path:match(\"([^/]+)$\"):gsub(\"%.lua$\",\"\")\n"
+"      if rawget(_G, _s) == nil then _G[_s] = result end\n"
 "      return result\n"
 "    end\n"
 "    return _orig_require(name)\n"
 "  end\n"
 "end\n"
+"-- AUTO COMPLETE ADAPTATIVO: atualiza cache sempre que um módulo é carregado\n"
+"do\n"
+"  local _req_wrapped = require\n"
+"  function require(name)\n"
+"    local ok, result = pcall(_req_wrapped, name)\n"
+"    if ok then\n"
+"      -- dispara lua_scan em background via arquivo de sinal\n"
+"      -- o REPL lê ~/.elliot_ac_dirty e chama lua_scan no próximo Tab\n"
+"      local h = os.getenv('HOME')\n"
+"      if h then\n"
+"        local f = io.open(h .. '/.elliot_ac_dirty', 'w')\n"
+"        if f then f:write('1'); f:close() end\n"
+"      end\n"
+"      return result\n"
+"    else\n"
+"      error(result, 2)\n"
+"    end\n"
+"  end\n"
+"end\n"
+"-- Autocall: help e clear sem () no REPL\n"
+"do\n"
+"  local _rh = help\n"
+"  local _rc = clear\n"
+"  if type(_rh) == 'function' then\n"
+"    help = setmetatable({}, {\n"
+"      __call = function(_, t)\n"
+"        if t ~= nil then\n"
+"          os.execute('ms --doc '..tostring(t)..' 2>/dev/null||true')\n"
+"        else\n"
+"          _rh()\n"
+"          io.write([[\n  Dica: use help('modulo') p/ ver doc de um modulo\n]])\n"
+"        end\n"
+"      end,\n"
+"      __tostring = function() _rh(); io.write([[\n  Dica: help('lx'), help('net')...\n]]); return '' end,\n"
+"    })\n"
+"  end\n"
+"  if type(_rc) == 'function' then\n"
+"    clear = setmetatable({}, {\n"
+"      __call = function() _rc() end,\n"
+"      __tostring = function() _rc(); return '' end,\n"
+"    })\n"
+"    cls = clear\n"
+"  end\n"
+"end\n"
+
+/* ElliotOS: prompt do REPL */
+"local _ESC = string.char(27)\n"
+"_PROMPT  = 'ms> '\n"
+"_PROMPT2 = '  > '\n"
 
     );  /* fim luaL_dostring -- ELLIOT PRELUDE */
     if (_prelude_rc != LUA_OK) {
@@ -98179,7 +99937,6 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L, l_back_impl);
     lua_setglobal(L, "back");
 
-    /* ── Histórico persistente v3: add_history override em libnet.o ── */
 
     /* ── Variáveis indexadas (experimental) ── */
     elliot_ivar_init(L);
@@ -98219,6 +99976,37 @@ int luaopen_net(lua_State *L) {
     lua_pushcfunction(L,l_adb_setup);          lua_setfield(L,-2,"setup");
     lua_pushcfunction(L,l_adb_help);      lua_setfield(L,-2,"help");
     elliot_std_set(L,"adb");
+
+    /* ── lx — GUI de alto nível: configura cpath e carrega lx.lua do disco ── */
+    {
+        /* Adiciona PREFIX/lib/lua/5.4 ao package.cpath para o lgi funcionar */
+        const char *prefix = getenv("PREFIX");
+        if (!prefix) prefix = "/data/data/com.termux/files/usr";
+        const char *home = getenv("HOME");
+        if (!home) home = "/data/data/com.termux/files/home";
+        char lua_setup[4096];
+        snprintf(lua_setup, sizeof(lua_setup),
+            "pcall(function()\n"
+            "  local prefix = '%s'\n"
+            "  local home   = '%s'\n"
+            "  -- Adiciona dirs do lgi ao package.cpath\n"
+            "  local extra_c = prefix..'/lib/lua/5.4/?.so;'\n"
+            "               .. prefix..'/lib/lua/5.4/?/?.so;'\n"
+            "  if not package.cpath:find(extra_c, 1, true) then\n"
+            "    package.cpath = extra_c .. package.cpath\n"
+            "  end\n"
+            "  -- Adiciona dirs do lx ao package.path para require('lx') funcionar\n"
+            "  local extra_p = home..'/.lua-modules/?.lua;'\n"
+            "               .. home..'/.luarocks/share/lua/5.4/?.lua;'\n"
+            "               .. prefix..'/share/lua/5.4/?.lua;'\n"
+            "  if not package.path:find(home..'/.lua-modules', 1, true) then\n"
+            "    package.path = extra_p .. package.path\n"
+            "  end\n"
+            "end)\n",
+            prefix, home
+        );
+        luaL_dostring(L, lua_setup);
+    }
 
     /* ── help global: help / help("topico") → ms --doc [topico] ── */
     {
@@ -101016,58 +102804,84 @@ LIBNET_EOF
             print
             print "  luaopen_net(L);  /* ElliotOS: carrega módulos + prelude */"
             print "  _elliot_L = L; /* ElliotOS: salva L para print_version */"
-            print "  if (lua_stdin_is_tty()) { elliot_readline_init(); luaL_dostring(L, \"if type(lg)=='function' then lg() end\"); }"
+            print "  if (lua_stdin_is_tty()) { extern void elliot_repl_engine_init(void); elliot_repl_engine_init(); luaL_dostring(L, \"if type(lg)=='function' then lg() end\"); }"
+            print "  { int _es=0,_ei; for(_ei=1;_ei<argc;_ei++){if(argv[_ei]&&argv[_ei][0]!=45){_es=1;break;}} if(lua_stdin_is_tty()&&!_es){extern void _elliot_print_repl_banner(lua_State *L);_elliot_print_repl_banner(L);} }"
+            print "  /* ElliotOS: se rodando como warm-up do editor ee, popula cache de autocomplete */"
+            print "  if (getenv(\"ELLIOT_AC_WARMUP\")) {"
+            print "    /* executa o -e já agendado pelo lua.c, depois dispara lua_scan */"
+            print "    /* lua_scan() é chamado via atexit para garantir que roda após luaL_dostring do -e */"
+            print "    extern void lua_scan(void);"
+            print "    atexit(lua_scan);"
+            print "  }"
             next
         } {print}' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
     fi
 
-    # ── Patch ivar: pré-processa !N no REPL e em luaL_loadbuffer ────────────
-    # Injeta hook elliot_ivar_preprocess_block() no caminho que executa código:
-    # loadline() chama luaL_loadbuffer — patchamos para pré-processar a linha.
-    # Patcha lua.c: injeta ivar_preprocess_block() em pushline()
-    # pushline() é a função do Lua 5.4 que empurra a linha lida pro buffer.
-    # Interceptamos ali pra pré-processar !N antes de qualquer parsing.
-    # Guard usa elliot_ivar_preprocess_block(b) — específico do hook em pushline,
-    # não confunde com o extern já adicionado pelo patch anterior.
-    # Nota: [[:space:]]* cobre o espaço antes do ( em "pushline (lua_State *L ...)"
-    if ! grep -q "elliot_ivar_preprocess_block(b)" lua.c 2>/dev/null; then
-        # Dentro de pushline(): após obter a linha (lua_readline ou readline),
-        # pré-processa o buffer antes de qualquer parsing Lua.
+    # ── Substitui pushline() por completo: motor de REPL próprio ───────────
+    # Não usamos mais GNU Readline para ler/editar a linha do REPL. Em vez
+    # de patchar pushline() com hooks incrementais (abordagem antiga, que
+    # teve um bug visual intermitente nunca totalmente resolvido), agora a
+    # função inteira é substituída por uma chamada ao motor novo
+    # (elliot_repl_engine_readline, em elliot_repl_main.c), que já devolve
+    # a linha PRONTA (histórico salvo, pré-processada por
+    # elliot_ivar_preprocess_block). pushline() original só empurrava b
+    # para a pilha Lua e retornava 1/0 — replicamos exatamente esse
+    # contrato, então o resto do lua.c (loadline/multiline/doREPL) nem
+    # percebe a troca.
+    if ! grep -q "elliot_repl_engine_readline" lua.c 2>/dev/null; then
         awk '
-        /^static int pushline[[:space:]]*\(/ { in_fn=1 }
-        in_fn && /lua_readline/ {
-            print "  /* ElliotOS: sinaliza que o REPL interativo esta ativo */"
+        /^static int pushline[[:space:]]*\(/ {
+            print "static int pushline (lua_State *L, int firstline) {"
+            print "  extern char *elliot_repl_engine_readline(int firstline);"
             print "  elliot_rl_interactive = 1;"
-            print $0
+            print "  char *b = elliot_repl_engine_readline(firstline);"
+            print "  if (b == NULL) return 0;  /* EOF (Ctrl+D) */"
+            print "  lua_pushstring(L, b);"
+            print "  free(b);"
+            print "  return 1;"
+            print "}"
+            # Começa a consumir (sem imprimir) o corpo da função ORIGINAL,
+            # contando chaves JÁ a partir desta própria linha da
+            # assinatura (ela contém o "{" de abertura, que precisa ser
+            # contado — senão o primeiro "}" interno, de um if/while
+            # qualquer, zera a contagem prematuramente e deixa código
+            # órfão sobrando, como um bug real encontrado ao testar isto
+            # isoladamente contra uma função de exemplo).
+            in_fn=1; brace=0
+            line=$0
+            n=gsub(/\{/,"{",line); brace+=n
+            n=gsub(/\}/,"}",line); brace-=n
             next
         }
-        in_fn && /lua_saveline/ {
-            print $0
-
-            print "  /* ElliotOS ivar: pre-processa !N e intercepta :help/help */"
-            print "  if (b) { char *_p = elliot_ivar_preprocess_block(b);"
-            print "    if (_p) {"
-            print "      size_t _n = strlen(_p);"
-            print "      size_t _orig = strlen(b);"
-            print "      if (_n <= _orig) {"
-            print "        memcpy(b, _p, _n); b[_n] = 0;"
-            print "      } else {"
-            print "        /* linha expandida maior: substitui ponteiro (b e malloc do readline) */"
-            print "        char *_nb = (char*)realloc(b, _n + 2);"
-            print "        if (_nb) { memcpy(_nb, _p, _n); _nb[_n] = 0; b = _nb; }"
-            print "        else { memcpy(b, _p, _orig); b[_orig] = 0; }"
-            print "      }"
-            print "      free(_p); } }"
+        in_fn {
+            line=$0
+            n=gsub(/\{/,"{",line); brace+=n
+            n=gsub(/\}/,"}",line); brace-=n
+            if (brace <= 0) { in_fn=0 }
             next
         }
-        in_fn && /^\}/ { in_fn=0 }
         { print }
         ' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
     fi
 
 
+
+    # ── Silencia mensagem de copyright do Lua no REPL (ElliotOS tem banner próprio) ──
+    if ! grep -q 'elliot_noop_print_version' lua.c 2>/dev/null; then
+        awk '/^static void print_version \(void\) \{/ {
+            print "static void print_version (void) { /* ElliotOS: silenciado */ }"
+            in_fn=1; next
+        }
+        in_fn && /^\}/ { in_fn=0; next }
+        in_fn { next }
+        { print }' lua.c > lua.c.tmp && mv lua.c.tmp lua.c
+        # Guard para o if! grep acima
+        sed -i '1s/^/\/* elliot_noop_print_version *\/\n/' lua.c
+    fi
+
+
     # Garante que libnet.o entre no Makefile
-    sed -i '/^LIB_O=/ s/$/ libnet.o/' Makefile
+    sed -i '/^LIB_O=/ s/$/ libnet.o elliot_repl_engine.o/' Makefile
 
     # ── Patcha lua.c para traduzir erros para português ──────────────────────
     if ! grep -q "elliot_translate_error" lua.c 2>/dev/null; then
@@ -101093,12 +102907,12 @@ static void elliot_type_pt(const char *en, char *out, int sz) {
         {"boolean",   "booleano"},
         {"integer",   "inteiro"},
         {"float",     "decimal"},
-        {"number",    "numero"},
+        {"number",    "n\xc3\xbamero"},
         {"string",    "string"},
         {"table",     "tabela"},
-        {"function",  "funcao"},
+        {"function",  "fun\xc3\xa7\xc3\xa3o"},
         {"userdata",  "userdata"},
-        {"thread",    "coroutine"},
+        {"thread",    "corrotina"},
         {NULL,NULL}
     };
     for (int i=0;T[i][0];i++) {
@@ -101120,7 +102934,7 @@ static const char *elliot_translate_error(const char *msg) {
             elliot_type_pt(exp,ep,sizeof(ep));
             elliot_type_pt(got,gp,sizeof(gp));
             snprintf(buf,sizeof(buf),
-                "argumento #%d invalido em '%s' (esperado %s, recebeu %s)",
+                "argumento #%d inv\xc3\xa1lido em '%s' (esperado %s, recebeu %s)",
                 n,func,ep,gp);
             return buf;
         }
@@ -101134,7 +102948,7 @@ static const char *elliot_translate_error(const char *msg) {
             elliot_type_pt(exp,ep,sizeof(ep));
             elliot_type_pt(got,gp,sizeof(gp));
             snprintf(buf,sizeof(buf),
-                "argumento #%d invalido (esperado %s, recebeu %s)",n,ep,gp);
+                "argumento #%d inv\xc3\xa1lido (esperado %s, recebeu %s)",n,ep,gp);
             return buf;
         }
     }
@@ -101143,7 +102957,7 @@ static const char *elliot_translate_error(const char *msg) {
         int n; char detail[128];
         if (sscanf(msg,"bad argument #%d (%127[^)])",
                    &n,detail)==2) {
-            snprintf(buf,sizeof(buf),"argumento #%d invalido: %s",n,detail);
+            snprintf(buf,sizeof(buf),"argumento #%d inv\xc3\xa1lido: %s",n,detail);
             return buf;
         }
     }
@@ -101152,13 +102966,12 @@ static const char *elliot_translate_error(const char *msg) {
         char tp[32];
         if (sscanf(msg,"attempt to perform arithmetic on a %31s value",tp)==1) {
             char tp_pt[32]; elliot_type_pt(tp,tp_pt,sizeof(tp_pt));
-            /* remove trailing "value" se ficar duplicado */
             snprintf(buf,sizeof(buf),
-                "tentativa de operacao aritmetica em um valor %s",tp_pt);
+                "tentativa de opera\xc3\xa7\xc3\xa3o aritm\xc3\xa9tica em um valor %s",tp_pt);
             return buf;
         }
         if (strstr(msg,"attempt to perform arithmetic")) {
-            snprintf(buf,sizeof(buf),"tentativa de operacao aritmetica em valor invalido");
+            snprintf(buf,sizeof(buf),"tentativa de opera\xc3\xa7\xc3\xa3o aritm\xc3\xa9tica em valor inv\xc3\xa1lido");
             return buf;
         }
     }
@@ -101183,10 +102996,10 @@ static const char *elliot_translate_error(const char *msg) {
         if (sscanf(msg,"attempt to index a %31s value (%15s '%63[^']')",tp,kind,name)==3) {
             char tp_pt[32]; elliot_type_pt(tp,tp_pt,sizeof(tp_pt));
             const char *kind_pt =
-                strstr(kind,"global")  ? "variavel global" :
-                strstr(kind,"local")   ? "variavel local"  :
-                strstr(kind,"upvalue") ? "upvalue"         :
-                strstr(kind,"field")   ? "campo"           : kind;
+                strstr(kind,"global")  ? "vari\xc3\xa1vel global" :
+                strstr(kind,"local")   ? "vari\xc3\xa1vel local"  :
+                strstr(kind,"upvalue") ? "upvalue"                :
+                strstr(kind,"field")   ? "campo"                  : kind;
             snprintf(buf,sizeof(buf),
                 "tentativa de indexar um valor %s (%s '%s')",
                 tp_pt,kind_pt,name);
@@ -101204,11 +103017,11 @@ static const char *elliot_translate_error(const char *msg) {
         if (sscanf(msg,"attempt to call a %31s value (%15s '%63[^']')",tp,kind,name)==3) {
             char tp_pt[32]; elliot_type_pt(tp,tp_pt,sizeof(tp_pt));
             const char *kind_pt =
-                strstr(kind,"global")  ? "variavel global" :
-                strstr(kind,"local")   ? "variavel local"  :
-                strstr(kind,"upvalue") ? "upvalue"         :
-                strstr(kind,"field")   ? "campo"           :
-                strstr(kind,"method")  ? "metodo"          : kind;
+                strstr(kind,"global")  ? "vari\xc3\xa1vel global" :
+                strstr(kind,"local")   ? "vari\xc3\xa1vel local"  :
+                strstr(kind,"upvalue") ? "upvalue"                :
+                strstr(kind,"field")   ? "campo"                  :
+                strstr(kind,"method")  ? "m\xc3\xa9todo"          : kind;
             snprintf(buf,sizeof(buf),
                 "tentativa de chamar um valor %s (%s '%s')",
                 tp_pt,kind_pt,name);
@@ -101243,63 +103056,63 @@ static const char *elliot_translate_error(const char *msg) {
         char tp[32];
         if (sscanf(msg,"attempt to perform bitwise operation on a %31s value",tp)==1) {
             char tp_pt[32]; elliot_type_pt(tp,tp_pt,sizeof(tp_pt));
-            snprintf(buf,sizeof(buf),"tentativa de operacao bitwise em um valor %s",tp_pt);
+            snprintf(buf,sizeof(buf),"tentativa de opera\xc3\xa7\xc3\xa3o bitwise em um valor %s",tp_pt);
             return buf;
         }
     }
     /* ── 11. attempt to yield across a C-call boundary ── */
     if (strstr(msg,"attempt to yield across")) {
-        snprintf(buf,sizeof(buf),"tentativa de yield atravessando chamada C (nao permitido)");
+        snprintf(buf,sizeof(buf),"tentativa de yield atravessando chamada C (n\xc3\xa3o permitido)");
         return buf;
     }
     /* ── 12. attempt to yield from outside a coroutine ── */
     if (strstr(msg,"attempt to yield from outside a coroutine")) {
-        snprintf(buf,sizeof(buf),"tentativa de yield fora de uma coroutine");
+        snprintf(buf,sizeof(buf),"tentativa de yield fora de uma corrotina");
         return buf;
     }
     /* ── 13. stack overflow ── */
     if (strstr(msg,"stack overflow")) {
-        snprintf(buf,sizeof(buf),"estouro de pilha (recursao infinita ou chamadas demais)");
+        snprintf(buf,sizeof(buf),"estouro de pilha (recurs\xc3\xa3o infinita ou chamadas demais)");
         return buf;
     }
     /* ── 14. C stack overflow ── */
     if (strstr(msg,"C stack overflow")) {
-        snprintf(buf,sizeof(buf),"estouro de pilha C (recursao profunda demais)");
+        snprintf(buf,sizeof(buf),"estouro de pilha C (recurs\xc3\xa3o profunda demais)");
         return buf;
     }
     /* ── 15. table index is nil ── */
     if (strstr(msg,"table index is nil")) {
-        snprintf(buf,sizeof(buf),"indice de tabela nulo (nil nao pode ser chave)");
+        snprintf(buf,sizeof(buf),"\xc3\xadndice de tabela nulo (nil n\xc3\xa3o pode ser chave)");
         return buf;
     }
     /* ── 16. table index is NaN ── */
     if (strstr(msg,"table index is NaN")) {
-        snprintf(buf,sizeof(buf),"indice de tabela invalido (NaN nao pode ser chave)");
+        snprintf(buf,sizeof(buf),"\xc3\xadndice de tabela inv\xc3\xa1lido (NaN n\xc3\xa3o pode ser chave)");
         return buf;
     }
     /* ── 17. attempt to perform 'n%0' ── */
     if (strstr(msg,"attempt to perform 'n%0'")) {
-        snprintf(buf,sizeof(buf),"tentativa de modulo por zero (n%%0)");
+        snprintf(buf,sizeof(buf),"tentativa de m\xc3\xb3dulo por zero (n%%0)");
         return buf;
     }
     /* ── 18. attempt to perform 'n//0' ── */
     if (strstr(msg,"attempt to perform 'n//0'")) {
-        snprintf(buf,sizeof(buf),"tentativa de divisao inteira por zero (n//0)");
+        snprintf(buf,sizeof(buf),"tentativa de divis\xc3\xa3o inteira por zero (n//0)");
         return buf;
     }
     /* ── 19. value has no integer representation ── */
     if (strstr(msg,"has no integer representation")) {
-        snprintf(buf,sizeof(buf),"valor sem representacao inteira (numero nao e inteiro exato)");
+        snprintf(buf,sizeof(buf),"valor sem representa\xc3\xa7\xc3\xa3o inteira (n\xc3\xbamero n\xc3\xa3o \xc3\xa9 inteiro exato)");
         return buf;
     }
     /* ── 20. not enough memory ── */
     if (strstr(msg,"not enough memory")) {
-        snprintf(buf,sizeof(buf),"memoria insuficiente");
+        snprintf(buf,sizeof(buf),"mem\xc3\xb3ria insuficiente");
         return buf;
     }
     /* ── 21. assertion failed! ── */
     if (strstr(msg,"assertion failed!")) {
-        snprintf(buf,sizeof(buf),"falha na assercao (assert falhou)");
+        snprintf(buf,sizeof(buf),"falha na asser\xc3\xa7\xc3\xa3o (assert falhou)");
         return buf;
     }
     /* ── 22. lparser: 'X' expected ── */
@@ -101319,8 +103132,8 @@ static const char *elliot_translate_error(const char *msg) {
             return buf;
         }
     }
-    /* ── 24. lparser: <name> expected ── */
-    if (strstr(msg,"<name> expected")) {
+    /* ── 24. lparser: <n> expected ── */
+    if (strstr(msg,"<n> expected")) {
         snprintf(buf,sizeof(buf),"nome esperado");
         return buf;
     }
@@ -101344,14 +103157,14 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 27. lparser: break outside loop ── */
     if (strstr(msg,"break outside loop")) {
-        snprintf(buf,sizeof(buf),"'break' fora de um laco (for/while/repeat)");
+        snprintf(buf,sizeof(buf),"'break' fora de um la\xc3\xa7o (for/while/repeat)");
         return buf;
     }
     /* ── 28. lparser: no visible label 'X' for goto ── */
     {
         char lbl[64];
         if (sscanf(msg,"no visible label '%63[^']' for 'goto'",lbl)==1) {
-            snprintf(buf,sizeof(buf),"rotulo '%s' nao visivel para 'goto'",lbl);
+            snprintf(buf,sizeof(buf),"r\xc3\xb3tulo '%s' n\xc3\xa3o vis\xc3\xadvel para 'goto'",lbl);
             return buf;
         }
     }
@@ -101359,7 +103172,7 @@ static const char *elliot_translate_error(const char *msg) {
     {
         char lbl[64]; int ln;
         if (sscanf(msg,"label '%63[^']' already defined on line %d",lbl,&ln)==2) {
-            snprintf(buf,sizeof(buf),"rotulo '%s' ja definido na linha %d",lbl,ln);
+            snprintf(buf,sizeof(buf),"r\xc3\xb3tulo '%s' j\xc3\xa1 definido na linha %d",lbl,ln);
             return buf;
         }
     }
@@ -101369,18 +103182,18 @@ static const char *elliot_translate_error(const char *msg) {
         if (sscanf(msg,"<goto %63[^>]> at line %d jumps into the scope of local '%63[^']'",
                    lbl,&ln,var)==3) {
             snprintf(buf,sizeof(buf),
-                "<goto %s> na linha %d entra no escopo da variavel local '%s'",lbl,ln,var);
+                "<goto %s> na linha %d entra no escopo da vari\xc3\xa1vel local '%s'",lbl,ln,var);
             return buf;
         }
     }
     /* ── 31. lparser: cannot use '...' outside vararg function ── */
     if (strstr(msg,"cannot use '...' outside a vararg")) {
-        snprintf(buf,sizeof(buf),"nao e possivel usar '...' fora de funcao vararg");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel usar '...' fora de fun\xc3\xa7\xc3\xa3o vararg");
         return buf;
     }
     /* ── 32. lparser: too many local variables ── */
     if (strstr(msg,"too many local variables")) {
-        snprintf(buf,sizeof(buf),"variaveis locais demais (limite: 200 por funcao)");
+        snprintf(buf,sizeof(buf),"vari\xc3\xa1veis locais demais (limite: 200 por fun\xc3\xa7\xc3\xa3o)");
         return buf;
     }
     /* ── 33. lparser: too many upvalues ── */
@@ -101390,7 +103203,7 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 34. lparser: chunk has too many syntax levels ── */
     if (strstr(msg,"too many syntax levels")) {
-        snprintf(buf,sizeof(buf),"niveis de sintaxe demais (expressao muito aninhada)");
+        snprintf(buf,sizeof(buf),"n\xc3\xadveis de sintaxe demais (express\xc3\xa3o muito aninhada)");
         return buf;
     }
     /* ── 35. llex: unfinished string ── */
@@ -101405,23 +103218,23 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 37. llex: unfinished long comment ── */
     if (strstr(msg,"unfinished long comment")) {
-        snprintf(buf,sizeof(buf),"comentario longo incompleto (falta fechamento '--]]')");
+        snprintf(buf,sizeof(buf),"coment\xc3\xa1rio longo incompleto (falta fechamento '--]]')");
         return buf;
     }
     /* ── 38. llex: malformed number ── */
     if (strstr(msg,"malformed number")) {
-        snprintf(buf,sizeof(buf),"numero malformado");
+        snprintf(buf,sizeof(buf),"n\xc3\xbamero malformado");
         return buf;
     }
     /* ── 39. llex: invalid escape sequence ── */
     {
         char esc[8];
         if (sscanf(msg,"invalid escape sequence '\\%7[^']'",esc)==1) {
-            snprintf(buf,sizeof(buf),"sequencia de escape invalida '\\%s'",esc);
+            snprintf(buf,sizeof(buf),"seq\xc3\xbcencia de escape inv\xc3\xa1lida '\\%s'",esc);
             return buf;
         }
         if (strstr(msg,"invalid escape sequence")) {
-            snprintf(buf,sizeof(buf),"sequencia de escape invalida");
+            snprintf(buf,sizeof(buf),"seq\xc3\xbcencia de escape inv\xc3\xa1lida");
             return buf;
         }
     }
@@ -101432,7 +103245,7 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 41. llex: hexadecimal digit expected ── */
     if (strstr(msg,"hexadecimal digit expected")) {
-        snprintf(buf,sizeof(buf),"digito hexadecimal esperado");
+        snprintf(buf,sizeof(buf),"d\xc3\xadgito hexadecimal esperado");
         return buf;
     }
     /* ── 42. llex: UTF-8 value too large ── */
@@ -101442,14 +103255,14 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 43. llex: lexical element too long ── */
     if (strstr(msg,"lexical element too long")) {
-        snprintf(buf,sizeof(buf),"elemento lexico longo demais");
+        snprintf(buf,sizeof(buf),"elemento l\xc3\xa9xico longo demais");
         return buf;
     }
     /* ── 44. module 'X' not found ── */
     {
         char mod[128];
         if (sscanf(msg,"module '%127[^']' not found",mod)==1) {
-            snprintf(buf,sizeof(buf),"modulo '%s' nao encontrado",mod);
+            snprintf(buf,sizeof(buf),"m\xc3\xb3dulo '%s' n\xc3\xa3o encontrado",mod);
             return buf;
         }
     }
@@ -101457,7 +103270,7 @@ static const char *elliot_translate_error(const char *msg) {
     {
         char mod[128];
         if (sscanf(msg,"error loading module '%127[^']'",mod)==1) {
-            snprintf(buf,sizeof(buf),"erro ao carregar modulo '%s'",mod);
+            snprintf(buf,sizeof(buf),"erro ao carregar m\xc3\xb3dulo '%s'",mod);
             return buf;
         }
     }
@@ -101471,25 +103284,25 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 47. circular require ── */
     if (strstr(msg,"circular require")) {
-        snprintf(buf,sizeof(buf),"require circular detectado (modulo requer a si mesmo)");
+        snprintf(buf,sizeof(buf),"require circular detectado (m\xc3\xb3dulo requer a si mesmo)");
         return buf;
     }
     /* ── 48. cannot open FILE: REASON ── */
     {
         char file[256], reason[128];
         if (sscanf(msg,"cannot open %255[^:]: %127[^\n]",file,reason)==2) {
-            snprintf(buf,sizeof(buf),"nao foi possivel abrir '%s': %s",file,reason);
+            snprintf(buf,sizeof(buf),"n\xc3\xa3o foi poss\xc3\xadvel abrir '%s': %s",file,reason);
             return buf;
         }
     }
     /* ── 49. file is already closed ── */
     if (strstr(msg,"file is already closed")) {
-        snprintf(buf,sizeof(buf),"arquivo ja fechado");
+        snprintf(buf,sizeof(buf),"arquivo j\xc3\xa1 fechado");
         return buf;
     }
     /* ── 50. cannot close standard file ── */
     if (strstr(msg,"cannot close standard file")) {
-        snprintf(buf,sizeof(buf),"nao e possivel fechar arquivo padrao (stdin/stdout/stderr)");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel fechar arquivo padr\xc3\xa3o (stdin/stdout/stderr)");
         return buf;
     }
     /* ── 51. attempt to use a closed file ── */
@@ -101499,43 +103312,43 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 52. cannot read from a write-only file ── */
     if (strstr(msg,"cannot read from a write-only file")) {
-        snprintf(buf,sizeof(buf),"nao e possivel ler de arquivo aberto somente para escrita");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel ler de arquivo aberto somente para escrita");
         return buf;
     }
     /* ── 53. cannot write to a read-only file ── */
     if (strstr(msg,"cannot write to a read-only file")) {
-        snprintf(buf,sizeof(buf),"nao e possivel escrever em arquivo aberto somente para leitura");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel escrever em arquivo aberto somente para leitura");
         return buf;
     }
     /* ── 54. invalid mode ── */
     if (strstr(msg,"invalid mode")) {
-        snprintf(buf,sizeof(buf),"modo de abertura de arquivo invalido");
+        snprintf(buf,sizeof(buf),"modo de abertura de arquivo inv\xc3\xa1lido");
         return buf;
     }
     /* ── 55. coroutine errors ── */
     if (strstr(msg,"cannot resume dead coroutine")) {
-        snprintf(buf,sizeof(buf),"nao e possivel retomar uma coroutine morta");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar uma corrotina encerrada");
         return buf;
     }
     if (strstr(msg,"cannot resume running coroutine")) {
-        snprintf(buf,sizeof(buf),"nao e possivel retomar uma coroutine em execucao");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar uma corrotina em execu\xc3\xa7\xc3\xa3o");
         return buf;
     }
     if (strstr(msg,"cannot resume non-suspended coroutine")) {
-        snprintf(buf,sizeof(buf),"nao e possivel retomar uma coroutine que nao esta suspensa");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel retomar uma corrotina que n\xc3\xa3o est\xc3\xa1 suspensa");
         return buf;
     }
     if (strstr(msg,"coroutine failed")) {
-        snprintf(buf,sizeof(buf),"coroutine falhou");
+        snprintf(buf,sizeof(buf),"corrotina falhou");
         return buf;
     }
     if (strstr(msg,"cannot yield from outside a coroutine")) {
-        snprintf(buf,sizeof(buf),"nao e possivel yield fora de uma coroutine");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel yield fora de uma corrotina");
         return buf;
     }
     /* ── 56. invalid key to 'next' ── */
     if (strstr(msg,"invalid key to 'next'")) {
-        snprintf(buf,sizeof(buf),"chave invalida para 'next' (tabela foi modificada durante iteracao?)");
+        snprintf(buf,sizeof(buf),"chave inv\xc3\xa1lida para 'next' (tabela foi modificada durante itera\xc3\xa7\xc3\xa3o?)");
         return buf;
     }
     /* ── 57. too many results to unpack ── */
@@ -101547,7 +103360,7 @@ static const char *elliot_translate_error(const char *msg) {
     {
         char opt[8];
         if (sscanf(msg,"invalid option '%%%7[^']' to 'format'",opt)==1) {
-            snprintf(buf,sizeof(buf),"opcao '%%%s' invalida em string.format",opt);
+            snprintf(buf,sizeof(buf),"op\xc3\xa7\xc3\xa3o '%%%s' inv\xc3\xa1lida em string.format",opt);
             return buf;
         }
     }
@@ -101555,40 +103368,40 @@ static const char *elliot_translate_error(const char *msg) {
     {
         char pc[8];
         if (sscanf(msg,"invalid pattern capture index %%%7[^']",pc)==1) {
-            snprintf(buf,sizeof(buf),"indice de captura de padrao invalido: %%%s",pc);
+            snprintf(buf,sizeof(buf),"\xc3\xadndice de captura de padr\xc3\xa3o inv\xc3\xa1lido: %%%s",pc);
             return buf;
         }
     }
     if (strstr(msg,"malformed pattern")) {
         if (strstr(msg,"ends with")) {
-            snprintf(buf,sizeof(buf),"padrao malformado (termina com '%%')");
+            snprintf(buf,sizeof(buf),"padr\xc3\xa3o malformado (termina com '%%')");
         } else if (strstr(msg,"missing ')'")) {
-            snprintf(buf,sizeof(buf),"padrao malformado (falta ')')");
+            snprintf(buf,sizeof(buf),"padr\xc3\xa3o malformado (falta ')')");
         } else {
-            snprintf(buf,sizeof(buf),"padrao de string malformado");
+            snprintf(buf,sizeof(buf),"padr\xc3\xa3o de string malformado");
         }
         return buf;
     }
     if (strstr(msg,"missing '[' after '%%f' in pattern")) {
-        snprintf(buf,sizeof(buf),"padrao: falta '[' apos '%%f'");
+        snprintf(buf,sizeof(buf),"padr\xc3\xa3o: falta '[' ap\xc3\xb3s '%%f'");
         return buf;
     }
     if (strstr(msg,"pattern too complex")) {
-        snprintf(buf,sizeof(buf),"padrao de string complexo demais");
+        snprintf(buf,sizeof(buf),"padr\xc3\xa3o de string complexo demais");
         return buf;
     }
     if (strstr(msg,"too many captures")) {
-        snprintf(buf,sizeof(buf),"capturas demais no padrao");
+        snprintf(buf,sizeof(buf),"capturas demais no padr\xc3\xa3o");
         return buf;
     }
     if (strstr(msg,"unfinished capture")) {
-        snprintf(buf,sizeof(buf),"captura incompleta no padrao");
+        snprintf(buf,sizeof(buf),"captura incompleta no padr\xc3\xa3o");
         return buf;
     }
     {
         char c[4];
         if (sscanf(msg,"invalid use of '%3[^']' in pattern",c)==1) {
-            snprintf(buf,sizeof(buf),"uso invalido de '%s' no padrao",c);
+            snprintf(buf,sizeof(buf),"uso inv\xc3\xa1lido de '%s' no padr\xc3\xa3o",c);
             return buf;
         }
     }
@@ -101598,29 +103411,29 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 60. table.sort errors ── */
     if (strstr(msg,"invalid order function for sorting")) {
-        snprintf(buf,sizeof(buf),"funcao de ordenacao invalida (deve retornar booleano)");
+        snprintf(buf,sizeof(buf),"fun\xc3\xa7\xc3\xa3o de ordena\xc3\xa7\xc3\xa3o inv\xc3\xa1lida (deve retornar booleano)");
         return buf;
     }
     if (strstr(msg,"invalid value (table) at index") && strstr(msg,"for 'sort'")) {
-        snprintf(buf,sizeof(buf),"valor invalido na tabela durante sort");
+        snprintf(buf,sizeof(buf),"valor inv\xc3\xa1lido na tabela durante 'sort'");
         return buf;
     }
     if (strstr(msg,"wrong number of arguments to 'insert'")) {
-        snprintf(buf,sizeof(buf),"numero errado de argumentos em table.insert");
+        snprintf(buf,sizeof(buf),"n\xc3\xbamero incorreto de argumentos em table.insert");
         return buf;
     }
     /* ── 61. math errors ── */
     if (strstr(msg,"bad argument #1 to 'random' (interval is empty)")) {
-        snprintf(buf,sizeof(buf),"argumento #1 invalido em 'random' (intervalo vazio)");
+        snprintf(buf,sizeof(buf),"argumento #1 inv\xc3\xa1lido em 'random' (intervalo vazio)");
         return buf;
     }
     if (strstr(msg,"bad argument #2 to 'random' (interval too large)")) {
-        snprintf(buf,sizeof(buf),"argumento #2 invalido em 'random' (intervalo muito grande)");
+        snprintf(buf,sizeof(buf),"argumento #2 inv\xc3\xa1lido em 'random' (intervalo grande demais)");
         return buf;
     }
     /* ── 62. os/date errors ── */
     if (strstr(msg,"time result cannot be represented")) {
-        snprintf(buf,sizeof(buf),"resultado de os.time nao representavel nesta plataforma");
+        snprintf(buf,sizeof(buf),"resultado de os.time n\xc3\xa3o represent\xc3\xa1vel nesta plataforma");
         return buf;
     }
     if (strstr(msg,"field 'day' missing in date table")) {
@@ -101629,60 +103442,90 @@ static const char *elliot_translate_error(const char *msg) {
     }
     /* ── 63. utf8 errors ── */
     if (strstr(msg,"invalid UTF-8 code")) {
-        snprintf(buf,sizeof(buf),"codigo UTF-8 invalido");
+        snprintf(buf,sizeof(buf),"c\xc3\xb3digo UTF-8 inv\xc3\xa1lido");
         return buf;
     }
     if (strstr(msg,"initial position out of bounds")) {
-        snprintf(buf,sizeof(buf),"posicao inicial fora dos limites");
+        snprintf(buf,sizeof(buf),"posi\xc3\xa7\xc3\xa3o inicial fora dos limites");
         return buf;
     }
     if (strstr(msg,"final position out of bounds")) {
-        snprintf(buf,sizeof(buf),"posicao final fora dos limites");
+        snprintf(buf,sizeof(buf),"posi\xc3\xa7\xc3\xa3o final fora dos limites");
         return buf;
     }
     /* ── 64. debug lib ── */
     if (strstr(msg,"cannot change a protected metamethod")) {
-        snprintf(buf,sizeof(buf),"nao e possivel alterar um metamethod protegido");
+        snprintf(buf,sizeof(buf),"n\xc3\xa3o \xc3\xa9 poss\xc3\xadvel alterar um metamethod protegido");
         return buf;
     }
     if (strstr(msg,"no active function")) {
-        snprintf(buf,sizeof(buf),"nenhuma funcao ativa no nivel solicitado");
+        snprintf(buf,sizeof(buf),"nenhuma fun\xc3\xa7\xc3\xa3o ativa no n\xc3\xadvel solicitado");
         return buf;
     }
     /* ── 65. load/chunk errors ── */
     if (strstr(msg,"attempt to load a text chunk") && strstr(msg,"mode is 'b'")) {
-        snprintf(buf,sizeof(buf),"tentativa de carregar chunk de texto em modo binario");
+        snprintf(buf,sizeof(buf),"tentativa de carregar chunk de texto em modo bin\xc3\xa1rio");
         return buf;
     }
     if (strstr(msg,"attempt to load a binary chunk") && strstr(msg,"mode is 't'")) {
-        snprintf(buf,sizeof(buf),"tentativa de carregar chunk binario em modo texto");
+        snprintf(buf,sizeof(buf),"tentativa de carregar chunk bin\xc3\xa1rio em modo texto");
         return buf;
     }
     /* ── 66. unable to dump ── */
     if (strstr(msg,"unable to dump given function")) {
-        snprintf(buf,sizeof(buf),"impossivel serializar a funcao (tem upvalues?)");
+        snprintf(buf,sizeof(buf),"imposs\xc3\xadvel serializar a fun\xc3\xa7\xc3\xa3o (tem upvalues?)");
         return buf;
     }
     /* ── 67. no waiting coroutine ── */
     if (strstr(msg,"no waiting coroutine")) {
-        snprintf(buf,sizeof(buf),"nenhuma coroutine aguardando");
+        snprintf(buf,sizeof(buf),"nenhuma corrotina aguardando");
         return buf;
     }
     /* ── 68. wrong number of arguments ── */
     if (strstr(msg,"wrong number of arguments")) {
-        snprintf(buf,sizeof(buf),"numero errado de argumentos");
+        snprintf(buf,sizeof(buf),"n\xc3\xbamero errado de argumentos");
         return buf;
     }
-    /* ── 69. stack traceback header (nao traduz — so reformata) ── */
+    /* ── 69. stack traceback header ── */
     if (strstr(msg,"stack traceback:")) {
-        /* substitui "stack traceback:" por versao PT */
         const char *p = strstr(msg,"stack traceback:");
         int pre = (int)(p - msg);
         snprintf(buf,sizeof(buf),"%.*srastro da pilha de chamadas:",pre,msg);
         return buf;
     }
-    /* ── 70. [C]: in ... / in function / in local / in upvalue ── */
-    /* nao traduz — sao nomes de debug, manter legivel */
+    /* ── 70. traceback lines: in function / in local / in upvalue / in ? ── */
+    {
+        char name[64];
+        if (sscanf(msg,"in function '%63[^']'",name)==1) {
+            snprintf(buf,sizeof(buf),"na fun\xc3\xa7\xc3\xa3o '%s'",name);
+            return buf;
+        }
+        if (sscanf(msg,"in local '%63[^']'",name)==1) {
+            snprintf(buf,sizeof(buf),"na vari\xc3\xa1vel local '%s'",name);
+            return buf;
+        }
+        if (sscanf(msg,"in upvalue '%63[^']'",name)==1) {
+            snprintf(buf,sizeof(buf),"no upvalue '%s'",name);
+            return buf;
+        }
+        if (sscanf(msg,"in method '%63[^']'",name)==1) {
+            snprintf(buf,sizeof(buf),"no m\xc3\xa9todo '%s'",name);
+            return buf;
+        }
+        if (strstr(msg,"in function <")) {
+            const char *p = strstr(msg,"in function <");
+            snprintf(buf,sizeof(buf),"na fun\xc3\xa7\xc3\xa3o <%s",p+13);
+            return buf;
+        }
+        if (strstr(msg,"in main chunk")) {
+            snprintf(buf,sizeof(buf),"no bloco principal");
+            return buf;
+        }
+        if (strstr(msg,"in ?")) {
+            snprintf(buf,sizeof(buf),"em ?");
+            return buf;
+        }
+    }
 
     return msg; /* sem traducao — retorna original */
 }
@@ -101839,16 +103682,24 @@ TRANSLATE_EOF
     _MAKE_FLAGS="${_PF_ARCH_FLAGS:--O2} -pipe -fomit-frame-pointer"
     _CC="${_PF_CC:-clang}"
 
-    # ETAPA 1: compila libnet.c em background (é o passo mais demorado)
+    # ETAPA 1: compila libnet.c e elliot_repl_engine.c em background
+    # (é o passo mais demorado)
     _libnet_log="$HOME/.elliot_libnet.log"
     if [ "$INSTALL_SQ" = "1" ]; then
         printf "\033[1;36m── [1/4] libnet.c ────────────────────────────────────────────\033[0m\n"
         ${_CC} ${_LIBNET_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE ${PROFILE_DEFINES} ${_INC} \
             -c libnet.c -o libnet.o 2>&1 | tee "$_libnet_log"
         _libnet_exit=${PIPESTATUS[0]}
+        if [ "$_libnet_exit" = "0" ]; then
+            ${_CC} ${_MAKE_FLAGS} -fPIC ${_INC} \
+                -c elliot_repl_engine.c -o elliot_repl_engine.o 2>&1 | tee -a "$_libnet_log"
+            _libnet_exit=${PIPESTATUS[0]}
+        fi
     else
-        ${_CC} ${_LIBNET_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE ${PROFILE_DEFINES} ${_INC} \
-            -c libnet.c -o libnet.o > "$_libnet_log" 2>&1 &
+        ( ${_CC} ${_LIBNET_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE ${PROFILE_DEFINES} ${_INC} \
+            -c libnet.c -o libnet.o > "$_libnet_log" 2>&1 \
+          && ${_CC} ${_MAKE_FLAGS} -fPIC ${_INC} \
+            -c elliot_repl_engine.c -o elliot_repl_engine.o >> "$_libnet_log" 2>&1 ) &
         _libnet_pid=$!
         # Anima a barra de 5% → 45% enquanto libnet.c compila
         _pct=5
@@ -102107,6 +103958,13 @@ _info()    { printf "${B}  → %s${R}\n" "$1"; }
 _warn()    { printf "${Y}  ! %s${R}\n" "$1"; }
 _err()     { printf "${E}  ✗ %s${R}\n" "$1"; rm -rf "$TMP_DIR" 2>/dev/null; [ "$_LPM_ALL_MODE" = "1" ] && return 1 || exit 1; }
 _LPM_ALL_MODE=0
+_banner() {
+    printf "${Y}"
+    printf "  ╔══════════════════════════════════════════╗\n"
+    printf "  ║   lpm — ElliotOS Lua Package Manager      ║\n"
+    printf "  ╚══════════════════════════════════════════╝\n"
+    printf "${R}\n"
+}
 
 _ensure_headers() {
     local BUILD_SRC="$HOME/.lua-net-build/lua-5.4.8/src"
@@ -102377,26 +104235,17 @@ _install() {
             _info "lgi é um binding C (GObject/GTK) — instalando via pkg..."
             pkg install -y lua-lgi 2>/dev/null || _err "Falha: tente pkg install lua-lgi"
             # Localiza o .so instalado e garante que está no LUA_CPATH
-            _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}/lib/lua" \
-                -name "corelgilua*.so" 2>/dev/null | head -1)
-            if [ -z "$_lgi_so" ]; then
-                _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}" \
-                    -name "corelgilua*.so" 2>/dev/null | head -1)
-            fi
+            # Procura o .so do lgi (ex: .../lib/lua/5.4/lgi/corelgilua54.so)
+            _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}" \
+                -path "*/lua*" -name "corelgilua*.so" 2>/dev/null | head -1)
             if [ -n "$_lgi_so" ]; then
-                _lgi_dir="$(dirname "$_lgi_so")"
-                # Cpath correto: parent do diretorio lgi (ex: /usr/lib/lua/5.4/?.so)
-                # lgi.corelgilua51 vira lgi/corelgilua51.so — precisa de ?.so na raiz
-                _lgi_cpath_root="$(dirname "$_lgi_dir")"
-                # Remove entrada antiga errada se existir
+                _lgi_dir="$(dirname "$_lgi_so")"          # .../lib/lua/5.4/lgi
+                _lgi_cpath_root="$(dirname "$_lgi_dir")"  # .../lib/lua/5.4
                 sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
-                sed -i '/lua\/.*\/lgi\/\\\?/d' "$HOME/.bashrc" 2>/dev/null
-                if ! grep -q "lgi_cpath" "$HOME/.bashrc" 2>/dev/null; then
-                    printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;${LUA_CPATH:-}"\n' \
-                        "$_lgi_cpath_root" >> "$HOME/.bashrc"
-                    export LUA_CPATH="$_lgi_cpath_root/?.so:${LUA_CPATH:-}"
-                fi
-                _ok "lgi instalado — .so em: $_lgi_dir (cpath: $_lgi_cpath_root/?.so)"
+                printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;%s/?/?.so;\${LUA_CPATH:-}"\n' \
+                    "$_lgi_cpath_root" "$_lgi_cpath_root" >> "$HOME/.bashrc"
+                export LUA_CPATH="$_lgi_cpath_root/?.so:$_lgi_cpath_root/?/?.so:${LUA_CPATH:-}"
+                _ok "lgi instalado — .so em: $_lgi_dir"
             else
                 _warn "lgi instalado mas .so nao localizado — pode nao funcionar com Lua 5.4"
             fi
@@ -102412,6 +104261,1271 @@ _install() {
             pkg install -y lua-curl 2>/dev/null \
                 && _ok "lcurl instalado via pkg (lua-curl)" \
                 || _err "Falha ao instalar lua-curl — tente: pkg install lua-curl"
+            return ;;
+        lx)
+            _info "lx — instalando dependência lgi (GTK/LGI)..."
+            pkg install -y lua-lgi 2>/dev/null || _warn "Falha ao instalar lua-lgi via pkg"
+            # Configura LUA_CPATH para o .so do lgi
+            _lgi_so=$(find "${PREFIX:-/data/data/com.termux/files/usr}" \
+                -path "*/lua*" -name "corelgilua*.so" 2>/dev/null | head -1)
+            if [ -n "$_lgi_so" ]; then
+                _lgi_dir="$(dirname "$_lgi_so")"
+                _lgi_cpath_root="$(dirname "$_lgi_dir")"
+                sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
+                printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;%s/?/?.so;\${LUA_CPATH:-}"\n' \
+                    "$_lgi_cpath_root" "$_lgi_cpath_root" >> "$HOME/.bashrc"
+                export LUA_CPATH="$_lgi_cpath_root/?.so:$_lgi_cpath_root/?/?.so:${LUA_CPATH:-}"
+            fi
+            # Instala lx.lua no LUA_DIR
+            mkdir -p "$LUA_DIR"
+            cat > "$LUA_DIR/lx.lua" << 'LX_EOF'
+--[[
+  lx — Interface Gráfica de Alto Nível para ElliotOS
+  ═══════════════════════════════════════════════════
+  Cria janelas, formulários, tabelas e menus com código mínimo.
+  Toda a complexidade do GTK fica escondida aqui dentro.
+
+  Instalação : lpm install lx
+  Uso        : local lx = require("lx")
+
+  CONCEITOS
+  ─────────
+  lx.app(titulo, [tamanho], [tema], layout)
+    Cria e exibe uma janela. layout é uma lista de widgets.
+    Tamanho: "500x400"   Tema: "dark" ou "light"
+
+  Widgets de layout:
+    lx.screen(id, layout)        → tela (para apps multipágina)
+    lx.menu({ ... })             → barra de menus
+    lx.text("...")               → texto / título
+    lx.field("id", "hint")      → campo de entrada
+    lx.output("id")             → área de saída de texto
+    lx.table("id", {colunas})   → tabela com colunas
+    lx.progress("id")           → barra de progresso
+    lx.button("texto", fn)      → botão (fn recebe v)
+    lx.spacer()                  → espaço flexível
+
+  Dentro do botão, v carrega tudo:
+    v.campo        → valor do field (string)
+    v.saida = tab  → exibe tabela no output/table automaticamente
+    v.prog  = 0.5  → progresso 50%  |  v.prog = "Texto"
+    v.go("tela")   → navega para outra tela
+    lx.confirm("Pergunta?", fn) → diálogo sim/não
+
+  Diálogos autônomos (fora do app):
+    lx.alert(msg)
+    lx.confirm(msg, fn_sim, fn_nao?)
+    lx.prompt(msg, fn)          → fn(texto_digitado)
+    lx.notify(titulo, msg)      → notificação do sistema
+    lx.filepick(fn)             → fn(caminho)
+    lx.dirpick(fn)              → fn(caminho)
+
+  Loop:
+    lx.run()        → inicia o loop (obrigatório no final)
+    lx.quit()       → fecha o app
+    lx.after(ms,fn) → executa fn após N ms
+    lx.every(ms,fn) → executa fn a cada N ms → id
+    lx.cancel(id)   → cancela timer
+
+  help("lx") para ver esta documentação.
+--]]
+
+-- ═══════════════════════════════════════════════════════════
+-- BOOTSTRAP — GTK carregado sob demanda
+-- ═══════════════════════════════════════════════════════════
+local _G_lgi, _Gtk, _Gdk, _GLib, _Pango, _gtk_ok = nil,nil,nil,nil,nil,false
+-- outputs do callback ativo: set antes de coroutine.resume, usado por lx.print
+local _active_outputs = nil
+
+local function _boot()
+    if _gtk_ok then return end
+    local ok, err = pcall(function()
+        _G_lgi  = require("lgi")
+        _Gtk    = _G_lgi.require("Gtk",  "3.0")
+        _Gdk    = _G_lgi.require("Gdk",  "3.0")
+        _GLib   = _G_lgi.require("GLib")
+        _Pango  = _G_lgi.require("Pango")
+    end)
+    if not ok then
+        error("[lx] GTK indisponível — inicie o Termux:X11 primeiro.\n"..tostring(err), 3)
+    end
+    _gtk_ok = true
+end
+
+-- ═══════════════════════════════════════════════════════════
+-- MÓDULO
+-- ═══════════════════════════════════════════════════════════
+local lx = {}
+local _loop, _main_win = nil, nil
+local _app_title = ""
+
+-- ───────────────────────────────────────────────────────────
+-- PRIVADO — wrappers GTK internos (invisíveis ao usuário)
+-- ───────────────────────────────────────────────────────────
+local function _w(x)   return (type(x)=="table" and x._g) or x end
+local function _css(w, s) local p=_Gtk.CssProvider(); p:load_from_data(s)
+    w:get_style_context():add_provider(p,_Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION) end
+
+local function _margin(w, n)
+    w:set_margin_top(n); w:set_margin_bottom(n)
+    w:set_margin_start(n); w:set_margin_end(n)
+end
+
+local function _vbox(sp, mg)
+    local b = _Gtk.Box{ orientation=_Gtk.Orientation.VERTICAL, spacing=sp or 6 }
+    if mg then _margin(b, mg) end
+    return b
+end
+
+local function _hbox(sp)
+    return _Gtk.Box{ orientation=_Gtk.Orientation.HORIZONTAL, spacing=sp or 6 }
+end
+
+-- Cores nomeadas → hex
+local _COLORS = {
+    -- Escuros
+    dark="#1e1e1e", darker="#0d1117", darkest="#060910", black="#000000",
+    -- Claros
+    white="#ffffff", light="#f5f5f5", lighter="#fafafa",
+    -- Vermelho
+    red="#ef5350", red_bold="#b71c1c", crimson="#c62828",
+    -- Azul
+    blue="#42a5f5", blue_bold="#0d47a1", navy="#1a237e",
+    -- Verde
+    green="#66bb6a", green_bold="#1b5e20", lime="#00e676", teal="#26a69a", teal_bold="#004d40",
+    -- Amarelo / Laranja
+    yellow="#ffee58", yellow_bold="#f57f17", orange="#ffa726", orange_bold="#e65100",
+    -- Roxo / Rosa
+    purple="#ab47bc", purple_bold="#4a148c", pink="#ec407a", pink_bold="#880e4f",
+    -- Ciano / Aqua
+    cyan="#26c6da", cyan_bold="#006064", aqua="#00bcd4",
+    -- Cinza
+    grey="#9e9e9e", grey_bold="#212121", silver="#bdbdbd",
+    -- Terminal
+    terminal="#0c0c0c", terminal_green="#00ff41",
+}
+
+-- Resolve nome de cor ou retorna o valor direto (#hex / rgb(...))
+local function _color(s)
+    if not s then return nil end
+    return _COLORS[s] or s
+end
+
+-- Presets de CSS prontos
+local _CSS_PRESETS = {
+    rounded  = "* { border-radius: 8px; }",
+    rounded_lg = "* { border-radius: 16px; }",
+    flat     = "* { border-radius: 0; box-shadow: none; }",
+    shadow   = "window { box-shadow: 0 4px 16px rgba(0,0,0,0.6); }",
+    bordered = "* { border: 1px solid rgba(255,255,255,0.12); }",
+    compact  = "* { padding: 2px; margin: 2px; }",
+    comfortable = "* { padding: 8px; margin: 4px; }",
+}
+
+local function _scroll(child)
+    local sw = _Gtk.ScrolledWindow{}
+    sw:set_hexpand(true); sw:set_vexpand(true)
+    sw:add(child); return sw
+end
+
+local function _font_mono(view)
+    view:override_font(_Pango.FontDescription.from_string("Monospace 10"))
+end
+
+-- Padrão comum aos widgets "label + controle" (select/slider/spin/toggle/color).
+-- inner       → o widget GTK já pronto (combo, scale, spin, switch, color button...)
+-- get_value   → função sem args que lê o valor atual, vira fields[desc.id].get_text
+-- opts.vertical      → label em cima do widget (usado pelo slider)
+-- opts.expand_widget = false → label ocupa o espaço extra em vez do widget (usado pelo toggle)
+local function _labeled(fields, desc, inner, get_value, opts)
+    opts = opts or {}
+    local expand = opts.expand_widget ~= false
+    local box = opts.vertical and _vbox(2) or _hbox(opts.spacing or 6)
+    if desc.label and desc.label ~= "" then
+        local lbl = _Gtk.Label{ label=desc.label }
+        lbl:set_xalign(0)
+        box:pack_start(lbl, not expand, not expand, 0)
+    end
+    box:pack_start(inner, expand, expand, 0)
+    box:set_hexpand(true)
+    fields[desc.id] = { get_text = get_value }
+    return box
+end
+
+-- ───────────────────────────────────────────────────────────
+-- LOOP
+-- ───────────────────────────────────────────────────────────
+function lx.run(fn)
+    _boot()
+    _Gtk.init()
+    if fn then fn() end
+    _loop = _GLib.MainLoop(nil, false)
+    _loop:run()
+end
+
+function lx.quit()
+    if _main_win then _main_win:close() end
+    if _loop then _loop:quit() end
+end
+
+function lx.after(ms, fn)
+    _boot()
+    _GLib.timeout_add(_GLib.PRIORITY_DEFAULT, ms, function() fn(); return false end)
+end
+
+function lx.every(ms, fn)
+    _boot()
+    return _GLib.timeout_add(_GLib.PRIORITY_DEFAULT, ms, function() return fn()~=false end)
+end
+
+function lx.cancel(id) _GLib.source_remove(id) end
+
+local function _idle(fn)
+    _GLib.idle_add(_GLib.PRIORITY_DEFAULT_IDLE, function() fn(); return false end)
+end
+
+-- Executa o callback de um botão de forma cooperativa usando coroutine +
+-- GLib idle_add. O yield acontece automaticamente dentro do __newindex do
+-- objeto "v" (quando o usuário escreve "v.resultado = ..."), que é código
+-- Lua puro — sem debug hook, sem fronteira C, sem coroutine.yield() manual.
+-- `state` é uma tabela por-botão ({co=nil}) usada para ignorar cliques
+-- repetidos enquanto uma execução anterior ainda está ativa.
+local function _run_cooperative(fn, v, state, outputs_ref)
+    if state.co then return end
+    local co = coroutine.create(fn)
+    state.co = co
+    _GLib.idle_add(_GLib.PRIORITY_DEFAULT_IDLE, function()
+        _active_outputs = outputs_ref
+        -- Redireciona print() global → lx.print() durante o callback,
+        -- para que módulos como net.syn que usam print() internamente
+        -- apareçam no widget de output em vez do terminal.
+        local _orig_print = print
+        print = function(...) lx.print(...) end
+        local ok, err = coroutine.resume(co, v)
+        print = _orig_print
+        _active_outputs = nil
+        if coroutine.status(co) == "dead" then
+            state.co = nil
+            if not ok then
+                io.stderr:write("[lx] erro no callback do botão: "..tostring(err).."\n")
+            end
+            return false
+        end
+        return true
+    end)
+end
+
+-- lx.print(...): como print() mas saída vai para o(s) output(s) do app,
+-- com yield automático para a UI atualizar. Fora de um callback, faz
+-- fallback para io.write (terminal).
+function lx.print(...)
+    local parts = {}
+    for i = 1, select('#', ...) do
+        parts[i] = tostring(select(i, ...))
+    end
+    local line = table.concat(parts, "\t") .. "\n"
+    if _active_outputs and next(_active_outputs) then
+        for _, entry in pairs(_active_outputs) do
+            entry.api:append(line)
+        end
+        local co, is_main = coroutine.running()
+        if co and not is_main then coroutine.yield() end
+    else
+        io.write(line)
+    end
+end
+
+-- Processa eventos GTK pendentes sem bloquear.
+-- Necessário para que a UI atualize mesmo dentro de callbacks bloqueantes
+-- (ex: while true do ... v.saida = "texto" ... end).
+local function _gtk_flush()
+    local ctx = _GLib.MainContext.get_default()
+    if ctx then while ctx:iteration(false) do end end
+end
+
+-- ───────────────────────────────────────────────────────────
+-- DIÁLOGOS AUTÔNOMOS
+-- ───────────────────────────────────────────────────────────
+function lx.alert(msg, title)
+    _boot()
+    local d = _Gtk.MessageDialog{
+        transient_for=_main_win, message_type=_Gtk.MessageType.INFO,
+        buttons=_Gtk.ButtonsType.OK, text=tostring(msg)
+    }
+    if title then d:set_title(title) end
+    d:run(); d:destroy()
+end
+
+function lx.confirm(msg, fn_yes, fn_no)
+    _boot()
+    local d = _Gtk.MessageDialog{
+        transient_for=_main_win, message_type=_Gtk.MessageType.QUESTION,
+        buttons=_Gtk.ButtonsType.NONE, text=tostring(msg)
+    }
+    d:add_button("Não", _Gtk.ResponseType.NO)
+    d:add_button("Sim", _Gtk.ResponseType.YES)
+    local r = d:run(); d:destroy()
+    if r == _Gtk.ResponseType.YES then
+        if fn_yes then fn_yes() end
+    else
+        if fn_no  then fn_no()  end
+    end
+end
+
+function lx.prompt(msg, fn)
+    _boot()
+    local d = _Gtk.Dialog{ title="Entrada", transient_for=_main_win }
+    d:add_button("Cancelar", _Gtk.ResponseType.CANCEL)
+    d:add_button("OK",       _Gtk.ResponseType.OK)
+    d:set_default_response(_Gtk.ResponseType.OK)
+    local box   = d:get_content_area()
+    local label = _Gtk.Label{ label=tostring(msg), margin_bottom=6 }
+    local entry = _Gtk.Entry{ activates_default=true }
+    box:pack_start(label, false, false, 6)
+    box:pack_start(entry, false, false, 6)
+    box:show_all()
+    if d:run() == _Gtk.ResponseType.OK then
+        if fn then fn(entry:get_text()) end
+    end
+    d:destroy()
+end
+
+function lx.notify(title, msg)
+    if msg == nil then title, msg = _app_title, title end
+    os.execute(("notify-send %q %q 2>/dev/null"):format(tostring(title), tostring(msg or "")))
+end
+
+function lx.filepick(fn)
+    _boot()
+    local d = _Gtk.FileChooserDialog{
+        title="Escolher arquivo", action=_Gtk.FileChooserAction.OPEN }
+    d:add_button("Cancelar", _Gtk.ResponseType.CANCEL)
+    d:add_button("Abrir",    _Gtk.ResponseType.ACCEPT)
+    if d:run() == _Gtk.ResponseType.ACCEPT then
+        if fn then fn(d:get_filename()) end
+    end
+    d:destroy()
+end
+
+function lx.dirpick(fn)
+    _boot()
+    local d = _Gtk.FileChooserDialog{
+        title="Escolher pasta", action=_Gtk.FileChooserAction.SELECT_FOLDER }
+    d:add_button("Cancelar", _Gtk.ResponseType.CANCEL)
+    d:add_button("Selecionar", _Gtk.ResponseType.ACCEPT)
+    if d:run() == _Gtk.ResponseType.ACCEPT then
+        if fn then fn(d:get_filename()) end
+    end
+    d:destroy()
+end
+
+-- ───────────────────────────────────────────────────────────
+-- CONSTRUTORES DE WIDGET (retornam descritores, não GTK raw)
+-- O usuário usa esses. lx.app() os constrói internamente.
+-- ───────────────────────────────────────────────────────────
+
+-- Texto / título
+-- lx.text("msg", {bold=true, color="red_bold", size="large"})
+-- Atalhos: lx.text("msg", "red") — só cor; lx.text("msg", "bold") — negrito
+function lx.text(str, opts)
+    if type(opts)=="string" then
+        if opts=="bold" then opts={bold=true}
+        else opts={color=opts} end
+    end
+    opts = opts or {}
+    return { _type="text", text=tostring(str), bold=opts.bold,
+             color=_color(opts.color), size=opts.size, align=opts.align }
+end
+
+-- Campo de entrada
+function lx.field(id, hint, ftype)
+    return { _type="field", id=id, hint=hint or "", ftype=ftype or "text" }
+end
+
+-- Área de saída de texto
+function lx.output(id, opts)
+    if type(opts)=="number" then opts={height=opts} end
+    opts = opts or {}
+    return { _type="output", id=id, mono=opts.mono~=false, height=opts.height }
+end
+
+-- Tabela com colunas
+function lx.table(id, cols, opts)
+    opts = opts or {}
+    return { _type="table", id=id, cols=cols or {}, opts=opts }
+end
+
+-- Barra de progresso
+function lx.progress(id, opts)
+    opts = opts or {}
+    return { _type="progress", id=id, opts=opts }
+end
+
+-- Botão
+function lx.button(label, fn, opts)
+    opts = opts or {}
+    return { _type="button", label=label, fn=fn,
+             suggested=opts.suggested, destructive=opts.destructive,
+             icon=opts.icon }
+end
+
+-- Tela (para apps multipágina)
+function lx.screen(id, layout, opts)
+    if type(opts)=="string" then opts={title=opts} end
+    opts = opts or {}
+    return { _type="screen", id=id, layout=layout, title=opts.title }
+end
+
+-- Barra de menus
+-- items: { {"Menu", {"Item", fn}, {"Item2", fn2}, {sep=true} }, ... }
+function lx.menu(items)
+    return { _type="menu", items=items }
+end
+
+-- Espaço flexível
+function lx.spacer()
+    return { _type="spacer" }
+end
+
+-- Separador visual
+function lx.sep()
+    return { _type="sep" }
+end
+
+-- Imagem — lx.image(path_ou_icon, largura, altura)
+-- Primeiro arg: caminho de arquivo OU nome de ícone GTK (ex: "dialog-info")
+-- Segundo/terceiro args: largura e altura em pixels (opcionais)
+function lx.image(path, width, height)
+    if width ~= nil and height == nil then height = width end
+    local icon = nil
+    if type(path)=="string" and not path:match("[/\\.]") then
+        icon = path  -- parece nome de ícone, não caminho
+    end
+    return { _type="image", path=not icon and path or nil,
+             icon=icon, width=width, height=height }
+end
+
+-- Layout horizontal
+function lx.row(items, opts)
+    opts = opts or {}
+    return { _type="row", items=items, spacing=opts.spacing }
+end
+
+-- Checkbox
+function lx.check(id, label, default)
+    return { _type="check", id=id, label=label or "", default=default or false }
+end
+
+-- Dropdown / ComboBox
+function lx.select(id, label, options, default)
+    return { _type="select", id=id, label=label or "", options=options or {}, default=default or 1 }
+end
+
+-- Slider — lx.slider(id, label, min, max, step, default)
+-- Todos os args após label são opcionais e posicionais
+function lx.slider(id, label, min, max, step, default)
+    min = min or 0; max = max or 100
+    step = step or 1; default = default or (min + max) / 2
+    return { _type="slider", id=id, label=label or "",
+             min=min, max=max, step=step, default=default }
+end
+
+-- SpinButton (input numérico)
+function lx.spin(id, label, min, max, step, default)
+    return { _type="spin", id=id, label=label or "",
+             min=min or 0, max=max or 100, step=step or 1, default=default or min or 0 }
+end
+
+-- Toggle / Switch
+function lx.toggle(id, label, default)
+    return { _type="toggle", id=id, label=label or "", default=default or false }
+end
+
+-- Color picker — lx.color(id, label, cor_inicial)
+-- cor_inicial: nome ("red","lime","blue_bold"...) ou hex "#rrggbb"
+function lx.color(id, label, default)
+    return { _type="color", id=id, label=label or "",
+             default=_color(default) or "#ffffff" }
+end
+
+-- Barra de status (rodapé da janela)
+function lx.statusbar(id)
+    return { _type="statusbar", id=id }
+end
+
+-- Cor ou imagem de fundo da janela.
+-- Aceita: nome ("dark","blue_bold","terminal"...), hex "#rrggbb", rgb(), ou path de imagem
+function lx.bg(value)
+    return { _type="bg", value=value }
+end
+
+-- Ícone da janela
+function lx.icon(path)
+    return { _type="icon", path=path }
+end
+
+-- CSS global do app.
+-- Aceita CSS raw: lx.css("button { color: red; }")
+-- Aceita preset:  lx.css("rounded") / "flat" / "shadow" / "bordered" / "compact" / "comfortable"
+-- Aceita múltiplos: lx.css("rounded", "shadow")
+function lx.css(...)
+    local parts = {}
+    for _, s in ipairs({...}) do
+        parts[#parts+1] = _CSS_PRESETS[s] or s
+    end
+    return { _type="css", style=table.concat(parts, "\n") }
+end
+
+-- ───────────────────────────────────────────────────────────
+-- CONSTRUTOR INTERNO DE WIDGETS GTK
+-- ───────────────────────────────────────────────────────────
+local function _build_widget(desc, fields, outputs, tables, progresses, stack, dark, statusbars)
+    local t = desc._type
+
+    -- TEXTO
+    if t == "text" then
+        local lbl = _Gtk.Label{ label="" }
+        lbl:set_xalign(0)
+        lbl:set_line_wrap(true)
+        local s = tostring(desc.text)
+        if desc.bold  then s = "<b>"..s.."</b>" end
+        if desc.color then s = '<span color="'..desc.color..'">'..s..'</span>' end
+        if desc.size  then s = '<span size="'..desc.size..'">'..s..'</span>' end
+        if desc.bold or desc.color or desc.size then lbl:set_markup(s)
+        else lbl:set_text(s) end
+        return lbl
+
+    -- FIELD
+    elseif t == "field" then
+        local entry = _Gtk.Entry{
+            placeholder_text = desc.hint,
+            visibility = desc.ftype ~= "password",
+        }
+        entry:set_hexpand(true)
+        fields[desc.id] = entry
+        return entry
+
+    -- OUTPUT
+    elseif t == "output" then
+        local buf  = _Gtk.TextBuffer{}
+        local view = _Gtk.TextView{ buffer=buf, editable=false,
+            wrap_mode=_Gtk.WrapMode.WORD_CHAR }
+        view:set_hexpand(true); view:set_vexpand(true)
+        if desc.mono ~= false then _font_mono(view) end
+        if dark then _css(view, "textview { background-color: #1e1e1e; color: #d4d4d4; }") end
+        local sw = _scroll(view)
+        if desc.height then sw:set_size_request(-1, desc.height) end
+        -- API do output
+        local api = {}
+        function api:set(s)
+            -- BUGFIX: buf:set_text(text, len) — o binding LGI nesta plataforma
+            -- exige o comprimento explícito; omiti-lo causa
+            -- "argumento #3 inválido em 'set_text'".
+            local text = tostring(s or "")
+            buf:set_text(text, #text)
+            local e = buf:get_end_iter(); view:scroll_to_iter(e,0,false,0,0)
+            -- Força atualização visual imediata, mesmo dentro de while loops
+            -- que bloqueiam o loop principal do GLib.
+        end
+        function api:append(s)
+            -- BUGFIX: buf:insert(iter, text, len) — idem, len explícito.
+            local text = tostring(s or "")
+            local e = buf:get_end_iter(); buf:insert(e, text, #text)
+            e = buf:get_end_iter(); view:scroll_to_iter(e,0,false,0,0)
+        end
+        function api:clear() buf:set_text("", 0) end   -- BUGFIX: len explícito
+        function api:get()
+            local s,e = buf:get_bounds(); return buf:get_text(s,e,true)
+        end
+        -- exibe tabela automaticamente
+        function api:show_table(rows, cols)
+            buf:set_text("", 0)   -- BUGFIX: len explícito
+            if cols and #cols > 0 then
+                local header = table.concat(cols, "\t")
+                local htext  = header.."\n"..string.rep("─",40).."\n"
+                local e = buf:get_end_iter(); buf:insert(e, htext, #htext)  -- BUGFIX
+            end
+            for _, row in ipairs(rows) do
+                local line
+                if type(row) == "table" then
+                    if cols then
+                        local parts = {}
+                        for _, c in ipairs(cols) do
+                            local key = c:lower():gsub("%s","_")
+                            parts[#parts+1] = tostring(row[key] or row[c] or "")
+                        end
+                        line = table.concat(parts, "\t")
+                    else
+                        local parts = {}
+                        for k,v in pairs(row) do parts[#parts+1] = tostring(k).."="..tostring(v) end
+                        line = table.concat(parts, "  ")
+                    end
+                else
+                    line = tostring(row)
+                end
+                local ltext = line.."\n"
+                local e = buf:get_end_iter(); buf:insert(e, ltext, #ltext)  -- BUGFIX
+            end
+            local e = buf:get_end_iter(); view:scroll_to_iter(e,0,false,0,0)
+        end
+        outputs[desc.id] = { widget=sw, api=api }
+        return sw
+
+    -- TABLE (TreeView com colunas)
+    elseif t == "table" then
+        local cols = desc.cols
+        local types = {}
+        for _ = 1, math.max(#cols,1) do types[#types+1] = "gchararray" end
+        local store = _Gtk.ListStore.new(types)
+        local view  = _Gtk.TreeView{ model=store, headers_visible=#cols>0 }
+        for i, name in ipairs(cols) do
+            local cell = _Gtk.CellRendererText{}
+            local col  = _Gtk.TreeViewColumn{ title=name, resizable=true }
+            col:pack_start(cell, true)
+            col:add_attribute(cell, "text", i-1)
+            view:append_column(col)
+        end
+        view:set_hexpand(true); view:set_vexpand(true)
+        local sw = _scroll(view)
+        -- API da tabela
+        local api = {}
+        function api:set(rows)
+            store:clear()
+            for _, row in ipairs(rows) do
+                local it = store:append()
+                local idxs, vals = {}, {}
+                if type(row) == "table" and #cols > 0 then
+                    for i, c in ipairs(cols) do
+                        local key = c:lower():gsub("%s","_")
+                        idxs[i] = i-1
+                        vals[i] = tostring(row[key] or row[c] or row[i] or "")
+                    end
+                elseif type(row) == "table" then
+                    local i = 0
+                    for k,v in pairs(row) do
+                        idxs[#idxs+1]=i; vals[#vals+1]=tostring(k).."="..tostring(v); i=i+1
+                    end
+                else
+                    idxs[1]=0; vals[1]=tostring(row)
+                end
+                store:set(it, idxs, vals)
+            end
+        end
+        function api:clear() store:clear() end
+        tables[desc.id] = { widget=sw, api=api, cols=cols }
+        return sw
+
+    -- PROGRESS
+    elseif t == "progress" then
+        local pb = _Gtk.ProgressBar{}
+        pb:set_hexpand(true)
+        pb:set_show_text(true)
+        local api = {}
+        function api:set(v)
+            if type(v) == "number" then
+                pb:set_fraction(math.max(0, math.min(1, v)))
+                pb:set_text(math.floor(v*100).."%")
+            elseif type(v) == "string" then
+                pb:set_text(v)
+                pb:pulse()
+            end
+        end
+        function api:pulse() pb:pulse() end
+        function api:reset() pb:set_fraction(0); pb:set_text("") end
+        progresses[desc.id] = { widget=pb, api=api }
+        return pb
+
+    -- BUTTON
+    elseif t == "button" then
+        local btn = _Gtk.Button{ label=tostring(desc.label or "") }
+        btn:set_hexpand(true)
+        if desc.suggested   then btn:get_style_context():add_class("suggested-action") end
+        if desc.destructive then btn:get_style_context():add_class("destructive-action") end
+        if desc.fn then
+            local fn = desc.fn
+            local state = {}
+            btn.on_clicked = function()
+                local v = _make_v(fields, outputs, tables, progresses, stack, statusbars)
+                _run_cooperative(fn, v, state, outputs)
+            end
+        end
+        return btn
+
+    -- SPACER
+    elseif t == "spacer" then
+        local b = _Gtk.Box{}; b:set_vexpand(true); return b
+
+    -- SEP
+    elseif t == "sep" then
+        return _Gtk.Separator{ orientation=_Gtk.Orientation.HORIZONTAL }
+
+    -- IMAGE
+    elseif t == "image" then
+        local img
+        if desc.icon then
+            img = _Gtk.Image.new_from_icon_name(desc.icon, _Gtk.IconSize.DIALOG)
+        elseif desc.path then
+            local pb = _Gdk.Pixbuf.new_from_file_at_scale(desc.path,
+                desc.width or -1, desc.height or -1, true)
+            img = _Gtk.Image.new_from_pixbuf(pb)
+        else
+            img = _Gtk.Image{}
+        end
+        if desc.width  then img:set_size_request(desc.width,  -1) end
+        if desc.height then img:set_size_request(-1, desc.height) end
+        return img
+
+    -- ROW (layout horizontal)
+    elseif t == "row" then
+        local hb = _hbox(desc.spacing or 8)
+        for _, child in ipairs(desc.items or {}) do
+            if type(child) == "table" then
+                local cw = _build_widget(child, fields, outputs, tables, progresses, stack, dark, statusbars)
+                if cw then
+                    local exp = child._type=="output" or child._type=="table"
+                    hb:pack_start(cw, exp, exp, 0)
+                end
+            end
+        end
+        hb:set_hexpand(true)
+        return hb
+
+    -- CHECK (checkbox)
+    elseif t == "check" then
+        local cb = _Gtk.CheckButton{ label=desc.label }
+        cb:set_active(desc.default == true)
+        cb:set_hexpand(true)
+        fields[desc.id] = { get_text = function() return cb:get_active() end }
+        return cb
+
+    -- SELECT (dropdown)
+    elseif t == "select" then
+        local combo = _Gtk.ComboBoxText{}
+        for _, opt in ipairs(desc.options) do combo:append_text(tostring(opt)) end
+        combo:set_active((desc.default or 1) - 1)
+        return _labeled(fields, desc, combo, function() return combo:get_active_text() or "" end)
+
+    -- SLIDER
+    elseif t == "slider" then
+        local scale = _Gtk.Scale.new_with_range(
+            _Gtk.Orientation.HORIZONTAL, desc.min, desc.max, desc.step)
+        scale:set_value(desc.default)
+        scale:set_digits(desc.step < 1 and 2 or 0)
+        if desc.marks then
+            for _, m in ipairs(desc.marks) do
+                scale:add_mark(m, _Gtk.PositionType.BOTTOM, tostring(m))
+            end
+        end
+        return _labeled(fields, desc, scale, function() return scale:get_value() end, {vertical=true})
+
+    -- SPIN (input numérico)
+    elseif t == "spin" then
+        local spin = _Gtk.SpinButton.new_with_range(desc.min, desc.max, desc.step)
+        spin:set_value(desc.default)
+        return _labeled(fields, desc, spin, function() return spin:get_value() end)
+
+    -- TOGGLE (switch on/off)
+    elseif t == "toggle" then
+        local sw = _Gtk.Switch{}
+        sw:set_active(desc.default == true)
+        sw:set_valign(_Gtk.Align.CENTER)
+        return _labeled(fields, desc, sw, function() return sw:get_active() end,
+            {spacing=8, expand_widget=false})
+
+    -- COLOR picker
+    elseif t == "color" then
+        local rgba = _Gdk.RGBA()
+        rgba:parse(desc.default or "#ffffff")
+        local btn = _Gtk.ColorButton.new_with_rgba(rgba)
+        return _labeled(fields, desc, btn, function()
+            local r = _Gdk.RGBA()
+            btn:get_rgba(r)
+            return string.format("#%02x%02x%02x",
+                math.floor(r.red*255), math.floor(r.green*255), math.floor(r.blue*255))
+        end)
+
+    -- STATUSBAR
+    elseif t == "statusbar" then
+        local sb = _Gtk.Statusbar{}
+        sb:set_hexpand(true)
+        local ctx = 0
+        local api = {}
+        function api:set(s) sb:pop(ctx); sb:push(ctx, tostring(s or "")) end
+        function api:clear() sb:pop(ctx) end
+        if statusbars then statusbars[desc.id] = api end
+        return sb
+
+    -- BG / ICON / CSS → tratados em lx.app antes de build
+    elseif t == "bg" or t == "icon" or t == "css" then
+        return nil
+
+    -- MENU (retorna nil — tratado separado em lx.app)
+    elseif t == "menu" then
+        return nil
+
+    -- SCREEN (retorna nil — tratado separado em lx.app)
+    elseif t == "screen" then
+        return nil
+    end
+end
+
+-- ───────────────────────────────────────────────────────────
+-- lx.app — ponto de entrada principal
+-- ───────────────────────────────────────────────────────────
+-- ── Atalhos de alto nível ───────────────────────────────────
+function lx.h1(text, color)
+    return lx.text(text, {bold=true, size="x-large", color=color})
+end
+function lx.h2(text, color)
+    return lx.text(text, {bold=true, size="large", color=color})
+end
+function lx.password(id, hint)
+    return lx.field(id, hint, "password")
+end
+function lx.ok(label, fn)
+    return lx.button(label, fn, {suggested=true})
+end
+function lx.danger(label, fn)
+    return lx.button(label, fn, {destructive=true})
+end
+
+function lx.app(title, ...)
+    _boot()
+
+    -- Parseia args: "500x400", "dark"/"light", "500x400 dark" (combinado), {layout}
+    _app_title = title
+    local opts, layout = { width=600, height=400, dark=false }, nil
+    for _, arg in ipairs({...}) do
+        if type(arg) == "string" then
+            local w, h, rest = arg:match("^(%d+)x(%d+)%s*(.*)")
+            if w then
+                opts.width=tonumber(w); opts.height=tonumber(h)
+                if rest=="dark"  then opts.dark=true  end
+                if rest=="light" then opts.dark=false end
+            elseif arg=="dark"  then opts.dark=true
+            elseif arg=="light" then opts.dark=false end
+        elseif type(arg) == "table" then
+            layout = arg
+        end
+    end
+
+    if opts.dark then
+        _Gtk.Settings.get_default().gtk_application_prefer_dark_theme = true
+    end
+
+    -- Janela
+    local win = _Gtk.Window{
+        title=title, default_width=opts.width, default_height=opts.height }
+    win:set_position(_Gtk.WindowPosition.CENTER)
+    _main_win = win
+    win.on_destroy = function() lx.quit() end
+
+    -- Aplica bg / icon / css passados como itens do layout
+    for _, item in ipairs(layout or {}) do
+        if type(item)=="table" then
+            if item._type=="bg" then
+                local v = _color(tostring(item.value or "")) or ""
+                if v:match("^#") or v:match("^rgb") then
+                    _css(win, "window, .background { background-color: "..v.."; }")
+                else
+                    _css(win, "window { background-image: url('"..v.."'); background-size: cover; background-repeat: no-repeat; }")
+                end
+            elseif item._type=="icon" then
+                pcall(function() win:set_icon_from_file(item.path) end)
+            elseif item._type=="css" then
+                _css(win, item.style)
+            end
+        end
+    end
+
+    -- Detecta se é multipágina (tem lx.screen)
+    local has_screens = layout and (function()
+        for _, item in ipairs(layout) do
+            if type(item)=="table" and item._type=="screen" then return true end
+        end
+        return false
+    end)()
+
+    -- ── Multipágina ──────────────────────────────────────
+    if has_screens then
+        local stack    = _Gtk.Stack{ transition_type=_Gtk.StackTransitionType.SLIDE_LEFT_RIGHT,
+                                     transition_duration=200 }
+        local all_fields, all_outputs, all_tables, all_progs, all_statusbars = {},{},{},{},{}
+
+        -- extrai menu se existir
+        local menu_desc = nil
+        for _, item in ipairs(layout) do
+            if type(item)=="table" and item._type=="menu" then menu_desc=item; break end
+        end
+
+        for _, item in ipairs(layout) do
+            if type(item)=="table" and item._type=="screen" then
+                local fields, outputs, tables, progs, statusbars = {},{},{},{},{}
+                local box = _vbox(8, 12)
+                for _, w in ipairs(item.layout or {}) do
+                    if type(w)~="table" then goto continue end
+                    local cw = _build_widget(w, fields, outputs, tables, progs, stack, opts.dark, statusbars)
+                    if cw then
+                        local expand = w._type=="output" or w._type=="table" or w._type=="spacer"
+                        box:pack_start(cw, w._type=="button" and false or expand,
+                                           w._type=="button" and false or expand, 0)
+                    end
+                    -- merge nos globais
+                    for k,v in pairs(fields)     do all_fields[k]=v end
+                    for k,v in pairs(outputs)    do all_outputs[k]=v end
+                    for k,v in pairs(tables)     do all_tables[k]=v end
+                    for k,v in pairs(progs)      do all_progs[k]=v end
+                    for k,v in pairs(statusbars) do all_statusbars[k]=v end
+                    ::continue::
+                end
+                stack:add_titled(box, item.id, item.title or item.id)
+            end
+        end
+
+
+        -- monta janela com menu + stack
+        local root = _vbox(0, 0)
+        if menu_desc then
+            local mb = _build_menubar(menu_desc.items)
+            if mb then root:pack_start(mb, false, false, 0) end
+        end
+        root:pack_start(stack, true, true, 0)
+        win:add(root)
+
+    -- ── Tela única ───────────────────────────────────────
+    else
+        local fields, outputs, tables, progs, statusbars = {},{},{},{},{}
+        local root = _vbox(0, 0)
+        local box  = _vbox(8, 12)
+        local _sbars_widgets = {}   -- statusbars vão pro rodapé
+
+        for _, item in ipairs(layout or {}) do
+            if type(item)~="table" then goto continue end
+            -- bg/icon/css já foram aplicados antes
+            if item._type=="bg" or item._type=="icon" or item._type=="css" then goto continue end
+            if item._type=="menu" then
+                local mb = _build_menubar(item.items)
+                if mb then root:pack_start(mb, false, false, 0) end
+                goto continue
+            end
+            if item._type=="button" then
+                local g = _build_widget(item, fields, outputs, tables, progs, nil, opts.dark, statusbars)
+                if g then box:pack_start(g, false, false, 0) end
+            elseif item._type=="statusbar" then
+                local g = _build_widget(item, fields, outputs, tables, progs, nil, opts.dark, statusbars)
+                if g then _sbars_widgets[#_sbars_widgets+1] = g end
+            else
+                local g = _build_widget(item, fields, outputs, tables, progs, nil, opts.dark, statusbars)
+                if g then
+                    local expand = item._type=="output" or item._type=="table" or item._type=="spacer"
+                    box:pack_start(g, expand, expand, 0)
+                end
+            end
+            ::continue::
+        end
+
+        root:pack_start(box, true, true, 0)
+        -- statusbars sempre no rodapé
+        for _, w in ipairs(_sbars_widgets) do root:pack_end(w, false, false, 0) end
+        win:add(root)
+    end
+
+    win:show_all()
+    return win
+end
+
+-- ───────────────────────────────────────────────────────────
+-- _make_v — cria o objeto v que o usuário usa no botão
+-- ───────────────────────────────────────────────────────────
+function _make_v(fields, outputs, tables, progs, stack, statusbars)
+    local v = {}
+
+    -- leitura: v.campo → valor do field
+    for id, entry in pairs(fields)  do v[id] = entry:get_text() end
+
+    -- v.go(tela) — navega (multipágina)
+    if stack then
+        v.go = function(id) stack:set_visible_child_name(id) end
+    end
+
+    -- metatable: v.saida = valor → aciona output/table/progress automaticamente
+    return setmetatable(v, {
+        __newindex = function(t, k, val)
+            -- output de texto
+            if outputs[k] then
+                local api = outputs[k].api
+                if type(val) == "table" then
+                    api:show_table(val)
+                elseif type(val) == "number" then
+                    api:set(tostring(val))
+                else
+                    api:set(tostring(val or ""))
+                end
+                -- yield automático: se rodando dentro de uma coroutine lx,
+                -- devolve o controle ao GLib para a UI atualizar.
+                -- O usuário não sabe (nem precisa saber) que isso acontece.
+                local co, is_main = coroutine.running()
+                if co and not is_main then coroutine.yield() end
+                return
+            end
+            -- tabela com colunas
+            if tables[k] then
+                local api = tables[k].api
+                if type(val) == "table" then api:set(val)
+                else api:clear() end
+                return
+            end
+            -- barra de progresso
+            if progs[k] then
+                _idle(function() progs[k].api:set(val) end)
+                return
+            end
+            -- statusbar
+            if statusbars and statusbars[k] then
+                statusbars[k]:set(val)
+                return
+            end
+            -- campo normal
+            rawset(t, k, val)
+        end,
+        __index = function(t, k)
+            -- acesso ao widget de output pelo id (para métodos como :append)
+            if outputs[k] then return outputs[k].api end
+            if tables[k]  then return tables[k].api  end
+            if progs[k]   then return progs[k].api   end
+            return rawget(t, k)
+        end
+    })
+end
+
+-- ───────────────────────────────────────────────────────────
+-- _build_menubar — constrói barra de menus GTK
+-- ───────────────────────────────────────────────────────────
+function _build_menubar(items)
+    if not items or #items == 0 then return nil end
+    local bar = _Gtk.MenuBar{}
+    for _, md in ipairs(items) do
+        local mi   = _Gtk.MenuItem{ label=md[1] or md.label or "" }
+        local menu = _Gtk.Menu{}
+        for i = 2, #md do
+            local e = md[i]
+            if type(e)=="table" then
+                if e.sep then
+                    menu:append(_Gtk.SeparatorMenuItem.new())
+                else
+                    local mitem = _Gtk.MenuItem{ label=e[1] or e.label or "" }
+                    if e[2] or e.fn then
+                        local fn = e[2] or e.fn
+                        mitem.on_activate = function() fn() end
+                    end
+                    menu:append(mitem)
+                end
+            end
+        end
+        mi:set_submenu(menu)
+        bar:append(mi)
+    end
+    bar:show_all()
+    return bar
+end
+
+-- ───────────────────────────────────────────────────────────
+-- TRAY (system tray / ícone na bandeja)
+-- ───────────────────────────────────────────────────────────
+function lx.tray(icon, menu_items)
+    _boot()
+    local si
+    local ok = pcall(function()
+        if type(icon)=="string" and (icon:match("^/") or icon:match("%.png$") or icon:match("%.svg$")) then
+            si = _Gtk.StatusIcon.new_from_file(icon)
+        else
+            si = _Gtk.StatusIcon.new_from_icon_name(tostring(icon or "dialog-information"))
+        end
+    end)
+    if not ok or not si then
+        io.stderr:write("[lx] lx.tray: StatusIcon indisponível neste ambiente\n")
+        return nil
+    end
+    si:set_visible(true)
+    if menu_items then
+        local menu = _Gtk.Menu{}
+        for _, item in ipairs(menu_items) do
+            if type(item)=="table" then
+                if item.sep then
+                    menu:append(_Gtk.SeparatorMenuItem.new())
+                else
+                    local mi = _Gtk.MenuItem{ label=item[1] or item.label or "" }
+                    local fn = item[2] or item.fn
+                    if fn then mi.on_activate = function() fn() end end
+                    menu:append(mi)
+                end
+            end
+        end
+        menu:show_all()
+        si.on_popup_menu = function(_, btn, t)
+            menu:popup(nil, nil, nil, nil, btn, t)
+        end
+    end
+    -- clique esimples foca a janela principal
+    si.on_activate = function()
+        if _main_win then _main_win:present() end
+    end
+    return si
+end
+
+-- ───────────────────────────────────────────────────────────
+-- HELP
+-- ───────────────────────────────────────────────────────────
+function lx.help()
+    local ok = os.execute("ms --doc lx 2>/dev/null")
+    if not ok then
+        local c = { b="\27[1;36m", g="\27[1;32m", y="\27[1;33m",
+                    m="\27[1;35m", d="\27[0;90m", r="\27[0m" }
+        print(c.b.."═══ lx — GUI de Alto Nível ═══"..c.r)
+        local sections = {
+            { title="── JANELA E TELAS ──────────────────────────────────────────", items={
+                {"lx.app(titulo, [tamanho], [tema], layout)",
+                 "janela principal — ex: lx.app(\"App\", \"600x400\", \"dark\", {...})"},
+                {"lx.screen(id, layout, [opts])",  "tela para apps multipágina — v.go(id) navega"},
+                {"lx.menu(items)",                 "barra de menus — {{\"Arquivo\", {\"Sair\", lx.quit}}}"},
+                {"lx.bg(cor_ou_path)",             "fundo da janela: nome/hex/rgb ou path de imagem"},
+                {"lx.icon(path)",                  "ícone da janela (.png/.svg)"},
+                {"lx.css(...)",                    "CSS GTK global — presets: rounded, flat, shadow, bordered, compact, comfortable"},
+            }},
+            { title="── WIDGETS ─────────────────────────────────────────────────", items={
+                {"lx.text(str, [opts])",           "texto/título — opts: bold, color, size, align"},
+                {"lx.h1(texto, [cor])",            "título grande (bold + x-large)"},
+                {"lx.h2(texto, [cor])",            "título médio (bold + large)"},
+                {"lx.field(id, hint, [ftype])",    "campo de entrada — ftype: \"text\"|\"password\""},
+                {"lx.password(id, hint)",          "campo de senha (atalho de lx.field com ftype=password)"},
+                {"lx.output(id, [opts])",          "área de texto — v.id = texto/tabela exibe auto"},
+                {"lx.table(id, {colunas}, [opts])","tabela com colunas — v.id = rows preenche"},
+                {"lx.progress(id, [opts])",        "barra de progresso — v.id = 0.5 (50%) ou \"texto\""},
+                {"lx.button(label, fn, [opts])",   "botão — fn(v) recebe campos e saídas"},
+                {"lx.ok(label, fn)",               "botão sugerido (azul/ação) — atalho de button"},
+                {"lx.danger(label, fn)",           "botão destrutivo (vermelho) — atalho de button"},
+                {"lx.check(id, label, [default])", "checkbox — v.id retorna true/false"},
+                {"lx.select(id, lbl, opts, [def])","dropdown — v.id retorna opção selecionada"},
+                {"lx.slider(id, lbl, min, max, step, def)","slider horizontal — v.id retorna número"},
+                {"lx.spin(id, lbl, min, max, [step, def])","input numérico — v.id retorna número"},
+                {"lx.toggle(id, label, [default])","switch on/off — v.id retorna true/false"},
+                {"lx.color(id, label, [default])", "color picker — v.id retorna hex \"#rrggbb\""},
+                {"lx.image(path, [width, height])","imagem de arquivo ou nome de ícone GTK"},
+                {"lx.row({widgets}, [opts])",      "layout horizontal com widgets filhos"},
+                {"lx.statusbar(id)",               "barra de status no rodapé — v.id = \"texto\""},
+                {"lx.spacer()",                    "espaço flexível"},
+                {"lx.sep()",                       "separador visual"},
+            }},
+            { title="── OBJETO v NO BOTÃO ─────────────────────────────────────────", items={
+                {"v.campo",                        "lê o valor de lx.field(\"campo\")"},
+                {"v.saida = texto",                "substitui conteúdo de lx.output(\"saida\")"},
+                {"v.saida = {tabela}",             "exibe tabela em lx.output (com cabeçalho)"},
+                {"v.saida:append(\"linha\")",        "adiciona texto sem apagar o resto"},
+                {"v.saida:clear()",                "limpa o output"},
+                {"v.saida:get()",                  "retorna o conteúdo atual do output"},
+                {"v.tabela = {rows}",              "preenche lx.table(\"tabela\") com linhas"},
+                {"v.tabela:clear()",               "limpa a tabela"},
+                {"v.prog = 0.75",                  "barra de progresso 75%"},
+                {"v.prog = \"Aguarde...\"",          "texto pulsante na barra de progresso"},
+                {"v.prog:pulse()",                 "anima a barra manualmente"},
+                {"v.prog:reset()",                 "reseta a barra para vazio"},
+                {"v.status = \"texto\"",             "atualiza lx.statusbar(\"status\")"},
+                {"v.go(\"tela\")",                   "navega para outra tela (multipágina)"},
+            }},
+            { title="── DIÁLOGOS ──────────────────────────────────────────────────", items={
+                {"lx.alert(msg, [titulo])",        "diálogo de aviso com OK"},
+                {"lx.confirm(msg, fn_sim, [fn_nao])","diálogo sim/não — fn_sim se Sim, fn_nao se Não"},
+                {"lx.prompt(msg, fn)",             "pede texto — fn(texto) recebe a resposta"},
+                {"lx.notify(titulo, msg)",         "notificação do sistema (notify-send)"},
+                {"lx.filepick(fn)",                "escolhe arquivo — fn(caminho)"},
+                {"lx.dirpick(fn)",                 "escolhe pasta — fn(caminho)"},
+            }},
+            { title="── SAÍDA E LOOP ──────────────────────────────────────────────", items={
+                {"lx.print(...)",                  "como print() mas → widgets de output do app"},
+                {"lx.tray(icon, menu_items)",      "ícone na bandeja do sistema"},
+                {"lx.run([fn])",                   "inicia o app — fn opcional executada antes do loop"},
+                {"lx.quit()",                      "fecha o app"},
+                {"lx.after(ms, fn)",               "executa fn uma vez após N ms"},
+                {"lx.every(ms, fn) → id",          "executa fn a cada N ms — retorna id do timer"},
+                {"lx.cancel(id)",                  "cancela timer criado por lx.every"},
+            }},
+        }
+        for _, sec in ipairs(sections) do
+            print(c.m.."\n  "..sec.title..c.r)
+            for _, it in ipairs(sec.items) do
+                print(("  %-42s %s"):format(c.g..it[1]..c.r, c.d..it[2]..c.r))
+            end
+        end
+        print(c.y.."\n  Exemplo 1 — calculadora com select e histórico:"..c.r)
+        local ex1 = {
+            'local lx = require("lx")',
+            'local hist = {}',
+            'lx.app("Calculadora", "420x400", "dark", {',
+            '  lx.h1("Calculadora"),',
+            '  lx.row({ lx.field("a", "Numero A"), lx.field("b", "Numero B") }),',
+            '  lx.select("op", "Operacao", {"+", "-", "*", "/"}, 1),',
+            '  lx.table("historico", {"A", "Op", "B", "Resultado"}),',
+            '  lx.statusbar("status"),',
+            '  lx.ok("Calcular", function(v)',
+            '    local a, b = tonumber(v.a), tonumber(v.b)',
+            '    if not a or not b then v.status = "Numero invalido" return end',
+            '    local r',
+            '    if v.op == "+" then r = a+b',
+            '    elseif v.op == "-" then r = a-b',
+            '    elseif v.op == "*" then r = a*b',
+            '    elseif v.op == "/" then',
+            '      if b == 0 then v.status = "Divisao por zero" return end',
+            '      r = a/b',
+            '    end',
+            '    hist[#hist+1] = { a=v.a, op=v.op, b=v.b, resultado=r }',
+            '    v.historico = hist',
+            '    v.status = v.a..' '..v.op..' '..v.b..' = '..r',
+            '  end),',
+            '})',
+            'lx.run()',
+        }
+        for _, l in ipairs(ex1) do print(c.d.."  "..l..c.r) end
+        print(c.y.."\n  Exemplo 2 — app multipágina com menu:"..c.r)
+        local ex2 = {
+            'local lx = require("lx")',
+            'lx.app("App", "450x350", {',
+            '  lx.menu({ {"Arquivo", {"Sair", lx.quit}} }),',
+            '  lx.css("rounded", "shadow"),',
+            '  lx.screen("home", {',
+            '    lx.h1("Início"), lx.spacer(),',
+            '    lx.ok("Ir para Config", function(v) v.go("config") end),',
+            '  }),',
+            '  lx.screen("config", {',
+            '    lx.h2("Configurações"),',
+            '    lx.toggle("modo", "Modo escuro", true),',
+            '    lx.slider("vol", "Volume", 0, 100, 1, 50),',
+            '    lx.danger("Voltar", function(v) v.go("home") end),',
+            '  }),',
+            '})',
+            'lx.run()',
+        }
+        for _, l in ipairs(ex2) do print(c.d.."  "..l..c.r) end
+        print("")
+    end
+end
+
+return lx
+
+LX_EOF
+            # Copia lx.lua para ~/.lua-modules (diretório padrão de módulos do usuário)
+            mkdir -p "$HOME/.lua-modules"
+            cp "$LUA_DIR/lx.lua" "$HOME/.lua-modules/lx.lua"
+            # Garante LUA_PATH no .bashrc (inclui ambos os diretórios)
+            grep -qF "lpm_lua_path" "$HOME/.bashrc" 2>/dev/null || cat >> "$HOME/.bashrc" << BASHEOF
+# lpm_lua_path
+export LUA_PATH="${LUA_DIR}/?.lua;${LUA_DIR}/?/init.lua;\${LUA_PATH:-}"
+export LUA_CPATH="${LIB_DIR}/?.so;${LIB_DIR}/?/?.so;\${LUA_CPATH:-}"
+BASHEOF
+            # Garante também ~/.lua-modules no LUA_PATH
+            grep -qF "lua_modules_path" "$HOME/.bashrc" 2>/dev/null || printf '\n# lua_modules_path\nexport LUA_PATH="%s/.lua-modules/?.lua;${LUA_PATH:-}"\n' "$HOME" >> "$HOME/.bashrc"
+            export LUA_PATH="$HOME/.lua-modules/?.lua;$LUA_DIR/?.lua;$LUA_DIR/?/init.lua;${LUA_PATH:-}"
+            export LUA_CPATH="$LIB_DIR/?.so;$LIB_DIR/?/?.so;${LUA_CPATH:-}"
+            _ok "lx instalado! Uso: local lx = require(\"lx\") — veja lx.help() para documentação completa"
             return ;;
     esac
     case "$pkg" in
@@ -102582,6 +105696,23 @@ _list() {
                  [ -z "$1" ] && { echo "Uso: lpm remove [--all] <pacote>"; exit 1; }
                  _PKG="$1"
                  _PFXDIR="${PREFIX:-/data/data/com.termux/files/usr}"
+                 # Pacotes instalados via pkg — removidos com pkg remove
+                 case "$_PKG" in
+                     lgi|lua-lgi)
+                         pkg remove -y lua-lgi 2>/dev/null && _ok "lgi removido via pkg" || _err "Falha ao remover lua-lgi"
+                         sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
+                         continue 2>/dev/null || true ;;
+                     luaposix|posix)
+                         pkg remove -y lua-posix 2>/dev/null && _ok "luaposix removido via pkg" || _err "Falha ao remover lua-posix"
+                         continue 2>/dev/null || true ;;
+                     lcurl|curl)
+                         pkg remove -y lua-curl 2>/dev/null && _ok "lcurl removido via pkg" || _err "Falha ao remover lua-curl"
+                         continue 2>/dev/null || true ;;
+                     lx)
+                         pkg remove -y lua-lgi 2>/dev/null || true
+                         sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
+                         rm -f "$HOME/.lua-modules/lx.lua" ;;
+                 esac
                  rm -f "$LUA_DIR/${_PKG}.lua"
                  rm -f "$LIB_DIR/${_PKG}.so"
                  rm -rf "$LUA_DIR/${_PKG}"
@@ -102596,6 +105727,33 @@ _list() {
                  rm -f "/usr/local/lib/lua/5.4/${_PKG}.so"
                  _ok "$_PKG removido"
              fi ;;
+
+    update)  shift
+             [ -z "$1" ] && { echo "Uso: lpm update <pacote>"; exit 1; }
+             for p in "$@"; do
+                 _banner
+                 printf "  ${Y}↻${R} Atualizando: ${W}$p${R}\n\n"
+                 _PFXDIR="${PREFIX:-/data/data/com.termux/files/usr}"
+                 case "$p" in
+                     lgi|lua-lgi)
+                         pkg remove -y lua-lgi 2>/dev/null || true
+                         sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null ;;
+                     luaposix|posix)
+                         pkg remove -y lua-posix 2>/dev/null || true ;;
+                     lcurl|curl)
+                         pkg remove -y lua-curl 2>/dev/null || true ;;
+                     lx)
+                         pkg remove -y lua-lgi 2>/dev/null || true
+                         sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
+                         rm -f "$HOME/.lua-modules/lx.lua" ;;
+                 esac
+                 rm -f "$LUA_DIR/${p}.lua" "$LIB_DIR/${p}.so"
+                 rm -rf "$LUA_DIR/${p}" "$LIB_DIR/${p}"
+                 rm -f "$_PFXDIR/share/lua/5.4/${p}.lua" "$_PFXDIR/lib/lua/5.4/${p}.so"
+                 rm -rf "$_PFXDIR/share/lua/5.4/${p}" "$_PFXDIR/lib/lua/5.4/${p}"
+                 _install "$p" ""
+                 _ok "$p atualizado"
+             done ;;
 
     # ── --script: busca e instala scripts de fontes externas ──────────────
     --script|-S)
@@ -102909,6 +106067,7 @@ _list() {
              printf "  lpm list                           lista instalados\n"
              printf "  lpm remove <pacote>                remove pacote\n"
              printf "  lpm remove --all                   remove todos os pacotes instalados\n"
+             printf "  lpm update <pacote>                reinstala pacote (remove + instala)\n"
              printf "  lpm --script -s <termo>            busca scripts em exploit-db/packetstorm/github\n"
              printf "  lpm --script -i <num>              baixa script pelo número do resultado\n"
              printf "  lpm --script -l                    lista fontes de scripts\n" ;;
@@ -106908,6 +110067,208 @@ XPMEOF
     chmod +x "${_TPFX}/bin/xpm"
     _ok "xpm instalado em ${_TPFX}/bin/xpm"
 
+    # ── Instala pst — ElliotOS Paste Tool ───────────────────────────────────
+    _step "📋" "Instalando pst (Paste Tool)..."
+    cat > "${_TPFX}/bin/pst" << 'PSTEOF'
+#!/bin/bash
+# pst — ElliotOS Paste Tool v1.0
+# Família: lpm · xpm · pst
+# Publica arquivos/texto no pastebin.ai via API (sem autenticação)
+# Dependências: bash >= 4, curl
+
+_R=$'\033[1;31m'; _G=$'\033[1;32m'; _Y=$'\033[1;33m'
+_B=$'\033[1;34m'; _C=$'\033[1;36m'; _M=$'\033[1;35m'
+_W=$'\033[1;37m'; _D=$'\033[0;90m'; _N=$'\033[0m'
+
+_ok()   { printf "  ${_G}✓${_N} %s\n" "$1"; }
+_err()  { printf "  ${_R}✗${_N} %s\n" "$1" >&2; }
+_info() { printf "  ${_D}→${_N} %s\n" "$1"; }
+_step() { printf "  ${_C}[*]${_N} %s\n" "$1"; }
+
+_PST_VERSION="1.0"
+_API_URL="https://pastebin.ai/api/v1/pastes"
+
+_banner() {
+    printf "\n${_Y}╔══════════════════════════════════════════════════════════════╗${_N}\n"
+    printf "${_Y}║${_N}  ${_M}pst${_N} ${_D}—${_N} ${_W}ElliotOS Paste Tool${_N} ${_D}v${_PST_VERSION}${_N}                           ${_Y}║${_N}\n"
+    printf "${_Y}║${_N}  ${_D}família: lpm · xpm · pst${_N}                                    ${_Y}║${_N}\n"
+    printf "${_Y}╚══════════════════════════════════════════════════════════════╝${_N}\n\n"
+}
+
+_help() {
+    _banner
+    printf "${_W}USO:${_N}\n"
+    printf "  ${_C}pst${_N} [opções] ${_Y}<arquivo>${_N}\n"
+    printf "  ${_C}cat arquivo${_N} | ${_C}pst${_N} [opções]\n"
+    printf "  ${_C}echo 'texto'${_N} | ${_C}pst${_N} [opções]\n\n"
+
+    printf "${_W}VISIBILIDADE:${_N}\n"
+    printf "  ${_G}--public${_N}             Paste público, aparece na lista pública  ${_D}(padrão)${_N}\n"
+    printf "  ${_Y}--unlisted${_N}           Paste não listado, só acessível pelo link\n"
+    printf "  ${_R}--private${_N}            Paste privado — requer user key ${_D}(PASTEBIN_USER_KEY)${_N}\n\n"
+
+    printf "${_W}OPÇÕES:${_N}\n"
+    printf "  ${_C}-n, --name${_N}   ${_Y}<título>${_N}   Título do paste ${_D}(padrão: nome do arquivo)${_N}\n"
+    printf "  ${_C}-l, --lang${_N}   ${_Y}<lang>${_N}     Highlight de sintaxe ${_D}(auto-detectado pela extensão)${_N}\n"
+    printf "  ${_C}-e, --expire${_N} ${_Y}<tempo>${_N}    Expiração: N · 10M · 1H · 1D · 1W · 2W · 1M · 6M · 1Y\n"
+    printf "  ${_C}-h, --help${_N}               Exibe esta ajuda\n"
+    printf "  ${_C}-v, --version${_N}            Exibe a versão\n\n"
+
+    printf "${_W}LINGUAGENS (auto-detecção pela extensão):${_N}\n"
+    printf "  ${_D}lua · python · bash · c · cpp · javascript · typescript${_N}\n"
+    printf "  ${_D}html · css · json · markdown · xml · sql · go · rust · e mais...${_N}\n\n"
+
+    printf "${_W}SERVIÇO:${_N}\n"
+    printf "  ${_D}Usa pastebin.ai — sem conta, sem API key, gratuito.${_N}\n\n"
+
+    printf "${_W}EXEMPLOS:${_N}\n"
+    printf "  ${_C}pst --public main.lua${_N}\n"
+    printf "  ${_C}pst --unlisted -l lua -n \"ElliotOS boot\" boot.lua${_N}\n"
+    printf "  ${_C}pst --public -e 1D script.py${_N}\n"
+    printf "  ${_C}cat main.lua | pst --unlisted -n \"snippet\"${_N}\n"
+    printf "  ${_C}echo 'print(42)' | pst -l lua${_N}\n\n"
+}
+
+_detect_lang() {
+    local ext="${1##*.}"
+    case "${ext,,}" in
+        lua)           echo "lua" ;;
+        py)            echo "python" ;;
+        sh|bash)       echo "bash" ;;
+        c)             echo "c" ;;
+        cpp|cc|cxx)    echo "cpp" ;;
+        h|hpp)         echo "cpp" ;;
+        js)            echo "javascript" ;;
+        ts)            echo "typescript" ;;
+        html|htm)      echo "html5" ;;
+        css)           echo "css" ;;
+        json)          echo "json" ;;
+        md|markdown)   echo "markdown" ;;
+        xml)           echo "xml" ;;
+        sql)           echo "sql" ;;
+        php)           echo "php" ;;
+        rb)            echo "ruby" ;;
+        go)            echo "go" ;;
+        rs)            echo "rust" ;;
+        java)          echo "java" ;;
+        kt)            echo "kotlin" ;;
+        cs)            echo "csharp" ;;
+        yaml|yml)      echo "yaml" ;;
+        toml)          echo "toml" ;;
+        ini|cfg|conf)  echo "ini" ;;
+        *)             echo "text" ;;
+    esac
+}
+
+PRIVACY=0; PASTE_NAME=""; PASTE_LANG=""; PASTE_EXPIRE="N"; FILE=""
+
+[[ $# -eq 0 ]] && { _help; exit 0; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --public)    PRIVACY=0; shift ;;
+        --unlisted)  PRIVACY=1; shift ;;
+        --private)   PRIVACY=2; shift ;;
+        -n|--name)   PASTE_NAME="$2"; shift 2 ;;
+        -l|--lang)   PASTE_LANG="$2"; shift 2 ;;
+        -e|--expire) PASTE_EXPIRE="$2"; shift 2 ;;
+        -h|--help)   _help; exit 0 ;;
+        -v|--version) printf "pst v${_PST_VERSION} — ElliotOS Paste Tool\n"; exit 0 ;;
+        -*) _err "Opção desconhecida: $1"; _info "Use: pst --help"; exit 1 ;;
+        *)  FILE="$1"; shift ;;
+    esac
+done
+
+if [[ -n "$FILE" ]]; then
+    [[ ! -f "$FILE" ]] && { _err "Arquivo não encontrado: $FILE"; exit 1; }
+    CONTENT=$(cat "$FILE")
+    [[ -z "$PASTE_NAME" ]] && PASTE_NAME="$FILE"
+    [[ -z "$PASTE_LANG" ]] && PASTE_LANG=$(_detect_lang "$FILE")
+elif [[ ! -t 0 ]]; then
+    CONTENT=$(cat)
+    [[ -z "$PASTE_LANG" ]] && PASTE_LANG="text"
+else
+    _err "Nenhum arquivo ou entrada fornecida."
+    _info "Use: pst --help"; exit 1
+fi
+
+[[ -z "$CONTENT" ]] && { _err "Conteúdo vazio — nada a publicar."; exit 1; }
+[[ -z "$PASTE_LANG" ]] && PASTE_LANG="text"
+
+case "$PRIVACY" in
+    0) _PRIV_LABEL="público"    ; _PRIV_COLOR="$_G" ;;
+    1) _PRIV_LABEL="não listado"; _PRIV_COLOR="$_Y" ;;
+    2) _PRIV_LABEL="privado"    ; _PRIV_COLOR="$_R" ;;
+esac
+
+printf "\n${_M}── pst ${_D}·${_N} ${_W}Publicando paste${_N} ${_M}──────────────────────────────────────────${_N}\n\n"
+[[ -n "$PASTE_NAME" ]] && _info "Título    : ${_W}${PASTE_NAME}${_N}"
+_info "Linguagem : ${_W}${PASTE_LANG}${_N}"
+_info "Expiração : ${_W}${PASTE_EXPIRE}${_N}"
+printf "  ${_D}→${_N} Visibilidade: ${_PRIV_COLOR}${_PRIV_LABEL}${_N}\n\n"
+_step "Enviando para pastebin.ai..."
+
+# Mapeia visibility
+case "$PRIVACY" in
+    0) _VIS="public"   ;;
+    *) _VIS="unlisted" ;;
+esac
+
+# Mapeia expiração (pst usa "N"/"1H" etc → pastebin.ai usa "never"/"1h" etc)
+_EXP=$(printf '%s' "$PASTE_EXPIRE" | tr '[:upper:]' '[:lower:]')
+[[ "$_EXP" == "n" ]] && _EXP="never"
+
+# Monta JSON via python3 — valores passados como env vars (evita interpolação)
+_PST_TMP="${TMPDIR:-/tmp}/_pst_resp_$$.json"
+JSON_BODY=$(PST_VIS="$_VIS" PST_EXP="$_EXP" PST_TITLE="$PASTE_NAME" PST_LANG="$PASTE_LANG" \
+python3 -c '
+import json, os, sys
+d = {
+    "content": sys.stdin.read(),
+    "visibility": os.environ["PST_VIS"],
+    "expiration": os.environ["PST_EXP"],
+}
+if os.environ.get("PST_TITLE"): d["title"] = os.environ["PST_TITLE"]
+lang = os.environ.get("PST_LANG", "")
+if lang and lang != "text": d["language"] = lang
+print(json.dumps(d))
+' <<< "$CONTENT")
+
+HTTP_CODE=$(curl -s -o "$_PST_TMP" -w "%{http_code}" \
+    -X POST "$_API_URL" \
+    -H "Content-Type: application/json" \
+    -d "$JSON_BODY" 2>/dev/null)
+RESPONSE=$(cat "$_PST_TMP" 2>/dev/null)
+rm -f "$_PST_TMP"
+
+PASTE_URL=$(python3 -c \
+    'import json,sys; d=json.load(sys.stdin); print(d.get("url",""))' \
+    <<< "$RESPONSE" 2>/dev/null)
+PASTE_RAW=$(python3 -c \
+    'import json,sys; d=json.load(sys.stdin); print(d.get("raw_url",""))' \
+    <<< "$RESPONSE" 2>/dev/null)
+
+if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]] && [[ "$PASTE_URL" == http* ]]; then
+    printf "\n${_G}╔══════════════════════════════════════════════════════════════╗${_N}\n"
+    printf "${_G}║  ✔  Paste publicado com sucesso!                             ║${_N}\n"
+    printf "${_G}╚══════════════════════════════════════════════════════════════╝${_N}\n\n"
+    printf "  ${_W}Link:${_N} ${_B}${PASTE_URL}${_N}\n"
+    [[ -n "$PASTE_RAW" ]] && printf "  ${_W}Raw: ${_N} ${_D}${PASTE_RAW}${_N}\n"
+    printf "\n"
+else
+    printf "\n${_R}╔══════════════════════════════════════════════════════════════╗${_N}\n"
+    printf "${_R}║  ✗  Falha ao publicar                                        ║${_N}\n"
+    printf "${_R}╚══════════════════════════════════════════════════════════════╝${_N}\n\n"
+    _err "HTTP $HTTP_CODE — Resposta: ${RESPONSE}"
+    printf "\n"
+    _info "Verifique sua conexão com a internet."
+    _info "API: ${_B}https://pastebin.ai/api/v1/pastes${_N}"
+    exit 1
+fi
+PSTEOF
+    chmod +x "${_TPFX}/bin/pst"
+    _ok "pst instalado em ${_TPFX}/bin/pst"
+
     # ── Instala módulo ell — ElliotOS Code Encoder ──────────────────────────
     _step "🔒" "Instalando módulo ell (Code Encoder/Decoder)..."
     _ELL_DIR="${PREFIX:-/data/data/com.termux/files/usr}/share/lua-modules"
@@ -107822,5414 +111183,5657 @@ INSTALL_ARCH_HEREDOC
 
     SH_INTERP="/data/data/com.termux/files/usr/bin/bash"
     [ "$OS_TYPE" != "termux" ] && SH_INTERP="/bin/bash"
-    cat > "$MS" << MS_WRAPPER_EOF
-#!${SH_INTERP}
-# ElliotOS ms — wrapper com argumentos nativos
-_B="MS_BIN_PLACEHOLDER"
-
-# Carrega chaves de API do ~/.bashrc se não estiverem no ambiente
-# Necessário porque o ms é executado via exec (não shell interativo)
-if [ -z "\$ELLIOT_AI_KEY" ]; then
-  _KEY=\$(grep -m1 'export ELLIOT_AI_KEY=' "\$HOME/.bashrc" "\$HOME/.profile" 2>/dev/null | head -1 | sed "s/.*ELLIOT_AI_KEY=['\"]\\?//;s/['\"].*//")
-  [ -n "\$_KEY" ] && export ELLIOT_AI_KEY="\$_KEY"
-fi
-if [ -z "\$ELLIOT_AI_KEY" ] && [ -z "\$GEMINI_API_KEY" ]; then
-  _KEY=\$(grep -m1 'export GEMINI_API_KEY=' "\$HOME/.bashrc" "\$HOME/.profile" 2>/dev/null | head -1 | sed "s/.*GEMINI_API_KEY=['\"]\\?//;s/['\"].*//")
-  [ -n "\$_KEY" ] && export GEMINI_API_KEY="\$_KEY" && export ELLIOT_AI_KEY="\$_KEY"
-fi
-# Propaga para todas as vars específicas de provider de IA
-if [ -n "\$ELLIOT_AI_KEY" ]; then
-  [ -z "\$GEMINI_API_KEY"  ] && export GEMINI_API_KEY="\$ELLIOT_AI_KEY"
-  [ -z "\$GROQ_API_KEY"    ] && export GROQ_API_KEY="\$ELLIOT_AI_KEY"
-  [ -z "\$OPENAI_API_KEY"  ] && export OPENAI_API_KEY="\$ELLIOT_AI_KEY"
-  [ -z "\$DEEPSEEK_API_KEY"] && export DEEPSEEK_API_KEY="\$ELLIOT_AI_KEY"
-  [ -z "\$AI_KEY"          ] && export AI_KEY="\$ELLIOT_AI_KEY"
-fi
-
-# Injeta paths do lpm (~/.luarocks) e lmod (~/.lua-modules) antes de exec
-# O binário lua-net usa LUA_PATH/LUA_CPATH na inicialização do package loader
-_LPM_LUA="\$HOME/.luarocks/share/lua/5.4"
-_LPM_LIB="\$HOME/.luarocks/lib/lua/5.4"
-_LMOD_DIR="\$HOME/.lua-modules"
-_EXTRA_PATH="\${_LPM_LUA}/?.lua;\${_LPM_LUA}/?/init.lua;\${_LMOD_DIR}/?.lua;\${_LMOD_DIR}/?/init.lua"
-_SYS_LIB="\${PREFIX:-/data/data/com.termux/files/usr}/lib/lua/5.4"
-_EXTRA_CPATH="\${_LPM_LIB}/?.so;\${_LPM_LIB}/?/?.so;\${_SYS_LIB}/?.so;\${_SYS_LIB}/?/?.so"
-# Inclui diretório atual para que require("modulo") encontre ./modulo.lua
-export LUA_PATH="./?.lua;./?/init.lua;\${_EXTRA_PATH};\${LUA_PATH:-;}"
-export LUA_CPATH="\${_EXTRA_CPATH};\${LUA_CPATH:-}"
-
-_help() {
-
-printf "\033[1;35m┌────────────────────────────────────────────────────────────────┐\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m   _________ __   .__  .__        __   ________    _________  \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m  /   _____/|  |  |  | |__| _____/  |_ \_____  \  /   _____/  \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m  \_____  \ |  |  |  | |  |/  _ \   __\ /   |   \ \_____  \   \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m  /        \|  |_ |  |_|  (  <_> )  |  /    |    \/        \  \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m /_______  /|____/|____/__|\____/|__|  \_______  /_______  /  \033[0m  \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;31m         \/                                     \/        \/   \033[0m  \033[1;35m│\033[0m\n"
-printf "\033[1;35m│                                                                │\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;36m  __  __                ___  _        _                        \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;36m |  \/  | ___  ___ _ _ / __|| |_ _  _| | ___                   \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;36m | |\/| |/ _ \/ _ \ \ /\__ \| __| || | |/ -_)                  \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;36m |_|  |_|\___/\___/_\_\|___/ \__|\_, |_|\___|                  \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m│\033[0m\033[1;36m                                  |__/                         \033[0m \033[1;35m│\033[0m\n"
-printf "\033[1;35m└────────────────────────────────────────────────────────────────┘\033[0m\n"
-
-printf "\033[1;33m── Geral ───────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms\033[0m                           — REPL interativo\n"
-printf "  \033[1;32mms -c \033[0;33m'codigo lua'\033[0m          — executa Lua sem abrir REPL\n"
-printf "  \033[1;32mms -f \033[0;33mscript.lua\033[0m            — executa arquivo\n"
-printf "  \033[1;32mms -e\033[0m                        — abre ElliotOS Editor (arquivo novo)\n"
-printf "  \033[1;32mms -e \033[0;33marquivo\033[0m              — abre/cria arquivo no ElliotOS Editor\n"
-printf "  \033[1;32mms -lua2c \033[0;33marquivo.lua\033[0m      — transpila Lua → C (gera arquivo.c)\n"
-printf "  \033[1;32mms -lua2c -r \033[0;33marquivo.lua\033[0m  — transpila e compila com cxx\n"
-printf "  \033[1;32mms -lua2c -o \033[0;33msaida.c arq.lua\033[0m — nome do .c gerado\n"
-printf "  \033[1;32mms -i\033[0m                        — info do sistema\n"
-printf "  \033[1;32mms -v\033[0m                        — versao\n"
-printf "  \033[1;32mms -h\033[0m                        — esta ajuda\n\n"
-
-printf "\033[1;33m── Diagnostico ─────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms -t\033[0m                        — ms.check() self-test\n"
-printf "  \033[1;32mms -tv\033[0m                       — ms.check() verbose\n"
-printf "  \033[1;32mms -T\033[0m                        — ms.force() stress test\n"
-printf "  \033[1;32mms -Tv\033[0m                       — ms.force() verbose\n"
-printf "\n"
-
-printf "\033[1;33m── IA ──────────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms -a\033[0m                        — chat interativo com CYN\n"
-printf "  \033[1;32mms -a \033[0;33m'pergunta'\033[0m            — pergunta direta\n"
-printf "  \033[1;32mms -A \033[0;33m'pergunta'\033[0m            — resposta raw sem formatacao\n"
-printf "  \033[1;32mms -e \033[0;33m<arq> [-v erros.txt]\033[0m  — abre editor (com -v verifica sintaxe e salva erros)\n"
-printf "  \033[1;32mms -a \033[0;33m[-f arq] 'pergunta'\033[0m    — pergunta para a CYN (-f passa arquivo como contexto)\n"
-printf "  \033[1;32mms --search \033[0;33m'query'\033[0m       — pesquisa na web e resume o resultado\n"
-printf "  \033[1;32mms --code \033[0;33m[-o arq] 'tarefa'\033[0m  — gera código/script sem restrições (-o salva no arquivo)\n"
-
-printf "\033[1;33m── Rede ────────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms -g \033[0;33murl\033[0m                   — HTTP GET\n"
-printf "  \033[1;32mms --post \033[0;33murl dados\033[0m         — HTTP POST\n"
-printf "  \033[1;32mms --headers \033[0;33murl\033[0m            — headers da resposta\n"
-printf "  \033[1;32mms --ip\033[0m                      — IP público\n"
-printf "  \033[1;32mms -d \033[0;33mhost\033[0m                  — DNS lookup\n"
-printf "  \033[1;32mms -P \033[0;33mhost\033[0m                  — ping\n"
-printf "  \033[1;32mms --scan \033[0;33mhost p1 p2\033[0m        — port scan\n"
-printf "  \033[1;32mms --listen \033[0;33mporta\033[0m           — listener TCP\n"
-printf "  \033[1;32mms --socket \033[0;33mfam type h p [data]\033[0m — fire-and-forget socket\n\n"
-
-printf "\033[1;33m── Pentest ─────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[0;90m(N = endpoints a testar; padrão 1; 0 = todos)\033[0m\n"
-printf "  \033[1;32mms -x \033[0;33murl \033[0;90m[N]\033[0m             — XSS\n"
-printf "  \033[1;32mms -q \033[0;33murl \033[0;90m[N]\033[0m             — SQLi\n"
-printf "  \033[1;32mms -l \033[0;33murl \033[0;90m[N]\033[0m             — LFI\n"
-printf "  \033[1;32mms -r \033[0;33murl \033[0;90m[N]\033[0m             — RCE\n"
-printf "  \033[1;32mms -N \033[0;33murl\033[0m               — NoSQL Injection\n"
-printf "  \033[1;32mms --ssrf \033[0;33murl \033[0;90m[N]\033[0m         — SSRF\n"
-printf "  \033[1;32mms --redir \033[0;33murl \033[0;90m[N]\033[0m        — Open Redirect\n"
-printf "  \033[1;32mms --ssti \033[0;33murl \033[0;90m[N]\033[0m         — SSTI\n"
-printf "  \033[1;32mms --scan-all \033[0;33murl \033[0;90m[N]\033[0m     — todos os scanners\n"
-printf "  \033[1;32mms -s \033[0;33murl \033[0;90m[limit] [ep]\033[0m     — spider (ep=qualquer valor filtra só endpoints)\n"
-printf "  \033[1;32mms -p \033[0;33measy|med|hard\033[0m         — sobe lab vulneravel\n"
-printf "  \033[1;32mms -p stop\033[0m                   — encerra todos os labs\n"
-printf "  \033[1;32mms -web\033[0m                      — servidor HTML interativo (pede arquivo e porta)\n"
-printf "  \033[1;32mms -web \033[0;33marquivo porta\033[0m       — sobe servidor direto com o HTML indicado\n"
-printf "  \033[1;32mms -web stop\033[0m                 — para o servidor web\n"
-printf "  \033[1;32mms --exploit-rce \033[0;33murl\033[0m        — exploit.rce REPL\n"
-printf "  \033[1;32mms --exploit-sqli \033[0;33murl\033[0m       — exploit.sqli REPL\n"
-printf "  \033[1;32mms --exploit-lfi \033[0;33murl\033[0m        — exploit.lfi REPL\n"
-printf "\n"
-
-printf "\033[1;33m── APK ─────────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --apk \033[0;33marquivo.apk [arquivo2.apk ...]\033[0m — testa compatibilidade E instalabilidade real (aceita vários apks de uma vez)\n"
-printf "  \033[1;32mms --apk-sign \033[0;33marquivo.apk\033[0m    — alinha+assina um apk JÁ compilado (ex: logo após 'apktool b'), sem refazer decode/rebuild\n"
-printf "  \033[1;32mappforge build \033[0;33m<dir> [opções]\033[0m — converte HTML/CSS/JS em APK sem root (ex: appforge build ./meuapp/ --perm camera,mic)\n"
-printf "\n"
-
-
-printf "\033[1;33m── Ambiente / Ferramentas ──────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms -nh\033[0m                         — instala Kali NetHunter no Termux (sem root)\n"
-printf "  \033[1;32mms -ba\033[0m                         — instala Arch Linux + BlackArch no Termux (sem root)\n"
-printf "\n"
-
-printf "\033[1;33m── Filesystem ──────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --cat \033[0;33marquivo\033[0m            — le e imprime arquivo\n"
-printf "  \033[1;32mms --ls \033[0;33m[dir]\033[0m              — lista diretorio\n"
-printf "  \033[1;32mms --write \033[0;33marq texto\033[0m        — escreve arquivo\n"
-printf "  \033[1;32mms --lua-scan \033[0;33m[dir]\033[0m         — detecta .lua no diretorio e lista\n"
-printf "  \033[1;32mms --lua-scan \033[0;33m[dir] --export \033[0;33m[saida.lua]\033[0m — junta todos os .lua em um arquivo\n\n"
-
-# Crypto (md5/sha256) só meio e god; b64 existe em todos
-printf "\033[1;33m── Crypto ──────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --md5 \033[0;33m'texto'\033[0m            — hash MD5\n"
-printf "  \033[1;32mms --sha256 \033[0;33m'texto'\033[0m         — hash SHA256\n"
-printf "  \033[1;32mms --b64e \033[0;33m'texto'\033[0m           — Base64 encode\n"
-printf "  \033[1;32mms --b64d \033[0;33m'b64'\033[0m             — Base64 decode\n"
-printf "  \033[1;32mms --jwt \033[0;33m'token'\033[0m            — decodifica JWT\n\n"
-
-printf "\033[1;33m── Shell / Sistema ─────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --sh \033[0;33m'cmd'\033[0m               — executa shell, captura output\n"
-printf "  \033[1;32mms --ps\033[0m                      — lista processos\n"
-printf "  \033[1;32mms --kill \033[0;33mpid\033[0m              — mata processo\n"
-printf "  \033[1;32mms --env \033[0;33m[VAR]\033[0m             — variaveis de ambiente\n\n"
-
-printf "\033[1;33m── Aprender / Exemplos ─────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --learn\033[0m                   — tutorial interativo em português\n"
-printf "  \033[1;32mms --examples\033[0m                — lista scripts de exemplo prontos\n"
-printf "  \033[1;32mms --doc\033[0m                     — documentação completa do sistema\n"
-printf "  \033[1;32mms --doc net\033[0m                 — módulo net.*\n"
-printf "  \033[1;32mms --doc mod\033[0m                 — módulo mod.* (23 scanners)\n"
-printf "  \033[1;32mms --doc crypto|sys|fs|ai\033[0m    — outros módulos\n"
-printf "  \033[1;32mms --payload\033[0m                 — gerador de payloads (reverse/bind/web shell)\n"
-printf "  \033[0;90m  Scripts: recon, portscan, webcheck, hashcrack, nexus\033[0m\n\n"
-
-printf "\033[1;33m── Scripts ─────────────────────────────────────────────────────\033[0m\n"
-printf "  \033[1;32mms --script \033[0;33m<nome>\033[0m            — executa script Lua ou C do diretorio de scripts\n"
-printf "  \033[1;32mms --script \033[0;33m<nome> -- [args]\033[0m  — com argumentos\n"
-printf "  \033[0;90m  Lua: ${PREFIX:-/usr/local}/share/lua-scripts\033[0m\n"
-printf "  \033[0;90m  C:   ${PREFIX:-/usr/local}/share/c-scripts  (fontes .c compilam automaticamente)\033[0m\n"
-printf "  \033[0;90m  Exemplos:\033[0m\n"
-printf "  \033[0;90m    ms --script nexus --os 8.8.8.8\033[0m\n"
-printf "  \033[0;90m    ms --script portscan.lua -- 192.168.1.1 80 443\033[0m\n"
-printf "  \033[0;90m    ms --script xerxes.c -- 192.168.1.1 80\033[0m\n\n"
-printf "  \033[1;32mms --cscript \033[0;33m<nome.c>\033[0m         — compila e executa script C de c-scripts\n"
-printf "  \033[1;32mms --cscript \033[0;33m<binario>\033[0m        — executa binario C ja compilado\n"
-printf "  \033[1;32mms --cscript \033[0;33m<nome.c> -- [args]\033[0m — com argumentos\n\n"
-
-printf "\033[0;90m  Exemplos:\033[0m\n"
-printf "  \033[0;90mms -a 'o que e XSS?'                    ms --sha256 'senha123'\033[0m\n"
-printf "  \033[0;90mms -q 'http://127.0.0.1:8081/?q='       ms -g https://example.com\033[0m\n"
-printf "  \033[0;90mms --scan-all 'http://127.0.0.1:8081/'  ms --sh 'ls ~'\033[0m\n"
-printf "  \033[0;90mms --apk app.apk                        ms --apk-sign app-recompilado.apk\033[0m\n"
-
-
-printf "\033[0;90m  No REPL: ms.help()  mod.help()  crypto.help()  ai.help()  pent.help()\033[0m\n\n"
-
-printf "\033[1;33m── Variáveis Indexadas (ivar v2.0) ─────────────────────────────\033[0m\n"
-printf "  \033[1;32mivar.enable()\033[0m                — ativa (padrão desde a instalação)\n"
-printf "  \033[1;32mivar.disable()\033[0m               — desativa\n"
-printf "  \033[1;32mivar.list()\033[0m                  — mapa !N → nome = valor atual\n"
-printf "  \033[1;32mivar.alias(\"hp\", \"player_hp\")\033[0m  — registra !hp → player_hp\n"
-printf "  \033[1;32mivar.debug(true)\033[0m             — avisa ao registrar cada variável\n"
-printf "  \033[1;32mivar.reset()\033[0m                 — limpa índices, aliases e escopos\n"
-printf "  \033[0;90m  !hp = player_hp              — alias nomeado (suprimido do Lua)\033[0m\n"
-printf "  \033[0;90m  nome_longo = 42  → !1; print(!1) → print(nome_longo)\033[0m\n"
-printf "  \033[0;90m  Dentro de function{}: !1 reinicia no escopo da função.\033[0m\n\n"
-}
-
-
-
-# ── Tradução de erros Lua → português BR ─────────────────────────────────────
-_lua_run() {
-    local _tmp; _tmp="\$HOME/.elliot_err_\$$"
-    "\$@" 2>"\$_tmp"
-    local _rc=\$?
-    if [ -s "\$_tmp" ]; then
-        sed \
-            -e 's/bad argument #\([0-9]*\) to '"'"'\([^'"'"']*\)'"'"' (\([a-z ]*\) expected, got \([a-z ]*\))/argumento #\1 invalido em '"'"'\2'"'"' (esperado \3, recebeu \4)/g' \
-            -e 's/bad argument #\([0-9]*\) (\([a-z ]*\) expected, got \([a-z ]*\))/argumento #\1 invalido (esperado \2, recebeu \3)/g' \
-            -e 's/attempt to index a nil value (global '"'"'\([^'"'"']*\)'"'"')/tentativa de indexar valor nulo: variavel global '"'"'\1'"'"' nao existe/g' \
-            -e 's/attempt to index a nil value (local '"'"'\([^'"'"']*\)'"'"')/tentativa de indexar valor nulo: variavel local '"'"'\1'"'"' e nulo/g' \
-            -e 's/attempt to index a nil value (field '"'"'\([^'"'"']*\)'"'"')/tentativa de indexar campo nulo: '"'"'\1'"'"' e nulo/g' \
-            -e 's/attempt to index a nil value/tentativa de indexar um valor nulo/g' \
-            -e 's/attempt to index a \([a-z]*\) value/tentativa de indexar valor \1/g' \
-            -e 's/attempt to call a nil value (global '"'"'\([^'"'"']*\)'"'"')/tentativa de chamar '"'"'\1'"'"' que nao e uma funcao/g' \
-            -e 's/attempt to call a nil value (local '"'"'\([^'"'"']*\)'"'"')/variavel local '"'"'\1'"'"' nao e uma funcao/g' \
-            -e 's/attempt to call a nil value (field '"'"'\([^'"'"']*\)'"'"')/campo '"'"'\1'"'"' nao e uma funcao/g' \
-            -e 's/attempt to call a nil value/tentativa de chamar um valor nulo/g' \
-            -e 's/attempt to call a \([a-z]*\) value/tentativa de chamar um valor \1/g' \
-            -e 's/attempt to perform arithmetic on a nil value/operacao aritmetica em valor nulo/g' \
-            -e 's/attempt to perform arithmetic on a \([a-z]*\) value/operacao aritmetica em valor \1/g' \
-            -e 's/attempt to concatenate a nil value/tentativa de concatenar valor nulo/g' \
-            -e 's/attempt to concatenate a \([a-z]*\) value/tentativa de concatenar valor \1/g' \
-            -e 's/attempt to get length of a nil value/tentativa de obter tamanho de valor nulo/g' \
-            -e 's/attempt to get length of a \([a-z]*\) value/tentativa de obter tamanho de valor \1/g' \
-            -e 's/attempt to compare two \([a-z]*\) values/tentativa de comparar dois valores \1/g' \
-            -e 's/attempt to compare \([a-z]*\) with \([a-z]*\)/tentativa de comparar \1 com \2/g' \
-            -e 's/attempt to perform bitwise operation on a \([a-z]*\) value/operacao bitwise em valor \1/g' \
-            -e 's/stack overflow/estouro de pilha (recursao infinita?)/g' \
-            -e 's/table index is nil/indice de tabela nulo/g' \
-            -e 's/table index is NaN/indice de tabela invalido (NaN)/g' \
-            -e 's/not enough memory/memoria insuficiente/g' \
-            -e 's/assertion failed!/falha na assercao!/g' \
-            -e 's/syntax error near '"'"'\([^'"'"']*\)'"'"'/erro de sintaxe perto de '"'"'\1'"'"'/g' \
-            -e 's/break outside loop/break fora de um laco/g' \
-            -e 's/unfinished string/string incompleta (falta fechar aspas)/g' \
-            -e 's/unfinished long string/string longa incompleta (falta ]])/g' \
-            -e 's/unfinished long comment/comentario longo incompleto/g' \
-            -e 's/malformed number/numero malformado/g' \
-            -e 's/invalid escape sequence/sequencia de escape invalida/g' \
-            -e 's/module '"'"'\([^'"'"']*\)'"'"' not found/modulo '"'"'\1'"'"' nao encontrado/g' \
-            -e 's/cannot resume dead coroutine/nao e possivel retomar coroutine morta/g' \
-            -e 's/cannot resume running coroutine/nao e possivel retomar coroutine em execucao/g' \
-            -e 's/value has no integer representation/valor sem representacao inteira/g' \
-            -e 's/stack traceback:/rastro de chamadas:/g' \
-            -e 's/in main chunk/no codigo principal/g' \
-            -e 's/\bnumber\b/numero/g' \
-            -e 's/\bnil\b/nulo/g' \
-            -e 's/\bboolean\b/booleano/g' \
-            -e 's/\binteger\b/inteiro/g' \
-            -e 's/\bfloat\b/decimal/g' \
-            "\$_tmp" >&2
-    fi
-    rm -f "\$_tmp"
-    return \$_rc
-}
-
-# ── Pré-processamento de variáveis indexadas (experimental) ──────────────────
-# Se o arquivo contiver "ivar.enable()" ou referências "!N" (fora de strings),
-# gera um temporário pré-processado e executa esse arquivo.
-# Caso contrário, executa o arquivo original sem overhead.
-_ivar_needs_preprocess() {
-    # Retorna 0 (true) se o arquivo contiver ivar.enable(), !<digito> ou sintaxe trif/tryif
-    grep -qE 'ivar\.enable\(\)|![0-9]|^[[:space:]]*(trif |tryif |tryelse|tryend|tryelseif )' "\$1" 2>/dev/null
-}
-
-_ivar_run_file() {
-    local _src="\$1"; shift
-    local _ivar_tmp="\${HOME}/.cache/elliot/ivar_pp_\$\$.lua"
-    mkdir -p "\${HOME}/.cache/elliot"
-    # Usa o próprio runtime para pré-processar via ivar.preprocess()
-    "\$_B" -e "
-require('@std')
-local _ivar_mod = require('@std/ivar')
-local src = [[\$_src]]
-local f = io.open(src, 'r')
-if not f then io.stderr:write('ivar: nao foi possivel abrir ' .. src .. '\n') os.exit(1) end
-local code = f:read('*a'); f:close()
-code = ('\\n'..code):gsub('\\n([ \\t]*)tryif ', '\\n%1trif '):sub(2)
-local out = _ivar_mod.preprocess(code)
-local w = io.open([[\$_ivar_tmp]], 'w')
-if not w then io.stderr:write('ivar: nao foi possivel criar temp\n') os.exit(1) end
-w:write(out); w:close()
-" 2>/dev/null
-    if [ -f "\$_ivar_tmp" ]; then
-        # Injeta arg[0] com o nome real do script no topo do arquivo temporário
-        local _tmp2="\${HOME}/.cache/elliot/ivar_pp2_\$\$.lua"
-        printf 'require("@std")\narg[0]="%s"\n' "\$_src" > "\$_tmp2"
-        cat "\$_ivar_tmp" >> "\$_tmp2"
-        mv "\$_tmp2" "\$_ivar_tmp"
-        _lua_run "\$_B" "\$_ivar_tmp" "\$@"
-        local _rc=\$?
-        rm -f "\$_ivar_tmp"
-        return \$_rc
-    else
-        # Fallback: executa original sem preprocessamento
-        _lua_run "\$_B" -e "require('@std')" "\$_src" "\$@"
-    fi
-}
-
-case "\$1" in
-  -h|--help)
-    _help
-    ;;
-  -v|--version)
-    printf "\033[1;37mElliotOS v17.0\033[0m — Lua 5.4.8 + módulos nativos\n"
-    ;;
-  -c)
-    shift
-    exec "\$_B" -e "\$*"
-    ;;
-  -f)
-    shift
-    # Executa arquivo com pré-processamento automático de ivar se necessário
-    if [ -f "\${1:-}" ] && _ivar_needs_preprocess "\$1"; then
-        _ivar_run_file "\$@"
-    else
-        _lua_run "\$_B" "\$@"
-    fi
-    ;;
-  -e|--edit)
-    shift
-    _EE_FILE=""
-    _EE_OUT=""
-    while [ "\$#" -gt 0 ]; do
-      case "\$1" in
-        -v|--verify)
-          shift; _EE_OUT="\$1"; shift ;;
-        *) _EE_FILE="\$1"; shift ;;
-      esac
-    done
-    # Modo -v: verifica sintaxe e salva erros no arquivo sem abrir o editor
-    if [ -n "\$_EE_OUT" ] && [ -n "\$_EE_FILE" ]; then
-      if [ ! -f "\$_EE_FILE" ]; then
-        printf "\033[1;31m[✗] Arquivo não encontrado: \$_EE_FILE\033[0m\n"; exit 1
-      fi
-      _EXT="\${_EE_FILE##*.}"
-      _ERRORS=""
-      case "\$_EXT" in
-        lua)
-          _ERRORS=\$(luac -p "\$_EE_FILE" 2>&1) ;;
-        sh|bash)
-          _ERRORS=\$(sh -n "\$_EE_FILE" 2>&1) ;;
-        c|h)
-          _ERRORS=\$(clang -fsyntax-only "\$_EE_FILE" 2>&1) ;;
-        py)
-          _ERRORS=\$(python3 -m py_compile "\$_EE_FILE" 2>&1) ;;
-        js)
-          _ERRORS=\$(node --check "\$_EE_FILE" 2>&1) ;;
-        *)
-          printf "\033[1;33m[!] Tipo .\$_EXT sem verificador — tentando luac...\033[0m\n"
-          _ERRORS=\$(luac -p "\$_EE_FILE" 2>&1) ;;
-      esac
-      if [ -z "\$_ERRORS" ]; then
-        printf "\033[1;32m[✓] Nenhum erro encontrado em \$_EE_FILE\033[0m\n"
-        printf "# Verificado em \$(date)\n# \$_EE_FILE: OK\n" > "\$_EE_OUT"
-      else
-        printf "\033[1;31m[✗] Erros encontrados — salvando em \$_EE_OUT\033[0m\n"
-        printf "# Erros em \$_EE_FILE (\$(date))\n\n\$_ERRORS\n" > "\$_EE_OUT"
-        printf "\033[0;90m%s\033[0m\n" "\$_ERRORS"
-      fi
-      exit 0
-    fi
-    # Modo normal: abre o editor
-    _EE=\$(command -v ee 2>/dev/null)
-    if [ -n "\$_EE" ]; then
-      clear
-      exec "\$_EE" "\${_EE_FILE:-}"
-    else
-      printf "\033[1;31m[✗] ElliotOS Editor (ee) não encontrado.\033[0m\n"
-      printf "\033[0;90m    Reinstale com: bash luascript -e\033[0m\n"
-      exit 1
-    fi
-    ;;
-  -t)
-    exec "\$_B" -e "require('@std');ms.check()"
-    ;;
-  -tv|-vt)
-    exec "\$_B" -e "require('@std');ms.check('v')"
-    ;;
-  -T)
-    exec "\$_B" -e "require('@std');ms.force()"
-    ;;
-  -Tv|-vT)
-    exec "\$_B" -e "require('@std');ms.force('v')"
-    ;;
-  -p)
-    shift
-    if [ -z "\$1" ] || [ "\$1" = "stop" ]; then
-      exec "\$_B" -e "require('@std');pent.stop()"
-    else
-      exec "\$_B" -e "require('@std');pent.start('\$1')"
-    fi
-    ;;
-  -i|--info)
-    exec "\$_B" -e "require('@std');sys.info()"
-    ;;
-
-  # ── Servidor Web HTML ────────────────────────────────────────
-  -web)
-    shift
-    _WEB_CACHE="\${HOME}/.cache/elliot"
-    _WEB_PID_FILE="\${_WEB_CACHE}/web.pid"
-    _WEB_INFO_FILE="\${_WEB_CACHE}/web.info"
-    mkdir -p "\${_WEB_CACHE}"
-
-    # Função interna: mata servidor anterior se existir
-    _web_stop_old() {
-      if [ -f "\${_WEB_PID_FILE}" ]; then
-        _OLD_PID=\$(cat "\${_WEB_PID_FILE}" 2>/dev/null)
-        if [ -n "\${_OLD_PID}" ]; then
-          kill "\${_OLD_PID}" 2>/dev/null
-          # mata também o subshell de keepalive (PID+1 e PGID)
-          kill -- "-\${_OLD_PID}" 2>/dev/null || true
-        fi
-        rm -f "\${_WEB_PID_FILE}" "\${_WEB_INFO_FILE}"
-      fi
-    }
-
-    # Função interna: sobe o servidor e salva PID
-    _web_start() {
-      _WEB_ABS="\$1"; _WEB_PORT="\$2"
-      _web_stop_old
-      # web.serve() lanca thread detached e retorna imediatamente.
-      # O processo Lua precisa ficar vivo ou a thread do servidor morre junto.
-      # Solução: loop Lua infinito após o serve.
-      "\${_B}" -e "web.serve('\${_WEB_ABS}',\${_WEB_PORT}); while true do os.execute('sleep 60') end" \
-        </dev/null >/dev/null 2>&1 &
-      _WEB_BG_PID=\$!
-      # Aguarda até 3s confirmar que o processo ainda esta vivo
-      _WEB_OK=0
-      _WEB_TRIES=0
-      while [ \${_WEB_TRIES} -lt 30 ]; do
-        sleep 0.1
-        if kill -0 "\${_WEB_BG_PID}" 2>/dev/null; then
-          _WEB_OK=1; break
-        fi
-        _WEB_TRIES=\$(( _WEB_TRIES + 1 ))
-      done
-      if [ "\${_WEB_OK}" = "0" ]; then
-        printf "\033[1;33m[web]\033[0m Falha ao iniciar o servidor.\n"; return 1
-      fi
-      echo "\${_WEB_BG_PID}" > "\${_WEB_PID_FILE}"
-      printf "port=\${_WEB_PORT}\ndir=\${_WEB_ABS}\n" > "\${_WEB_INFO_FILE}"
-      return 0
-    }
-
-    if [ "\${1:-}" = "stop" ]; then
-      if [ -f "\${_WEB_PID_FILE}" ]; then
-        _WEB_PID=\$(cat "\${_WEB_PID_FILE}" 2>/dev/null)
-        if [ -n "\${_WEB_PID}" ] && kill -0 "\${_WEB_PID}" 2>/dev/null; then
-          kill "\${_WEB_PID}" 2>/dev/null
-          kill -- "-\${_WEB_PID}" 2>/dev/null || true
-          _WEB_PORT_STOPPED=\$(grep '^port=' "\${_WEB_INFO_FILE}" 2>/dev/null | cut -d= -f2)
-          rm -f "\${_WEB_PID_FILE}" "\${_WEB_INFO_FILE}"
-          printf "\033[1;31m[web]\033[0m Servidor parado (porta \${_WEB_PORT_STOPPED:-?}).\n"
-        else
-          rm -f "\${_WEB_PID_FILE}" "\${_WEB_INFO_FILE}"
-          printf "\033[1;33m[web]\033[0m Nenhum servidor ativo.\n"
-        fi
-      else
-        printf "\033[1;33m[web]\033[0m Nenhum servidor ativo.\n"
-      fi
-
-    elif [ -n "\${1:-}" ] && [ -n "\${2:-}" ]; then
-      # ms -web arquivo|dir porta — modo direto
-      _WEB_FILE="\$1"
-      _WEB_PORT="\$2"
-      case "\${_WEB_PORT}" in
-        ''|*[!0-9]*) printf "\033[1;33m[web]\033[0m Porta invalida: \${_WEB_PORT}\n"; exit 1 ;;
-      esac
-      if [ "\${_WEB_PORT}" -lt 1 ] || [ "\${_WEB_PORT}" -gt 65535 ]; then
-        printf "\033[1;33m[web]\033[0m Porta fora do intervalo (1-65535): \${_WEB_PORT}\n"; exit 1
-      fi
-      if [ -d "\${_WEB_FILE}" ]; then
-        _WEB_ABS=\$(cd "\${_WEB_FILE}" 2>/dev/null && pwd)
-      elif [ -f "\${_WEB_FILE}" ]; then
-        _WEB_ABS=\$(cd "\$(dirname "\${_WEB_FILE}")" 2>/dev/null && pwd)
-      else
-        printf "\033[1;33m[web]\033[0m Nao encontrado: \${_WEB_FILE}\n"; exit 1
-      fi
-      _web_start "\${_WEB_ABS}" "\${_WEB_PORT}" || exit 1
-      printf "\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n"
-      printf "\033[1;35m║  ElliotOS — Servidor Web HTML                                ║\033[0m\n"
-      printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n"
-      printf "\033[1;32m  ✓ Servidor rodando em background\033[0m\n"
-      printf "\033[0;90m  Raiz    : \033[1;37m\${_WEB_ABS}\033[0m\n"
-      printf "\033[0;90m  Porta   : \033[1;37m\${_WEB_PORT}\033[0m\n"
-      printf "\033[0;90m  URL     : \033[1;36mhttp://localhost:\${_WEB_PORT}/\033[0m\n"
-      printf "\033[0;90m  PID     : \033[1;37m\${_WEB_BG_PID}\033[0m\n\n"
-      printf "\033[0;90m  Parar   : \033[1;37mms -web stop\033[0m\n\n"
-
-    else
-      # ms -web sem args — modo interativo
-      ESC=\$(printf '\033')
-      M="\${ESC}[1;35m"; G="\${ESC}[1;32m"; C="\${ESC}[1;36m"
-      Y="\${ESC}[1;33m"; D="\${ESC}[0;90m"; W="\${ESC}[1;37m"; R="\${ESC}[0m"
-      printf "\${M}╔══════════════════════════════════════════════════════════════╗\${R}\n"
-      printf "\${M}║  ElliotOS — Servidor Web HTML                                ║\${R}\n"
-      printf "\${M}║  \${D}Sobe um diretório ou arquivo HTML como servidor HTTP local  \${M}║\${R}\n"
-      printf "\${M}╚══════════════════════════════════════════════════════════════╝\${R}\n\n"
-      printf "\${C}Arquivo HTML ou diretório\${D} (caminho ou '.' para atual) \${D}» \${R}"
-      read -r _WEB_FILE </dev/tty
-      if [ -z "\${_WEB_FILE}" ] || [ "\${_WEB_FILE}" = ".sair" ]; then
-        printf "\${D}  Cancelado.\${R}\n"; exit 0
-      fi
-      if [ -d "\${_WEB_FILE}" ]; then
-        _WEB_ABS=\$(cd "\${_WEB_FILE}" 2>/dev/null && pwd)
-      elif [ -f "\${_WEB_FILE}" ]; then
-        _WEB_ABS=\$(cd "\$(dirname "\${_WEB_FILE}")" 2>/dev/null && pwd)
-      else
-        printf "\${Y}[web]\${R} Nao encontrado: \${_WEB_FILE}\n"; exit 1
-      fi
-      printf "\${C}Porta\${D} [padrao: 8080] \${D}» \${R}"
-      read -r _WEB_PORT </dev/tty
-      _WEB_PORT="\${_WEB_PORT:-8080}"
-      case "\${_WEB_PORT}" in
-        ''|*[!0-9]*) printf "\${Y}[web]\${R} Porta invalida: \${_WEB_PORT}\n"; exit 1 ;;
-      esac
-      if [ "\${_WEB_PORT}" -lt 1 ] || [ "\${_WEB_PORT}" -gt 65535 ]; then
-        printf "\${Y}[web]\${R} Porta fora do intervalo (1-65535): \${_WEB_PORT}\n"; exit 1
-      fi
-      _web_start "\${_WEB_ABS}" "\${_WEB_PORT}" || exit 1
-      printf "\n\${G}╔══════════════════════════════════════════════════════════════╗\${R}\n"
-      printf "\${G}║  ✓ Servidor rodando em background!                           ║\${R}\n"
-      printf "\${G}╚══════════════════════════════════════════════════════════════╝\${R}\n\n"
-      printf "\${D}  Raiz    : \${W}\${_WEB_ABS}\${R}\n"
-      printf "\${D}  Porta   : \${W}\${_WEB_PORT}\${R}\n"
-      printf "\${D}  URL     : \${C}http://localhost:\${_WEB_PORT}/\${R}\n"
-      printf "\${D}  PID     : \${W}\${_WEB_BG_PID}\${R}\n\n"
-      printf "\${D}  Parar   : \${W}ms -web stop\${R}\n\n"
-    fi
-    ;;
-
-  # ── IA ──────────────────────────────────────────────────────
-  -a|--ask)
-    shift
-    _ASK_FILES=""
-    _ASK_ARGS=""
-    while [ "\$#" -gt 0 ]; do
-      case "\$1" in
-        -f|--file)
-          shift
-          if [ -r "\$1" ]; then
-            _FNAME="\$1"
-            _FCONTENT=\$(cat "\$_FNAME" 2>/dev/null)
-            _ASK_FILES="\${_ASK_FILES}\n--- arquivo: \${_FNAME} ---\n\${_FCONTENT}\n--- fim: \${_FNAME} ---\n"
-          else
-            printf "\033[1;31m[cyn] arquivo não encontrado: \$1\033[0m\n"
-          fi
-          shift ;;
-        *) _ASK_ARGS="\${_ASK_ARGS} \$1"; shift ;;
-      esac
-    done
-    _MS_ASK_Q="\${_ASK_ARGS# }"
-    _MS_ASK_FILES="\$_ASK_FILES"
-    export _MS_ASK_Q _MS_ASK_FILES
-    if [ -z "\${_MS_ASK_Q}\${_MS_ASK_FILES}" ]; then
-      # Sem argumento — abre chat interativo
-      # Usa arquivo temporário para evitar problemas de escaping de aspas e ^ em -e "..."
-      _CYN_TMP="\${TMPDIR:-\$HOME/.cache/elliot}/ms_chat_\$\$.lua"
-      mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}"
-      cat > "\$_CYN_TMP" << 'CYNEOF'
-local ESC=string.char(27)
-local function c(code,s) return ESC..'['..code..'m'..s..ESC..'[0m' end
-local M  = function(s) return ESC..'[1;35m'..s..ESC..'[0m' end
-local C  = function(s) return ESC..'[1;36m'..s..ESC..'[0m' end
-local G  = function(s) return ESC..'[1;32m'..s..ESC..'[0m' end
-local D  = function(s) return ESC..'[0;90m'..s..ESC..'[0m' end
-local W  = function(s) return ESC..'[1;37m'..s..ESC..'[0m' end
-local Y  = function(s) return ESC..'[1;33m'..s..ESC..'[0m' end
-ui.clear()
-print(M('╔══════════════════════════════════════════════════════════════╗'))
-print(M('║  CYN — IA Central do ElliotOS                                ║'))
-print(M('║  ')..D('Fala. Estou aqui. Por enquanto.                               ')..M('║'))
-print(M('║  ')..D('.ajuda para comandos  ·  .sair quando terminar                ')..M('║'))
-print(M('╚══════════════════════════════════════════════════════════════╝'))
-print('')
-local function mostrar_ajuda()
-  print(Y('── Comandos do chat ────────────────────────────────────────'))
-  print('  '..G('.ajuda')..'              — mostra estes comandos')
-  print('  '..G('.sair')..'               — encerra o chat')
-  print('  '..G('.limpar')..'             — limpa o histórico da conversa')
-  print('  '..G('.historico')..'          — exibe o histórico')
-  print('  '..G('.modelo')..'             — lista modelos disponíveis')
-  print('  '..G('.modelo nome')..'        — troca o modelo ativo')
-  print('  '..G('.persona nome')..'       — ativa uma persona/RP')
-  print('  '..G('.persona off')..'        — desativa persona, volta pra CYN')
-  print('  '..G('.salvar arquivo')..'     — salva a conversa em arquivo')
-  print('  '..G('.arquivo <caminho>')..'   — carrega arquivo como contexto para a CYN')
-  print('  '..G('.arquivos')..'            — mostra contexto de arquivos ativo')
-  print('  '..G('.limpar_arquivos')..'     — remove os arquivos do contexto')
-  print(D('────────────────────────────────────────────────────────────'))
-  print('')
-end
-local historico_txt = {}
-while true do
-  io.write(C('Voce')..' '..D('»')..' ')
-  io.flush()
-  local line = io.read('l')
-  if line == nil or line == '.sair' or line == '.exit' or line == '.quit' then
-    print(M('[CYN]')..D(' Encerrando. Tenta não se perder sem mim, amor.'))
-    break
-  elseif line == '' then
-  elseif line == '.ajuda' then
-    mostrar_ajuda()
-  elseif line == '.limpar' then
-    ai.clear()
-    historico_txt = {}
-    ui.clear()
-    print(M('[CYN]')..D(' Limpo. Página em branco. Desta vez seja mais claro.'))
-  elseif line == '.historico' then
-    ai.history()
-  elseif line == '.modelo' then
-    ai.list()
-  elseif line:sub(1,7) == '.modelo' then
-    local m = line:sub(9):match('^%s*(.-)%s*$')
-    if m ~= '' then
-      ai.main(m)
-      print(G('  Modelo alterado para: ')..W(m))
-    end
-  elseif line:sub(1,8) == '.arquivo' then
-    local fname = line:sub(10):match('^%s*(.-)%s*$')
-    if fname == '' then
-      print(Y('  Uso: .arquivo <caminho>')..D('  — carrega arquivo como contexto'))
-    else
-      local fh = io.open(fname,'r')
-      if fh then
-        local fcontent = fh:read('*a'); fh:close()
-        local NL=string.char(10)
-        _repl_file_ctx = (_repl_file_ctx or '') ..
-          NL..'--- arquivo: '..fname..' ---'..NL..fcontent..NL..'--- fim: '..fname..' ---'..NL
-        print(G('  Arquivo carregado: ')..W(fname)..'  '..D('('..#fcontent..' bytes)'))
-      else
-        print(ESC..'[1;31m  Arquivo não encontrado ou sem permissão: '..fname..'\027[0m')
-      end
-    end
-  elseif line == '.arquivos' then
-    if not _repl_file_ctx or _repl_file_ctx == '' then
-      print(D('  Nenhum arquivo carregado.'))
-    else
-      print(G('  Contexto de arquivos ativo ('..#_repl_file_ctx..' bytes)'))
-    end
-  elseif line == '.limpar_arquivos' then
-    _repl_file_ctx = ''
-    print(G('  Contexto de arquivos limpo.'))
-  elseif line:sub(1,7) == '.salvar' then
-    local fname = line:sub(9):match('^%s*(.-)%s*$')
-    if fname == '' then fname = 'chat_' .. os.time() .. '.txt' end
-    local f = io.open(fname,'w')
-    if f then
-      for _,entry in ipairs(historico_txt) do f:write(entry..string.char(10)) end
-      f:close()
-      print(G('  Conversa salva em: ')..W(fname))
-    else
-      print(ESC..'[1;31m  Erro ao salvar arquivo.\027[0m')
-    end
-  else
-    -- Filtra escape codes do terminal (teclas Home/End/setas/etc)
-    if line:match('^\027%[') or line:match('^\27%[') then
-      -- ignora silenciosamente
-    else
-      historico_txt[#historico_txt+1] = 'Voce: ' .. line
-      local _low = line:lower()
-      local _q = line
-      if _repl_file_ctx and _repl_file_ctx ~= '' then
-        _q = _q .. string.char(10,10) .. 'ARQUIVOS DE CONTEXTO:' .. string.char(10) .. _repl_file_ctx
-      end
-      if _low:match('^pesquisa') or _low:match('^pesquise') or
-         _low:match('^busca') or _low:match('^busque') or
-         _low:match('^procura') or _low:match('^search ') or
-         _low:match('pesquisa na web') or _low:match('busca na internet') or
-         _low:match('buscar na web') or _low:match('pesquisa na internet') then
-        ai.search(_q)
-      else
-        ai.ask(_q)
-      end
-      historico_txt[#historico_txt+1] = '---'
-    end
-  end
-end
-CYNEOF
-      exec "\$_B" "\$_CYN_TMP"
-    else
-      # Monta prompt com arquivos se passados via -f
-      _MS_Q="\${_MS_ASK_Q}"
-      _MS_FILES="\${_MS_ASK_FILES}"
-      export _MS_Q _MS_FILES
-      # Detecta intenção de busca na web
-      case "\$(echo "\$_MS_Q" | tr '[:upper:]' '[:lower:]')" in
-        "pesquisa "*|"pesquise "*|"pesquisar "*|\
-        "busca "*|"busque "*|"buscar "*|\
-        "procura "*|"procure "*|"procurar "*|\
-        "pesquisa na web"*|"busca na web"*|\
-        "pesquisa na internet"*|"busca na internet"*|\
-        "pesquise na web"*|"busque na web"*|\
-        "pesquise na internet"*|"busque na internet"*|\
-        "search "*|"buscar na web"*|"buscar na internet"*)
-          export _MS_Q _MS_FILES
-          exec "\$_B" -e "require('@std');local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.search(q)"
-          ;;
-        *)
-          export _MS_Q _MS_FILES
-          exec "\$_B" -e "require('@std');local q=os.getenv('_MS_Q') or '' local f=os.getenv('_MS_FILES') or '' if f~='' then q=q..string.char(10,10)..'ARQUIVOS:'..string.char(10)..f end ai.ask(q)"
-          ;;
-      esac
-    fi
-    ;;
-  -A|--ask-raw)
-    # raw: sem streaming/header/timer, texto puro sem markdown
-    shift
-    _ATMP="\${TMPDIR:-\$HOME/.cache/elliot}/ms_raw_\$\$.lua"
-    mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}"
-    cat > "\$_ATMP" << 'MSRAWEOF'
-ai.raw_mode(true)
-local _q = os.getenv("_MS_RAW_Q") or ""
-local _r = ai.ask(_q)
-local bt = string.char(96)
-local fence = bt..bt..bt
-_r = _r:gsub(fence..".-"..fence, "")
-_r = _r:gsub(bt.."([^"..bt.."]-)"..bt, "%1")
-_r = _r:gsub("%*%*(.-)%*%*", "%1")
-_r = _r:gsub("%*(.-)%*",     "%1")
-_r = _r:gsub("__(.-)__",     "%1")
-_r = _r:gsub("_(.-)_",       "%1")
-_r = _r:gsub("^#+%s*",  "")
-_r = _r:gsub("\n#+%s*", "\n")
-_r = _r:gsub("\n%s*[-*+]%s+", "\n")
-_r = _r:gsub("\n%s*%d+%.%s+", "\n")
-_r = _r:gsub("%[(.-)%]%(.-%)", "%1")
-_r = _r:gsub("^%s+", ""):gsub("%s+$", "")
-print(_r)
-MSRAWEOF
-    _MS_RAW_Q="\$*" exec "\$_B" "\$_ATMP"
-    ;;
-  --search|--pesquisa|--web)
-    shift
-    _MS_SEARCH_Q="\$*"
-    export _MS_SEARCH_Q
-    exec "\$_B" -e "require('@std');local q=os.getenv('_MS_SEARCH_Q') or '' ai.search(q)"
-    ;;
-
-  --codigo|--code)
-    shift
-    _CODE_OUT=""
-    _CODE_FILES=""
-    _CODE_ARGS=""
-    while [ "\$#" -gt 0 ]; do
-      case "\$1" in
-        -o|--output)
-          shift; _CODE_OUT="\$1"; shift ;;
-        -f|--file)
-          shift
-          if [ -r "\$1" ]; then
-            _FNAME="\$1"
-            _FCONTENT=\$(cat "\$_FNAME" 2>/dev/null)
-            _CODE_FILES="\${_CODE_FILES}\n--- arquivo: \${_FNAME} ---\n\${_FCONTENT}\n--- fim: \${_FNAME} ---\n"
-          else
-            printf "\033[1;31m[code] arquivo não encontrado ou sem permissão: \$1\033[0m\n"
-          fi
-          shift ;;
-        *)
-          _CODE_ARGS="\${_CODE_ARGS} \$1"; shift ;;
-      esac
-    done
-    _MS_CODE_PROMPT="\${_CODE_ARGS# }"
-    _MS_CODE_OUT="\$_CODE_OUT"
-    _MS_CODE_FILES="\$_CODE_FILES"
-    export _MS_CODE_PROMPT _MS_CODE_OUT _MS_CODE_FILES
-    exec "\$_B" -e "require('@std');
-local p=os.getenv('_MS_CODE_PROMPT') or ''
-local o=os.getenv('_MS_CODE_OUT') or ''
-local f=os.getenv('_MS_CODE_FILES') or ''
-if f~='' then p=p..string.char(10,10)..'ARQUIVOS FORNECIDOS:'..string.char(10)..f end
-if o~='' then ai.code(p,o) else ai.code(p) end
-"
-    ;;
-
-
-  # ── Rede ────────────────────────────────────────────────────
-  -g|--get)
-    shift
-    exec "\$_B" -e "require('@std');print(net.geth('\$1'))"
-    ;;
-  -d|--dns)
-    shift
-    exec "\$_B" -e "require('@std');
-local h='\$1'
-h=h:gsub('^https?://',''):gsub('^ftp://',''):gsub('/.*',''):gsub(':.*','')
-if h=='' then print('uso: ms -d host') else
-  local t=net.dns(h)
-  if type(t)=='table' then
-    for _,v in ipairs(t) do print(v) end
-  elseif t then print(t)
-  else print('nao resolvido: '..h) end
-end"
-    ;;
-  -P|--ping)
-    shift
-    exec "\$_B" -e "require('@std');print(net.ping('\$1'))"
-    ;;
-  --scan)
-    shift
-    exec "\$_B" -e "require('@std');local t=net.scan('\$1',\$2,\${3:-\$2}) for _,p in pairs(t) do print(p) end"
-    ;;
-  --socket)
-    # ms --socket ipv4 stream host port [payload]
-    shift
-    exec "\$_B" -e "require('@std');print(net.socket('\$1','\$2','\$3',\$4,5,'\${5:-}'))"
-    ;;
-  --ip)
-    exec "\$_B" -e "require('@std');
-local ESC=string.char(27)
-local ip = net.geth('https://api.ipify.org')
-if ip and #ip > 0 then
-  print(ESC..'[1;36mIP público:'..ESC..'[0m '..ESC..'[1;37m'..ip:gsub('%s','')..ESC..'[0m')
-else
-  print(ESC..'[1;31mNão foi possível obter o IP público.'..ESC..'[0m')
-end"
-    ;;
-  --post)
-    shift
-    exec "\$_B" -e "require('@std');
-local url='\$1'
-local data='\$2'
-if url=='' then print('uso: ms --post url dados') os.exit(1) end
-local r=net.post(url,data)
-print(r or '(sem resposta)')"
-    ;;
-  --headers)
-    shift
-    exec "\$_B" -e "
-local ESC=string.char(27)
-local C = ESC..'[1;36m'
-local Y = ESC..'[1;33m'
-local R = ESC..'[0m'
-local url='\$1'
-if url=='' then print('uso: ms --headers url') os.exit(1) end
-local out = sh.capture('curl -sI --max-time 8 ' .. url .. ' 2>/dev/null')
-if out and #out > 0 then
-  for line in (out..'\n'):gmatch('([^\n]*)\n') do
-    if #line > 0 then
-      local k,v = line:match('^([^:]+):%s*(.+)')
-      if k then
-        print(C..k..R..': '..v)
-      else
-        print(Y..line..R)
-      end
-    end
-  end
-else
-  print(ESC..'[1;31mNão foi possível obter headers.'..R)
-end"
-    ;;
-  --jwt)
-    shift
-    exec "\$_B" -e "require('@std');
-local ESC=string.char(27)
-local M = ESC..'[1;35m' local W = ESC..'[1;37m'
-local D = ESC..'[0;90m' local R = ESC..'[1;31m' local Z = ESC..'[0m'
-local token='\$1'
-if token=='' then print('uso: ms --jwt token') os.exit(1) end
-local parts={}
-for p in (token..'.'):gmatch('([^.]*).') do parts[#parts+1]=p end
-if #parts < 3 then print(R..'Token JWT inválido (esperado 3 partes).'..Z) os.exit(1) end
-local function b64pad(s)
-  s=s:gsub('-','+'):gsub('_','/')
-  while #s%4~=0 do s=s..'=' end
-  return s
-end
-local function decode(s)
-  local ok,r = pcall(ms.b64.dec, b64pad(s))
-  return ok and r or nil
-end
-local header  = decode(parts[1])
-local payload = decode(parts[2])
-print(M..'── Header ──────────────────────────────────'..Z)
-print(W..(header  or '(erro ao decodificar)')..Z)
-print(M..'── Payload ─────────────────────────────────'..Z)
-print(W..(payload or '(erro ao decodificar)')..Z)
-print(M..'── Assinatura ──────────────────────────────'..Z)
-print(D..parts[3]..Z)
-print(D..'(assinatura não verificada — sem chave secreta)'..Z)"
-    ;;
-  --learn)
-    _EX="${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    if [ -f "\$_EX/learn.lua" ]; then
-      exec "\$_B" "\$_EX/learn.lua"
-    fi
-    # Tutorial interativo embutido — 35 licoes
-    _TOTAL=35
-    _learn_step() {
-      _LS_NUM="\${1:-0}"
-      _LS_TOT="\${2:-35}"
-      _LS_TIT="\${3:-}"
-      clear 2>/dev/null || true
-      printf "\n\033[1;35m╔══════════════════════════════════════════════════════════════════╗\033[0m\n"
-      printf "\033[1;35m║  ElliotOS — Tutorial  [Licao \$_LS_NUM/\$_LS_TOT]%-25s║\033[0m\n" ""
-      printf "\033[1;35m║  \033[1;33m%-64s\033[1;35m║\033[0m\n" "\$_LS_TIT"
-      printf "\033[1;35m╚═════════════════════════════════════════════════════════════════╝\033[0m\n\n"
-    }
-    _sec() {
-      printf "\033[1;36m  ── %s ──\033[0m\n\n" "\$1"
-    }
-    _ok() {
-      printf "\033[0;90m  \$@\033[0m\n"
-    }
-    _code() {
-      printf "  \033[1;32m\$@\033[0m\n"
-    }
-    _cont() {
-      printf "\n\033[0;90m  [ENTER para continuar]\033[0m "; read -r _dummy < /dev/tty
-    }
-    printf "\n\033[1;35m  ╔══════════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;35m  ║        ElliotOS — Tutorial Completo                    ║\033[0m\n"
-    printf "\033[1;35m  ╚══════════════════════════════════════════════════════════╝\033[0m\n\n"
-    printf "  \033[1;33mTrilha 0:\033[0m \033[1;32mDo zero — Termux, terminal e logica\033[0m \033[0;90m(licoes  1-5)\033[0m\n"
-    printf "  \033[1;33mTrilha 1:\033[0m \033[1;32mLua — do zero ao avancado\033[0m           \033[0;90m(licoes  6-17)\033[0m\n"
-    printf "  \033[1;33mTrilha 2:\033[0m \033[1;32mLua + ElliotOS API\033[0m                  \033[0;90m(licoes 18-26)\033[0m\n"
-    printf "  \033[1;33mTrilha 3:\033[0m \033[1;32mC no ElliotOS\033[0m                       \033[0;90m(licoes 27-32)\033[0m\n"
-    printf "  \033[1;33mTrilha 4:\033[0m \033[1;32mProjetos reais de pentest\033[0m           \033[0;90m(licoes 33-35)\033[0m\n\n"
-    printf "  \033[0;90m35 licoes. ENTER avanca, Ctrl+C sai.\033[0m\n\n"
-    printf "  \033[0;90m[ENTER para comecar]\033[0m "; read -r _dummy < /dev/tty
-
-    # ══════════════════════════════════════════════════
-    # TRILHA 0 — DO ZERO: TERMUX, TERMINAL E LOGICA
-    # ══════════════════════════════════════════════════
-
-    _learn_step 1 35 "TRILHA 0 — O que e o Termux e para que serve"
-    _sec "O que e o Termux"
-    printf "  Termux e um aplicativo gratuito que transforma o seu Android\n"
-    printf "  num computador Linux de bolso — sem root, sem modificar nada.\n"
-    printf "  Dentro dele voce tem um terminal: uma tela preta onde voce\n"
-    printf "  digita comandos e o sistema responde.\n\n"
-    _sec "Por que usar o terminal"
-    printf "  No terminal voce faz coisas que app nenhum faz:\n"
-    printf "  escanear redes, testar seguranca, automatizar tarefas,\n"
-    printf "  criar ferramentas proprias — tudo pelo celular.\n\n"
-    _sec "Instalando o Termux (so uma vez)"
-    _ok "1. Acesse: https://f-droid.org"
-    _ok "2. Baixe e instale o F-Droid (loja alternativa, gratis)"
-    _ok "3. Dentro do F-Droid, busque 'Termux' e instale"
-    _ok "4. NAO instale o Termux da Play Store — versao desatualizada!"
-    printf "\n"
-    _sec "Abrindo o Termux"
-    _ok "Abra o app Termux. Voce vai ver uma tela preta com um cursor."
-    _ok "Isso e o terminal. Aqui voce manda — o sistema obedece."
-    _cont
-
-    _learn_step 2 35 "TRILHA 0 — Sobrevivendo no terminal"
-    _sec "O prompt — onde voce digita"
-    printf "  Voce vai ver algo assim:\n\n"
-    _code "\$ _"
-    printf "\n  O \033[1;32m\$\033[0m indica que o terminal esta esperando um comando.\n"
-    printf "  Digite o comando e aperte ENTER.\n\n"
-    _sec "Comandos essenciais do dia a dia"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "pwd" "mostra em qual pasta voce esta"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "ls" "lista arquivos da pasta atual"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "ls -la" "lista com detalhes e arquivos ocultos"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "cd nome-da-pasta" "entra numa pasta"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "cd .." "volta uma pasta"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "cd ~" "vai para sua pasta inicial (home)"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "mkdir nome" "cria uma pasta nova"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "touch arquivo.txt" "cria um arquivo vazio"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "cat arquivo.txt" "mostra o conteudo de um arquivo"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "rm arquivo.txt" "apaga um arquivo"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "clear" "limpa a tela"
-    printf "\n"
-    _sec "Atalhos que salvam a vida"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "seta para cima/baixo" "navega no historico de comandos"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "TAB" "completa o nome do comando ou arquivo"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "Ctrl+C" "cancela o comando que esta rodando"
-    printf "  \033[1;33m%-28s\033[0m %s\n" "Ctrl+L" "limpa a tela (igual ao clear)"
-    printf "\n"
-    _sec "Experimente agora"
-    _code "pwd"
-    _code "ls"
-    _code "cd ~"
-    _code "mkdir meu-primeiro-teste"
-    _code "ls"
-    _cont
-
-    _learn_step 3 35 "TRILHA 0 — Instalando o ElliotOS"
-    _sec "Preparando o Termux (so uma vez)"
-    printf "  Antes de instalar o ElliotOS, o Termux precisa de\n"
-    printf "  algumas ferramentas basicas. Copie e cole cada linha:\n\n"
-    _code "pkg update -y"
-    _ok "  (atualiza a lista de pacotes — pode demorar um pouco)"
-    printf "\n"
-    _code "pkg install -y git wget curl clang make readline"
-    _ok "  (instala compilador e ferramentas necessarias)"
-    printf "\n"
-    _sec "Baixando o ElliotOS"
-    _code "git clone https://github.com/mikeelliot218/ElliotOS.git"
-    _ok "  (baixa o ElliotOS do GitHub)"
-    printf "\n"
-    _code "cd ElliotOS"
-    _ok "  (entra na pasta do ElliotOS)"
-    printf "\n"
-    _sec "Instalando"
-    _code "bash luascript.sh"
-    _ok "  (compila e instala — pode demorar 2-5 minutos)"
-    printf "\n"
-    _sec "Testando se funcionou"
-    _code "ms -v"
-    _ok "  deve mostrar a versao do ElliotOS"
-    printf "\n"
-    _code "ms"
-    _ok "  abre o REPL — seu novo terminal de superpoderes"
-    _ok "  Para sair do REPL: Ctrl+C ou digite exit()"
-    _cont
-
-    _learn_step 4 35 "TRILHA 0 — O que e logica de programacao"
-    _sec "Programar e dar ordens ao computador"
-    printf "  Um programa e uma lista de instrucoes que o computador\n"
-    printf "  segue uma por uma, na ordem que voce escreveu.\n\n"
-    printf "  Pense assim: voce esta ensinando alguem muito obediente\n"
-    printf "  mas que nao pensa — faz EXATAMENTE o que voce mandou.\n\n"
-    _sec "Os tres blocos de qualquer programa"
-    printf "  \033[1;33m1. SEQUENCIA\033[0m — instrucoes em ordem\n"
-    _ok "     acorda -> escova dente -> toma cafe -> vai trabalhar"
-    printf "\n"
-    printf "  \033[1;33m2. DECISAO (if/else)\033[0m — escolher caminhos diferentes\n"
-    _ok "     SE ta chovendo → pega guarda-chuva"
-    _ok "     SENAO          → deixa em casa"
-    printf "\n"
-    printf "  \033[1;33m3. REPETICAO (loop)\033[0m — fazer algo varias vezes\n"
-    _ok "     ENQUANTO tiver roupa suja → lava uma peca"
-    printf "\n"
-    _sec "Variaveis — guardando informacoes"
-    printf "  Uma variavel e uma caixinha com nome que guarda um valor.\n\n"
-    _ok "  nome = 'Mike'      -- caixinha 'nome' guarda 'Mike'"
-    _ok "  idade = 25         -- caixinha 'idade' guarda 25"
-    _ok "  ativo = true       -- caixinha 'ativo' guarda verdadeiro"
-    printf "\n"
-    _sec "Tipos de dados"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "numero" "42 / 3.14 / -7"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "texto" "'ola mundo'  /  \"ElliotOS\""
-    printf "  \033[1;33m%-12s\033[0m %s\n" "booleano" "true  /  false"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "nulo" "nil  (nada, vazio)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "lista" "{ 'a', 'b', 'c' }"
-    printf "\n"
-    _sec "Funcoes — ensinando o computador um truque novo"
-    printf "  Uma funcao e um bloco de codigo com nome que voce pode\n"
-    printf "  chamar quantas vezes quiser.\n\n"
-    _ok "  funcao saudar(nome):"
-    _ok "    mostrar 'Ola, ' + nome"
-    _ok ""
-    _ok "  saudar('Mike')   --> Ola, Mike"
-    _ok "  saudar('CYN')    --> Ola, CYN"
-    _cont
-
-    _learn_step 5 35 "TRILHA 0 — Seu primeiro programa no ElliotOS"
-    _sec "Abrindo o REPL"
-    printf "  O REPL e um ambiente onde voce digita Lua e ve o resultado\n"
-    printf "  na hora — sem precisar criar arquivo. Ideal para aprender.\n\n"
-    _code "ms"
-    _ok "  Voce vera o prompt:  ms>"
-    printf "\n"
-    _sec "Experimento 1 — o computador como calculadora"
-    _ok "  No prompt do ms, digite:"
-    _code "  print(2 + 2)"
-    _ok "  Resultado: 4"
-    _code "  print(10 * 3 - 5)"
-    _ok "  Resultado: 25"
-    _code "  print(2 ^ 10)"
-    _ok "  Resultado: 1024  (2 elevado a 10)"
-    printf "\n"
-    _sec "Experimento 2 — sua primeira variavel"
-    _code "  nome = 'Mike'"
-    _code "  print('Ola, ' .. nome)"
-    _ok "  Resultado: Ola, Mike"
-    _ok "  O .. junta textos em Lua"
-    printf "\n"
-    _sec "Experimento 3 — sua primeira decisao"
-    _code "  idade = 20"
-    _code "  if idade >= 18 then"
-    _code "    print('maior de idade')"
-    _code "  else"
-    _code "    print('menor de idade')"
-    _code "  end"
-    printf "\n"
-    _sec "Experimento 4 — seu primeiro loop"
-    _code "  for i = 1, 5 do"
-    _code "    print('linha ' .. i)"
-    _code "  end"
-    printf "\n"
-    _sec "Experimento 5 — usando o ElliotOS de verdade"
-    _code "  print(net.get('https://ifconfig.me'))"
-    _ok "  Mostra seu IP publico — isso e pentest real!"
-    printf "\n"
-    printf "  \033[1;32m  Parabens!\033[0m Voce acaba de rodar seu primeiro scan de rede.\n"
-    printf "  Agora a Trilha 1 vai te ensinar Lua do zero ao avancado.\n\n"
-    _cont
-
-    # ══════════════════════════════════════════════════
-    # TRILHA 1 — LUA DO ZERO AO AVANCADO
-    # ══════════════════════════════════════════════════
-
-    _learn_step 6 35 "TRILHA 1 — Lua: O que e e por que usar"
-    _sec "O que e Lua"
-    printf "  Lua e uma linguagem leve, rapida e embarcavel criada no Brasil (PUC-Rio).\n"
-    printf "  E a linguagem de scripts do ElliotOS — todos os modulos de pentest\n"
-    printf "  sao acessiveis via Lua. O interpretador e o proprio 'ms'.\n\n"
-    _sec "Como rodar Lua no ElliotOS"
-    _code "ms                      # REPL interativo — digite Lua direto"
-    _code "ms -c 'print(\"ola\")'   # executa uma linha"
-    _code "ms -f meu_script.lua    # executa um arquivo"
-    printf "\n"
-    _sec "Primeiro programa"
-    _ok  "-- salve como ola.lua"
-    _ok  "print('Ola, ElliotOS!')"
-    _ok  "print(1 + 1)           --> 2"
-    _ok  "print(type('texto'))   --> string"
-    _cont
-
-    _learn_step 7 35 "TRILHA 1 — Variaveis e Tipos"
-    _sec "Tipos basicos de Lua"
-    _ok  "nil        -- ausencia de valor"
-    _ok  "boolean    -- true / false"
-    _ok  "number     -- inteiros e decimais (64-bit)"
-    _ok  "string     -- texto"
-    _ok  "table      -- arrays, dicionarios, objetos"
-    _ok  "function   -- funcoes sao valores de primeira classe"
-    printf "\n"
-    _sec "Variaveis"
-    _ok  "local x = 10            -- local ao bloco (recomendado)"
-    _ok  "y = 20                  -- global (evite)"
-    _ok  "local nome = 'Elliot'"
-    _ok  "local ativo = true"
-    _ok  "local nada = nil"
-    printf "\n"
-    _sec "Strings"
-    _ok  "local s = 'ola mundo'"
-    _ok  "local t = \"tambem funciona\""
-    _ok  "local multi = [[ texto"
-    _ok  "em varias linhas ]]"
-    _ok  "print(#s)               -- comprimento: 9"
-    _ok  "print(s .. '!')         -- concatenacao: 'ola mundo !'"
-    _ok  "print(s:upper())        -- 'OLA MUNDO'"
-    _ok  "print(s:sub(1,3))       -- 'ola'"
-    _cont
-
-    _learn_step 8 35 "TRILHA 1 — Operadores e Logica"
-    _sec "Operadores aritmeticos"
-    _ok  "print(10 + 3)    --> 13"
-    _ok  "print(10 - 3)    --> 7"
-    _ok  "print(10 * 3)    --> 30"
-    _ok  "print(10 / 3)    --> 3.3333..."
-    _ok  "print(10 // 3)   --> 3   (divisao inteira)"
-    _ok  "print(10 % 3)    --> 1   (resto)"
-    _ok  "print(2 ^ 8)     --> 256 (potencia)"
-    printf "\n"
-    _sec "Operadores relacionais"
-    _ok  "==  ~=  <  >  <=  >="
-    _ok  "print(1 == 1)    --> true"
-    _ok  "print(1 ~= 2)    --> true   (diferente)"
-    printf "\n"
-    _sec "Operadores logicos"
-    _ok  "and   or   not"
-    _ok  "print(true and false)   --> false"
-    _ok  "print(true or false)    --> true"
-    _ok  "print(not true)         --> false"
-    _ok  ""
-    _ok  "-- truque util: valor padrao"
-    _ok  "local x = nil"
-    _ok  "local v = x or 'padrao'   --> 'padrao'"
-    _cont
-
-    _learn_step 9 35 "TRILHA 1 — if, elseif, else"
-    _sec "Estrutura condicional"
-    _ok  "local nota = 75"
-    _ok  ""
-    _ok  "if nota >= 90 then"
-    _ok  "  print('A')"
-    _ok  "elseif nota >= 70 then"
-    _ok  "  print('B')          -- cai aqui"
-    _ok  "elseif nota >= 50 then"
-    _ok  "  print('C')"
-    _ok  "else"
-    _ok  "  print('Reprovado')"
-    _ok  "end"
-    printf "\n"
-    _sec "Condicional em uma linha (ternario via and/or)"
-    _ok  "local status = (nota >= 70) and 'aprovado' or 'reprovado'"
-    _ok  "print(status)    --> 'aprovado'"
-    printf "\n"
-    _sec "Nil e false sao falsos — tudo o mais e verdadeiro"
-    _ok  "if 0 then print('0 e true em Lua!') end    -- imprime!"
-    _ok  "if '' then print('string vazia e true') end -- imprime!"
-    _cont
-
-    _learn_step 10 35 "TRILHA 1 — Loops: while, repeat, for"
-    _sec "while"
-    _ok  "local i = 1"
-    _ok  "while i <= 5 do"
-    _ok  "  print(i)"
-    _ok  "  i = i + 1"
-    _ok  "end"
-    printf "\n"
-    _sec "repeat...until (executa ao menos uma vez)"
-    _ok  "local x = 0"
-    _ok  "repeat"
-    _ok  "  x = x + 1"
-    _ok  "until x >= 3"
-    _ok  "print(x)   --> 3"
-    printf "\n"
-    _sec "for numerico"
-    _ok  "for i = 1, 5 do print(i) end          -- 1 a 5"
-    _ok  "for i = 10, 1, -2 do print(i) end     -- 10 8 6 4 2"
-    printf "\n"
-    _sec "break"
-    _ok  "for i = 1, 100 do"
-    _ok  "  if i == 5 then break end"
-    _ok  "  print(i)"
-    _ok  "end"
-    _cont
-
-    _learn_step 11 35 "TRILHA 1 — Funcoes"
-    _sec "Definindo funcoes"
-    _ok  "local function soma(a, b)"
-    _ok  "  return a + b"
-    _ok  "end"
-    _ok  "print(soma(3, 4))   --> 7"
-    printf "\n"
-    _sec "Multiplos retornos"
-    _ok  "local function minmax(t)"
-    _ok  "  local mn, mx = t[1], t[1]"
-    _ok  "  for _, v in ipairs(t) do"
-    _ok  "    if v < mn then mn = v end"
-    _ok  "    if v > mx then mx = v end"
-    _ok  "  end"
-    _ok  "  return mn, mx"
-    _ok  "end"
-    _ok  "local a, b = minmax({3,1,7,2})"
-    _ok  "print(a, b)   --> 1  7"
-    printf "\n"
-    _sec "Funcoes como valores (closures)"
-    _ok  "local function contador(inicio)"
-    _ok  "  local n = inicio"
-    _ok  "  return function()"
-    _ok  "    n = n + 1"
-    _ok  "    return n"
-    _ok  "  end"
-    _ok  "end"
-    _ok  "local c = contador(0)"
-    _ok  "print(c(), c(), c())   --> 1  2  3"
-    _cont
-
-    _learn_step 12 35 "TRILHA 1 — Tables: arrays e dicionarios"
-    _sec "Array (indice comeca em 1)"
-    _ok  "local frutas = {'maca', 'banana', 'uva'}"
-    _ok  "print(frutas[1])        --> maca"
-    _ok  "print(#frutas)          --> 3"
-    _ok  "table.insert(frutas, 'kiwi')"
-    _ok  "table.remove(frutas, 1)"
-    printf "\n"
-    _sec "Dicionario (chave-valor)"
-    _ok  "local alvo = {"
-    _ok  "  host = '192.168.1.1',"
-    _ok  "  porta = 80,"
-    _ok  "  aberto = true"
-    _ok  "}"
-    _ok  "print(alvo.host)        --> 192.168.1.1"
-    _ok  "print(alvo['porta'])    --> 80"
-    _ok  "alvo.ssl = false        -- adiciona campo"
-    printf "\n"
-    _sec "Iteracao"
-    _ok  "-- array:"
-    _ok  "for i, v in ipairs(frutas) do print(i, v) end"
-    _ok  ""
-    _ok  "-- dicionario:"
-    _ok  "for k, v in pairs(alvo) do print(k, v) end"
-    _cont
-
-    _learn_step 13 35 "TRILHA 1 — Strings avancado"
-    _sec "Funcoes da biblioteca string"
-    _ok  "local url = 'http://alvo.com/login?id=1'"
-    _ok  ""
-    _ok  "url:find('login')          -- posicao: 19 23"
-    _ok  "url:match('(%w+)%.com')    -- captura: 'alvo'"
-    _ok  "url:gsub('http', 'https')  -- substitui"
-    _ok  "url:len()                  -- comprimento"
-    _ok  "url:rep(2, ', ')           -- repete"
-    _ok  "('  ola  '):match('^%s*(.-)%s*\$')  -- trim"
-    printf "\n"
-    _sec "string.format (como printf)"
-    _ok  "string.format('%s:%d', 'host', 80)  --> 'host:80'"
-    _ok  "string.format('%.2f', 3.14159)      --> '3.14'"
-    _ok  "string.format('%05d', 42)           --> '00042'"
-    printf "\n"
-    _sec "Padroes Lua (tipo regex simplificado)"
-    _ok  "%d   digito      %a  letra      %s  espaco"
-    _ok  "%w   alfanum     %p  pontuacao  %l  minuscula"
-    _ok  ".    qualquer    *   zero+      +   um+     ?  zero/um"
-    _ok  ""
-    _ok  "-- extrair IP de texto:"
-    _ok  "local txt = 'host: 192.168.1.1 porta 80'"
-    _ok  "print(txt:match('%d+%.%d+%.%d+%.%d+'))  --> 192.168.1.1"
-    _cont
-
-    _learn_step 14 35 "TRILHA 1 — Modulos e arquivos"
-    _sec "Criando um modulo"
-    _ok  "-- arquivo: utils.lua"
-    _ok  "local M = {}"
-    _ok  ""
-    _ok  "function M.sha_check(hash)"
-    _ok  "  return #hash == 64  -- SHA256 tem 64 hex chars"
-    _ok  "end"
-    _ok  ""
-    _ok  "function M.trim(s)"
-    _ok  "  return s:match('^%s*(.-)%s*\$')"
-    _ok  "end"
-    _ok  ""
-    _ok  "return M"
-    printf "\n"
-    _sec "Usando o modulo"
-    _ok  "local utils = dofile('utils.lua')   -- carrega arquivo"
-    _ok  "print(utils.trim('  ola  '))        --> 'ola'"
-    printf "\n"
-    _sec "No ElliotOS: nunca use require() para modulos do sistema"
-    _ok  "-- ERRADO:  local net = require('net')"
-    _ok  "-- CERTO:   net ja esta carregado automaticamente no ms"
-    _cont
-
-    _learn_step 15 35 "TRILHA 1 — OOP com metatables"
-    _sec "Orientacao a objetos em Lua"
-    _ok  "local Scanner = {}"
-    _ok  "Scanner.__index = Scanner"
-    _ok  ""
-    _ok  "function Scanner.novo(host, porta)"
-    _ok  "  return setmetatable({host=host, porta=porta, resultados={}}, Scanner)"
-    _ok  "end"
-    _ok  ""
-    _ok  "function Scanner:adicionar(info)"
-    _ok  "  table.insert(self.resultados, info)"
-    _ok  "end"
-    _ok  ""
-    _ok  "function Scanner:resumo()"
-    _ok  "  print(self.host..':'..self.porta, #self.resultados..' achados')"
-    _ok  "end"
-    _ok  ""
-    _ok  "-- uso:"
-    _ok  "local s = Scanner.novo('192.168.1.1', 80)"
-    _ok  "s:adicionar('XSS encontrado')"
-    _ok  "s:resumo()   --> 192.168.1.1:80  1 achados"
-    _cont
-
-    _learn_step 16 35 "TRILHA 1 — Erros e pcall"
-    _sec "Tratamento de erros"
-    _ok  "-- error() lanca um erro"
-    _ok  "local function dividir(a, b)"
-    _ok  "  if b == 0 then error('divisao por zero') end"
-    _ok  "  return a / b"
-    _ok  "end"
-    printf "\n"
-    _ok  "-- pcall captura o erro sem travar o programa"
-    _ok  "local ok, resultado = pcall(dividir, 10, 0)"
-    _ok  "if ok then"
-    _ok  "  print('resultado:', resultado)"
-    _ok  "else"
-    _ok  "  print('erro:', resultado)   --> erro: divisao por zero"
-    _ok  "end"
-    printf "\n"
-    _sec "xpcall — com traceback"
-    _ok  "local ok, err = xpcall(funcao_perigosa, function(e)"
-    _ok  "  return debug.traceback(e, 2)"
-    _ok  "end)"
-    printf "\n"
-    _sec "Em scripts de pentest: sempre use pcall em chamadas de rede"
-    _ok  "local ok, r = pcall(net.get, 'https://alvo.com')"
-    _ok  "if not ok then print('falhou:', r) end"
-    _cont
-
-    _learn_step 17 35 "TRILHA 1 — Corrotinas (concorrencia cooperativa)"
-    _sec "O que sao corrotinas"
-    _ok  "Corrotinas permitem pausar e retomar funcoes."
-    _ok  "Uteis para scraping, pipelines e I/O multiplo."
-    printf "\n"
-    _sec "Criando e rodando"
-    _ok  "local co = coroutine.create(function(a, b)"
-    _ok  "  print('inicio', a, b)"
-    _ok  "  local c = coroutine.yield(a + b)   -- pausa, retorna a+b"
-    _ok  "  print('continuou com', c)"
-    _ok  "end)"
-    _ok  ""
-    _ok  "local ok, v = coroutine.resume(co, 10, 20)"
-    _ok  "print('yield retornou:', v)         --> 30"
-    _ok  "coroutine.resume(co, 'dado extra')  -- retoma"
-    printf "\n"
-    _sec "coroutine.wrap — interface mais simples"
-    _ok  "local gen = coroutine.wrap(function()"
-    _ok  "  for i = 1, 3 do coroutine.yield(i) end"
-    _ok  "end)"
-    _ok  "print(gen(), gen(), gen())   --> 1  2  3"
-    _cont
-
-    # ══════════════════════════════════════════════════
-    # TRILHA 2 — LUA + ELLIOTOS API
-    # ══════════════════════════════════════════════════
-
-    _learn_step 18 35 "TRILHA 2 — ElliotOS: o ms e os modulos"
-    printf "  \033[1;33m  Trilha 2: Lua + ElliotOS API\033[0m\n\n"
-    _sec "Como o ElliotOS funciona"
-    _ok  "O ms e o Lua 5.4 compilado com 23 modulos C embutidos."
-    _ok  "Ao iniciar o REPL, todos os modulos ja estao no ambiente global."
-    _ok  "Voce escreve Lua puro e acessa pentest, rede, crypto, IA, etc."
-    printf "\n"
-    _sec "Modulos disponiveis (sem require)"
-    _ok  "net.*      HTTP, TCP, UDP, DNS, port scan, sockets"
-    _ok  "mod.*      23 scanners de pentest (XSS, SQLi, LFI...)"
-    _ok  "crypto.*   MD5, SHA, AES, Base64, JWT, HMAC"
-    _ok  "sys.*      threads, processos, env, sleep, tempo"
-    _ok  "fs.*       read, write, list, stat, glob, chmod"
-    _ok  "ai.*       CYN: chat, code, search, providers"
-    _ok  "db.*       SQLite embutido"
-    _ok  "pent.*     utilitarios de pentest extras"
-    _ok  "ui.*       interface no terminal"
-    _ok  "agent.*    agente autonomo com tools"
-    _cont
-
-    _learn_step 19 35 "TRILHA 2 — net.*: HTTP e rede"
-    _sec "HTTP GET e POST"
-    _ok  "local r = net.get('https://httpbin.org/get')"
-    _ok  "print(r.code)           --> 200"
-    _ok  "print(#r.body)          -- tamanho da resposta"
-    _ok  "print(r.headers['content-type'])"
-    _ok  ""
-    _ok  "local r2 = net.post('https://httpbin.org/post',"
-    _ok  "  'user=admin&pass=123',"
-    _ok  "  {headers={['Content-Type']='application/x-www-form-urlencoded'}})"
-    printf "\n"
-    _sec "DNS, ping e port scan"
-    _ok  "net.dns('google.com')              -- tabela de IPs"
-    _ok  "net.ping('8.8.8.8')               -- ms ou nil"
-    _ok  "local portas = net.scan('192.168.1.1', 1, 1024)"
-    _ok  "for _, p in ipairs(portas) do print('aberta:', p) end"
-    printf "\n"
-    _sec "Socket TCP"
-    _ok  "local s = net.tcp('192.168.1.1', 80)"
-    _ok  "s:send('GET / HTTP/1.0\\r\\nHost: alvo\\r\\n\\r\\n')"
-    _ok  "print(s:recv(4096))"
-    _ok  "s:close()"
-    _cont
-
-    _learn_step 20 35 "TRILHA 2 — mod.*: scanners de pentest"
-    _sec "Scanners basicos"
-    _ok  "mod.xss('http://alvo.com/?q=')        -- XSS reflected/stored"
-    _ok  "mod.sqli('http://alvo.com/?id=')       -- SQLi multi-tecnica"
-    _ok  "mod.lfi('http://alvo.com/?file=')      -- LFI / path traversal"
-    _ok  "mod.rce('http://alvo.com/?cmd=')       -- RCE"
-    _ok  "mod.ssrf('http://alvo.com/?url=')      -- SSRF"
-    _ok  "mod.ssti('http://alvo.com/?tpl=')      -- template injection"
-    printf "\n"
-    _sec "Analise de infraestrutura"
-    _ok  "mod.headers('https://alvo.com')        -- security headers"
-    _ok  "mod.waf('https://alvo.com')            -- detecta WAF"
-    _ok  "mod.cors('https://alvo.com')           -- CORS misconfig"
-    _ok  "mod.subdomains('alvo.com')             -- enumeracao"
-    _ok  "mod.dirs('http://alvo.com')            -- bruteforce dirs"
-    _ok  "mod.secrets('http://alvo.com')         -- secrets expostos"
-    printf "\n"
-    _sec "Pipeline completo"
-    _ok  "-- roda todos os scanners em sequencia:"
-    _ok  "mod.chain('http://alvo.com')"
-    _ok  ""
-    _ok  "-- spider + scan:"
-    _ok  "local urls = mod.spider('http://alvo.com', 50)"
-    _ok  "for _, url in ipairs(urls) do"
-    _ok  "  mod.xss(url)"
-    _ok  "end"
-    _cont
-
-    _learn_step 21 35 "TRILHA 2 — crypto.*: criptografia"
-    _sec "Hashes"
-    _ok  "crypto.md5('senha')         --> 'd41d8cd98f00b204...'"
-    _ok  "crypto.sha1('senha')        --> hash SHA1"
-    _ok  "crypto.sha256('senha')      --> hash SHA256 (64 hex)"
-    _ok  "crypto.sha512('senha')      --> hash SHA512"
-    _ok  "crypto.hmac('chave','dado','sha256')  -- HMAC"
-    printf "\n"
-    _sec "Encoding"
-    _ok  "crypto.b64e('ola mundo')    --> 'b2xhIG11bmRv'"
-    _ok  "crypto.b64d('b2xhIG11bmRv')-- 'ola mundo'"
-    printf "\n"
-    _sec "AES e JWT"
-    _ok  "local enc = crypto.aes_enc('chave32bytes_____________', 'segredo')"
-    _ok  "local dec = crypto.aes_dec('chave32bytes_____________', enc)"
-    _ok  ""
-    _ok  "-- JWT: decodifica sem verificar assinatura"
-    _ok  "local t = crypto.jwt('eyJhbGc...')"
-    _ok  "print(t.header.alg)    -- algoritmo usado"
-    _ok  "print(t.payload.sub)   -- subject/usuario"
-    printf "\n"
-    _sec "Uso em pentest"
-    _ok  "-- crack MD5 simples:"
-    _ok  "local palavras = {'admin','123456','senha','root'}"
-    _ok  "local alvo = 'd41d8cd98f00b204e9800998ecf8427e'"
-    _ok  "for _, p in ipairs(palavras) do"
-    _ok  "  if crypto.md5(p) == alvo then print('senha:', p) end"
-    _ok  "end"
-    _cont
-
-    _learn_step 22 35 "TRILHA 2 — sys.* e fs.*: sistema e arquivos"
-    _sec "sys.* — controle do sistema"
-    _ok  "sys.info()              -- CPU, RAM, arch, deps"
-    _ok  "sys.sleep(2)            -- pausa 2 segundos"
-    _ok  "sys.time()              -- epoch em segundos"
-    _ok  "sys.time_ms()           -- epoch em milissegundos"
-    _ok  "sys.env('HOME')         -- le variavel de ambiente"
-    _ok  "sys.env('MYVAR','abc')  -- seta variavel"
-    _ok  "sys.pid()               -- PID do processo"
-    _ok  "sys.sh('ls -la')        -- executa shell"
-    printf "\n"
-    _sec "Threads em Lua (sys.thread)"
-    _ok  "local t1 = sys.thread(function()"
-    _ok  "  net.scan('192.168.1.1', 1, 512)"
-    _ok  "end)"
-    _ok  "local t2 = sys.thread(function()"
-    _ok  "  net.scan('192.168.1.1', 513, 1024)"
-    _ok  "end)"
-    _ok  "sys.join(t1); sys.join(t2)"
-    printf "\n"
-    _sec "fs.* — arquivos"
-    _ok  "fs.read('/etc/hosts')              -- string com conteudo"
-    _ok  "fs.write('log.txt', 'linha\\n')     -- cria/sobrescreve"
-    _ok  "fs.append('log.txt', 'mais\\n')     -- adiciona"
-    _ok  "fs.list('/home')                   -- tabela de nomes"
-    _ok  "fs.stat('/etc/passwd')             -- {size, mtime, ...}"
-    _ok  "fs.isfile('/etc/passwd')           -- true/false"
-    _ok  "fs.mkdir('/tmp/scan_out')          -- cria dir"
-    _ok  "fs.glob('/tmp/*.txt')              -- lista por padrao"
-    _cont
-
-    _learn_step 23 35 "TRILHA 2 — ai.*: CYN inteligencia artificial"
-    _sec "Chat e perguntas"
-    _ok  "ai.ask('o que e SQLi?')           -- resposta direta"
-    _ok  "ai.chat('explique SSRF')          -- com historico"
-    _ok  "ai.clear()                        -- limpa historico"
-    printf "\n"
-    _sec "Geracao de codigo"
-    _ok  "local cod = ai.code('escreva um port scanner em Lua')"
-    _ok  "print(cod)"
-    _ok  "-- ou execute direto:"
-    _ok  "load(ai.code('funcao que faz ping em tabela de IPs'))()"
-    printf "\n"
-    _sec "Providers"
-    _ok  "ai.provider('sky')                -- gratuito, sem key"
-    _ok  "ai.provider('pollinations')       -- gratuito"
-    _ok  "ai.provider('groq','llama-3.3-70b-versatile')  -- key"
-    _ok  "ai.provider('openai','gpt-4o')   -- key"
-    _ok  "ai.provider('gemini')             -- key Google"
-    _ok  "ai.key('SUA_KEY_AQUI')            -- configura key"
-    printf "\n"
-    _sec "Uso em pentest assistido"
-    _ok  "local headers = mod.headers('https://alvo.com')"
-    _ok  "local analise = ai.ask('analise esses headers de seguranca: '..headers)"
-    _ok  "print(analise)"
-    _cont
-
-    _learn_step 24 35 "TRILHA 2 — db.*: banco de dados SQLite"
-    _sec "Abrindo e criando tabelas"
-    _ok  "local db = db.open('scan.db')"
-    _ok  ""
-    _ok  "db:exec([["
-    _ok  "  CREATE TABLE IF NOT EXISTS resultados ("
-    _ok  "    id    INTEGER PRIMARY KEY,"
-    _ok  "    host  TEXT,"
-    _ok  "    vuln  TEXT,"
-    _ok  "    data  TEXT"
-    _ok  "  )"
-    _ok  "]])"
-    printf "\n"
-    _sec "Insert e query"
-    _ok  "db:exec(string.format("
-    _ok  "  \"INSERT INTO resultados VALUES(NULL,'%s','%s',datetime('now'))\","
-    _ok  "  'alvo.com', 'XSS'))"
-    _ok  ""
-    _ok  "local rows = db:query('SELECT * FROM resultados')"
-    _ok  "for _, row in ipairs(rows) do"
-    _ok  "  print(row.host, row.vuln, row.data)"
-    _ok  "end"
-    _ok  ""
-    _ok  "db:close()"
-    printf "\n"
-    _sec "Uso pratico: salvar scans"
-    _ok  "-- escaneia e salva tudo no banco:"
-    _ok  "local urls = mod.spider('http://alvo.com', 100)"
-    _ok  "for _, url in ipairs(urls) do"
-    _ok  "  local r = mod.xss(url)"
-    _ok  "  if r and r.vuln then"
-    _ok  "    db:exec(\"INSERT INTO resultados VALUES(NULL,'\"..url..\"','XSS',datetime('now'))\")"
-    _ok  "  end"
-    _ok  "end"
-    _cont
-
-    _learn_step 25 35 "TRILHA 2 — Scripts profissionais com ElliotOS"
-    _sec "Estrutura de um script completo"
-    _ok  "#!/usr/bin/env ms"
-    _ok  "-- recon.lua — reconhecimento basico"
-    _ok  "-- Uso: ms --script recon -- alvo.com"
-    _ok  ""
-    _ok  "local alvo = arg[1] or error('uso: recon -- <host>')"
-    _ok  "local db_scan = db.open('/tmp/recon_'..alvo..'.db')"
-    _ok  ""
-    _ok  "print('[*] Alvo: '..alvo)"
-    _ok  ""
-    _ok  "-- DNS"
-    _ok  "local ips = net.dns(alvo)"
-    _ok  "for _, ip in ipairs(ips) do print('[+] IP:', ip) end"
-    _ok  ""
-    _ok  "-- port scan em thread"
-    _ok  "local portas = {}"
-    _ok  "local t = sys.thread(function()"
-    _ok  "  portas = net.scan(ips[1], 1, 1024)"
-    _ok  "end)"
-    _ok  ""
-    _ok  "-- headers enquanto scanneia"
-    _ok  "local h = mod.headers('https://'..alvo)"
-    _ok  "sys.join(t)"
-    _ok  ""
-    _ok  "print('[+] Portas abertas:', #portas)"
-    _ok  "print('[+] Headers analisados')"
-    _cont
-
-    _learn_step 26 35 "TRILHA 2 — lpm, xpm e scripts externos"
-    _sec "lpm — gerenciador de modulos Lua"
-    _ok  "lpm install luasocket      # socket Lua puro"
-    _ok  "lpm install luajson        # JSON"
-    _ok  "lpm install --all          # instala lista curada"
-    _ok  "lpm list                   # modulos instalados"
-    _ok  "lpm --script -s 'sqli'     # busca exploit-db"
-    _ok  "lpm --script -i 42         # instala exploit #42"
-    printf "\n"
-    _sec "xpm — ferramentas de pentest externas"
-    _ok  "xpm install nuclei         # scanner de templates"
-    _ok  "xpm install sqlmap         # SQLi automatizado"
-    _ok  "xpm install ffuf           # fuzzer HTTP"
-    _ok  "xpm install nmap           # port scan avancado"
-    _ok  "xpm search web             # busca ferramentas web"
-    _ok  "xpm list                   # instaladas"
-    printf "\n"
-    _sec "Integrando xpm com Lua"
-    _ok  "-- rodar nuclei a partir do script Lua:"
-    _ok  "local out = sys.sh('nuclei -u https://alvo.com -silent')"
-    _ok  "for linha in out:gmatch('[^\\n]+') do"
-    _ok  "  if linha:find('CRITICAL','HIGH') then"
-    _ok  "    print('[!]', linha)"
-    _ok  "  end"
-    _ok  "end"
-    _cont
-
-    # ══════════════════════════════════════════════════
-    # TRILHA 3 — C NO ELLIOTOS
-    # ══════════════════════════════════════════════════
-
-    _learn_step 27 35 "TRILHA 3 — C: base e diferenca para Lua"
-    printf "  \033[1;33m  Trilha 3: C no ElliotOS\033[0m\n\n"
-    _sec "Por que C no ElliotOS"
-    _ok  "O ElliotOS e escrito em C. Os 23 modulos do ms sao C."
-    _ok  "Scripts .c em ms --script compilam automaticamente via cxx."
-    _ok  "C e necessario para: performance, sockets raw, syscalls,"
-    _ok  "modulos customizados e ferramentas de baixo nivel."
-    printf "\n"
-    _sec "Diferencas principais C vs Lua"
-    _ok  "C: compilado, tipado, manual de memoria, rapido"
-    _ok  "Lua: interpretado, dinamico, garbage collected, flexivel"
-    _ok  ""
-    _ok  "C usa:   int, char, float, double, struct, pointer"
-    _ok  "Lua usa: number, string, table, boolean, nil (automatico)"
-    printf "\n"
-    _sec "Primeiro programa C no ElliotOS"
-    _ok  "// ola.c"
-    _ok  "#include <stdio.h>"
-    _ok  ""
-    _ok  "int main(void) {"
-    _ok  "    printf(\"Ola, ElliotOS!\\n\");"
-    _ok  "    return 0;"
-    _ok  "}"
-    _ok  ""
-    _ok  "-- Compilar e rodar:"
-    _ok  "cxx ola.c -o ola && ./ola"
-    _ok  "-- ou direto:"
-    _ok  "ms --script ola.c"
-    _cont
-
-    _learn_step 28 35 "TRILHA 3 — C: tipos, variaveis, operadores"
-    _sec "Tipos fundamentais"
-    _ok  "int     x = 42;          // inteiro (32-bit)"
-    _ok  "long    y = 123456789L;  // inteiro longo (64-bit)"
-    _ok  "float   f = 3.14f;       // decimal simples"
-    _ok  "double  d = 3.14159;     // decimal duplo"
-    _ok  "char    c = 'A';         // caractere / byte"
-    _ok  "char   *s = \"texto\";     // ponteiro para string"
-    _ok  "int     arr[5] = {1,2,3,4,5};  // array"
-    printf "\n"
-    _sec "Modificadores de tipo (tamanho garantido — prefira em pentest)"
-    _ok  "#include <stdint.h>"
-    _ok  "uint8_t   b = 0xFF;      // 1 byte unsigned"
-    _ok  "uint16_t  p = 443;       // 2 bytes (porta)"
-    _ok  "uint32_t  ip = 0xC0A801; // 4 bytes (IPv4)"
-    _ok  "int64_t   ts;            // timestamp"
-    printf "\n"
-    _sec "Operadores bitwise (essencial em redes/crypto)"
-    _ok  "x & y   -- AND bit a bit"
-    _ok  "x | y   -- OR bit a bit"
-    _ok  "x ^ y   -- XOR (muito usado em criptografia)"
-    _ok  "~x      -- NOT / complemento"
-    _ok  "x << n  -- shift esquerda (multiplica por 2^n)"
-    _ok  "x >> n  -- shift direita  (divide por 2^n)"
-    _ok  ""
-    _ok  "// mascara de sub-rede:"
-    _ok  "uint32_t mask = 0xFFFFFF00;  // /24"
-    _ok  "uint32_t net  = ip & mask;"
-    _cont
-
-    _learn_step 29 35 "TRILHA 3 — C: if, loops, funcoes"
-    _sec "Condicional"
-    _ok  "int porta = 443;"
-    _ok  "if (porta == 80) {"
-    _ok  "    printf(\"HTTP\\n\");"
-    _ok  "} else if (porta == 443) {"
-    _ok  "    printf(\"HTTPS\\n\");   // cai aqui"
-    _ok  "} else {"
-    _ok  "    printf(\"outra\\n\");"
-    _ok  "}"
-    printf "\n"
-    _sec "Loops"
-    _ok  "for (int i = 0; i < 10; i++) { printf(\"%d\\n\", i); }"
-    _ok  ""
-    _ok  "int n = 0;"
-    _ok  "while (n < 5) { n++; }"
-    _ok  ""
-    _ok  "do { n--; } while (n > 0);"
-    printf "\n"
-    _sec "Funcoes"
-    _ok  "// declaracao (prototipo)"
-    _ok  "int soma(int a, int b);"
-    _ok  ""
-    _ok  "// definicao"
-    _ok  "int soma(int a, int b) {"
-    _ok  "    return a + b;"
-    _ok  "}"
-    _ok  ""
-    _ok  "// ponteiro de funcao (callbacks)"
-    _ok  "int (*fn)(int, int) = soma;"
-    _ok  "printf(\"%d\\n\", fn(3, 4));   // 7"
-    _cont
-
-    _learn_step 30 35 "TRILHA 3 — C: ponteiros e memoria"
-    _sec "Ponteiros — o coracao do C"
-    _ok  "int x = 42;"
-    _ok  "int *p = &x;     // p aponta para x"
-    _ok  "printf(\"%d\\n\", *p);    // desreferencia: 42"
-    _ok  "*p = 99;          // muda x via ponteiro"
-    _ok  "printf(\"%d\\n\", x);     // 99"
-    printf "\n"
-    _sec "Alocacao dinamica"
-    _ok  "#include <stdlib.h>"
-    _ok  ""
-    _ok  "char *buf = malloc(1024);       // aloca 1KB"
-    _ok  "if (!buf) { perror(\"malloc\"); exit(1); }"
-    _ok  ""
-    _ok  "snprintf(buf, 1024, \"payload=%s\", input);"
-    _ok  "// usa buf..."
-    _ok  "free(buf);                      // SEMPRE libere"
-    printf "\n"
-    _sec "Strings em C (arrays de char terminados em 0)"
-    _ok  "#include <string.h>"
-    _ok  "char dst[256];"
-    _ok  "strncpy(dst, src, sizeof(dst)-1);  // copia segura"
-    _ok  "strncat(dst, \" sufixo\", sizeof(dst)-strlen(dst)-1);"
-    _ok  "strlen(s)          -- comprimento"
-    _ok  "strcmp(a, b)       -- compara (0 = igual)"
-    _ok  "strstr(hay, needle)-- busca substring"
-    _ok  ""
-    _ok  "// NUNCA use strcpy/strcat sem limite — buffer overflow!"
-    _cont
-
-    _learn_step 31 35 "TRILHA 3 — C: sockets e rede raw"
-    _sec "Socket TCP em C (como o ms faz internamente)"
-    _ok  "#include <stdio.h>"
-    _ok  "#include <string.h>"
-    _ok  "#include <sys/socket.h>"
-    _ok  "#include <netinet/in.h>"
-    _ok  "#include <arpa/inet.h>"
-    _ok  "#include <unistd.h>"
-    _ok  ""
-    _ok  "int fd = socket(AF_INET, SOCK_STREAM, 0);"
-    _ok  "struct sockaddr_in addr = {"
-    _ok  "    .sin_family = AF_INET,"
-    _ok  "    .sin_port   = htons(80),"
-    _ok  "};"
-    _ok  "inet_pton(AF_INET, \"192.168.1.1\", &addr.sin_addr);"
-    _ok  ""
-    _ok  "if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {"
-    _ok  "    char req[] = \"GET / HTTP/1.0\\r\\n\\r\\n\";"
-    _ok  "    send(fd, req, strlen(req), 0);"
-    _ok  "    char buf[4096];"
-    _ok  "    int n = recv(fd, buf, sizeof(buf)-1, 0);"
-    _ok  "    buf[n] = 0;"
-    _ok  "    puts(buf);"
-    _ok  "}"
-    _ok  "close(fd);"
-    _cont
-
-    _learn_step 32 35 "TRILHA 3 — C: criar modulo para o ms"
-    _sec "Modulo C que o ms pode carregar"
-    _ok  "// meu_mod.c — modulo Lua escrito em C"
-    _ok  "#include <lua.h>"
-    _ok  "#include <lauxlib.h>"
-    _ok  ""
-    _ok  "// funcao Lua: meu.xor(str, key)"
-    _ok  "static int l_xor(lua_State *L) {"
-    _ok  "    size_t slen, klen;"
-    _ok  "    const char *s = luaL_checklstring(L, 1, &slen);"
-    _ok  "    const char *k = luaL_checklstring(L, 2, &klen);"
-    _ok  "    char *out = malloc(slen+1);"
-    _ok  "    for (size_t i = 0; i < slen; i++)"
-    _ok  "        out[i] = s[i] ^ k[i % klen];"
-    _ok  "    out[slen] = 0;"
-    _ok  "    lua_pushlstring(L, out, slen);"
-    _ok  "    free(out);"
-    _ok  "    return 1;  // 1 valor retornado"
-    _ok  "}"
-    _ok  ""
-    _ok  "int luaopen_meu_mod(lua_State *L) {"
-    _ok  "    luaL_Reg funcs[] = {{\"xor\", l_xor}, {NULL,NULL}};"
-    _ok  "    luaL_newlib(L, funcs);"
-    _ok  "    return 1;"
-    _ok  "}"
-    _ok  ""
-    _ok  "-- compilar:"
-    _ok  "cxx -shared -fPIC meu_mod.c -o meu_mod.so \$(pkg-config --cflags lua5.4)"
-    _ok  "-- usar no ms:"
-    _ok  "local meu = require('meu_mod')"
-    _ok  "print(meu.xor('segredo', 'k'))"
-    _cont
-
-    # ══════════════════════════════════════════════════
-    # TRILHA 4 — PROJETOS REAIS
-    # ══════════════════════════════════════════════════
-
-    _learn_step 33 35 "TRILHA 4 — Projeto: scanner de vulnerabilidades"
-    printf "  \033[1;33m  Trilha 4: Projetos reais de pentest\033[0m\n\n"
-    _sec "vuln_scan.lua — scanner completo com relatorio"
-    _ok  "-- Uso: ms --script vuln_scan -- http://alvo.com"
-    _ok  "local alvo  = arg[1] or error('informe a URL')"
-    _ok  "local relat = 'relatorio_'..os.date('%Y%m%d_%H%M')..'.txt'"
-    _ok  "local vulns = 0"
-    _ok  ""
-    _ok  "local function log(msg)"
-    _ok  "  print(msg)"
-    _ok  "  fs.append(relat, msg..'\\n')"
-    _ok  "end"
-    _ok  ""
-    _ok  "log('[*] Iniciando scan: '..alvo)"
-    _ok  "log('[*] '..os.date())"
-    _ok  ""
-    _ok  "local checks = {"
-    _ok  "  {'XSS',    function() return mod.xss(alvo)  end},"
-    _ok  "  {'SQLi',   function() return mod.sqli(alvo) end},"
-    _ok  "  {'LFI',    function() return mod.lfi(alvo)  end},"
-    _ok  "  {'Headers',function() return mod.headers(alvo) end},"
-    _ok  "}"
-    _ok  ""
-    _ok  "for _, ck in ipairs(checks) do"
-    _ok  "  local ok, r = pcall(ck[2])"
-    _ok  "  if ok and r and r.vuln then"
-    _ok  "    log('[!] '..ck[1]..': VULNERAVEL')"
-    _ok  "    vulns = vulns + 1"
-    _ok  "  end"
-    _ok  "end"
-    _ok  ""
-    _ok  "log('\\n[=] Total: '..vulns..' vulnerabilidades')"
-    _ok  "log('[=] Relatorio: '..relat)"
-    _cont
-
-    _learn_step 34 35 "TRILHA 4 — Projeto: port scanner multi-thread"
-    _sec "portscan_mt.lua — scan paralelo com threads"
-    _ok  "-- Uso: ms --script portscan_mt -- 192.168.1.1 1 9999"
-    _ok  "local host  = arg[1] or '127.0.0.1'"
-    _ok  "local p_ini = tonumber(arg[2]) or 1"
-    _ok  "local p_fim = tonumber(arg[3]) or 1024"
-    _ok  "local THREADS = 4"
-    _ok  ""
-    _ok  "local abertas = {}"
-    _ok  "local chunk = math.floor((p_fim - p_ini + 1) / THREADS)"
-    _ok  ""
-    _ok  "print(string.format('[*] Scan %s:%d-%d (%d threads)', host, p_ini, p_fim, THREADS))"
-    _ok  ""
-    _ok  "local ts = {}"
-    _ok  "for i = 1, THREADS do"
-    _ok  "  local ini = p_ini + (i-1) * chunk"
-    _ok  "  local fim = (i == THREADS) and p_fim or (ini + chunk - 1)"
-    _ok  "  ts[i] = sys.thread(function()"
-    _ok  "    local r = net.scan(host, ini, fim)"
-    _ok  "    for _, p in ipairs(r) do"
-    _ok  "      table.insert(abertas, p)"
-    _ok  "    end"
-    _ok  "  end)"
-    _ok  "end"
-    _ok  ""
-    _ok  "for _, t in ipairs(ts) do sys.join(t) end"
-    _ok  "table.sort(abertas)"
-    _ok  ""
-    _ok  "print('[+] Portas abertas ('..#abertas..'):')"
-    _ok  "for _, p in ipairs(abertas) do"
-    _ok  "  print(string.format('  %-6d  %s', p, net.banner(host,p) or ''))"
-    _ok  "end"
-    _cont
-
-    _learn_step 35 35 "TRILHA 4 — Proximos passos e recursos"
-    _sec "Voce concluiu o tutorial completo!"
-    _ok  "Trilha 1: Lua basico ao avancado      [COMPLETO]"
-    _ok  "Trilha 2: Lua + ElliotOS API          [COMPLETO]"
-    _ok  "Trilha 3: C no ElliotOS               [COMPLETO]"
-    _ok  "Trilha 4: Projetos reais              [COMPLETO]"
-    printf "\n"
-    _sec "Proximos passos"
-    _ok  "ms --examples        # scripts prontos para estudar"
-    _ok  "ms --doc modulos     # referencia completa da API"
-    _ok  "ms --doc net         # modulo net.*"
-    _ok  "ms --doc mod         # scanners mod.*"
-    _ok  "ms --doc crypto      # crypto.*"
-    _ok  "lpm --script -s ''   # explore o exploit-db"
-    _ok  "xpm list             # ferramentas disponiveis"
-    printf "\n"
-    _sec "Recursos externos"
-    _ok  "lua.org/manual/5.4       -- manual oficial do Lua 5.4"
-    _ok  "github.com/mikeelliot218/ElliotOS  -- codigo fonte"
-    _ok  "ms -a 'duvida'           -- pergunte para a CYN"
-    printf "\n"
-    printf "  \033[1;32m  Bom pentest. Use com responsabilidade.\033[0m\n\n"
-    ;;
-  --payload)
-    _EX="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    if [ -f "\$_EX/payload.lua" ]; then
-      exec "\$_B" "\$_EX/payload.lua" "\${@:2}"
-    else
-      printf "\033[1;31m[!] payload.lua nao encontrado. Reinstale com: bash luascript.sh --update\033[0m\n"
-      exit 1
-    fi
-    ;;
-  --examples)
-    _EX="${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    _EX_C="${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
-    printf "\n\033[1;35m╔════════════════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;35m║  ElliotOS — Scripts de Exemplo                              ║\033[0m\n"
-    printf "\033[1;35m╚═══════════════════════════════════════════════════════════════╝\033[0m\n\n"
-    # Scripts Lua
-    _lua_count=0
-    if [ -d "\$_EX" ]; then
-      for f in "\$_EX"/*.lua; do [ -f "\$f" ] && _lua_count=\$((_lua_count+1)); done
-    fi
-    if [ "\$_lua_count" -gt 0 ]; then
-      printf "\033[1;33m── Scripts Lua (%d) ───────────────────────────────────────────────\033[0m\n" "\$_lua_count"
-      printf "  \033[0;90m%-22s  %-12s  %s\033[0m\n" "NOME" "CATEGORIA" "DESCRIÇÃO"
-      printf "  \033[0;90m%s\033[0m\n" "───────────────────────────────────────────────────────────────"
-      for f in "\$_EX"/*.lua; do
-        [ -f "\$f" ] || continue
-        _name=\$(basename "\$f")
-        _desc=\$(head -5 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
-        _cat=\$(head -8 "\$f" | grep -i "^-- *cat\|^-- *type\|^-- *category" | sed 's/^--[^:]*: *//' | head -1)
-        [ -z "\$_cat" ] && _cat="pentest"
-        printf "  \033[1;32m%-22s\033[0m \033[1;33m%-12s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_cat" "\$_desc"
-        _args=\$(head -10 "\$f" | grep -i "^-- *args\|^-- *uso\|^-- *use" | sed 's/^--[^:]*: *//' | head -1)
-        [ -n "\$_args" ] && printf "  \033[0;90m  args: %s\033[0m\n" "\$_args"
-      done
-      printf "\n"
-    else
-      printf "  \033[0;90m(nenhum script Lua em \$_EX)\033[0m\n\n"
-    fi
-    # Scripts C
-    _c_count=0
-    if [ -d "\$_EX_C" ]; then
-      for f in "\$_EX_C"/*; do [ -f "\$f" ] && _c_count=\$((_c_count+1)); done
-    fi
-    if [ "\$_c_count" -gt 0 ]; then
-      printf "\033[1;33m── Scripts C (%d) ──────────────────────────────────────────────────\033[0m\n" "\$_c_count"
-      for f in "\$_EX_C"/*; do
-        [ -f "\$f" ] || continue
-        _name=\$(basename "\$f")
-        _desc=\$(head -5 "\$f" | grep -m1 "^//" | sed 's|^// *||')
-        case "\$_name" in *.c) _ctype="C fonte";; *) _ctype="binario";; esac
-        printf "  \033[1;33m%-22s\033[0m \033[0;90m%-10s  %s\033[0m\n" "\$_name" "\$_ctype" "\$_desc"
-      done
-      printf "\n"
-    fi
-    # Scripts pessoais
-    _EX_HOME="\$HOME/.elliot/scripts"
-    _home_count=0
-    if [ -d "\$_EX_HOME" ]; then
-      for f in "\$_EX_HOME"/*; do [ -f "\$f" ] && _home_count=\$((_home_count+1)); done
-    fi
-    if [ "\$_home_count" -gt 0 ]; then
-      printf "\033[1;33m── Scripts pessoais — ~/.elliot/scripts (%d) ───────────────────\033[0m\n" "\$_home_count"
-      for f in "\$_EX_HOME"/*; do
-        [ -f "\$f" ] || continue
-        _name=\$(basename "\$f")
-        _desc=\$(head -5 "\$f" | grep -m1 "^--\|^//\|^#" | sed 's|^[#/-]* *||')
-        printf "  \033[1;35m%-22s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-      done
-      printf "\n"
-    fi
-    printf "\033[1;36mComo executar:\033[0m\n"
-    printf "  \033[1;32mms --script nome\033[0m                   # Lua ou C\n"
-    printf "  \033[1;32mms --script nome -- [args]\033[0m         # com argumentos\n"
-    printf "  \033[1;32mms --script portscan.lua -- host 80\033[0m\n"
-    printf "  \033[1;32mms --script xerxes.c -- host 80\033[0m\n"
-    printf "  \033[1;32mlpm --script -s 'sqli'\033[0m             # baixar do exploit-db\n\n"
-    ;;
-  --doc)
-    _DOC_PAGER=""
-    command -v less > /dev/null 2>&1 && _DOC_PAGER="less -R"
-    command -v more > /dev/null 2>&1 && [ -z "\$_DOC_PAGER" ] && _DOC_PAGER="more"
-    _doc_body() {
-    printf "\n\033[1;36m╔════════════════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;36m║          ElliotOS — Documentação do Sistema                  ║\033[0m\n"
-    printf "\033[1;36m║  O primeiro sistema de pentest nativo para Android           ║\033[0m\n"
-    printf "\033[1;36m╚═══════════════════════════════════════════════════════════════╝\033[0m\n"
-    printf "\033[0;90m  Desenvolvido por Mike Elliot · github.com/mikeelliot218/ElliotOS\033[0m\n\n"
-    printf "\033[1;35m═══ O QUE E O ElliotOS ═════════════════════════════════════════\033[0m\n\n"
-    printf "  Sistema de seguranca e pentest dentro do Termux. Roda no celular,\n"
-    printf "  sem root, sem VM. Um script compila do zero: Lua 5.4.8, 23 modulos\n"
-    printf "  C, IA nativa (CYN), e ferramentas: ms, lpm, xpm, cxx, ee, xtun.\n\n"
-    printf "\033[1;35m═══ PLATAFORMAS ═══════════════════════════════════════════════\033[0m\n\n"
-    printf "  \033[1;32m%-18s\033[0m \033[1;33m%-14s\033[0m %s\n" "Ambiente" "Flag" "Gerenciador"
-    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Android/Termux" "--termux" "pkg"
-    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Debian/Ubuntu" "--debian" "apt"
-    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Arch Linux" "--arch" "pacman"
-    printf "  \033[0;90m%-18s  %-14s  %s\033[0m\n" "Fedora/RHEL" "--fedora" "dnf"
-    printf "\n"
-    printf "\033[1;35m═══ INSTALACAO ════════════════════════════════════════════════\033[0m\n\n"
-    printf "  \033[1;36mMinimo:\033[0m  \033[0;90mpkg update && pkg install git wget curl clang\033[0m\n"
-    printf "           \033[0;90mgit clone https://github.com/mikeelliot218/ElliotOS.git\033[0m\n"
-    printf "           \033[0;90mcd ElliotOS && bash luascript.sh\033[0m\n\n"
-    printf "  \033[1;36mCom editor:\033[0m  \033[0;90mbash luascript.sh -e\033[0m\n"
-    printf "  \033[1;36mCom GUI:\033[0m     \033[0;90mbash luascript.sh --gui\033[0m\n"
-    printf "  \033[1;36mAtualizar:\033[0m   \033[0;90mbash luascript.sh --update\033[0m\n"
-    printf "  \033[1;36mDesinstalar:\033[0m \033[0;90mbash luascript.sh -u\033[0m\n"
-    printf "  \033[1;36mDiagnostico:\033[0m \033[0;90mbash luascript.sh --doctor\033[0m\n\n"
-    printf "\033[1;35m═══ BINARIOS E FERRAMENTAS ═══════════════════════════════════\033[0m\n\n"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "ms" "MoonStyle - REPL Lua 5.4 com modulos de pentest"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "lua-net" "Interpretador Lua com 23 modulos de seguranca"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "lpm" "Gerenciador de modulos Lua e exploits"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "xpm" "Gerenciador de ferramentas de pentest"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "cxx" "Compilador C/C++ simplificado"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "ee" "Editor de texto nativo leve"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "xtun" "Tunnel Toolkit TCP/UDP sem root"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "appforge" "HTML/CSS/JS -> APK sem root"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "apkinspect" "Analise estatica de APKs"
-    printf "  \033[1;32m%-12s\033[0m %s\n" "wordmagic" "Gerador inteligente de wordlists"
-    printf "\n"
-    printf "\033[1;35m═══ FLAGS DO ms ════════════════════════════════════════════════\033[0m\n\n"
-    printf "  \033[1;36mGeral:\033[0m\n"
-    printf "  \033[1;32m  ms\033[0m                    REPL interativo\n"
-    printf "  \033[1;32m  ms -c 'codigo'\033[0m        executa Lua\n"
-    printf "  \033[1;32m  ms -f script.lua\033[0m      executa arquivo\n"
-    printf "  \033[1;32m  ms -e [arquivo]\033[0m       editor\n"
-    printf "  \033[1;32m  ms -i\033[0m                 info do sistema\n"
-    printf "  \033[1;32m  ms -v\033[0m                 versao\n"
-    printf "  \033[1;32m  ms -h\033[0m                 ajuda completa\n\n"
-    printf "  \033[1;36mIA (CYN):\033[0m\n"
-    printf "  \033[1;32m  ms -a\033[0m                 chat com a CYN\n"
-    printf "  \033[1;32m  ms -a 'pergunta'\033[0m      pergunta direta\n"
-    printf "  \033[1;32m  ms --search 'query'\033[0m   pesquisa web\n"
-    printf "  \033[1;32m  ms --code 'tarefa'\033[0m    gera codigo\n\n"
-    printf "  \033[1;36mRede:\033[0m\n"
-    printf "  \033[1;32m  ms -g url\033[0m             HTTP GET\n"
-    printf "  \033[1;32m  ms --post url dados\033[0m   HTTP POST\n"
-    printf "  \033[1;32m  ms --ip\033[0m               IP publico\n"
-    printf "  \033[1;32m  ms -d host\033[0m            DNS lookup\n"
-    printf "  \033[1;32m  ms -P host\033[0m            ping\n"
-    printf "  \033[1;32m  ms --scan host p1 p2\033[0m  port scan\n"
-    printf "  \033[1;32m  ms --listen porta\033[0m     listener TCP\n\n"
-    printf "  \033[1;36mPentest:\033[0m\n"
-    printf "  \033[1;32m  ms -x url [N]\033[0m         XSS\n"
-    printf "  \033[1;32m  ms -q url [N]\033[0m         SQLi\n"
-    printf "  \033[1;32m  ms -l url [N]\033[0m         LFI\n"
-    printf "  \033[1;32m  ms -r url [N]\033[0m         RCE\n"
-    printf "  \033[1;32m  ms -N url\033[0m             NoSQL Injection\n"
-    printf "  \033[1;32m  ms --ssrf url [N]\033[0m     SSRF\n"
-    printf "  \033[1;32m  ms --ssti url [N]\033[0m     SSTI\n"
-    printf "  \033[1;32m  ms --scan-all url\033[0m     todos os scanners\n"
-    printf "  \033[1;32m  ms -s url [limit]\033[0m     spider\n\n"
-    printf "  \033[1;36mCrypto:\033[0m\n"
-    printf "  \033[1;32m  ms --md5 'texto'\033[0m      hash MD5\n"
-    printf "  \033[1;32m  ms --sha256 'texto'\033[0m   hash SHA256\n"
-    printf "  \033[1;32m  ms --b64e 'texto'\033[0m     Base64 encode\n"
-    printf "  \033[1;32m  ms --b64d 'b64'\033[0m       Base64 decode\n"
-    printf "  \033[1;32m  ms --jwt 'token'\033[0m      decodifica JWT\n\n"
-    printf "  \033[1;36mAPK:\033[0m\n"
-    printf "  \033[1;32m  ms --apk app.apk\033[0m      testa APK\n"
-    printf "  \033[1;32m  ms --apk-sign app.apk\033[0m assina APK\n"
-    printf "  \033[1;32m  appforge build <dir>\033[0m   HTML -> APK\n\n"
-    printf "  \033[1;36mAprender / Docs:\033[0m\n"
-    printf "  \033[1;32m  ms --learn\033[0m            tutorial (8 licoes)\n"
-    printf "  \033[1;32m  ms --examples\033[0m         scripts de exemplo\n"
-    printf "  \033[1;32m  ms --doc\033[0m              esta documentacao\n"
-    printf "  \033[1;32m  ms --doc modulos\033[0m      referencia dos modulos\n"
-    printf "  \033[1;32m  ms --doc net\033[0m          modulo net.*\n"
-    printf "  \033[1;32m  ms --doc mod\033[0m          modulo mod.* (scanners)\n"
-    printf "  \033[1;32m  ms --doc crypto\033[0m       modulo crypto.*\n"
-    printf "  \033[1;32m  ms --doc sys\033[0m          modulo sys.*\n"
-    printf "  \033[1;32m  ms --doc fs\033[0m           modulo fs.*\n"
-    printf "  \033[1;32m  ms --doc ai\033[0m           modulo ai.*\n"
-    printf "  \033[1;32m  ms --doc string\033[0m       extensoes string.*\n"
-    printf "  \033[1;32m  ms --doc util\033[0m         stdlib funcional util.*\n"
-    printf "  \033[1;32m  ms --doc json\033[0m         json.encode / json.decode\n"
-    printf "  \033[1;32m  ms --doc log\033[0m          modulo log.* — logging estruturado\n"
-    printf "  \033[1;32m  ms --doc csv\033[0m          modulo csv.* — parse e escrita de CSV\n"
-    printf "  \033[1;32m  ms --doc num\033[0m          num.* — parsing e formatação numérica\n"
-    printf "  \033[1;32m  ms --doc path\033[0m         path.* — manipulação de caminhos\n"
-    printf "  \033[1;32m  ms --doc color\033[0m        color.* — escape ANSI com nome\n"
-    printf "  \033[1;32m  ms --doc test\033[0m         test.* — assertions para scripts testáveis\n"
-    printf "  \033[1;32m  ms --doc re\033[0m           re.* — expressões regulares (match/sub/named)\n"
-    printf "  \033[1;32m  ms --doc queue\033[0m        Queue/Stack — estruturas FIFO/LIFO\n"
-    printf "  \033[1;32m  ms --doc try\033[0m          try.* — trif/tryelse/tryend + try.call/pcall/must\n\n"
-    printf "\033[1;35m═══ COMANDOS ESPECIAIS DO REPL ══════════════════════════════════════════════\033[0m\n\n"
-    printf "  Não são funções Lua. Não precisam de (). Interceptados antes do parser.\n\n"
-    printf "  \033[1;33m%-16s\033[0m %s\n" "help" "exibe a documentação (igual a ms --doc)"
-    printf "  \033[1;33m%-16s\033[0m %s\n" "help <modulo>" "doc de módulo: help net, help util..."
-    printf "  \033[1;33m%-16s\033[0m %s\n" "clear" "limpa a tela de verdade (via terminfo)"
-    printf "  \033[1;33m%-16s\033[0m %s\n" "cls" "alias de clear"
-    printf "  \033[1;33m%-16s\033[0m %s\n" "cd <dir>" "muda o diretório de trabalho"
-    printf "  \033[1;33m%-16s\033[0m %s\n" "exit / q" "sai do REPL"
-    printf "  \033[0;90m  Dica: também funcionam como função: help() e clear()\033[0m\n\n"
-    printf "\033[1;35m\u2550\u2550\u2550 SISTEMA DE NAMESPACES (require) \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\033[0m\n\n"
-    printf "  Os modulos do ElliotOS NAO sao globais por padrao.\n"
-    printf "  Voce escolhe o que importar com require().\n\n"
-    printf "  \033[1;36m@std \u2014 Biblioteca padrao do ElliotOS:\033[0m\n\n"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@std")' "importa TODOS os modulos como globais"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'local net = require("@std/net")' "importa so o modulo net"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'local get = require("@std/net/get")' "importa so a funcao net.get"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'local enc = require("@std/crypto/sha256")' "importa so crypto.sha256"
-    printf "\n"
-    printf "  \033[1;36m@user \u2014 Modulos proprios do usuario:\033[0m\n\n"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/MeuMod")' "$HOME/MeuMod.lua"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/libs/utils")' "$HOME/libs/utils.lua"
-    printf "    \033[1;32m%-40s\033[0m %s\n" 'require("@user/../files/mod")' "$HOME/../files/mod.lua"
-    printf "\n"
-    printf "  \033[0;90m  Path em @user e relativo ao HOME. Voce pode usar ../ livremente.\033[0m\n"
-    printf "  \033[0;90m  require() normal (sem @) continua funcionando para modulos Lua padrao.\033[0m\n\n"
-    printf "  \033[1;36mExemplos:\033[0m\n\n"
-    printf "  \033[0;90m  local net    = require("@std/net")           -- modulo net\033[0m\n"
-    printf "  \033[0;90m  local sha256 = require("@std/crypto/sha256") -- funcao especifica\033[0m\n"
-    printf "  \033[0;90m  local MyAPI  = require("@user/method")       -- $HOME/method.lua\033[0m\n\n"
-    printf "\033[1;35m═══ MODULOS DA API ════════════════════════════════════════════\033[0m\n\n"
-    printf "  Use require(\"@std\") para todos os modulos, ou require(\"@std/mod\") para um especifico.\n"
-    printf "  Referencia especifica: \033[1;32mms --doc <modulo>\033[0m\n\n"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "net.*" "Rede: HTTP, TCP, UDP, DNS, port scan, sockets"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "mod.*" "Pentest: 23 scanners (XSS, SQLi, LFI, RCE...)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "exploit.*" "REPLs de exploracao interativa"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "crypto.*" "Criptografia: MD5, SHA, AES, Base64, JWT"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "sys.*" "Sistema: threads, processos, env, sleep"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "fs.*" "Filesystem: read, write, list, stat, glob"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "ai.*" "IA (CYN): chat, code, search, providers"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "db.*" "Banco de dados SQLite embutido"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "web.*" "Parsing HTML, links, forms e servidor HTTP"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "dow.*" "Download de midia: video, audio, playlist, imagem"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "lmod.*" "Criador de modulos Lua customizados"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "adb.*" "Android Debug Bridge via Wi-Fi (sem root)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "pent.*" "Lab local vulneravel para praticar pentest"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "sh.*" "Shell direto: exec e captura de saida"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "cc.*" "Compilador C inline e transpilador Lua -> C"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "ui.*" "Interface de usuario no terminal"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "tui.*" "Terminal UI interativo (menus, formularios)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "ell.*" "Encoder/Decoder de scripts (.ell)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "agent.*" "Agente autonomo com tools"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "string.*" "Extensoes de string: trim, split, slugify, is*, pad..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "util.*" "Stdlib funcional: map, filter, pipe, stats, iter, chain"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "json.*" "JSON encode/decode nativo"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "log.*" "Logging estruturado: info/ok/warn/err/debug com timestamp e cores"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "csv.*" "CSV parse/write: decode, encode, read, write"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "re.*" "Regex: match/search/findall/sub/split/named/gmatch..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "ivar.*" "Variaveis indexadas no REPL (!N -> nome)"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "num.*" "Números: parse/format/clamp/lerp/round/to_bin/hex/oct..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "path.*" "Caminhos: join/basename/dirname/ext/abs/exists/parts..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "color.*" "ANSI: red/green/bold/rgb/bg_rgb/strip/len..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "test.*" "Assertions: ok/eq/neq/gt/err/deep_eq/suite/report..."
-    printf "  \033[1;33m%-12s\033[0m %s\n" "Queue/Stack" "Estruturas FIFO/LIFO: push/pop/peek/size/to_table"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "try.*" "trif/tryelse/tryend + try.call/pcall/xpcall/must"
-    printf "  \033[1;33m%-12s\033[0m %s\n" "table.*" "Extras: map/filter/reduce/flat/zip/group_by/sorted..."
-    }
-    _doc_str() {
-    printf "\033[1;35m═══ str.* — Strings de Propósito Geral ══════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── Busca e Comparação ────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstr.starts\033[0m(s, prefix)  → bool\n"
-    printf "  \033[1;33mstr.ends\033[0m(s, suffix)    → bool\n"
-    printf "  \033[1;33mstr.contains\033[0m(s, sub [, plain])  → bool\n"
-    printf "  \033[1;33mstr.count\033[0m(s, sub [, plain])    → int\n"
-    printf "  \033[0;90m  str.count('aabaa', 'a')  --> 4\033[0m\n\n"
-    printf "\033[1;36m── Transformação ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstr.trim\033[0m(s [, chars])   remove espaços (ou chars) das extremidades\n"
-    printf "  \033[1;33mstr.ltrim\033[0m(s)            remove espaços à esquerda\n"
-    printf "  \033[1;33mstr.rtrim\033[0m(s)            remove espaços à direita\n"
-    printf "  \033[1;33mstr.upper\033[0m(s)  \033[1;33mstr.lower\033[0m(s)  \033[1;33mstr.reverse\033[0m(s)\n"
-    printf "  \033[1;33mstr.replace\033[0m(s, old, new [, n])  substitui n ocorrências (padrão: todas)\n"
-    printf "  \033[1;33mstr.title\033[0m(s)            Title Case\n"
-    printf "  \033[1;33mstr.slug\033[0m(s)             url-friendly: 'ElliotOS v2!' → 'elliotos-v2'\n"
-    printf "  \033[1;33mstr.truncate\033[0m(s, max [, suffix])  corta com '...' por padrão\n"
-    printf "  \033[0;90m  str.truncate('hello world', 8)  --> 'hello...'\033[0m\n\n"
-    printf "\033[1;36m── Formatação e Padding ──────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstr.pad\033[0m(s, width [, char [, align]])\n"
-    printf "  \033[0;90m  align: 'left'(padrão) | 'right' | 'center'\033[0m\n"
-    printf "  \033[0;90m  str.pad('hi', 6, ' ', 'center')  --> '  hi  '\033[0m\n"
-    printf "  \033[1;33mstr.wrap\033[0m(s, width)      quebra em linhas de até width chars\n"
-    printf "  \033[1;33mstr.fmt\033[0m(tmpl, vars)     interpolação: str.fmt('ola {name}', {name='Elliot'})\n"
-    printf "  \033[0;90m  também funciona com índice: str.fmt('{1} e {2}', {'a','b'})\033[0m\n\n"
-    printf "\033[1;36m── Split / Join / Lines ──────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstr.split\033[0m(s, sep [, plain])  → tabela\n"
-    printf "  \033[0;90m  str.split('a,b,c', ',')  --> {'a','b','c'}\033[0m\n"
-    printf "  \033[1;33mstr.join\033[0m(t, sep)       → string\n"
-    printf "  \033[1;33mstr.lines\033[0m(s)           → tabela de linhas\n\n"
-    printf "\033[1;36m── Bytes e Encoding ──────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstr.bytes\033[0m(s)           → tabela de byte values\n"
-    printf "  \033[1;33mstr.from_bytes\033[0m(t)      → string a partir de bytes\n"
-    printf "  \033[1;33mstr.is_empty\033[0m(s)        → bool (nil e '   ' são empty)\n"
-    printf "  \033[1;33mstr.rep\033[0m(s, n [, sep])  → repetição\n\n"
-    printf "  \033[0;90m  str.help()  — lista todas as funções\033[0m\n\n"
-    }
-    _doc_num() {
-    printf "\033[1;35m═══ num.* — Parsing e Formatação Numérica ════════════════════════\033[0m\n\n"
-    printf "  \033[1;33mnum.parse\033[0m(s)                → number | nil\n"
-    printf "  \033[0;90m  Tenta converter string para número, suporta vírgula decimal\033[0m\n\n"
-    printf "  \033[1;33mnum.format\033[0m(n [, dec [, thou [, dsep]]])\n"
-    printf "  \033[0;90m  Padrão BR: thou='.', dsep=','\033[0m\n"
-    printf "  \033[0;90m  num.format(1234567, 2)  --> '1.234.567,00'\033[0m\n\n"
-    printf "  \033[1;33mnum.clamp\033[0m(n, lo, hi)        → n limitado entre lo e hi\n"
-    printf "  \033[1;33mnum.lerp\033[0m(a, b, t)           → interpolação linear (t entre 0 e 1)\n"
-    printf "  \033[1;33mnum.round\033[0m(n [, decimais])    → arredondamento\n"
-    printf "  \033[0;90m  num.round(3.567, 2)  --> 3.57\033[0m\n\n"
-    printf "  \033[1;33mnum.sign\033[0m(n)    → -1 | 0 | 1\n"
-    printf "  \033[1;33mnum.is_int\033[0m(n)  → bool\n"
-    printf "  \033[1;33mnum.is_nan\033[0m(n)  → bool\n"
-    printf "  \033[1;33mnum.in_range\033[0m(n, lo, hi)  → bool\n\n"
-    printf "\033[1;36m── Conversão de Base ─────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mnum.to_bin\033[0m(n)              → string binária\n"
-    printf "  \033[1;33mnum.to_hex\033[0m(n [, upper])    → string hexadecimal\n"
-    printf "  \033[1;33mnum.to_oct\033[0m(n)              → string octal\n\n"
-    printf "\033[1;36m── Estatística Simples ───────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mnum.sum\033[0m(t)   \033[1;33mnum.avg\033[0m(t)   \033[1;33mnum.min\033[0m(t)   \033[1;33mnum.max\033[0m(t)\n"
-    printf "  \033[0;90m  num.help()  — lista todas as funções\033[0m\n\n"
-    }
-    _doc_path() {
-    printf "\033[1;35m═══ path.* — Manipulação de Caminhos ════════════════════════════\033[0m\n\n"
-    printf "  \033[1;33mpath.join\033[0m(...)              junta partes de caminho\n"
-    printf "  \033[0;90m  path.join('/home','elliot','x.lua')  --> '/home/elliot/x.lua'\033[0m\n\n"
-    printf "  \033[1;33mpath.basename\033[0m(p [, ext])    nome do arquivo (sem extensão se ext informada)\n"
-    printf "  \033[1;33mpath.dirname\033[0m(p)             diretório pai\n"
-    printf "  \033[1;33mpath.ext\033[0m(p)                 extensão: '.lua', '.c'\n"
-    printf "  \033[1;33mpath.stem\033[0m(p)                nome sem extensão\n"
-    printf "  \033[1;33mpath.split\033[0m(p)               → dir, base\n"
-    printf "  \033[1;33mpath.parts\033[0m(p)               → tabela de segmentos\n"
-    printf "  \033[1;33mpath.abs\033[0m(p)                 caminho absoluto\n"
-    printf "  \033[1;33mpath.expanduser\033[0m(p)          '~' → HOME\n"
-    printf "  \033[1;33mpath.exists\033[0m(p)              → bool\n"
-    printf "  \033[0;90m  path.help()  — lista todas as funções\033[0m\n\n"
-    }
-    _doc_color() {
-    printf "\033[1;35m═══ color.* — Escape ANSI com Nome ══════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── Cores de Texto ────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcolor.red\033[0m(s)   \033[1;33mcolor.green\033[0m(s)  \033[1;33mcolor.yellow\033[0m(s)  \033[1;33mcolor.blue\033[0m(s)\n"
-    printf "  \033[1;33mcolor.magenta\033[0m(s)  \033[1;33mcolor.cyan\033[0m(s)  \033[1;33mcolor.white\033[0m(s)  \033[1;33mcolor.black\033[0m(s)\n"
-    printf "  \033[0;90m  Versões brilhantes: color.bright_red, bright_green, bright_cyan...\033[0m\n\n"
-    printf "\033[1;36m── Estilos ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcolor.bold\033[0m(s)  \033[1;33mcolor.dim\033[0m(s)  \033[1;33mcolor.italic\033[0m(s)  \033[1;33mcolor.underline\033[0m(s)\n\n"
-    printf "\033[1;36m── Fundo ─────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcolor.bg_red\033[0m(s)  \033[1;33mcolor.bg_green\033[0m(s)  \033[1;33mcolor.bg_blue\033[0m(s)  ...\n\n"
-    printf "\033[1;36m── Truecolor (24-bit) ────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcolor.rgb\033[0m(r, g, b [, s])      foreground 24-bit\n"
-    printf "  \033[1;33mcolor.bg_rgb\033[0m(r, g, b [, s])   background 24-bit\n"
-    printf "  \033[0;90m  color.rgb(255,128,0,'alerta')  -- laranja\033[0m\n\n"
-    printf "\033[1;36m── Utilitários ───────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcolor.strip\033[0m(s)    remove todos os escapes ANSI da string\n"
-    printf "  \033[1;33mcolor.len\033[0m(s)      comprimento visível (sem escapes)\n"
-    printf "  \033[0;90m  Sem argumento retorna apenas o escape: color.red() → '\\x1b[31m'\033[0m\n"
-    printf "  \033[0;90m  color.help()  — lista todas as funções\033[0m\n\n"
-    }
-    _doc_test() {
-    printf "\033[1;35m═══ test.* — Assertions para Scripts Testáveis ══════════════════\033[0m\n\n"
-    printf "\033[1;36m── Organização ───────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtest.suite\033[0m(name)     inicia uma suite nomeada\n"
-    printf "  \033[1;33mtest.report\033[0m()        → int (número de falhas), imprime resumo\n"
-    printf "  \033[1;33mtest.reset\033[0m()         zera contadores\n\n"
-    printf "\033[1;36m── Assertions ────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtest.ok\033[0m(v, msg)          v é truthy\n"
-    printf "  \033[1;33mtest.eq\033[0m(a, b, msg)       a == b\n"
-    printf "  \033[1;33mtest.neq\033[0m(a, b, msg)      a ~= b\n"
-    printf "  \033[1;33mtest.gt\033[0m(a, b, msg)       a > b\n"
-    printf "  \033[1;33mtest.lt\033[0m(a, b, msg)       a < b\n"
-    printf "  \033[1;33mtest.gte\033[0m(a, b, msg)      a >= b\n"
-    printf "  \033[1;33mtest.lte\033[0m(a, b, msg)      a <= b\n"
-    printf "  \033[1;33mtest.nil_\033[0m(v, msg)        v == nil\n"
-    printf "  \033[1;33mtest.not_nil\033[0m(v, msg)     v ~= nil\n"
-    printf "  \033[1;33mtest.type_is\033[0m(v, tp, msg) type(v) == tp\n"
-    printf "  \033[1;33mtest.contains\033[0m(s, sub, msg)\n"
-    printf "  \033[1;33mtest.match\033[0m(s, pat, msg)  padrão Lua\n"
-    printf "  \033[1;33mtest.deep_eq\033[0m(a, b, msg)  comparação recursiva de tabelas\n"
-    printf "  \033[1;33mtest.err\033[0m(fn, msg)        fn deve lançar erro\n"
-    printf "  \033[1;33mtest.no_err\033[0m(fn, msg)     fn não deve lançar erro\n\n"
-    printf "\033[1;36m── Exemplo ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  test.suite('math')\033[0m\n"
-    printf "  \033[0;90m  test.eq(2+2, 4, 'soma')\033[0m\n"
-    printf "  \033[0;90m  test.deep_eq({1,2},{1,2}, 'tabelas iguais')\033[0m\n"
-    printf "  \033[0;90m  local falhas = test.report()\033[0m\n"
-    printf "  \033[0;90m  test.help()  — lista todas as funções\033[0m\n\n"
-    }
-    _doc_queue_stack() {
-    printf "\033[1;35m═══ Queue / Stack — Estruturas de Dados ═════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── Queue — Fila FIFO ─────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlocal q = Queue.new()\033[0m\n"
-    printf "  \033[0;90m  q:push(v)      adiciona ao final\033[0m\n"
-    printf "  \033[0;90m  q:pop()        remove e retorna o primeiro\033[0m\n"
-    printf "  \033[0;90m  q:peek()       lê o primeiro sem remover\033[0m\n"
-    printf "  \033[0;90m  q:size()       quantidade de elementos\033[0m\n"
-    printf "  \033[0;90m  q:is_empty()   → bool\033[0m\n"
-    printf "  \033[0;90m  q:to_table()   → cópia como tabela Lua\033[0m\n\n"
-    printf "\033[1;36m── Stack — Pilha LIFO ────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlocal s = Stack.new()\033[0m\n"
-    printf "  \033[0;90m  s:push(v)      empilha no topo\033[0m\n"
-    printf "  \033[0;90m  s:pop()        remove e retorna o topo\033[0m\n"
-    printf "  \033[0;90m  s:peek()       lê o topo sem remover\033[0m\n"
-    printf "  \033[0;90m  s:size()       quantidade de elementos\033[0m\n"
-    printf "  \033[0;90m  s:is_empty()   → bool\033[0m\n"
-    printf "  \033[0;90m  s:to_table()   → cópia em ordem LIFO (topo primeiro)\033[0m\n\n"
-    printf "\033[1;36m── Exemplo ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local q = Queue.new()\033[0m\n"
-    printf "  \033[0;90m  for _, host in ipairs(targets) do q:push(host) end\033[0m\n"
-    printf "  \033[0;90m  while not q:is_empty() do\033[0m\n"
-    printf "  \033[0;90m    local h = q:pop()\033[0m\n"
-    printf "  \033[0;90m    scan(h)\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    }
-    _doc_table_extras() {
-    printf "\033[1;35m═══ table.* extras — Funções Adicionais ═════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── Transformação ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtable.map\033[0m(t, fn)          → nova tabela com fn aplicada\n"
-    printf "  \033[1;33mtable.filter\033[0m(t, fn)       → elementos onde fn retorna true\n"
-    printf "  \033[1;33mtable.reduce\033[0m(t, fn [, acc])  → valor acumulado\n"
-    printf "  \033[1;33mtable.flat\033[0m(t [, depth])   → achata aninhamento\n"
-    printf "  \033[1;33mtable.unique\033[0m(t)           → remove duplicatas\n"
-    printf "  \033[1;33mtable.reverse\033[0m(t)          → ordem inversa\n"
-    printf "  \033[1;33mtable.sorted\033[0m(t [, fn])    → cópia ordenada\n"
-    printf "  \033[1;33mtable.slice\033[0m(t, a, b)      → subtabela\n\n"
-    printf "\033[1;36m── Busca e Predicados ────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtable.find\033[0m(t, fn)         → v, i (primeiro que satisfaz fn)\n"
-    printf "  \033[1;33mtable.any\033[0m(t, fn)          → bool\n"
-    printf "  \033[1;33mtable.all\033[0m(t, fn)          → bool\n"
-    printf "  \033[1;33mtable.count\033[0m(t [, fn])     → int\n"
-    printf "  \033[1;33mtable.index_of\033[0m(t, val)    → int | nil\n\n"
-    printf "\033[1;36m── Combinação ────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtable.merge\033[0m(...)          → mescla tabelas (último vence)\n"
-    printf "  \033[1;33mtable.concat_all\033[0m(...)     → concatena arrays\n"
-    printf "  \033[1;33mtable.zip\033[0m(...)            → tabela de tuplas\n"
-    printf "  \033[1;33mtable.group_by\033[0m(t, fn)     → agrupa por chave\n"
-    printf "  \033[1;33mtable.keys\033[0m(t)  \033[1;33mtable.values\033[0m(t)  \033[1;33mtable.sum\033[0m(t)\n\n"
-    }
-    _doc_re() {
-    printf "\033[1;35m═══ re.* — Expressões Regulares ══════════════════════════════════\033[0m\n\n"
-    printf "  \033[1;33mre.match\033[0m(s, pat)          → string | nil (match completo)\n"
-    printf "  \033[1;33mre.search\033[0m(s, pat)         → string | nil (busca em qualquer posição)\n"
-    printf "  \033[1;33mre.findall\033[0m(s, pat)        → tabela com todas as ocorrências\n"
-    printf "  \033[0;90m  re.findall('a1b2c3', '%d')  --> {'1','2','3'}\033[0m\n\n"
-    printf "  \033[1;33mre.sub\033[0m(s, pat, repl)      → string com substituições\n"
-    printf "  \033[0;90m  re.sub('foo bar', 'foo', 'baz')  --> 'baz bar'\033[0m\n\n"
-    printf "  \033[1;33mre.split\033[0m(s, pat)          → tabela\n"
-    printf "  \033[1;33mre.compile\033[0m(pat)           → padrão compilado reutilizável\n"
-    printf "  \033[1;33mre.finditer\033[0m(s, pat)       → iterator de ocorrências\n\n"
-    printf "\033[1;36m── Extras (ElliotOS) ─────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mre.named\033[0m(s, pat, names)   → tabela com grupos nomeados\n"
-    printf "  \033[0;90m  re.named('2026-09-06','(%d+)-(%d+)-(%d+)',{'year','month','day'})\033[0m\n"
-    printf "  \033[0;90m  --> {year='2026', month='09', day='06'}\033[0m\n\n"
-    printf "  \033[1;33mre.gmatch\033[0m(s, pat)         → iterator (compatível com string.gmatch)\n\n"
-    printf "  \033[0;90m  Padrões usam sintaxe Lua: %%d %%a %%s %%w %%p etc.\033[0m\n\n"
-    }
-    _doc_try() {
-    printf "\033[1;35m═══ try.* — Tratamento de Erros ══════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── Sintaxe trif (preprocessada — estilo if/else do Lua) ───────────\033[0m\n\n"
-    printf "  \033[1;33mtrif\033[0m <expr> then\n"
-    printf "  \033[0;90m    -- executado se <expr> não deu erro\033[0m\n"
-    printf "  \033[1;33mtryelseif\033[0m \"padrão\" then\n"
-    printf "  \033[0;90m    -- erro que contém \"padrão\" (opcional, repetível)\033[0m\n"
-    printf "  \033[1;33mtryelse\033[0m [var] then\n"
-    printf "  \033[0;90m    -- qualquer outro erro; var recebe a mensagem (padrão: err)\033[0m\n"
-    printf "  \033[1;33mtryend\033[0m\n\n"
-    printf "\033[1;36m── Exemplo trif ────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  trif net.get(\"https://exemplo.com\") then\033[0m\n"
-    printf "  \033[0;90m    print(\"enviado\")\033[0m\n"
-    printf "  \033[0;90m  tryelseif \"timeout\" then\033[0m\n"
-    printf "  \033[0;90m    print(\"sem resposta\")\033[0m\n"
-    printf "  \033[0;90m  tryelse err then\033[0m\n"
-    printf "  \033[0;90m    print(\"erro: \"..err)\033[0m\n"
-    printf "  \033[0;90m  tryend\033[0m\n\n"
-    printf "\033[1;36m── API try.* (programática) ────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtry.call\033[0m(fn, ...)         → objeto com métodos encadeáveis\n"
-    printf "  \033[0;90m    :catch(function(err) print(err) end)\033[0m\n"
-    printf "  \033[0;90m    :finally(function() print('sempre') end)\033[0m\n\n"
-    printf "  \033[1;33mtry.pcall\033[0m(fn, ...)         → ok, err  (alias direto de pcall)\n"
-    printf "  \033[1;33mtry.xpcall\033[0m(fn, msgh, ...)  → ok, err  (alias de xpcall)\n"
-    printf "  \033[1;33mtry.must\033[0m(fn, ...)          → executa ou propaga erro\n\n"
-    }
-    _doc_net() {
-    printf "\033[1;35m═══ net.* — Módulo de Rede ════════════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── HTTP ───────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mnet.get\033[0m(url [, opts])\n"
-    printf "  \033[0;90m  Retorna: body(string), code(int)   ou   nil, errmsg\033[0m\n"
-    printf "  \033[1;31m  ⚠ retorna DOIS valores separados, não uma tabela!\033[0m\n"
-    printf "  \033[0;90m  local body, code = net.get('https://alvo.com')\033[0m\n"
-    printf "  \033[0;90m  local body, code = net.get(url, {timeout=10, quiet=true})\033[0m\n"
-    printf "  \033[0;90m  net.get('https://alvo.com', 'saida.html')   -- salva em arquivo\033[0m\n\n"
-    printf "  \033[1;33mnet.post\033[0m(url, body [, content_type [, opts]])\n"
-    printf "  \033[0;90m  Retorna: body(string), code(int)   ou   nil, errmsg\033[0m\n"
-    printf "  \033[0;90m  Content-Type padrão: application/x-www-form-urlencoded\033[0m\n"
-    printf "  \033[0;90m  local b, c = net.post(url,\033[0m\n"
-    printf "  \033[0;90m    'user=admin&pass=123')\033[0m\n"
-    printf "  \033[0;90m  local b, c = net.post(url, json_str, 'application/json')\033[0m\n\n"
-    printf "  \033[1;33mnet.fetch\033[0m(url, opts)\n"
-    printf "  \033[0;90m  Interface moderna. Retorna: body, code, headers_recebidos\033[0m\n"
-    printf "  \033[0;90m  opts: {method, body, timeout,\033[0m\n"
-    printf "  \033[0;90m    headers, quiet, follow, ua, file}\033[0m\n"
-    printf "  \033[0;90m  local b,c,h = net.fetch(url, {method='PUT',\033[0m\n"
-    printf "  \033[0;90m    body='{}', quiet=true})\033[0m\n\n"
-    printf "  \033[1;33mnet.geth\033[0m(url [, opts])\n"
-    printf "  \033[0;90m  Como get + retorna headers. quiet por padrao.\033[0m\n\n"
-    printf "\033[1;36m── TCP / SOCKETS ──────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mnet.tcp\033[0m(host, port)  ->  socket OO  ou  nil, errmsg\n"
-    printf "  \033[0;90m  local s = net.tcp('192.168.1.1', 80)\033[0m\n"
-    printf "  \033[0;90m  s:send('dados')    -- envia string\033[0m\n"
-    printf "  \033[0;90m  local data = s:recv(4096)\033[0m\n"
-    printf "  \033[0;90m  s:close()\033[0m\n\n"
-    printf "  \033[1;31m  ! recv() retorna nil sem dado -- nao e erro!\033[0m\n"
-    printf "  \033[0;90m    repeat sys.sleep(0.1)\033[0m\n"
-    printf "  \033[0;90m    data = s:recv(4096) until data\033[0m\n\n"
-    printf "  \033[1;33mnet.listen\033[0m(port [, host])  ->  socket servidor\n"
-    printf "  \033[1;31m  ! PORTA e o primeiro argumento!\033[0m\n"
-    printf "  \033[0;90m  local srv  = net.listen(4444)\033[0m\n"
-    printf "  \033[0;90m  local conn = srv:accept()\033[0m\n"
-    printf "  \033[0;90m  conn:send('resposta')\033[0m\n"
-    printf "  \033[0;90m  conn:close(); srv:close()\033[0m\n\n"
-    printf "  \033[1;33mnet.syn\033[0m(host, port [, timeout [, family]])\n"
-    printf "  \033[0;90m  SYN probe dedicado sem root. Retorna tabela {status,host,port,ms,open,family}.\033[0m\n"
-    printf "  \033[0;90m  Posicional: imprime resultado colorido automaticamente.\033[0m\n"
-    printf "  \033[0;90m  net.syn('1.1.1.1', 80)\033[0m\n"
-    printf "  \033[0;90m  net.syn({host='alvo.com', port=443, verbose=false})\033[0m\n"
-    printf "  \033[0;90m  local r = net.syn('alvo.com', 22); if r.open then ... end\033[0m\n\n"
-    printf "  \033[1;33mnet.socket\033[0m(family, type, host, port [, to [, payload]])\n"
-    printf "  \033[0;90m  Fire-and-forget: conecta, envia, recebe, fecha.\033[0m\n"
-    printf "  \033[0;90m  net.socket('ipv4','stream','alvo.com',80)\033[0m\n\n"
-    printf "  \033[1;33mnet.udp\033[0m(host, port)  ->  socket UDP\n\n"
-    printf "\033[1;36m── DNS / PING / SCAN ──────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mnet.dns\033[0m(host [, type])  →  tabela de IPs   ou   nil, errmsg\033[0m\n"
-    printf "  \033[0;90m  type: 'A' (padrão), 'AAAA', 'ANY'\033[0m\n"
-    printf "  \033[0;90m  local ips = net.dns('google.com')\033[0m\n"
-    printf "  \033[0;90m  for _, ip in ipairs(ips) do print(ip) end\033[0m\n\n"
-    printf "  \033[1;33mnet.ping\033[0m(host)  →  true / false\033[0m\n"
-    printf "  \033[1;33mnet.scan\033[0m(host, p1, p2 [, threads])\n"
-    printf "  \033[0;90m  -> tabela de portas abertas\033[0m\n"
-    printf "  \033[0;90m  local abertas = net.scan('192.168.1.1', 1, 1024)\033[0m\n"
-    printf "  \033[0;90m  for _, p in ipairs(abertas) do print(p) end\033[0m\n\n"
-    printf "  \033[1;33mnet.os\033[0m(host)         OS fingerprint\033[0m\n"
-    printf "  \033[1;33mnet.ip\033[0m([subnet])     hosts ativos na rede local\033[0m\n"
-    printf "  \033[0;90m  net.ip('192.168.1')   -- subnet específica\033[0m\n"
-    printf "  \033[1;33mnet.import\033[0m(url)      baixa e executa Lua remoto\033[0m\n\n"
-    }
-    _doc_mod() {
-    printf "\033[1;35m═══ mod.* — Scanners de Pentest (23) ═════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── INJEÇÕES ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mmod.xss\033[0m(url)           XSS reflected, stored e DOM\033[0m\n"
-    printf "  \033[1;33mmod.sqli\033[0m(url)          SQLi: error, boolean, time-based, UNION\033[0m\n"
-    printf "  \033[1;33mmod.nosql\033[0m(url)         NoSQL Injection\033[0m\n"
-    printf "  \033[1;33mmod.lfi\033[0m(url)           LFI e Path Traversal\033[0m\n"
-    printf "  \033[1;33mmod.rce\033[0m(url)           Remote Code Execution\033[0m\n"
-    printf "  \033[1;33mmod.ssti\033[0m(url)          Server-Side Template Injection\033[0m\n"
-    printf "  \033[1;33mmod.xxe\033[0m(url)           XML External Entity\033[0m\n"
-    printf "  \033[0;90m  Todos retornam: {vuln=bool, payload=string, detalhes=string} ou nil\033[0m\n\n"
-    printf "\033[1;36m── INFRAESTRUTURA ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mmod.ssrf\033[0m(url)          SSRF\033[0m\n"
-    printf "  \033[1;33mmod.cors\033[0m(url)          CORS misconfiguration\033[0m\n"
-    printf "  \033[1;33mmod.csrf\033[0m(url)          CSRF\033[0m\n"
-    printf "  \033[1;33mmod.redir\033[0m(url)         Open Redirect\033[0m\n"
-    printf "  \033[1;33mmod.idor\033[0m(url, param)   IDOR\033[0m\n"
-    printf "  \033[1;33mmod.jwt\033[0m(token)         JWT: alg:none, weak secret, RS256→HS256\033[0m\n"
-    printf "  \033[1;33mmod.headers\033[0m(url)       analisa security headers\033[0m\n"
-    printf "  \033[1;33mmod.waf\033[0m(url)           detecta e fingerprinta WAF\033[0m\n\n"
-    printf "\033[1;36m── RECONHECIMENTO ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mmod.spider\033[0m(url, limit) crawler → tabela de URLs\033[0m\n"
-    printf "  \033[1;33mmod.dirs\033[0m(url)          bruteforce de diretórios\033[0m\n"
-    printf "  \033[1;33mmod.subdomains\033[0m(domain) enumeração de subdomínios\033[0m\n"
-    printf "  \033[1;33mmod.backup\033[0m(url)        arquivos de backup expostos\033[0m\n"
-    printf "  \033[1;33mmod.secrets\033[0m(url)       secrets e chaves vazadas\033[0m\n"
-    printf "  \033[1;33mmod.params\033[0m(url)        parâmetros ocultos\033[0m\n"
-    printf "  \033[1;33mmod.chain\033[0m(url)         pipeline automático — roda tudo\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO: SCAN COM RELATÓRIO ────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local alvo = 'http://alvo.com'\033[0m\n"
-    printf "  \033[0;90m  local checks = {'xss','sqli','lfi','cors','headers'}\033[0m\n"
-    printf "  \033[0;90m  for _, nome in ipairs(checks) do\033[0m\n"
-    printf "  \033[0;90m    local ok, r = pcall(mod[nome], alvo)\033[0m\n"
-    printf "  \033[0;90m    if ok and r and r.vuln then\033[0m\n"
-    printf "  \033[0;90m      print('[!] '..nome:upper()..': '..r.payload)\033[0m\n"
-    printf "  \033[0;90m      fs.append('relatorio.txt', nome..': '..r.payload..'\\n')\033[0m\n"
-    printf "  \033[0;90m    end\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    }
-    _doc_crypto() {
-    printf "\033[1;35m═══ crypto.* — Criptografia ═══════════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── HASHES ─────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcrypto.md5\033[0m(s)              → string hex 32 chars\033[0m\n"
-    printf "  \033[1;33mcrypto.sha1\033[0m(s)             → string hex 40 chars\033[0m\n"
-    printf "  \033[1;33mcrypto.sha256\033[0m(s)           → string hex 64 chars\033[0m\n"
-    printf "  \033[1;33mcrypto.sha512\033[0m(s)           → string hex 128 chars\033[0m\n"
-    printf "  \033[1;33mcrypto.hmac\033[0m(key, data, algo)  → hex  (algo: 'sha256','sha1')\033[0m\n"
-    printf "  \033[0;90m  print(crypto.sha256('senha123'))\033[0m\n"
-    printf "  \033[0;90m  print(crypto.hmac('chave','dado','sha256'))\033[0m\n\n"
-    printf "\033[1;36m── ENCODING ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcrypto.b64e\033[0m(s)             → string Base64\033[0m\n"
-    printf "  \033[1;33mcrypto.b64d\033[0m(s)             → string decodificada\033[0m\n"
-    printf "  \033[0;90m  local enc = crypto.b64e('ola mundo')   --> 'b2xhIG11bmRv'\033[0m\n"
-    printf "  \033[0;90m  print(crypto.b64d(enc))                --> 'ola mundo'\033[0m\n\n"
-    printf "\033[1;36m── AES ────────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcrypto.aes_enc\033[0m(key, data)  → string cifrada\033[0m\n"
-    printf "  \033[1;33mcrypto.aes_dec\033[0m(key, data)  → string original\033[0m\n"
-    printf "  \033[1;31m  ⚠ key deve ter exatamente 32 bytes (AES-256)\033[0m\n"
-    printf "  \033[0;90m  local k   = 'chave_de_32_bytes_exatamente__'\033[0m\n"
-    printf "  \033[0;90m  local enc = crypto.aes_enc(k, 'segredo')\033[0m\n"
-    printf "  \033[0;90m  local dec = crypto.aes_dec(k, enc)  --> 'segredo'\033[0m\n\n"
-    printf "\033[1;36m── JWT ────────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcrypto.jwt\033[0m(token)          → {header={}, payload={}, raw}\033[0m\n"
-    printf "  \033[1;31m  ⚠ decodifica sem verificar assinatura (útil em pentest)\033[0m\n"
-    printf "  \033[0;90m  local t = crypto.jwt('eyJhbGc...')\033[0m\n"
-    printf "  \033[0;90m  print(t.header.alg)    -- 'HS256', 'RS256', 'none'...\033[0m\n"
-    printf "  \033[0;90m  print(t.payload.sub)   -- subject/usuário\033[0m\n"
-    printf "  \033[0;90m  print(t.payload.exp)   -- expiração (epoch)\033[0m\n\n"
-    printf "\033[1;36m── OUTROS ─────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcrypto.rand\033[0m(n)             → n bytes aleatórios (string binária)\033[0m\n"
-    printf "  \033[0;90m  local token = crypto.b64e(crypto.rand(16))  -- token URL-safe\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO: CRACK MD5 ─────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local hash  = 'd41d8cd98f00b204e9800998ecf8427e'\033[0m\n"
-    printf "  \033[0;90m  local words = {'admin','123456','senha','root','password'}\033[0m\n"
-    printf "  \033[0;90m  for _, w in ipairs(words) do\033[0m\n"
-    printf "  \033[0;90m    if crypto.md5(w) == hash then\033[0m\n"
-    printf "  \033[0;90m      print('[+] Senha: '..w); break\033[0m\n"
-    printf "  \033[0;90m    end\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    }
-    _doc_sys() {
-    printf "\033[1;35m═══ sys.* + sh.* — Sistema, Threads e Shell ══════════════════════\033[0m\n\n"
-    printf "\033[1;36m── SHELL ──────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;31m⚠  sys.sh(cmd)\033[0m — assíncrono, retorna PID. NÃO captura output.\033[0m\n\n"
-    printf "  \033[1;32m✓  sh.read\033[0m(cmd)      → string com stdout  (bloqueante)\033[0m\n"
-    printf "  \033[0;90m     local out = sh.read('whoami')\033[0m\n\n"
-    printf "  \033[1;32m✓  sh.capture\033[0m(cmd)   → string, exit_code  (bloqueante)\033[0m\n"
-    printf "  \033[0;90m     local out, code = sh.capture('ls -la 2>&1')\033[0m\n"
-    printf "  \033[0;90m     if code == 0 then print(out) end\033[0m\n\n"
-    printf "  \033[1;32m✓  sh.exec\033[0m(cmd)      → exit_code  (bloqueante, sem captura)\033[0m\n"
-    printf "  \033[0;90m     sh.exec('pkg install nmap -y')\033[0m\n\n"
-    printf "\033[1;36m── THREADS ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33msys.thread\033[0m(fn)        → tid\033[0m\n"
-    printf "  \033[1;33msys.join\033[0m(tid [, ms])  aguarda thread terminar\033[0m\n"
-    printf "  \033[1;33msys.kill\033[0m(id)          encerra task\033[0m\n"
-    printf "  \033[1;33msys.list\033[0m()            lista tasks ativas\033[0m\n"
-    printf "  \033[1;33msys.mutex\033[0m()           cria mutex para sincronização\033[0m\n"
-    printf "  \033[1;33msys.channel\033[0m()         canal entre threads\033[0m\n"
-    printf "  \033[0;90m  local t = sys.thread(function()\033[0m\n"
-    printf "  \033[0;90m    net.scan('192.168.1.1',1,1024)\033[0m\n"
-    printf "  \033[0;90m  end)\033[0m\n"
-    printf "  \033[0;90m  sys.join(t)\033[0m\n\n"
-    printf "\033[1;36m── SISTEMA ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33msys.info\033[0m()            info: CPU, RAM, arch, deps\033[0m\n"
-    printf "  \033[1;33msys.sleep\033[0m(s)          pausa (aceita decimal: sys.sleep(0.1))\033[0m\n"
-    printf "  \033[1;33msys.time\033[0m()            epoch em segundos (float)\033[0m\n"
-    printf "  \033[1;33msys.time_ms\033[0m()         epoch em milissegundos (int)\033[0m\n"
-    printf "  \033[1;33msys.pid\033[0m()             PID do processo atual\033[0m\n"
-    printf "  \033[1;33msys.env\033[0m(var)          lê variável de ambiente\033[0m\n"
-    printf "  \033[1;33msys.env\033[0m(var, val)     seta variável de ambiente\033[0m\n"
-    printf "  \033[1;33msys.exit\033[0m(n)           encerra com código n\033[0m\n"
-    printf "  \033[1;33msys.spawn\033[0m(cmd)        processo filho em background\033[0m\n"
-    printf "  \033[1;33msys.net\033[0m()             interfaces de rede com bytes TX/RX\033[0m\n"
-    printf "  \033[1;33msys.storage\033[0m([path])   espaço em disco: total, usado, livre\033[0m\n\n"
-    printf "\033[1;36m── DATA / RELÓGIO ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33msys.date\033[0m([fmt [, epoch]])   formata data/hora\033[0m\n"
-    printf "  \033[0;90m  fmt usa strftime. Padrão: '%%Y-%%m-%%d %%H:%%M:%%S'\033[0m\n"
-    printf "  \033[0;90m  fmt='*t' retorna tabela {year,month,day,hour,min,sec,...}\033[0m\n"
-    printf "  \033[0;90m  sys.date()              -->  '2026-09-04 19:45:20'\033[0m\n"
-    printf "  \033[0;90m  sys.date('%%d/%%m/%%Y')    -->  '04/09/2026'\033[0m\n"
-    printf "  \033[0;90m  sys.date('%%H:%%M', t0)   -->  hora de um epoch específico\033[0m\n\n"
-    printf "  \033[1;33msys.today\033[0m()               data atual no formato ISO\033[0m\n"
-    printf "  \033[0;90m  sys.today()             -->  '2026-09-04'\033[0m\n\n"
-    printf "  \033[1;33msys.now\033[0m()                 hora atual HH:MM:SS\033[0m\n"
-    printf "  \033[0;90m  sys.now()               -->  '19:45:13'\033[0m\n\n"
-    printf "  \033[1;33msys.clock\033[0m()               tempo de CPU do processo\033[0m\n"
-    printf "  \033[0;90m  local t0 = sys.clock()\033[0m\n"
-    printf "  \033[0;90m  -- faz algo pesado --\033[0m\n"
-    printf "  \033[0;90m  print(sys.clock()-t0, 's de CPU')\033[0m\n\n"
-    printf "  \033[1;33msys.uptime\033[0m()              segundos desde o boot\033[0m\n"
-    printf "  \033[0;90m  print(sys.fmt_dur(sys.uptime()))  -->  '3h 42m 11s'\033[0m\n\n"
-    printf "  \033[1;33msys.fmt_dur\033[0m(segundos)     converte duração em string legível\033[0m\n"
-    printf "  \033[0;90m  sys.fmt_dur(3725)       -->  '1h 2m 5s'\033[0m\n"
-    printf "  \033[0;90m  sys.fmt_dur(90)         -->  '1m 30s'\033[0m\n\n"
-    printf "  \033[1;33msys.tz\033[0m()                  fuso horário local\033[0m\n"
-    printf "  \033[0;90m  sys.tz()                -->  'America/Sao_Paulo' ou 'UTC-03:00'\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO: MEDIR TEMPO DE SCRIPT ─────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  log.info('inicio:', sys.now())\033[0m\n"
-    printf "  \033[0;90m  local t0 = sys.time()\033[0m\n"
-    printf "  \033[0;90m  net.syn('1.1.1.1', 80)\033[0m\n"
-    printf "  \033[0;90m  log.ok('concluido em', sys.fmt_dur(sys.time()-t0))\033[0m\n\n"
-    }
-    _doc_fs() {
-    printf "\033[1;35m═══ fs.* — Filesystem ═════════════════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── LEITURA E ESCRITA ──────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mfs.read\033[0m(path)         → string  ou  nil, errmsg\033[0m\n"
-    printf "  \033[0;90m  local txt = fs.read('/etc/hosts')\033[0m\n"
-    printf "  \033[0;90m  for linha in txt:gmatch('[^\\n]+') do print(linha) end\033[0m\n\n"
-    printf "  \033[1;33mfs.write\033[0m(path, data)  cria ou sobrescreve arquivo\033[0m\n"
-    printf "  \033[1;33mfs.append\033[0m(path, data) adiciona ao final\033[0m\n"
-    printf "  \033[0;90m  fs.write('log.txt', '[*] inicio\\n')\033[0m\n"
-    printf "  \033[0;90m  fs.append('log.txt', '[+] achou XSS\\n')\033[0m\n\n"
-    printf "\033[1;36m── INSPEÇÃO ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mfs.list\033[0m([dir])        → tabela de nomes (padrão: dir atual)\033[0m\n"
-    printf "  \033[1;33mfs.stat\033[0m(path)         → {size, mtime, ctime, isdir, isfile}\033[0m\n"
-    printf "  \033[1;33mfs.isfile\033[0m(path)       → true/false\033[0m\n"
-    printf "  \033[1;33mfs.isdir\033[0m(path)        → true/false\033[0m\n"
-    printf "  \033[1;33mfs.glob\033[0m(pattern)      → tabela de paths\033[0m\n"
-    printf "  \033[0;90m  for _, f in ipairs(fs.glob('/tmp/*.txt')) do print(f) end\033[0m\n\n"
-    printf "\033[1;36m── OPERAÇÕES ──────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mfs.mkdir\033[0m(path)        cria diretório (e pais)\033[0m\n"
-    printf "  \033[1;33mfs.rm\033[0m(path)           remove arquivo\033[0m\n"
-    printf "  \033[1;33mfs.move\033[0m(src, dst)     move/renomeia\033[0m\n"
-    printf "  \033[1;33mfs.copy\033[0m(src, dst)     copia\033[0m\n"
-    printf "  \033[1;33mfs.chmod\033[0m(path, mode)  muda permissões (ex: '755')\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO: LOG DE SCAN ───────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local log = '/tmp/scan_'..os.date('%%Y%%m%%d')..'.txt'\033[0m\n"
-    printf "  \033[0;90m  fs.write(log, '[*] '..os.date()..'\\n')\033[0m\n"
-    printf "  \033[0;90m  for _, url in ipairs(mod.spider('http://alvo.com', 50)) do\033[0m\n"
-    printf "  \033[0;90m    local r = mod.xss(url)\033[0m\n"
-    printf "  \033[0;90m    if r and r.vuln then fs.append(log, '[XSS] '..url..'\\n') end\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    }
-    _doc_ai() {
-    printf "\033[1;35m═══ ai.* — CYN (Inteligência Artificial) ══════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── CHAT E PERGUNTAS ───────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mai.ask\033[0m('pergunta')    → string (sem histórico)\033[0m\n"
-    printf "  \033[1;33mai.chat\033[0m('mensagem')   → string (mantém histórico)\033[0m\n"
-    printf "  \033[1;33mai.clear\033[0m()            limpa histórico\033[0m\n"
-    printf "  \033[0;90m  print(ai.ask('explique SSRF em uma linha'))\033[0m\n\n"
-    printf "\033[1;36m── GERAÇÃO DE CÓDIGO ──────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mai.code\033[0m('tarefa')     → string com código Lua pronto\033[0m\n"
-    printf "  \033[0;90m  local cod = ai.code('port scanner usando net.scan')\033[0m\n"
-    printf "  \033[0;90m  load(cod)()   -- executa direto\033[0m\n\n"
-    printf "\033[1;36m── PROVIDERS ──────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mai.provider\033[0m('sky')                gratuito, sem key (padrão)\033[0m\n"
-    printf "  \033[1;33mai.provider\033[0m('pollinations')       gratuito\033[0m\n"
-    printf "  \033[1;33mai.provider\033[0m('ollama')             local (sem internet)\033[0m\n"
-    printf "  \033[1;33mai.provider\033[0m('groq','modelo')      key gratuita\033[0m\n"
-    printf "  \033[1;33mai.provider\033[0m('openai','gpt-4o')    key paga\033[0m\n"
-    printf "  \033[1;33mai.provider\033[0m('gemini')             key gratuita: aistudio.google.com\033[0m\n"
-    printf "  \033[1;33mai.key\033[0m('SUA_KEY')                configura chave\033[0m\n"
-    printf "  \033[1;33mai.model\033[0m('modelo')               troca modelo\033[0m\n\n"
-    printf "\033[1;36m── BUSCA ──────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mai.search\033[0m('query')    → resultados da web\033[0m\n"
-    printf "  \033[0;90m  print(ai.search('CVE-2024 Apache RCE'))\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO: PENTEST ASSISTIDO POR IA ──────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local h = mod.headers('https://alvo.com')\033[0m\n"
-    printf "  \033[0;90m  local analise = ai.ask(\033[0m\n"
-    printf "  \033[0;90m    'Analise headers:\\n'..tostring(h))\033[0m\n"
-    printf "  \033[0;90m  print(analise)\033[0m\n"
-    printf "  \033[0;90m  -- gera e executa exploit:\033[0m\n"
-    printf "  \033[0;90m  load(ai.code(\033[0m\n"
-    printf "  \033[0;90m    'SQLi em http://alvo.com/?id='))()\033[0m\n\n"
-    }
-    _doc_string() {
-    printf "\n\033[1;35m═══ string.* — Extensões de String ═══════════════════════════════\033[0m\n\n"
-    printf "  \033[0;90mDisponíveis como funções e como métodos: s:trim()  s:split(\",\")  s:isnumeric()\033[0m\n\n"
-    printf "\033[1;36m── LIMPEZA ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.trim\033[0m(s)                 → remove espaços das duas pontas\n"
-    printf "  \033[0;90m  string.trim('  olá  ')  -->  'olá'\033[0m\n"
-    printf "  \033[1;33mstring.ltrim\033[0m(s)                → remove espaços da esquerda\n"
-    printf "  \033[1;33mstring.rtrim\033[0m(s)                → remove espaços da direita\n\n"
-    printf "\033[1;36m── BUSCA E VERIFICAÇÃO ────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.startswith\033[0m(s, prefix)    → true se s começa com prefix\n"
-    printf "  \033[1;33mstring.endswith\033[0m(s, suffix)      → true se s termina com suffix\n"
-    printf "  \033[1;33mstring.contains\033[0m(s, sub)         → true se sub está em s\n"
-    printf "  \033[1;33mstring.count_occ\033[0m(s, sub)        → número de ocorrências de sub\n"
-    printf "  \033[1;33mstring.removeprefix\033[0m(s, p)       → remove prefixo se presente\n"
-    printf "  \033[1;33mstring.removesuffix\033[0m(s, p)       → remove sufixo se presente\n"
-    printf "  \033[0;90m  string.startswith('ElliotOS','Elliot')  -->  true\033[0m\n\n"
-    printf "\033[1;36m── DIVISÃO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.split\033[0m(s, sep [, plain])  → tabela de partes\n"
-    printf "  \033[0;90m  string.split('a,b,c',',')  -->  {'a','b','c'}\033[0m\n"
-    printf "  \033[0;90m  string.split('um dois')    -->  {'um','dois'}  (sep padrão: %%s+)\033[0m\n"
-    printf "  \033[1;33mstring.lines\033[0m(s)                 → tabela de linhas (CRLF ok)\n"
-    printf "  \033[1;33mstring.words\033[0m(s)                 → tabela de palavras\n"
-    printf "  \033[1;33mstring.partition\033[0m(s, sep)        → antes, sep, depois (1ª ocorrência)\n"
-    printf "  \033[1;33mstring.rpartition\033[0m(s, sep)       → antes, sep, depois (última)\n"
-    printf "  \033[0;90m  string.partition('user@host','@')  -->  'user','@','host'\033[0m\n\n"
-    printf "\033[1;36m── FORMATAÇÃO E PADDING ───────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.lpad\033[0m(s, n [, ch])        → alinha à direita\n"
-    printf "  \033[1;33mstring.rpad\033[0m(s, n [, ch])        → alinha à esquerda\n"
-    printf "  \033[1;33mstring.ljust\033[0m(s, n [, ch])       → alias de rpad\n"
-    printf "  \033[1;33mstring.rjust\033[0m(s, n [, ch])       → alias de lpad\n"
-    printf "  \033[1;33mstring.center\033[0m(s, n [, ch])      → centraliza com ch\n"
-    printf "  \033[1;33mstring.zfill\033[0m(s, n)              → preenche com zeros à esquerda\n"
-    printf "  \033[1;33mstring.truncate\033[0m(s, n [, suf])   → corta em n chars + sufixo\n"
-    printf "  \033[1;33mstring.repeat_str\033[0m(s, n)         → repete s n vezes\n"
-    printf "  \033[1;33mstring.expandtabs\033[0m(s [, n])      → expande \\t em n espaços (padrão 8)\n"
-    printf "  \033[0;90m  string.lpad('42',6,'0')    -->  '000042'\033[0m\n"
-    printf "  \033[0;90m  string.center('EOS',9,'-') -->  '---EOS---'\033[0m\n\n"
-    printf "\033[1;36m── TRANSFORMAÇÃO DE CASO ──────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.capitalize\033[0m(s)            → Primeira letra maiúscula\n"
-    printf "  \033[1;33mstring.title\033[0m(s)                 → Cada Palavra Maiúscula\n"
-    printf "  \033[1;33mstring.swapcase\033[0m(s)              → inverte maiúsculas/minúsculas\n"
-    printf "  \033[1;33mstring.slugify\033[0m(s)               → Olá Mundo → ola-mundo\n"
-    printf "  \033[0;90m  string.title('olá mundo')    -->  'Olá Mundo'\033[0m\n"
-    printf "  \033[0;90m  string.swapcase('ElliotOS')  -->  'eLLIOTos'\033[0m\n\n"
-    printf "\033[1;36m── HTML E URL ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.escape_html\033[0m(s)           → & < > para entidades HTML\n"
-    printf "  \033[1;33mstring.unescape_html\033[0m(s)         → entidades HTML para chars\n"
-    printf "  \033[1;33mstring.encode_url\033[0m(s)            → percent-encoding para URLs\n"
-    printf "  \033[1;33mstring.decode_url\033[0m(s)            → decodifica percent-encoding\n"
-    printf "  \033[1;33mstring.interpolate\033[0m(s, vars)     → substitui {chave} pela tabela vars\n"
-    printf "  \033[0;90m  string.interpolate('{host}:{port}',{host='localhost',port=8080})\033[0m\n"
-    printf "  \033[0;90m  -->  'localhost:8080'\033[0m\n\n"
-    printf "\033[1;36m── VALIDAÇÃO (is*) ────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mstring.isnumeric\033[0m(s)             → true se s representa número\n"
-    printf "  \033[1;33mstring.isinteger\033[0m(s)             → true se representa inteiro\n"
-    printf "  \033[1;33mstring.isalpha\033[0m(s)               → true se só letras\n"
-    printf "  \033[1;33mstring.isalnum\033[0m(s)               → true se letras e dígitos\n"
-    printf "  \033[1;33mstring.isspace\033[0m(s)               → true se só espaços/tabs/newlines\n"
-    printf "  \033[1;33mstring.islower\033[0m(s)               → true se todas minúsculas\n"
-    printf "  \033[1;33mstring.isupper\033[0m(s)               → true se todas maiúsculas\n"
-    printf "  \033[0;90m  string.isnumeric('3.14')   -->  true\033[0m\n"
-    printf "  \033[0;90m  string.isupper('HELLO 1')  -->  true  (dígitos não contam)\033[0m\n\n"
-    printf "  \033[0;90mDica: string.help() no REPL para referência rápida colorida\033[0m\n\n"
-    }
-    _doc_util() {
-    printf "\n\033[1;35m═══ util.* — Stdlib Funcional ═════════════════════════════════════\033[0m\n\n"
-    printf "  \033[0;90mUse: local mod = require(\"@std/mod\")\033[0m\n"
-    printf "  \033[0;90mutil.help() / util.help('stats') / util.help('iter') / util.help('fn')\033[0m\n\n"
-    printf "\033[1;36m── TRANSFORMAÇÃO ──────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.map\033[0m(t, fn)           → nova tabela com fn(v,i) em cada item\n"
-    printf "  \033[0;90m  util.map({1,2,3}, function(x) return x*2 end)  -->  {2,4,6}\033[0m\n"
-    printf "  \033[1;33mutil.filter\033[0m(t, fn)        → itens onde fn(v) é verdadeiro\n"
-    printf "  \033[0;90m  util.filter({1,2,3,4}, function(x) return x%%2==0 end)  -->  {2,4}\033[0m\n"
-    printf "  \033[1;33mutil.reduce\033[0m(t, fn, acc)   → acumula com fn(acc,v)\n"
-    printf "  \033[0;90m  util.reduce({1,2,3,4,5}, function(a,b) return a+b end, 0)  -->  15\033[0m\n"
-    printf "  \033[1;33mutil.sorted\033[0m(t [, fn])     → cópia ordenada; fn=comparador opcional\n"
-    printf "  \033[1;33mutil.unique\033[0m(t)            → remove duplicatas, mantém ordem\n"
-    printf "  \033[1;33mutil.flatten\033[0m(t [, depth]) → achata tabelas aninhadas\n\n"
-    printf "\033[1;36m── PREDICADOS ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.any\033[0m(t, fn)           → true se algum satisfaz fn\n"
-    printf "  \033[1;33mutil.all\033[0m(t, fn)           → true se todos satisfazem fn\n"
-    printf "  \033[1;33mutil.count\033[0m(t, fn_ou_val)  → quantos satisfazem fn ou == val\n\n"
-    printf "\033[1;36m── GERAÇÃO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.range\033[0m(a [,b [,step]]) → sequência numérica estilo Python\n"
-    printf "  \033[0;90m  util.range(5)       -->  {1,2,3,4,5}\033[0m\n"
-    printf "  \033[0;90m  util.range(0,10,2)  -->  {0,2,4,6,8,10}\033[0m\n"
-    printf "  \033[0;90m  util.range(5,1,-1)  -->  {5,4,3,2,1}\033[0m\n"
-    printf "  \033[1;33mutil.enumerate\033[0m(t [, start]) → {{i,v},...}\n"
-    printf "  \033[1;33mutil.zip\033[0m(t1, t2, ...)      → {{a1,b1},{a2,b2},...}\n"
-    printf "  \033[1;33mutil.chunk\033[0m(t, n)           → divide em blocos de n\n"
-    printf "  \033[0;90m  util.chunk({1,2,3,4,5,6,7},3)  -->  {{1,2,3},{4,5,6},{7}}\033[0m\n\n"
-    printf "\033[1;36m── AGREGAÇÃO ──────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.sum\033[0m(t [, fn])         → soma\n"
-    printf "  \033[1;33mutil.min\033[0m(t [, fn])         → menor valor\n"
-    printf "  \033[1;33mutil.max\033[0m(t [, fn])         → maior valor\n"
-    printf "  \033[1;33mutil.groupby\033[0m(t, fn)        → {chave->{itens}} agrupados por fn\n"
-    printf "  \033[0;90m  util.groupby({1,2,3,4}, function(x) return x%%2==0 and 'par' or 'impar' end)\033[0m\n\n"
-    printf "\033[1;36m── TABELAS E DICTS ────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.keys\033[0m(t)              → lista de chaves\n"
-    printf "  \033[1;33mutil.values\033[0m(t)            → lista de valores\n"
-    printf "  \033[1;33mutil.pick\033[0m(t, keys)        → sub-tabela com as chaves\n"
-    printf "  \033[1;33mutil.omit\033[0m(t, keys)        → sub-tabela sem as chaves\n"
-    printf "  \033[1;33mutil.merge\033[0m(t1, t2, ...)   → une tabelas (direita sobrescreve)\n"
-    printf "  \033[1;33mutil.deepcopy\033[0m(t)          → cópia profunda recursiva\n"
-    printf "  \033[0;90m  util.merge({x=1,y=2},{y=99,z=3})  -->  {x=1,y=99,z=3}\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES DE ALTA ORDEM ──────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.partial\033[0m(fn, ...)      → aplicação parcial (currying)\n"
-    printf "  \033[0;90m  local add10 = util.partial(function(a,b) return a+b end, 10)\033[0m\n"
-    printf "  \033[0;90m  add10(5)  -->  15\033[0m\n"
-    printf "  \033[1;33mutil.memoize\033[0m(fn)          → cacheia resultados\n"
-    printf "  \033[1;33mutil.once\033[0m(fn)             → executa só na primeira chamada\n"
-    printf "  \033[1;33mutil.retry\033[0m(fn, n [, ms])  → tenta n vezes com delay\n"
-    printf "  \033[1;33mutil.pipe\033[0m(fn1, fn2, ...)  → composição esq→dir\n"
-    printf "  \033[0;90m  util.pipe(string.trim, string.lower)('  OLÁ  ')  -->  'olá'\033[0m\n"
-    printf "  \033[1;33mutil.compose\033[0m(fn1, fn2, ...) → composição dir→esq\n"
-    printf "  \033[1;33mutil.flip\033[0m(fn)             → inverte ordem dos 2 primeiros args\n"
-    printf "  \033[1;33mutil.tap\033[0m(v, fn)           → chama fn(v) e retorna v\n"
-    printf "  \033[1;33mutil.identity\033[0m(v)          → retorna v\n"
-    printf "  \033[1;33mutil.always\033[0m(v)            → função que sempre retorna v\n"
-    printf "  \033[1;33mutil.default\033[0m(v, d)        → v se não nil, senão d\n"
-    printf "  \033[1;33mutil.truthy\033[0m(v)            → v não é nil nem false\n"
-    printf "  \033[1;33mutil.falsy\033[0m(v)             → v é nil ou false\n\n"
-    printf "\033[1;36m── IO E DEBUG ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.printf\033[0m(fmt, ...)     → io.write com string.format\n"
-    printf "  \033[1;33mutil.pp\033[0m(v)                → pretty-print de qualquer valor\n"
-    printf "  \033[1;33mutil.with_file\033[0m(p, m, fn)  → abre arquivo, chama fn(f), fecha\n"
-    printf "  \033[0;90m  util.with_file('saida.txt','w', function(f) f:write('linha\\n') end)\033[0m\n\n"
-    printf "  \033[1;33mutil.func\033[0m(mod)             → lista fun\xc3\xa7\xc3\xb5es de qualquer m\xc3\xb3dulo ou tabela\n"
-    printf "  \033[0;90m  util.func(math)     -- lista todas as fun\xc3\xa7\xc3\xb5es do math.*\033[0m\n"
-    printf "  \033[0;90m  util.func('socket')  -- carrega e inspeciona m\xc3\xb3dulo luarocks\033[0m\n"
-    printf "  \033[0;90m  util.func(net)       -- inspeciona m\xc3\xb3dulos do ElliotOS\033[0m\n\n"
-    printf "\033[1;36m── ESTATÍSTICAS (util.help('stats')) ──────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.mean\033[0m(t)              → média aritmética\n"
-    printf "  \033[1;33mutil.median\033[0m(t)            → mediana\n"
-    printf "  \033[1;33mutil.mode\033[0m(t)              → valor mais frequente\n"
-    printf "  \033[1;33mutil.variance\033[0m(t)          → variância populacional\n"
-    printf "  \033[1;33mutil.stdev\033[0m(t)             → desvio padrão populacional\n"
-    printf "  \033[1;33mutil.stdev_sample\033[0m(t)      → desvio padrão amostral (n-1)\n"
-    printf "  \033[1;33mutil.percentile\033[0m(t, p)     → percentil p (0-100)\n"
-    printf "  \033[1;33mutil.normalize\033[0m(t)         → normaliza entre 0 e 1\n"
-    printf "  \033[1;33mutil.clamp\033[0m(v, lo, hi)     → limita v ao intervalo [lo,hi]\n"
-    printf "  \033[1;33mutil.round\033[0m(n [, decimals]) → arredonda para N casas decimais\n"
-    printf "  \033[0;90m  util.round(3.14159, 2)  -->  3.14\033[0m\n\n"
-    printf "\033[1;36m── ITERAÇÃO E GENERATORS (util.help('iter')) ──────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.iter\033[0m(t)              → iterador lazy sobre tabela\n"
-    printf "  \033[1;33mutil.generator\033[0m(fn)        → gerador via coroutine (yield)\n"
-    printf "  \033[1;33mutil.take\033[0m(src, n)         → primeiros n valores\n"
-    printf "  \033[1;33mutil.drop\033[0m(t, n)           → sem os primeiros n\n"
-    printf "  \033[1;33mutil.step\033[0m(t, n)           → um a cada n elementos\n"
-    printf "  \033[1;33mutil.tally\033[0m(t)             → {valor->contagem}\n"
-    printf "  \033[1;33mutil.flat_map\033[0m(t, fn)      → map + flatten de nível 1\n"
-    printf "  \033[1;33mutil.interleave\033[0m(a, b)     → mescla alternando elementos\n"
-    printf "  \033[1;33mutil.first\033[0m(t [, fn])      → primeiro (que satisfaz fn)\n"
-    printf "  \033[1;33mutil.last\033[0m(t [, fn])       → último (que satisfaz fn)\n"
-    printf "  \033[1;33mutil.index_of\033[0m(t, val)     → posição do valor (ou nil)\n"
-    printf "  \033[1;33mutil.without\033[0m(t, ...)      → tabela sem os valores listados\n"
-    printf "  \033[1;33mutil.difference\033[0m(a, b)     → elementos de a que não estão em b\n"
-    printf "  \033[1;33mutil.intersection\033[0m(a, b)   → elementos presentes em ambos\n"
-    printf "  \033[1;33mutil.union\033[0m(a, b)          → todos os elementos únicos de a e b\n"
-    printf "  \033[1;33mutil.rotate\033[0m(t, n)         → rotaciona n posições\n"
-    printf "  \033[1;33mutil.transpose\033[0m(m)         → transpõe matrix de tabelas\n"
-    printf "  \033[1;33mutil.combinations\033[0m(t, r)   → todas as combinações de r elementos\n"
-    printf "  \033[1;33mutil.permutations\033[0m(t)      → todas as permutações\n\n"
-    printf "\033[1;36m── PIPELINE ENCADEÁVEL (util.chain) ───────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mutil.chain\033[0m(t)             → objeto com métodos encadeáveis\n"
-    printf "  \033[0;90m  Métodos: :map :filter :sorted :unique :flatten :take :drop\033[0m\n"
-    printf "  \033[0;90m           :reverse :each :value :count :sum :min :max :mean :first :last\033[0m\n"
-    printf "  \033[0;90m  util.chain({5,3,8,1,9,2})\033[0m\n"
-    printf "  \033[0;90m    :filter(function(x) return x > 3 end)\033[0m\n"
-    printf "  \033[0;90m    :sorted():map(function(x) return x*10 end)\033[0m\n"
-    printf "  \033[0;90m    :value()   -->  {50,80,90}\033[0m\n\n"
-    printf "  \033[0;90mDica: util.help() no REPL para referência rápida colorida\033[0m\n\n"
-    }
-    _doc_json() {
-    printf "\033[1;35m═══ json.* — JSON encode/decode ═══════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mjson.encode\033[0m(value)   → string JSON  ou  nil\n"
-    printf "  \033[0;90m  Converte qualquer valor Lua em string JSON.\033[0m\n"
-    printf "  \033[0;90m  nil → 'null'   true/false → 'true'/'false'\033[0m\n"
-    printf "  \033[0;90m  number → número   string → string com escapes\033[0m\n"
-    printf "  \033[0;90m  table (array) → [...]   table (dict) → {...}\033[0m\n\n"
-    printf "  \033[0;90m  json.encode(nil)           --> 'null'\033[0m\n"
-    printf "  \033[0;90m  json.encode(true)          --> 'true'\033[0m\n"
-    printf "  \033[0;90m  json.encode(42)            --> '42'\033[0m\n"
-    printf "  \033[0;90m  json.encode('oi')          --> '\"oi\"'\033[0m\n"
-    printf "  \033[0;90m  json.encode({1,2,3})       --> '[1,2,3]'\033[0m\n"
-    printf "  \033[0;90m  json.encode({x=1,y=2})     --> '{\"x\":1,\"y\":2}'\033[0m\n\n"
-    printf "  \033[1;33mjson.decode\033[0m(str)     → value Lua  ou  nil\n"
-    printf "  \033[0;90m  Converte string JSON em valor Lua.\033[0m\n"
-    printf "  \033[0;90m  'null' → nil   'true'/'false' → boolean\033[0m\n"
-    printf "  \033[0;90m  número → number   string → string\033[0m\n"
-    printf "  \033[0;90m  [...] → table array   {...} → table dict\033[0m\n\n"
-    printf "  \033[0;90m  json.decode('null')        --> nil\033[0m\n"
-    printf "  \033[0;90m  json.decode('42')          --> 42\033[0m\n"
-    printf "  \033[0;90m  json.decode('[1,2,3]')     --> {1,2,3}\033[0m\n"
-    printf "  \033[0;90m  local o = json.decode('{\"a\":1,\"b\":{\"c\":99}}')\033[0m\n"
-    printf "  \033[0;90m  print(o.a, o.b.c)          --> 1   99\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLOS REAIS ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  -- consumir API REST:\033[0m\n"
-    printf "  \033[0;90m  local body, code = net.get('https://api.github.com/users/torvalds')\033[0m\n"
-    printf "  \033[0;90m  local u = json.decode(body)\033[0m\n"
-    printf "  \033[0;90m  print(u.name, u.public_repos)\033[0m\n\n"
-    printf "  \033[0;90m  -- POST com JSON:\033[0m\n"
-    printf "  \033[0;90m  local payload = json.encode({user='admin', pass='123'})\033[0m\n"
-    printf "  \033[0;90m  local b, c = net.post(url, payload, 'application/json')\033[0m\n"
-    printf "  \033[0;90m  local resp = json.decode(b)\033[0m\n\n"
-    printf "  \033[0;90m  -- payload NoSQL Injection:\033[0m\n"
-    printf "  \033[0;90m  local nosql = json.encode({username={['\\$ne']=''},\033[0m\n"
-    printf "  \033[0;90m                             password={['\\$ne']=>''}})\033[0m\n"
-    printf "  \033[0;90m  net.post(url, nosql, 'application/json')\033[0m\n\n"
-    printf "  \033[0;90m  -- salvar scan em JSON:\033[0m\n"
-    printf "  \033[0;90m  local resultado = {host='alvo.com', vulns={'xss','sqli'}}\033[0m\n"
-    printf "  \033[0;90m  fs.write('scan.json', json.encode(resultado))\033[0m\n\n"
-    printf "  \033[0;90m  -- roundtrip encode -> decode:\033[0m\n"
-    printf "  \033[0;90m  local orig = {hosts={'127.0.0.1','192.168.1.1'}, port=8080}\033[0m\n"
-    printf "  \033[0;90m  local back = json.decode(json.encode(orig))\033[0m\n"
-    printf "  \033[0;90m  print(back.port, back.hosts[1])  --> 8080  127.0.0.1\033[0m\n\n"
-    }
-    _doc_log() {
-    printf "\033[1;35m═══ log.* — Logging Estruturado ═══════════════════════════════════\033[0m\n\n"
-    printf "  Módulo de log com níveis, cores e timestamp. Nativo no ElliotOS.\n"
-    printf "  Não precisa de require() — disponível em qualquer script ou REPL.\n\n"
-    printf "\033[1;36m── NÍVEIS (do menor ao maior) ──────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90mTRACE=0  DEBUG=1  INFO=2  OK=3  WARN=4  ERR=5\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ─────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlog.trace\033[0m(...)   \033[0;90m[TRACE] HH:MM:SS mensagem\033[0m\n"
-    printf "  \033[1;33mlog.debug\033[0m(...)   \033[0;36m[DEBUG] HH:MM:SS mensagem\033[0m\n"
-    printf "  \033[1;33mlog.info\033[0m(...)    \033[1;37m[INFO ] HH:MM:SS mensagem\033[0m\n"
-    printf "  \033[1;33mlog.ok\033[0m(...)      \033[1;32m[OK   ] HH:MM:SS mensagem\033[0m\n"
-    printf "  \033[1;33mlog.warn\033[0m(...)    \033[1;33m[WARN ] HH:MM:SS mensagem\033[0m\n"
-    printf "  \033[1;33mlog.err\033[0m(...)     \033[1;31m[ERR  ] HH:MM:SS mensagem\033[0m\n\n"
-    printf "  Aceita múltiplos argumentos — são concatenados com espaço:\n"
-    printf "  \033[0;90m  log.info('host:', host, 'porta:', port)\033[0m\n\n"
-    printf "\033[1;36m── CONFIGURAÇÃO ────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlog.set_level\033[0m(lvl)\n"
-    printf "  \033[0;90m  Filtra mensagens abaixo do nível. Aceita nome ou número.\033[0m\n"
-    printf "  \033[0;90m  log.set_level('WARN')   -- só WARN e ERR aparecem\033[0m\n"
-    printf "  \033[0;90m  log.set_level(0)        -- tudo aparece (padrão)\033[0m\n\n"
-    printf "  \033[1;33mlog.to_file\033[0m(path)\n"
-    printf "  \033[0;90m  Duplica saída para arquivo (sem cores). Append automático.\033[0m\n"
-    printf "  \033[0;90m  log.to_file('scan.log')\033[0m\n\n"
-    printf "  \033[1;33mlog.set_output\033[0m(fn)\n"
-    printf "  \033[0;90m  Redireciona saída para função customizada.\033[0m\n"
-    printf "  \033[0;90m  log.set_output(function(s) ui.box(s) end)\033[0m\n\n"
-    printf "  \033[1;33mlog.silent\033[0m()    — desativa toda saída temporariamente\n"
-    printf "  \033[1;33mlog.resume\033[0m()    — reativa saída\n\n"
-    printf "\033[1;36m── UTILITÁRIOS ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlog.timed\033[0m(label, fn)\n"
-    printf "  \033[0;90m  Executa fn(), mede tempo e loga OK/ERR com duração.\033[0m\n"
-    printf "  \033[0;90m  log.timed('download', function() net.get(url) end)\033[0m\n"
-    printf "  \033[0;90m  -- [OK   ] 23:41:01 download (0.312s)\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLO COMPLETO ────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  log.to_file('app.log')\033[0m\n"
-    printf "  \033[0;90m  log.set_level('INFO')\033[0m\n"
-    printf "  \033[0;90m  log.info('iniciando scan em', host)\033[0m\n"
-    printf "  \033[0;90m  local ok, err = pcall(function() net.syn(host, 80) end)\033[0m\n"
-    printf "  \033[0;90m  if ok then log.ok('porta 80 aberta')\033[0m\n"
-    printf "  \033[0;90m  else      log.err('falhou:', err) end\033[0m\n\n"
-    }
-    _doc_csv() {
-    printf "\033[1;35m═══ csv.* — Parse e Escrita de CSV ════════════════════════════════\033[0m\n\n"
-    printf "  Parser CSV completo: suporta campos com aspas, CRLF, separador custom.\n"
-    printf "  Nativo no ElliotOS — sem require().\n\n"
-    printf "\033[1;36m── FUNÇÕES ─────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcsv.decode\033[0m(str [, opts])  →  tabela de linhas\n"
-    printf "  \033[0;90m  Parse de string CSV. Com header=true (padrão), cada linha\033[0m\n"
-    printf "  \033[0;90m  é uma tabela com chaves pelos nomes das colunas.\033[0m\n"
-    printf "  \033[0;90m  local t = csv.decode('nome,idade\\nMike,20\\nAna,25')\033[0m\n"
-    printf "  \033[0;90m  print(t[1].nome, t[1].idade)   --> Mike  20\033[0m\n"
-    printf "  \033[0;90m  print(t[2].nome)               --> Ana\033[0m\n\n"
-    printf "  \033[1;33mcsv.encode\033[0m(t [, opts])  →  string CSV\n"
-    printf "  \033[0;90m  Converte tabela de tabelas em string CSV.\033[0m\n"
-    printf "  \033[0;90m  Adiciona aspas automaticamente quando necessário.\033[0m\n"
-    printf "  \033[0;90m  local s = csv.encode(t)\033[0m\n"
-    printf "  \033[0;90m  local s = csv.encode(t, {sep=';'})\033[0m\n\n"
-    printf "  \033[1;33mcsv.read\033[0m(path [, opts])  →  tabela\n"
-    printf "  \033[0;90m  Lê arquivo CSV do disco. Equivale a decode(fs.read(path)).\033[0m\n"
-    printf "  \033[0;90m  local t = csv.read('dados.csv')\033[0m\n"
-    printf "  \033[0;90m  local t = csv.read('dados.csv', {sep=';', header=false})\033[0m\n\n"
-    printf "  \033[1;33mcsv.write\033[0m(path, t [, opts])\n"
-    printf "  \033[0;90m  Grava tabela como arquivo CSV.\033[0m\n"
-    printf "  \033[0;90m  csv.write('saida.csv', t)\033[0m\n"
-    printf "  \033[0;90m  csv.write('saida.csv', t, {sep=';'})\033[0m\n\n"
-    printf "\033[1;36m── OPÇÕES (opts) ───────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33msep\033[0m    separador de campo  (padrão: ',')\n"
-    printf "  \033[1;33mquote\033[0m  caractere de aspas  (padrão: '\"')\n"
-    printf "  \033[1;33mheader\033[0m true = primeira linha são cabeçalhos (padrão: true)\n\n"
-    printf "\033[1;36m── EXEMPLO COMPLETO ────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  -- ler, filtrar e reescrever\033[0m\n"
-    printf "  \033[0;90m  local t = csv.read('usuarios.csv')\033[0m\n"
-    printf "  \033[0;90m  local ativos = util.filter(t, function(r)\033[0m\n"
-    printf "  \033[0;90m    return r.status == 'ativo'\033[0m\n"
-    printf "  \033[0;90m  end)\033[0m\n"
-    printf "  \033[0;90m  csv.write('ativos.csv', ativos)\033[0m\n"
-    printf "  \033[0;90m  log.ok('filtrados:', #ativos, 'usuarios ativos')\033[0m\n\n"
-    printf "  \033[0;90m  -- ponto-e-vírgula (padrão BR de planilhas)\033[0m\n"
-    printf "  \033[0;90m  local t2 = csv.read('relatorio.csv', {sep=';'})\033[0m\n\n"
-    }
-    _doc_dow() {
-    printf "\033[1;35m═══ dow.* — Download de Mídia ════════════════════════════════════\033[0m\n\n"
-    printf "  Motor híbrido: YouTube usa yt-dlp; outros sites usam Cobalt API + wget.\n"
-    printf "  Todos os arquivos são salvos em ~/Downloads/\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mdow.video\033[0m(url)\n"
-    printf "  \033[0;90m  Baixa vídeo. YouTube → yt-dlp. Outros sites → Cobalt API.\033[0m\n"
-    printf "  \033[0;90m  dow.video('https://youtube.com/watch?v=...')\033[0m\n\n"
-    printf "  \033[1;33mdow.audio\033[0m(url)\n"
-    printf "  \033[0;90m  Extrai apenas o áudio do vídeo.\033[0m\n"
-    printf "  \033[0;90m  dow.audio('https://youtube.com/watch?v=...')\033[0m\n\n"
-    printf "  \033[1;33mdow.imagen\033[0m(url)\n"
-    printf "  \033[0;90m  Baixa imagem via URL direta.\033[0m\n"
-    printf "  \033[0;90m  dow.imagen('https://site.com/foto.jpg')\033[0m\n\n"
-    printf "  \033[1;33mdow.playlist\033[0m(url)\n"
-    printf "  \033[0;90m  Baixa playlist completa do YouTube via yt-dlp.\033[0m\n"
-    printf "  \033[0;90m  dow.playlist('https://youtube.com/playlist?list=...')\033[0m\n\n"
-    printf "  \033[1;33mdow.info\033[0m(url)\n"
-    printf "  \033[0;90m  Mostra status das ferramentas e instância Cobalt em uso.\033[0m\n\n"
-    printf "  \033[1;33mdow.reset\033[0m()\n"
-    printf "  \033[0;90m  Troca instância Cobalt em cache (útil se a atual falhar).\033[0m\n\n"
-    printf "  \033[1;33mdow.help\033[0m()\n"
-    printf "  \033[0;90m  Exibe ajuda completa do módulo.\033[0m\n\n"
-    printf "\033[1;36m── REQUISITOS ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;31m  ⚠ YouTube requer yt-dlp:\033[0m\n"
-    printf "  \033[0;90m  pkg install python-yt-dlp\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  dow.video('https://youtube.com/watch?v=dQw4w9WgXcQ')\033[0m\n"
-    printf "  \033[0;90m  dow.audio('https://youtube.com/watch?v=dQw4w9WgXcQ')\033[0m\n"
-    printf "  \033[0;90m  dow.playlist('https://youtube.com/playlist?list=PLxyz')\033[0m\n"
-    printf "  \033[0;90m  dow.imagen('https://site.com/imagem.png')\033[0m\n\n"
-    }
-    _doc_web() {
-    printf "\033[1;35m═══ web.* — Parsing HTML e Servidor Web ══════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mweb.get\033[0m(url [, opts])  →  html, code  ou  nil, errmsg\n"
-    printf "  \033[0;90m  Baixa HTML/CSS/JS, segue redirects, User-Agent de browser.\033[0m\n"
-    printf "  \033[0;90m  opts: {timeout, ua, quiet, headers, file}\033[0m\n"
-    printf "  \033[0;90m  local html, code = web.get('https://alvo.com')\033[0m\n\n"
-    printf "  \033[1;33mweb.links\033[0m(html)  →  tabela de URLs\n"
-    printf "  \033[0;90m  Extrai href de <a>/<link> e src de <img>/<script>.\033[0m\n"
-    printf "  \033[0;90m  local links = web.links(html)\033[0m\n"
-    printf "  \033[0;90m  for _, l in ipairs(links) do print(l) end\033[0m\n\n"
-    printf "  \033[1;33mweb.forms\033[0m(html)  →  tabela de formulários\n"
-    printf "  \033[0;90m  Extrai <form> com inputs, selects e textareas.\033[0m\n"
-    printf "  \033[0;90m  local forms = web.forms(html)\033[0m\n\n"
-    printf "  \033[1;33mweb.scripts\033[0m(html)  →  tabela de scripts\n"
-    printf "  \033[0;90m  Extrai <script> externos e inline.\033[0m\n\n"
-    printf "  \033[1;33mweb.serve\033[0m(path, port [, opts])\n"
-    printf "  \033[0;90m  Sobe servidor HTTP estático em background.\033[0m\n"
-    printf "  \033[0;90m  web.serve('/sdcard/meusite', 8080)\033[0m\n\n"
-    printf "  \033[1;33mweb.stop\033[0m()\n"
-    printf "  \033[0;90m  Para o servidor iniciado por web.serve().\033[0m\n\n"
-    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local html, code = web.get('https://alvo.com')\033[0m\n"
-    printf "  \033[0;90m  print('status:', code)\033[0m\n"
-    printf "  \033[0;90m  local links = web.links(html)\033[0m\n"
-    printf "  \033[0;90m  for _, l in ipairs(links) do print(l) end\033[0m\n\n"
-    printf "  \033[0;90m  -- auditar formulários de login:\033[0m\n"
-    printf "  \033[0;90m  local forms = web.forms(html)\033[0m\n"
-    printf "  \033[0;90m  for _, f in ipairs(forms) do\033[0m\n"
-    printf "  \033[0;90m    print(f.action, f.method)\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    printf "  \033[0;90m  -- servir projeto local:\033[0m\n"
-    printf "  \033[0;90m  web.serve('./meusite', 8080)\033[0m\n"
-    printf "  \033[0;90m  -- acessar no browser: http://localhost:8080\033[0m\n\n"
-    }
-    _doc_lmod() {
-    printf "\033[1;35m═══ lmod.* — Criador de Módulos Lua ══════════════════════════════\033[0m\n\n"
-    printf "  Cria e gerencia módulos Lua em ~/.lua-modules/\n"
-    printf "  Módulos criados com lmod são carregados via require('nome').\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mlmod.new\033[0m('nome' [, tipo])\n"
-    printf "  \033[0;90m  Cria módulo em ~/.lua-modules/nome.lua\033[0m\n"
-    printf "  \033[0;90m  tipos: scanner | recon | util | generic (padrão)\033[0m\n"
-    printf "  \033[0;90m  lmod.new('myscanner', 'scanner')\033[0m\n\n"
-    printf "  \033[1;33mlmod.mod\033[0m('arquivo.lua')\n"
-    printf "  \033[0;90m  Copia/registra arquivo Lua existente como módulo.\033[0m\n"
-    printf "  \033[0;90m  lmod.mod('meutool.lua')\033[0m\n\n"
-    printf "  \033[1;33mlmod.list\033[0m()\n"
-    printf "  \033[0;90m  Lista módulos instalados em ~/.lua-modules\033[0m\n\n"
-    printf "  \033[1;33mlmod.remove\033[0m('nome')\n"
-    printf "  \033[0;90m  Remove módulo pelo nome.\033[0m\n\n"
-    printf "  \033[1;33mlmod.path\033[0m()\n"
-    printf "  \033[0;90m  Mostra o diretório de módulos.\033[0m\n\n"
-    printf "  \033[1;33mlmod.help\033[0m()\n"
-    printf "  \033[0;90m  Ajuda com exemplos.\033[0m\n\n"
-    printf "  \033[1;33mlmod.extract\033[0m('nome' [, opts])\n"
-    printf "  \033[0;90m  Extrai a interface de qualquer módulo nativo do ElliotOS para um\033[0m\n"
-    printf "  \033[0;90m  arquivo .lua em ~/.lua-modules/<nome>_extract.lua\033[0m\n"
-    printf "  \033[0;90m  Útil para estudar funções, origens (C vs Lua) e criar módulos\033[0m\n"
-    printf "  \033[0;90m  próprios baseados nos nativos.\033[0m\n"
-    printf "  \033[0;90m  opts: { file='caminho.lua', verbose=true/false }\033[0m\n\n"
-    printf "  \033[0;90m  -- exemplos:\033[0m\n"
-    printf "  \033[0;90m  lmod.extract('net')              -- extrai interface de net.*\033[0m\n"
-    printf "  \033[0;90m  lmod.extract('fs')               -- extrai interface de fs.*\033[0m\n"
-    printf "  \033[0;90m  lmod.extract('log')              -- extrai módulo log.* (Lua)\033[0m\n"
-    printf "  \033[0;90m  lmod.extract('csv', {verbose=false})  -- silencioso\033[0m\n"
-    printf "  \033[0;90m  lmod.extract('net', {file='/sdcard/net_ref.lua'})\033[0m\n\n"
-    printf "\033[1;36m── FLUXO TÍPICO ───────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  lmod.new('authbypass', 'scanner') -- cria o template\033[0m\n"
-    printf "  \033[0;90m  ms -e ~/.lua-modules/authbypass.lua -- edita\033[0m\n"
-    printf "  \033[0;90m  -- no REPL ou em scripts:\033[0m\n"
-    printf "  \033[0;90m  local ab = require('authbypass')\033[0m\n"
-    printf "  \033[0;90m  ab.scan('https://alvo.com/login')\033[0m\n\n"
-    printf "\033[1;36m── TIPOS DE TEMPLATE ──────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33m%-10s\033[0m %s\n" "scanner" "template com scan(url) + detecção de vuln"
-    printf "  \033[1;33m%-10s\033[0m %s\n" "recon"   "template com run(host) para reconhecimento"
-    printf "  \033[1;33m%-10s\033[0m %s\n" "util"    "template utilitário genérico com helpers"
-    printf "  \033[1;33m%-10s\033[0m %s\n" "generic" "módulo vazio, estrutura mínima"
-    printf "\n"
-    }
-    _doc_adb() {
-    printf "\033[1;35m═══ adb.* — Android Debug Bridge via Wi-Fi ═══════════════════════\033[0m\n\n"
-    printf "  Usa o binário adb do Termux. Funciona sem root via ADB over TCP.\n"
-    printf "  \033[1;31m  ⚠ Requer: pkg install android-tools\033[0m\n\n"
-    printf "\033[1;36m── CONEXÃO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33madb.pair\033[0m('ip:porta', 'codigo')\n"
-    printf "  \033[0;90m  Pareia via Wi-Fi (Android 11+). Código aparece em:\033[0m\n"
-    printf "  \033[0;90m  Configurações → Desenvolvedor → Pareamento por código\033[0m\n"
-    printf "  \033[0;90m  adb.pair('192.168.1.5:37123', '123456')\033[0m\n\n"
-    printf "  \033[1;33madb.connect\033[0m('ip:porta')\n"
-    printf "  \033[0;90m  Conecta ao dispositivo após o pareamento.\033[0m\n"
-    printf "  \033[0;90m  adb.connect('192.168.1.5:5555')\033[0m\n\n"
-    printf "  \033[1;33madb.disconnect\033[0m()       Desconecta\n"
-    printf "  \033[1;33madb.devices\033[0m()          Lista dispositivos conectados\n"
-    printf "  \033[1;33madb.status\033[0m()           Status da conexão ADB\n\n"
-    printf "\033[1;36m── SHELL E ARQUIVOS ───────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33madb.shell\033[0m('cmd')        Executa comando como ADB shell\n"
-    printf "  \033[0;90m  adb.shell('pm list packages')\033[0m\n"
-    printf "  \033[0;90m  adb.shell('dumpsys battery')\033[0m\n\n"
-    printf "  \033[1;33madb.repl\033[0m()             Shell ADB interativo\n\n"
-    printf "  \033[1;33madb.push\033[0m('local', 'remoto')\n"
-    printf "  \033[0;90m  Copia arquivo para o device.\033[0m\n"
-    printf "  \033[0;90m  adb.push('/sdcard/arq.apk', '/sdcard/Download/arq.apk')\033[0m\n\n"
-    printf "  \033[1;33madb.pull\033[0m('remoto', 'local')\n"
-    printf "  \033[0;90m  Copia arquivo do device.\033[0m\n\n"
-    printf "  \033[1;33madb.install\033[0m('app.apk')  Instala APK no device\n\n"
-    printf "\033[1;36m── CONTROLE DO DEVICE ─────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33madb.tap\033[0m(x, y)             Simula toque na tela\n"
-    printf "  \033[1;33madb.swipe\033[0m(x1,y1,x2,y2)    Simula gesto de swipe\n"
-    printf "  \033[1;33madb.keyevent\033[0m(code)         Envia evento de tecla\n"
-    printf "  \033[1;33madb.text\033[0m('texto')          Digita texto\n"
-    printf "  \033[1;33madb.screenshot\033[0m()           Captura tela\n"
-    printf "  \033[1;33madb.reboot\033[0m('recovery')     Reinicia em recovery ou fastboot\n\n"
-    printf "\033[1;36m── INFORMAÇÕES DO SISTEMA ─────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33madb.prop\033[0m()               Lista propriedades do sistema\n"
-    printf "  \033[1;33madb.wifi\033[0m()               Info de Wi-Fi\n"
-    printf "  \033[1;33madb.screen_size\033[0m()         Resolução da tela\n"
-    printf "  \033[1;33madb.screen_density\033[0m()      Densidade da tela\n"
-    printf "  \033[1;33madb.forward\033[0m(lport, rport) Port forwarding\n"
-    printf "  \033[1;33madb.game_mode\033[0m(bool)       Ativa/desativa modo game\n"
-    printf "  \033[1;33madb.setup\033[0m()              Configura ambiente ADB\n\n"
-    printf "\033[1;36m── FLUXO TÍPICO (Android 11+) ─────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  -- 1. Ativar modo desenvolvedor + Pareamento por código\033[0m\n"
-    printf "  \033[0;90m  adb.pair('192.168.1.5:37123', '654321')\033[0m\n"
-    printf "  \033[0;90m  -- 2. Conectar\033[0m\n"
-    printf "  \033[0;90m  adb.connect('192.168.1.5:5555')\033[0m\n"
-    printf "  \033[0;90m  -- 3. Usar\033[0m\n"
-    printf "  \033[0;90m  adb.shell('id')\033[0m\n"
-    printf "  \033[0;90m  adb.screenshot()\033[0m\n"
-    printf "  \033[0;90m  adb.tap(540, 960)\033[0m\n\n"
-    }
-    _doc_db() {
-    printf "\033[1;35m═══ db.* — SQLite3 Embutido ═══════════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mdb.open\033[0m(path)      Abre/cria banco SQLite3\n"
-    printf "  \033[1;33mdb.close\033[0m()         Fecha o banco\n"
-    printf "  \033[1;33mdb.exec\033[0m(sql)       Executa sem retorno (CREATE, INSERT, UPDATE, DELETE)\n"
-    printf "  \033[1;33mdb.query\033[0m(sql)      SELECT → tabela Lua [{col=val,...}, ...]\n"
-    printf "  \033[1;33mdb.tables\033[0m()        Lista tabelas do banco\n"
-    printf "  \033[1;33mdb.help\033[0m()          Ajuda do módulo\n\n"
-    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  db.open('scan.db')\033[0m\n"
-    printf "  \033[0;90m  db.exec('CREATE TABLE IF NOT EXISTS vulns (host TEXT, tipo TEXT, url TEXT)')\033[0m\n"
-    printf "  \033[0;90m  db.exec(\"INSERT INTO vulns VALUES ('alvo.com','xss','/search')\")\033[0m\n"
-    printf "  \033[0;90m  local rows = db.query('SELECT * FROM vulns')\033[0m\n"
-    printf "  \033[0;90m  for _, r in ipairs(rows) do\033[0m\n"
-    printf "  \033[0;90m    print(r.host, r.tipo, r.url)\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n"
-    printf "  \033[0;90m  db.close()\033[0m\n\n"
-    printf "  \033[1;31m  ⚠ Sempre feche o banco com db.close() ao terminar!\033[0m\n\n"
-    }
-    _doc_pent() {
-    printf "\033[1;35m═══ pent.* — Lab Local Vulnerável ════════════════════════════════\033[0m\n\n"
-    printf "  Sobe um servidor HTTP vulnerável localmente para praticar pentest.\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mpent.start\033[0m(level, port)\n"
-    printf "  \033[0;90m  Sobe lab. level: 'easy', 'med' ou 'hard'\033[0m\n"
-    printf "  \033[0;90m  pent.start('easy', 8081)\033[0m\n\n"
-    printf "  \033[1;33mpent.stop\033[0m()          Para todos os labs\n"
-    printf "  \033[1;33mpent.status\033[0m()        Status dos labs rodando\n\n"
-    printf "\033[1;36m── PORTAS PADRÃO ──────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33m%-8s\033[0m  porta 8081\n" "easy"
-    printf "  \033[1;33m%-8s\033[0m  porta 8082\n" "med"
-    printf "  \033[1;33m%-8s\033[0m  porta 8083\n" "hard"
-    printf "\n"
-    printf "\033[1;36m── ENDPOINTS DISPONÍVEIS ──────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  /search  /login  /xss  /comment  /dom  /exec  /file  /path\033[0m\n"
-    printf "  \033[0;90m  /note  /tpl  /upload  /api/users  /api/me  /api/products\033[0m\n"
-    printf "  \033[0;90m  /redirect  /cors  /csrf  /jwt  /xxe  /admin  /register\033[0m\n"
-    printf "  \033[0;90m  /reset  /debug  /backup  /ssrf  /rate  /headers\033[0m\n\n"
-    printf "\033[1;36m── FLAGS EXEMPLO ──────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  FLAG{easy_sqli_win}    FLAG{nosql_auth_bypass}\033[0m\n"
-    printf "  \033[0;90m  FLAG{jwt_none_attack}  FLAG{lfi_found_you}\033[0m\n"
-    printf "  \033[0;90m  FLAG{ssrf_internal_fetch}\033[0m\n\n"
-    printf "\033[1;36m── FLUXO TÍPICO ───────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  pent.start('easy', 8081)\033[0m\n"
-    printf "  \033[0;90m  mod.sqli('http://localhost:8081/login')  -- testa sqli\033[0m\n"
-    printf "  \033[0;90m  mod.xss('http://localhost:8081/search')  -- testa xss\033[0m\n"
-    printf "  \033[0;90m  pent.stop()\033[0m\n\n"
-    }
-    _doc_sh() {
-    printf "\033[1;35m═══ sh.* — Shell Direto ══════════════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33msh.exec\033[0m(cmd)   Executa comando e retorna saída como string\n"
-    printf "  \033[1;33msh.read\033[0m(cmd)   Alias de sh.exec\n\n"
-    printf "\033[1;36m── EXEMPLOS ───────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  local out = sh.exec('uname -a')\033[0m\n"
-    printf "  \033[0;90m  print(out)\033[0m\n\n"
-    printf "  \033[0;90m  local files = sh.exec('ls -la ~')\033[0m\n"
-    printf "  \033[0;90m  print(files)\033[0m\n\n"
-    printf "  \033[0;90m  -- combinar com net e fs:\033[0m\n"
-    printf "  \033[0;90m  local ip = sh.exec('ip addr show wlan0 | grep inet')\033[0m\n"
-    printf "  \033[0;90m  fs.write('ip.txt', ip)\033[0m\n\n"
-    printf "  \033[1;31m  ⚠ sh.exec() captura stdout. Para stderr use 2>&1:\033[0m\n"
-    printf "  \033[0;90m  sh.exec('comando 2>&1')\033[0m\n\n"
-    }
-    _doc_cc() {
-    printf "\033[1;35m═══ cc.* — Compilador C Inline e Transpilador Lua→C ══════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mcc.run\033[0m(codigo_c)\n"
-    printf "  \033[0;90m  Compila e executa código C direto do REPL.\033[0m\n"
-    printf "  \033[0;90m  cc.run([[\033[0m\n"
-    printf "  \033[0;90m    #include <stdio.h>\033[0m\n"
-    printf "  \033[0;90m    int main() { printf(\"ola do C!\\n\"); return 0; }\033[0m\n"
-    printf "  \033[0;90m  ]])\033[0m\n\n"
-    printf "  \033[1;33mcc.lua2c\033[0m(arquivo_lua)\n"
-    printf "  \033[0;90m  Transpila arquivo Lua para C (gera arquivo.c).\033[0m\n"
-    printf "  \033[0;90m  Cobre: funções, tabelas, retorno múltiplo, inferência de tipo.\033[0m\n"
-    printf "  \033[0;90m  cc.lua2c('meu_script.lua')\033[0m\n\n"
-    printf "  \033[1;33mcc.help\033[0m()   Ajuda do módulo\n\n"
-    printf "\033[1;36m── VIA LINHA DE COMANDO ───────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  ms -lua2c arquivo.lua       # transpila → arquivo.c\033[0m\n"
-    printf "  \033[0;90m  ms -lua2c -r arquivo.lua    # transpila e compila com cxx\033[0m\n\n"
-    }
-    _doc_ui() {
-    printf "\033[1;35m═══ ui.* — Interface de Terminal ══════════════════════════════════\033[0m\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mui.color\033[0m(code, texto)  Texto colorido (códigos ANSI)\n"
-    printf "  \033[0;90m  ui.color('1;32', 'texto verde bold')\033[0m\n\n"
-    printf "  \033[1;33mui.box\033[0m(texto)          Desenha caixa ao redor do texto\n"
-    printf "  \033[0;90m  ui.box('ElliotOS')\033[0m\n\n"
-    printf "  \033[1;33mui.clear\033[0m()             Limpa a tela\n"
-    printf "  \033[1;33mui.sleep\033[0m(s)            Pausa em segundos\n\n"
-    printf "  \033[1;33mui.fig\033[0m(texto)          ASCII art via figlet\n"
-    printf "  \033[0;90m  ui.fig('ElliotOS')\033[0m\n\n"
-    printf "  \033[1;33mui.input\033[0m([prompt])     Lê linha do usuário\n"
-    printf "  \033[0;90m  local nome = ui.input('Seu nome: ')\033[0m\n"
-    printf "  \033[0;90m  print('Ola, ' .. nome)\033[0m\n\n"
-    printf "  \033[1;33mui.help\033[0m()              Ajuda do módulo\n\n"
-    printf "\033[1;36m── CÓDIGOS DE COR ─────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33m%-10s\033[0m  \033[1;32mVerde bold\033[0m\n"    "1;32"
-    printf "  \033[1;33m%-10s\033[0m  \033[1;31mVermelho bold\033[0m\n" "1;31"
-    printf "  \033[1;33m%-10s\033[0m  \033[1;33mAmarelo bold\033[0m\n"  "1;33"
-    printf "  \033[1;33m%-10s\033[0m  \033[1;36mCiano bold\033[0m\n"   "1;36"
-    printf "  \033[1;33m%-10s\033[0m  \033[0;90mCinza dim\033[0m\n"    "0;90"
-    printf "\n"
-    }
-    _doc_tui() {
-    printf "\033[1;35m═══ tui.* — Framework de UI Interativo ═══════════════════════════\033[0m\n\n"
-    printf "  Framework para criar interfaces interativas no terminal:\n"
-    printf "  menus, formulários, callbacks de teclado.\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mtui.main\033[0m()        Inicia loop principal de UI\n"
-    printf "  \033[1;33mtui.func\033[0m(fn)      Registra função de callback\n"
-    printf "  \033[1;33mtui.close\033[0m()       Encerra a UI\n"
-    printf "  \033[1;33mtui.read\033[0m()        Lê evento de teclado\n"
-    printf "  \033[1;33mtui.help\033[0m()        Ajuda do módulo\n\n"
-    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  tui.func(function()\033[0m\n"
-    printf "  \033[0;90m    ui.clear()\033[0m\n"
-    printf "  \033[0;90m    ui.fig('Menu')\033[0m\n"
-    printf "  \033[0;90m    local op = ui.input('Escolha [1-3]: ')\033[0m\n"
-    printf "  \033[0;90m    if op == '1' then\033[0m\n"
-    printf "  \033[0;90m      print(net.get('https://ifconfig.me'))\033[0m\n"
-    printf "  \033[0;90m    elseif op == 'q' then\033[0m\n"
-    printf "  \033[0;90m      tui.close()\033[0m\n"
-    printf "  \033[0;90m    end\033[0m\n"
-    printf "  \033[0;90m  end)\033[0m\n"
-    printf "  \033[0;90m  tui.main()\033[0m\n\n"
-    }
-    _doc_exploit() {
-    printf "\033[1;35m═══ exploit.* — REPLs de Pós-Exploração Interativa ════════════════\033[0m\n\n"
-    printf "  REPLs interativos para exploração passo a passo de vulnerabilidades.\n"
-    printf "  Cada REPL aceita payloads em loop até você sair (Ctrl+C ou 'q').\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mexploit.sqli\033[0m(url)   REPL de SQL Injection — extrai dados linha a linha\n"
-    printf "  \033[1;33mexploit.xss\033[0m(url)    REPL de XSS — injeta e verifica reflexão de payload\n"
-    printf "  \033[1;33mexploit.lfi\033[0m(url)    REPL de LFI — lê arquivos via path traversal\n"
-    printf "  \033[1;33mexploit.rce\033[0m(url)    REPL de RCE — shell interativo via execução remota\n"
-    printf "  \033[1;33mexploit.ssti\033[0m(url)   REPL de SSTI — injeta templates (Jinja2, Twig...)\n"
-    printf "  \033[1;33mexploit.idor\033[0m(url)   REPL de IDOR — fuzzing de IDs para acesso não autorizado\n"
-    printf "  \033[1;33mexploit.help\033[0m()      Exibe esta ajuda\n\n"
-    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  exploit.sqli('http://alvo.com/page?id=1')\033[0m\n"
-    printf "  \033[0;90m  exploit.rce('http://alvo.com/cmd?exec=')\033[0m\n"
-    printf "  \033[0;90m  exploit.lfi('http://alvo.com/view?file=')\033[0m\n\n"
-    printf "  \033[1;31m  ⚠ Use apenas em ambientes autorizados (lab / CTF).\033[0m\n\n"
-    }
-    _doc_ell() {
-    printf "\033[1;35m═══ ell.* — Encoder/Decoder de Scripts (.ell) ════════════════════\033[0m\n\n"
-    printf "  Converte scripts Lua/Python/Bash em formato .ell (ofuscado) e vice-versa.\n"
-    printf "  Útil para distribuir scripts sem expor o código-fonte.\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mell.encode\033[0m(path [, lang [, out]])\n"
-    printf "  \033[0;90m    Codifica arquivo para .ell. lang detectado pela extensão.\033[0m\n"
-    printf "  \033[0;90m    ell.encode('script.lua')            → gera script.ell\033[0m\n"
-    printf "  \033[0;90m    ell.encode('script.py', 'python')   → força linguagem\033[0m\n\n"
-    printf "  \033[1;33mell.decode\033[0m(path [, out])\n"
-    printf "  \033[0;90m    Restaura .ell para o código original.\033[0m\n"
-    printf "  \033[0;90m    ell.decode('script.ell')            → restaura script.lua\033[0m\n\n"
-    printf "  \033[1;33mell.encode_str\033[0m(code, lang)\n"
-    printf "  \033[0;90m    Codifica string de código → retorna string .ell\033[0m\n\n"
-    printf "  \033[1;33mell.decode_str\033[0m(data)\n"
-    printf "  \033[0;90m    Decodifica string .ell → retorna código original\033[0m\n\n"
-    printf "  \033[1;33mell.help\033[0m()            Exibe esta ajuda\n\n"
-    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  ell.encode('meu_scanner.lua')         -- gera meu_scanner.ell\033[0m\n"
-    printf "  \033[0;90m  ell.decode('meu_scanner.ell')         -- restaura o .lua\033[0m\n"
-    printf "  \033[0;90m  local s = ell.encode_str(code, 'lua') -- codifica em memória\033[0m\n\n"
-    }
-    _doc_agent() {
-    printf "\033[1;35m═══ agent.* — Agente Autônomo com Tools ══════════════════════════\033[0m\n\n"
-    printf "  Agente de IA que executa tarefas em loop: gera código,\n"
-    printf "  executa, analisa o resultado e itera automaticamente.\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33magent.run\033[0m('tarefa' [, opts])\n"
-    printf "  \033[0;90m    Executa tarefa com confirmação a cada bloco de código.\033[0m\n"
-    printf "  \033[0;90m    opts: { auto=true, lang='lua'|'c'|'bash', max=N }\033[0m\n"
-    printf "  \033[0;90m    agent.run('crie um port scanner')\033[0m\n"
-    printf "  \033[0;90m    agent.run('compile hello world', {auto=true, lang='c'})\033[0m\n\n"
-    printf "  \033[1;33magent.chat\033[0m('msg')\n"
-    printf "  \033[0;90m    Conversa livre sem execução de código.\033[0m\n"
-    printf "  \033[0;90m    agent.chat('explica buffer overflow')\033[0m\n\n"
-    printf "  \033[1;33magent.reset\033[0m()         Limpa o contexto/histórico do agente\n"
-    printf "  \033[1;33magent.help\033[0m()          Exibe esta ajuda\n\n"
-    printf "\033[1;36m── EXEMPLO ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  agent.run('faça um servidor HTTP em Lua', {auto=true})\033[0m\n"
-    printf "  \033[0;90m  agent.run('crie um port scanner em bash')\033[0m\n"
-    printf "  \033[0;90m  agent.chat('como funciona heap spray?')\033[0m\n\n"
-    }
-    _doc_ivar() {
-    printf "\033[1;35m═══ ivar v2.0 — Variáveis Indexadas ═════════════════════════════\033[0m\n\n"
-    printf "  Ativado por padrão. Toda variável declarada recebe um índice !N,\n"
-    printf "  permitindo referenciá-la pelo número em vez do nome completo.\n"
-    printf "  Ideal para nomes longos em projetos sérios, UIs e jogos.\n\n"
-    printf "\033[1;36m── FUNÇÕES ────────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[1;33mivar.enable\033[0m()           Ativa o ivar (padrão)\n"
-    printf "  \033[1;33mivar.disable\033[0m()          Desativa o ivar\n"
-    printf "  \033[1;33mivar.status\033[0m()           Status + contagem de vars, escopos e aliases\n"
-    printf "  \033[1;33mivar.list\033[0m()             Mapa !N → nome = valor_atual\n"
-    printf "  \033[1;33mivar.alias\033[0m(k, v)        Registra !k → variável v via Lua\n"
-    printf "  \033[1;33mivar.alias\033[0m()            Lista todos os aliases registrados\n"
-    printf "  \033[1;33mivar.debug\033[0m(bool)        Avisa em stderr ao registrar cada variável\n"
-    printf "  \033[1;33mivar.reset\033[0m()            Limpa índices, aliases e pilha de escopos\n"
-    printf "  \033[1;33mivar.preprocess\033[0m(code)   Pré-processa string substituindo !N e !alias\n"
-    printf "  \033[1;33mivar.help\033[0m()             Ajuda rápida\n\n"
-    printf "\033[1;36m── ÍNDICES NUMÉRICOS (!N — escopo atual) ──────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  nome_longo_aqui = 42     -- !1 → nome_longo_aqui\033[0m\n"
-    printf "  \033[0;90m  outro_nome = \"Mike\"      -- !2 → outro_nome\033[0m\n"
-    printf "  \033[0;90m  print(!1, !2)            -- print(nome_longo_aqui, outro_nome)\033[0m\n\n"
-    printf "\033[1;36m── !!N — ACESSO AO ESCOPO EXTERNO (pai/global) ────────────────────\033[0m\n\n"
-    printf "  Dentro de uma função, \033[1;32m!N\033[0m reinicia do 1 (escopo local).\n"
-    printf "  Use \033[1;32m!!N\033[0m para acessar variáveis do escopo de fora (global ou pai).\n\n"
-    printf "  \033[0;90m  dano_global = 50        -- !1 global / vira !!1 dentro de funções\033[0m\n"
-    printf "  \033[0;90m  multiplicador = 3       -- !2 global / vira !!2 dentro de funções\033[0m\n\n"
-    printf "  \033[0;90m  function calcular()\033[0m\n"
-    printf "  \033[0;90m    bonus = 10            -- !1 neste escopo (local)\033[0m\n"
-    printf "  \033[0;90m    return !!1 * !!2 + !1 -- (dano_global * multiplicador) + bonus\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n"
-    printf "  \033[0;90m  print(calcular())       -- 50 * 3 + 10 = 160\033[0m\n\n"
-    printf "  Regra: \033[1;33m!N\033[0m = escopo atual.  \033[1;33m!!N\033[0m = escopo pai (global ou função envolvente).\n\n"
-    printf "\033[1;36m── ALIASES NOMEADOS ───────────────────────────────────────────────\033[0m\n\n"
-    printf "  Linha \033[1;32m!alias = varname\033[0m no script é interceptada pelo pré-processador,\n"
-    printf "  registra o alias e some do código Lua (não gera erro de sintaxe).\n\n"
-    printf "  \033[0;90m  player_health_percentage = 100\033[0m\n"
-    printf "  \033[0;90m  !hp = player_health_percentage   -- registra alias\033[0m\n"
-    printf "  \033[0;90m  print(!hp)                       -- expande para player_health_percentage\033[0m\n\n"
-    printf "  Também via Lua: \033[1;32mivar.alias(\"hp\", \"player_health_percentage\")\033[0m\n\n"
-    printf "\033[1;36m── ESCOPO POR FUNÇÃO (automático) ─────────────────────────────────\033[0m\n\n"
-    printf "  Dentro de cada \033[1;32mfunction\033[0m, !1 reinicia do zero — não conflita\n"
-    printf "  com variáveis do escopo externo.\n\n"
-    printf "  \033[0;90m  function ataque()\033[0m\n"
-    printf "  \033[0;90m    dano_base    = 10   -- !1 neste escopo\033[0m\n"
-    printf "  \033[0;90m    multiplicador = 2   -- !2 neste escopo\033[0m\n"
-    printf "  \033[0;90m    return !1 * !2\033[0m\n"
-    printf "  \033[0;90m  end\033[0m\n\n"
-    printf "\033[1;36m── MODO DEBUG ─────────────────────────────────────────────────────\033[0m\n\n"
-    printf "  \033[0;90m  ivar.debug(true)         -- ativa avisos de registro\033[0m\n"
-    printf "  \033[0;90m  x = 10                   -- stderr: [ivar:debug] !1 → x\033[0m\n"
-    printf "  \033[0;90m  ivar.debug(false)        -- desativa\033[0m\n\n"
-    printf "  Persistência: estado salvo em \033[0;90m~/.elliot_ivar.cfg\033[0m\n\n"
-    }
-    _DOC_SUB="\${2:-}"
-    case "\$_DOC_SUB" in
-      net|rede)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_net | eval "\$_DOC_PAGER"; else _doc_net; fi ;;
-      mod|pentest|scanners)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_mod | eval "\$_DOC_PAGER"; else _doc_mod; fi ;;
-      crypto|crypt)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_crypto | eval "\$_DOC_PAGER"; else _doc_crypto; fi ;;
-      sys|sistema)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_sys | eval "\$_DOC_PAGER"; else _doc_sys; fi ;;
-      fs|filesystem|arquivos)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_fs | eval "\$_DOC_PAGER"; else _doc_fs; fi ;;
-      ai|cyn|ia)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_ai | eval "\$_DOC_PAGER"; else _doc_ai; fi ;;
-      string|str)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_string | eval "\$_DOC_PAGER"; else _doc_string; fi ;;
-      util)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_util | eval "\$_DOC_PAGER"; else _doc_util; fi ;;
-      json)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_json | eval "\$_DOC_PAGER"; else _doc_json; fi ;;
-      log)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_log | eval "\$_DOC_PAGER"; else _doc_log; fi ;;
-      csv)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_csv | eval "\$_DOC_PAGER"; else _doc_csv; fi ;;
-      modulos|modules|api)
-        _all_mods() { _doc_net; _doc_mod; _doc_crypto; _doc_sys; _doc_fs; _doc_ai; _doc_db; _doc_web; _doc_dow; _doc_lmod; _doc_adb; _doc_pent; _doc_sh; _doc_cc; _doc_ui; _doc_tui; _doc_exploit; _doc_ell; _doc_agent; _doc_ivar; _doc_string; _doc_util; _doc_json; _doc_log; _doc_csv; _doc_num; _doc_path; _doc_color; _doc_test; _doc_queue_stack; _doc_re; _doc_try; _doc_table_extras; }
-        if [ -n "\$_DOC_PAGER" ]; then _all_mods | eval "\$_DOC_PAGER"; else _all_mods; fi ;;
-      dow|download|midia)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_dow | eval "\$_DOC_PAGER"; else _doc_dow; fi ;;
-      web)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_web | eval "\$_DOC_PAGER"; else _doc_web; fi ;;
-      lmod)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_lmod | eval "\$_DOC_PAGER"; else _doc_lmod; fi ;;
-      adb)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_adb | eval "\$_DOC_PAGER"; else _doc_adb; fi ;;
-      db|sqlite)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_db | eval "\$_DOC_PAGER"; else _doc_db; fi ;;
-      pent|lab)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_pent | eval "\$_DOC_PAGER"; else _doc_pent; fi ;;
-      sh|shell)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_sh | eval "\$_DOC_PAGER"; else _doc_sh; fi ;;
-      cc|compiler)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_cc | eval "\$_DOC_PAGER"; else _doc_cc; fi ;;
-      ui)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_ui | eval "\$_DOC_PAGER"; else _doc_ui; fi ;;
-      tui)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_tui | eval "\$_DOC_PAGER"; else _doc_tui; fi ;;
-      exploit|post)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_exploit | eval "\$_DOC_PAGER"; else _doc_exploit; fi ;;
-      ell|encoder)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_ell | eval "\$_DOC_PAGER"; else _doc_ell; fi ;;
-      agent|agente)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_agent | eval "\$_DOC_PAGER"; else _doc_agent; fi ;;
-      ivar)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_ivar | eval "\$_DOC_PAGER"; else _doc_ivar; fi ;;
-      num|number)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_num | eval "\$_DOC_PAGER"; else _doc_num; fi ;;
-      path)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_path | eval "\$_DOC_PAGER"; else _doc_path; fi ;;
-      color|colour|ansi)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_color | eval "\$_DOC_PAGER"; else _doc_color; fi ;;
-      test|assert)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_test | eval "\$_DOC_PAGER"; else _doc_test; fi ;;
-      queue|stack|struct|estrutura)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_queue_stack | eval "\$_DOC_PAGER"; else _doc_queue_stack; fi ;;
-      re|regex|regexp)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_re | eval "\$_DOC_PAGER"; else _doc_re; fi ;;
-      try|trycatch|try-catch)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_try | eval "\$_DOC_PAGER"; else _doc_try; fi ;;
-      table_extras|table-extras|tableextras)
-        if [ -n "\$_DOC_PAGER" ]; then _doc_table_extras | eval "\$_DOC_PAGER"; else _doc_table_extras; fi ;;
-      "")
-        if [ -n "\$_DOC_PAGER" ]; then _doc_body | eval "\$_DOC_PAGER"; else _doc_body; fi ;;
-      *)
-        printf "\033[1;31mSubcomando desconhecido: %s\033[0m\n" "\$_DOC_SUB"
-        printf "  Use: \033[1;32mms --doc\033[0m           # geral\n"
-        printf "       \033[1;32mms --doc modulos\033[0m   # todos os modulos\n"
-        printf "       \033[1;32mms --doc net\033[0m       # net.*\n"
-        printf "       \033[1;32mms --doc mod\033[0m       # mod.*\n"
-        printf "       \033[1;32mms --doc crypto\033[0m    # crypto.*\n"
-        printf "       \033[1;32mms --doc sys\033[0m       # sys.* (inclui data/relogio)\n"
-        printf "       \033[1;32mms --doc fs\033[0m        # fs.*\n"
-        printf "       \033[1;32mms --doc ai\033[0m        # ai.*\n"
-        printf "       \033[1;32mms --doc db\033[0m        # db.* (SQLite)\n"
-        printf "       \033[1;32mms --doc web\033[0m       # web.*\n"
-        printf "       \033[1;32mms --doc dow\033[0m       # dow.* (downloads)\n"
-        printf "       \033[1;32mms --doc lmod\033[0m      # lmod.* (modulos custom)\n"
-        printf "       \033[1;32mms --doc adb\033[0m       # adb.* (Android Debug Bridge)\n"
-        printf "       \033[1;32mms --doc pent\033[0m      # pent.* (lab vulneravel)\n"
-        printf "       \033[1;32mms --doc sh\033[0m        # sh.* (shell direto)\n"
-        printf "       \033[1;32mms --doc cc\033[0m        # cc.* (compilador C)\n"
-        printf "       \033[1;32mms --doc ui\033[0m        # ui.* (interface)\n"
-        printf "       \033[1;32mms --doc tui\033[0m       # tui.* (UI interativo)\n"
-        printf "       \033[1;32mms --doc exploit\033[0m   # exploit.* (pós-exploração)\n"
-        printf "       \033[1;32mms --doc ell\033[0m       # ell.* (encoder de scripts)\n"
-        printf "       \033[1;32mms --doc agent\033[0m     # agent.* (agente autônomo)\n"
-        printf "       \033[1;32mms --doc ivar\033[0m      # ivar.* (variáveis indexadas)\n"
-        printf "       \033[1;32mms --doc string\033[0m    # extensoes string.*\n"
-        printf "       \033[1;32mms --doc util\033[0m      # stdlib funcional util.*\n"
-        printf "       \033[1;32mms --doc json\033[0m      # json.*\n"
-        printf "       \033[1;32mms --doc log\033[0m       # log.* (logging estruturado)\n"
-        printf "       \033[1;32mms --doc csv\033[0m       # csv.* (parse e escrita CSV)\n"
-        ;;
-    esac
-    ;;
-  --script)
-    shift
-    _EX_LUA="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts"
-    _EX_C="\${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
-    _SC="\$1"
-    if [ -z "\$_SC" ]; then
-        _has_lua=0
-        for f in "\$_EX_LUA"/*.lua; do [ -f "\$f" ] && _has_lua=1 && break; done
-        if [ "\$_has_lua" = "1" ]; then
-            printf "\033[1;36m── Scripts Lua ──────────────────────────────────────\033[0m\n"
-            for f in "\$_EX_LUA"/*.lua; do
-                [ -f "\$f" ] || continue
-                _name=\$(basename "\$f")
-                _desc=\$(head -3 "\$f" | grep "^--" | tail -1 | sed 's/^-- *//')
-                printf "  \033[1;32m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-            done
-        fi
-        _has_c=0
-        for f in "\$_EX_C"/*; do [ -f "\$f" ] && _has_c=1 && break; done
-        if [ "\$_has_c" = "1" ]; then
-            printf "\n\033[1;33m── Scripts C ────────────────────────────────────────\033[0m\n"
-            for f in "\$_EX_C"/*; do
-                [ -f "\$f" ] || continue
-                _name=\$(basename "\$f")
-                _desc=\$(head -3 "\$f" | grep -m1 "^//" | sed 's|^// *||')
-                printf "  \033[1;33m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-            done
-        else
-            printf "\n\033[0;90m  (nenhum script C em \$_EX_C)\033[0m\n"
-        fi
-        printf "\n\033[0;90m  Uso: ms --script <nome> -- [args]\033[0m\n"
-        printf "\033[0;90m  C: .c compila via cxx | binario executa direto\033[0m\n"
-        exit 0
-    fi
-    shift
-    _FULL=""
-    _SCRIPT_TYPE=""
-    case "\$_SC" in
-        *.c)
-            [ -f "\$_EX_C/\$_SC" ] && _FULL="\$_EX_C/\$_SC" && _SCRIPT_TYPE="c_src"
-            ;;
-        *)
-            _SC_LUA="\$_SC"
-            case "\$_SC_LUA" in *.lua) ;; *) _SC_LUA="\${_SC_LUA}.lua" ;; esac
-            if [ -f "\$_EX_LUA/\$_SC_LUA" ]; then
-                _FULL="\$_EX_LUA/\$_SC_LUA"; _SCRIPT_TYPE="lua"
-            elif [ -f "\$_EX_C/\$_SC" ] && [ -x "\$_EX_C/\$_SC" ]; then
-                _FULL="\$_EX_C/\$_SC"; _SCRIPT_TYPE="c_bin"
-            elif [ -f "\$_EX_C/\${_SC}.c" ]; then
-                _FULL="\$_EX_C/\${_SC}.c"; _SCRIPT_TYPE="c_src"
-            fi
-            ;;
-    esac
-    if [ -z "\$_FULL" ]; then
-        printf "\033[1;31mErro: '\$_SC' nao encontrado em lua-scripts nem c-scripts\033[0m\n"
-        printf "\033[0;90mLua:\033[0m\n"
-        for f in "\$_EX_LUA"/*.lua; do
-            [ -f "\$f" ] && printf "  \033[1;32m%s\033[0m\n" "\$(basename \$f)"
-        done
-        printf "\033[0;90mC:\033[0m\n"
-        for f in "\$_EX_C"/*; do
-            [ -f "\$f" ] && printf "  \033[1;33m%s\033[0m\n" "\$(basename \$f)"
-        done
-        exit 1
-    fi
-    [ "\$1" = "--" ] && shift
-    case "\$_SCRIPT_TYPE" in
-        lua)
-            if _ivar_needs_preprocess "\$_FULL"; then
-                _ivar_run_file "\$_FULL" "\$@"
-            else
-                _lua_run "\$_B" -e "require('@std')" "\$_FULL" "\$@"
-            fi
-            ;;
-        c_src)
-            mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}" 2>/dev/null || true
-            _CBIN="\$(mktemp "\${TMPDIR:-\$HOME/.cache/elliot}/elliot_cscript_XXXXXX")"
-            cxx "\$_FULL" -o "\$_CBIN" 2>&1 && chmod +x "\$_CBIN" && "\$_CBIN" "\$@"
-            rm -f "\$_CBIN"
-            ;;
-        c_bin)
-            "\$_FULL" "\$@"
-            ;;
-    esac
-    ;;
-  --cscript)
-    shift
-    _EX_C="\${PREFIX:-/data/data/com.termux/files/usr}/share/c-scripts"
-    _SC="\$1"
-    if [ -z "\$_SC" ]; then
-        printf "\033[1;33m── Scripts C disponiveis ────────────────────────────\033[0m\n"
-        _found=0
-        for f in "\$_EX_C"/*; do
-            [ -f "\$f" ] || continue
-            _found=1
-            _name=\$(basename "\$f")
-            _desc=\$(head -3 "\$f" | grep -m1 "^//" | sed 's|^// *||')
-            printf "  \033[1;33m%-20s\033[0m \033[0;90m%s\033[0m\n" "\$_name" "\$_desc"
-        done
-        [ "\$_found" = "0" ] && printf "  \033[0;90m(nenhum script C instalado ainda)\033[0m\n"
-        printf "\n\033[0;90m  Uso: ms --cscript <nome.c> -- [args]   (compila e executa)\033[0m\n"
-        printf "\033[0;90m       ms --cscript <binario> -- [args]   (executa direto)\033[0m\n"
-        exit 0
-    fi
-    shift
-    [ "\$1" = "--" ] && shift
-    if [ -x "\$_EX_C/\$_SC" ] && ! echo "\$_SC" | grep -q '\.c$'; then
-        "\$_EX_C/\$_SC" "\$@"
-    else
-        _SRC="\$_SC"
-        case "\$_SRC" in *.c) ;; *) _SRC="\${_SRC}.c" ;; esac
-        if [ ! -f "\$_EX_C/\$_SRC" ]; then
-            printf "\033[1;31mErro: '\$_SRC' nao encontrado em \$_EX_C\033[0m\n"
-            exit 1
-        fi
-        mkdir -p "\${TMPDIR:-\$HOME/.cache/elliot}" 2>/dev/null || true
-        _CBIN="\$(mktemp "\${TMPDIR:-\$HOME/.cache/elliot}/elliot_cscript_XXXXXX")"
-        cxx "\$_EX_C/\$_SRC" -o "\$_CBIN" 2>&1 && chmod +x "\$_CBIN" && "\$_CBIN" "\$@"
-        rm -f "\$_CBIN"
-    fi
-    ;;
-  --listen)
-    shift
-    exec "\$_B" -e "require('@std');
-local ESC=string.char(27)
-local C=ESC..'[1;36m' local W=ESC..'[1;37m'
-local D=ESC..'[0;90m' local G=ESC..'[1;32m' local R=ESC..'[1;31m' local Z=ESC..'[0m'
-local port=tonumber('\$1')
-if not port then print('uso: ms --listen porta') os.exit(1) end
-print(C..'[net]'..Z..' Ouvindo em '..W..'0.0.0.0:'..port..Z)
-print(D..'  Ctrl+C para encerrar'..Z)
-local srv = net.listen(port,'0.0.0.0',4)
-if not srv then print(R..'Não foi possível abrir a porta '..port..Z) os.exit(1) end
-while true do
-  local client = net.accept(srv)
-  if client then
-    local data = net.recv(client)
-    if data and #data > 0 then
-      print(G..'[+]'..Z..' '..data:gsub('[\r\n]+',' '))
-    end
-    net.close(client)
-  end
-end"
-    ;;
-  -x|--xss)
-    shift
-    exec "\$_B" -e "require('@std');mod.xss('\$1',nil,\${2:-1})"
-    ;;
-  -q|--sqli)
-    shift
-    exec "\$_B" -e "require('@std');mod.sqli('\$1',nil,\${2:-1})"
-    ;;
-  -l|--lfi)
-    shift
-    exec "\$_B" -e "require('@std');mod.lfi('\$1',nil,\${2:-1})"
-    ;;
-  -r|--rce)
-    shift
-    exec "\$_B" -e "require('@std');mod.rce('\$1',nil,\${2:-1})"
-    ;;
-  --ssrf)
-    shift
-    exec "\$_B" -e "require('@std');mod.ssrf('\$1',nil,\${2:-1})"
-    ;;
-  --redir)
-    shift
-    exec "\$_B" -e "require('@std');mod.redir('\$1',nil,\${2:-1})"
-    ;;
-  --ssti)
-    shift
-    exec "\$_B" -e "require('@std');mod.ssti('\$1',nil,\${2:-1})"
-    ;;
-  -N|--nosql)
-    shift
-    exec "\$_B" -e "require('@std');mod.nosql('\$1')"
-    ;;
-  --scan-all)
-    # roda todos os scanners em uma URL com spider integrado
-    shift
-    exec "\$_B" -e "require('@std');
-local url='\$1'
-local lim=tonumber('\${2:-0}') or 0
-print('\n\027[1;35m[scan-all] '..url..'\027[0m')
-
--- Spider primeiro: coleta endpoints reais
-local endpoints={}
-local ok_sp,sp=pcall(mod.spider,url,20)
-if ok_sp and type(sp)=='table' and sp.all and #sp.all>0 then
-  endpoints=sp.all
-  print('\027[1;32m[spider] '..#endpoints..' endpoints coletados\027[0m')
-else
-  endpoints={url}
-  print('\027[0;33m[spider] fallback para URL base\027[0m')
-end
-
-local total_vulns=0
-local mods={'xss','sqli','lfi','rce','ssrf','csrf','cors','headers','xxe','ssti','redir','idor'}
-for _,ep in ipairs(endpoints) do
-  print('\n\027[1;36m[+] '..ep..'\027[0m')
-  for _,m in ipairs(mods) do
-    if type(mod[m])=='function' then
-      local ok,n=pcall(mod[m],ep,nil,lim)
-      local hits=ok and tonumber(n) or 0
-      if hits and hits>0 then
-        print('  \027[1;31m['..m..'] '..hits..' vuln(s)\027[0m')
-        total_vulns=total_vulns+hits
-      end
-    end
-  end
-end
-print('\n\027[1;35m[scan-all] Total: '..total_vulns..' vulnerabilidade(s)\027[0m')
-"
-    ;;
-  --exploit-rce)
-    shift
-    exec "\$_B" -e "exploit.rce('\$1')"
-    ;;
-  --exploit-sqli)
-    shift
-    exec "\$_B" -e "exploit.sqli('\$1')"
-    ;;
-  --exploit-lfi)
-    shift
-    exec "\$_B" -e "exploit.lfi('\$1')"
-    ;;
-
-  # ── Filesystem ──────────────────────────────────────────────
-  --logs)
-    shift
-    _logdir="\$HOME/.elliot_logs"
-    _logfile="\$_logdir/vulns.txt"
-    if [ ! -f "\$_logfile" ]; then
-        printf "\033[1;33m[*]\033[0m Nenhum log encontrado em \$_logfile\n"
-        printf "\033[0;90m    Execute scanners primeiro. O log é criado automaticamente.\033[0m\n"
-    else
-        printf "\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n"
-        printf "\033[1;35m║  ElliotOS — Log de Vulnerabilidades                          ║\033[0m\n"
-        printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n"
-        # Conta por tipo
-        printf "\033[1;33m[*] Resumo:\033[0m\n"
-        for _t in CRITICAL XSS SQLi NoSQLi CRLF BACKUP PARAM; do
-            _n=\$(grep -c "\\[$_t\\]" "\$_logfile" 2>/dev/null || echo 0)
-            [ "\$_n" -gt 0 ] && printf "    \033[1;31m%-10s %d\033[0m\n" "\$_t" "\$_n"
-        done
-        printf "\n\033[1;33m[*] Últimas 30 entradas:\033[0m\n\n"
-        tail -30 "\$_logfile"
-    fi
-    ;;
-  --logs-clear)
-    rm -f "\$HOME/.elliot_logs/vulns.txt"
-    printf "\033[1;32m[✓] Log limpo.\033[0m\n"
-    ;;
-  --cat)
-    shift
-    exec "\$_B" -e "require('@std');print(fs.read('\$1'))"
-    ;;
-  --ls)
-    shift
-    exec "\$_B" -e "require('@std');for _,f in ipairs(fs.glob('\${1:-.}/*')) do print(f) end"
-    ;;
-  --write)
-    # ms --write arquivo "conteudo"
-    shift
-    exec "\$_B" -e "require('@std');fs.write('\$1','\$2') print('escrito: \$1')"
-    ;;
-
-  # ── Lua Scanner ─────────────────────────────────────────────
-  --lua-scan)
-    shift
-    _SCAN_DIR="\${PWD}"
-    _SCAN_EXPORT=""
-    _SCAN_OUTFILE=""
-
-    # Processa argumentos: [dir] [--export [arquivo]]
-    while [ "\$#" -gt 0 ]; do
-      case "\$1" in
-        --export)
-          _SCAN_EXPORT=1
-          shift
-          # Próximo arg é o nome do arquivo de saída (opcional)
-          if [ -n "\${1:-}" ] && [ "\${1#-}" = "\$1" ]; then
-            _SCAN_OUTFILE="\$1"; shift
-          fi
-          ;;
-        *)
-          # Primeiro arg não-flag é o diretório
-          if [ -d "\$1" ]; then
-            _SCAN_DIR="\$1"
-          else
-            printf "\033[1;31m[✗]\033[0m Diretório não encontrado: \$1\n"
-            exit 1
-          fi
-          shift
-          ;;
-      esac
-    done
-
-    # Coleta arquivos .lua no diretório
-    _LUA_FILES=\$(find "\$_SCAN_DIR" -maxdepth 1 -name "*.lua" 2>/dev/null | sort)
-
-    if [ -z "\$_LUA_FILES" ]; then
-      printf "\033[1;33m[!]\033[0m Nenhum arquivo .lua encontrado em: \033[1;37m\$_SCAN_DIR\033[0m\n"
-      exit 0
-    fi
-
-    # Conta e lista
-    _LUA_COUNT=\$(printf '%s\n' "\$_LUA_FILES" | wc -l | tr -d ' ')
-    printf "\n\033[1;35m── Lua Scanner — ElliotOS ──────────────────────────────────────\033[0m\n"
-    printf "\033[0;90m  Diretório: \$_SCAN_DIR\033[0m\n"
-    printf "\033[1;32m  %s arquivo(s) .lua encontrado(s):\033[0m\n\n" "\$_LUA_COUNT"
-
-    _IDX=1
-    for _F in \$_LUA_FILES; do
-      _FNAME=\$(basename "\$_F")
-      _FSIZE=\$(wc -c < "\$_F" 2>/dev/null | tr -d ' ')
-      _FLINES=\$(wc -l < "\$_F" 2>/dev/null | tr -d ' ')
-      printf "  \033[1;36m[%d]\033[0m \033[1;37m%-28s\033[0m \033[0;90m%s bytes / %s linhas\033[0m\n" "\$_IDX" "\$_FNAME" "\$_FSIZE" "\$_FLINES"
-      _IDX=\$((_IDX + 1))
-    done
-    printf "\n"
-
-    # Modo export: junta tudo em um arquivo
-    if [ -n "\$_SCAN_EXPORT" ]; then
-      _OUTFILE="\${_SCAN_OUTFILE:-\${_SCAN_DIR}/bundle_\$(date +%Y%m%d_%H%M%S).lua}"
-      printf "\033[1;33m[*]\033[0m Exportando para: \033[1;37m\$_OUTFILE\033[0m\n\n"
-
-      # Cabeçalho do bundle
-      printf "-- ============================================================\n" > "\$_OUTFILE"
-      printf "-- ElliotOS Lua Bundle — gerado em %s\n" "\$(date)" >> "\$_OUTFILE"
-      printf "-- Diretório: %s\n" "\$_SCAN_DIR" >> "\$_OUTFILE"
-      printf "-- Arquivos: %s\n" "\$_LUA_COUNT" >> "\$_OUTFILE"
-      printf "-- ============================================================\n\n" >> "\$_OUTFILE"
-
-      # Injeta cada arquivo com separador
-      for _F in \$_LUA_FILES; do
-        _FNAME=\$(basename "\$_F")
-        printf "-- ── %s ──────────────────────────────────────────────\n" "\$_FNAME" >> "\$_OUTFILE"
-        printf "do -- início: %s\n" "\$_FNAME" >> "\$_OUTFILE"
-        cat "\$_F" >> "\$_OUTFILE"
-        printf "\nend -- fim: %s\n\n" "\$_FNAME" >> "\$_OUTFILE"
-        printf "  \033[1;32m✓\033[0m %s\n" "\$_FNAME"
-      done
-
-      _BUNDLE_SIZE=\$(wc -c < "\$_OUTFILE" 2>/dev/null | tr -d ' ')
-      _BUNDLE_LINES=\$(wc -l < "\$_OUTFILE" 2>/dev/null | tr -d ' ')
-      printf "\n\033[1;32m[✔]\033[0m Bundle criado: \033[1;37m\$_OUTFILE\033[0m\n"
-      printf "\033[0;90m    %s bytes / %s linhas totais\033[0m\n\n" "\$_BUNDLE_SIZE" "\$_BUNDLE_LINES"
-    else
-      printf "\033[0;90m  Dica: use --export para juntar tudo em um único arquivo.\033[0m\n"
-      printf "\033[0;90m  Ex: ms --lua-scan \$_SCAN_DIR --export bundle.lua\033[0m\n\n"
-    fi
-    ;;
-
-  # ── Crypto ──────────────────────────────────────────────────
-  --md5)
-    shift
-    exec "\$_B" -e "require('@std');print(crypto.md5('\$*'))"
-    ;;
-  --sha256)
-    shift
-    exec "\$_B" -e "require('@std');print(crypto.sha256('\$*'))"
-    ;;
-  --b64e)
-    shift
-    exec "\$_B" -e "require('@std');print(ms.b64.enc('\$*'))"
-    ;;
-  --b64d)
-    shift
-    exec "\$_B" -e "require('@std');print(ms.b64.dec('\$*'))"
-    ;;
-
-  # ── Shell/Sys ────────────────────────────────────────────────
-  --sh)
-    shift
-    exec "\$_B" -e "print(sh.capture('\$*'))"
-    ;;
-  --ps)
-    exec "\$_B" -e "require('@std');sys.list()"
-    ;;
-  --kill)
-    shift
-    exec "\$_B" -e "require('@std');sys.kill(\$1)"
-    ;;
-  --env)
-    shift
-    if [ -n "\$1" ]; then
-      exec "\$_B" -e "require('@std');print(sys.env('\$1'))"
-    else
-      exec "\$_B" -e "require('@std');for k,v in pairs(sys.env()) do print(k..'='..v) end"
-    fi
-    ;;
-
-  # ── APK ───────────────────────────────────────────────────────
-  --apk)
-    shift
-    if [ "\$#" -eq 0 ]; then
-      printf "\033[1;31m[✗]\033[0m Uso: ms --apk arquivo.apk [arquivo2.apk arquivo3.apk ...]\n"
-      exit 1
-    fi
-
-    # ── checks de ambiente: rodam UMA VEZ só, antes do lote — não fazem
-    # sentido repetir por apk (nao mudam entre um arquivo e outro), e se
-    # falharem nao ha motivo pra tentar nenhum apk da lista.
-    _APK_BIN="\$(command -v apktool 2>/dev/null)"
-    if [ -z "\$_APK_BIN" ]; then
-      printf "\033[1;31m[✗] apktool não encontrado. Rode: xpm install apktool\033[0m\n"
-      exit 1
-    fi
-    if ! command -v java >/dev/null 2>&1; then
-      printf "\033[1;31m[✗] java não encontrado — apktool não vai rodar\033[0m\n"
-      exit 1
-    fi
-
-    # ── modo lote: um ou mais apks na linha de comando. Cada um roda o
-    # check completo isolado (workdir/log/keystore próprios), com um
-    # cabeçalho [i/N] separando os relatórios quando há mais de um. Uma
-    # falha individual NUNCA aborta o lote inteiro — só é contabilizada,
-    # e o próximo apk continua normalmente.
-    _BATCH_N="\$#"
-    _BATCH_I=0
-    _BATCH_OK=0
-    _BATCH_FAILED=""
-
-    for _APK in "\$@"; do
-    _BATCH_I=\$((_BATCH_I+1))
-    if [ "\$_BATCH_N" -gt 1 ]; then
-      printf "\n\033[1;35m════════ [%d/%d] %s ════════\033[0m\n" "\$_BATCH_I" "\$_BATCH_N" "\$_APK"
-    fi
-
-    if [ ! -f "\$_APK" ]; then
-      printf "\033[1;31m[✗] Arquivo não encontrado: %s\033[0m\n" "\$_APK"
-      _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
-      continue
-    fi
-
-    _APK_PASS=0
-    _APK_FAIL=0
-    _APK_REAL_CONFIRMED=0
-    _APK_SIG_CONFLICT=0
-    _APK_WORK="\$(mktemp -d)"
-    _APK_TIER="padrão"
-    _APK_TOOLDIR="\$HOME/.xpm/tools/apktool"
-    _APK_APKTOOL3="\$_APK_TOOLDIR/apktool3.jar"
-    _APK_AAPT2="\$_APK_TOOLDIR/aapt2"
-    _APK_DECODE_OK=0
-    _APK_BUILD_OK=0
-    _APK_INSTALLABLE=0
-    _APK_LASTLOG=""
-
-    # ── isola, um recurso .xml por vez, qual arquivo faz o aapt2 recusar o
-    # lote inteiro. "aapt2 compile --dir" (o que o apktool chama por baixo)
-    # é atômico: um único recurso inválido derruba a compilação de TODOS os
-    # outros, sem apontar qual foi — é exatamente o que aparece nos logs
-    # como uma AndrolibException genérica sem pista nenhuma da causa real.
-    # A quarentena por magic-byte que já roda dentro de todo "apktool b"
-    # (via wrapper, acima) só cobre um arquivo .xml que na real é outra
-    # coisa (PNG/JPEG/AXML cru) — isso é rejeitado ANTES mesmo de chegar
-    # no aapt2. O que ela não cobre: um arquivo que É xml de verdade
-    # (começa com "<?xml", passa o parser) mas que o aapt2 reprova na
-    # validação semântica dele — a marca de um resources.arsc adulterado
-    # de propósito (proteção anti-RE) que sobrevive ao decode inteiro.
-    # Só entra em ação como fallback, nunca no build normal, pra não pagar
-    # uma chamada de aapt2 por arquivo em toda recompilação saudável.
-    _apk_preflight_quarantine() {
-      local proj="\$1" aapt2="\$2"
-      [ -d "\$proj/res" ] || return 1
-      [ -x "\$aapt2" ] || return 1
-
-      local _pf; _pf="\$(mktemp -d)"
-      local f rel bad=0 category
-      # find ... > arquivo, depois "while read < arquivo" (sem process
-      # substitution "<(...)" e sem "read -d" — os dois são extensões só
-      # do bash. O "ms" roda em /usr/bin/sh (dash no Termux, não bash), e
-      # "<(...)" nem chega a ser sintaxe válida pro parser do dash: quebra
-      # o script INTEIRO no load, não só essa função (foi exatamente o bug
-      # relatado — "Syntax error: redirection unexpected", até em "ms" sem
-      # argumento nenhum, porque o dash precisa conseguir parsear cada
-      # branch do case/esac pra achar os ";;", mesmo os que não vão
-      # executar). Delimitador por linha (em vez de NUL/-print0) é seguro
-      # aqui porque nome de recurso do Android não aceita quebra de linha.
-      find "\$proj/res" -type f -name "*.xml" 2>/dev/null > "\$_pf/filelist"
-      while IFS= read -r f; do
-        [ -n "\$f" ] || continue
-        if ! "\$aapt2" compile --legacy -o "\$_pf" "\$f" >"\$_pf/one.log" 2>&1; then
-          rel="\${f#\$proj/}"
-          mv -f "\$f" "\$f.xpm-quarantine"
-          printf "  [XPM] recurso corrompido/adulterado: %s (rejeitado pelo aapt2 isoladamente) — original preservado em %s.xpm-quarantine\n" "\$rel" "\$(basename "\$f")"
-          printf "  [XPM]   motivo do aapt2: %s\n" "\$(grep -m1 'error:' "\$_pf/one.log" 2>/dev/null || tail -1 "\$_pf/one.log")"
-          category="\$(basename "\$(dirname "\$f")")"; category="\${category%%-*}"
-          case "\$category" in
-            drawable|mipmap) printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle" />' > "\$f" ;;
-            anim)            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<alpha xmlns:android="http://schemas.android.com/apk/res/android" android:fromAlpha="1.0" android:toAlpha="1.0" android:duration="1" />' > "\$f" ;;
-            animator)        printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<set xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
-            menu)            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<menu xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
-            layout)          printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<merge xmlns:android="http://schemas.android.com/apk/res/android" />' > "\$f" ;;
-            *)               printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources />' > "\$f" ;;
-          esac
-          bad=\$((bad+1))
-        fi
-      done < "\$_pf/filelist"
-
-      rm -rf "\$_pf"
-      [ "\$bad" -gt 0 ]
-    }
-
-    # heap de retry: mais agressivo que o padrão do wrapper (que já é
-    # adaptativo) — usado só quando a tentativa normal já falhou por OOM.
-    _APK_RETRY_XMX="\$(awk '/^MemAvailable:/{v=int(\$2*0.75/1024); if(v<512)v=512; if(v>4096)v=4096; print v; f=1} END{if(!f) print 1536}' /proc/meminfo 2>/dev/null)"
-    [ -z "\$_APK_RETRY_XMX" ] && _APK_RETRY_XMX=1536
-
-    printf "\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n"
-    printf "\033[1;35m║  ElliotOS — APK Compatibility Check                          ║\033[0m\n"
-    printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n\n"
-
-    printf "\033[1;36m[*]\033[0m apktool: %s\n" "\$_APK_BIN"
-    if command -v apktool >/dev/null 2>/dev/null; then
-      printf "\033[1;32m[✓]\033[0m apktool $(apktool --version 2>/dev/null | head -1)\n"
-      _APK_PASS=\$((_APK_PASS+1))
-    else
-      printf "\033[1;31m[✗]\033[0m wrapper NÃO está na V15 — rode 'xpm install apktool' de novo ou espere o --doctor corrigir\n"
-      _APK_FAIL=\$((_APK_FAIL+1))
-    fi
-    printf "\033[1;32m[✓]\033[0m java encontrado\n"
-    _APK_PASS=\$((_APK_PASS+1))
-
-    # ── pré-voo: dá pra saber de graça (só olhando o ZIP) que isso nunca
-    # vai fechar, sem nem chamar o apktool ────────────────────────────────
-    _APK_SZ=\$(stat -c%s "\$_APK" 2>/dev/null || echo 0)
-    _APK_HAS_SPLIT_REQ=0
-    _APK_DEX_ENCRYPTED=0
-    if command -v unzip >/dev/null 2>&1; then
-      if unzip -l "\$_APK" 2>/dev/null | grep -q 'BundleConfig\.pb'; then
-        printf "\033[1;31m[✗] Isso é um Android App Bundle (.aab), não um .apk instalável.\033[0m\n"
-        printf "\033[0;90m    O apktool não decodifica .aab diretamente — gere um .apk\033[0m\n"
-        printf "\033[0;90m    universal primeiro (ex: bundletool build-apks) e teste nele.\033[0m\n"
-        rm -rf "\$_APK_WORK"
-        _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
-        continue
-      fi
-      if ! unzip -l "\$_APK" 2>/dev/null | grep -qE 'classes[0-9]*\.dex'; then
-        printf "\033[1;33m[!]\033[0m Nenhum classes.dex — parece um split/config APK (idioma/ABI)\n"
-        printf "\033[0;90m    ou uma overlay/RRO sem código. Se a ideia era testar o app inteiro,\033[0m\n"
-        printf "\033[0;90m    use o base.apk (o que carrega o código) junto com esse.\033[0m\n"
-      fi
-
-      # ── detecção de DEX criptografado ──────────────────────────────────
-      # APKs protegidos (DexGuard, Bangcle, libjiagu) têm classes.dex com
-      # magic-byte inválido ou tamanho suspeito (< 500 KB = stub mínimo,
-      # > 30 MB = DEX empacotado com dados criptografados). O round-trip
-      # decode/rebuild passa, mas o APK resultante falha em runtime porque
-      # o loader do protector não encontra o bloco criptografado que o
-      # apktool descartou silenciosamente. Melhor avisar cedo.
-      _DEX_SZ=\$(unzip -p "\$_APK" classes.dex 2>/dev/null | wc -c)
-      if [ "\$_DEX_SZ" -lt 524288 ] 2>/dev/null && [ "\$_DEX_SZ" -gt 0 ] 2>/dev/null; then
-        printf "\033[1;33m[!]\033[0m classes.dex muito pequeno (%d KB) — pode ser stub de APK protegido\n" "\$((_DEX_SZ/1024))"
-        printf "\033[0;90m    O round-trip pode fechar mas o APK falhar em runtime se o DEX for loader.\033[0m\n"
-        _APK_DEX_ENCRYPTED=1
-      elif [ "\$_DEX_SZ" -gt 31457280 ] 2>/dev/null; then
-        printf "\033[1;33m[!]\033[0m classes.dex muito grande (%d MB) — possível DEX empacotado com payload criptografado\n" "\$((_DEX_SZ/1048576))"
-        printf "\033[0;90m    O rebuild pode gerar APK menor que o original e falhar em runtime.\033[0m\n"
-        _APK_DEX_ENCRYPTED=1
-      fi
-
-      # ── detecção de android:isSplitRequired ────────────────────────────
-      # Atributo introduzido na API 29, não suportado pelo aapt do apktool
-      # na recompilação — gera "No resource identifier found for attribute
-      # isSplitRequired". Fix: remover do AndroidManifest após o decode.
-      if unzip -p "\$_APK" AndroidManifest.xml 2>/dev/null | strings | grep -q 'isSplitRequired'; then
-        printf "\033[0;90m[*] AndroidManifest.xml contém isSplitRequired — será removido no decode pra compatibilidade com apktool.\033[0m\n"
-        _APK_HAS_SPLIT_REQ=1
-      fi
-    fi
-    if [ "\$_APK_SZ" -gt 314572800 ] 2>/dev/null; then
-      printf "\033[0;90m[*] APK grande (~%d MB, típico de jogo) — heap ajustado automaticamente\033[0m\n" "\$((_APK_SZ/1048576))"
-    fi
-    printf "\n"
-
-    _APK_OUT="\$_APK_WORK/decoded"
-    _APK_REBUILT="\$_APK_WORK/rebuilt.apk"
-
-    # ── spinner com tempo decorrido ───────────────────────────────────────
-    # Roda em background enquanto o apktool trabalha. Mostra um spinner
-    # animado + tempo decorrido em segundos na mesma linha (sobrescreve
-    # com \r). Mata o processo ao receber SIGUSR1.
-    _apk_spinner() {
-      local label="\$1" pid="\$2"
-      local frames='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-      local i=0 t=0
-      while kill -0 "\$pid" 2>/dev/null; do
-        i=\$(( (i+1) % 10 ))
-        f="\$(printf '%s' "\$frames" | cut -c\$((i+1)))"
-        printf "\r\033[0;90m    %s %s  %ds\033[0m" "\$f" "\$label" "\$t"
-        sleep 1
-        t=\$((t+1))
-      done
-      printf "\r\033[2K"  # limpa a linha do spinner
-    }
-
-    printf "\033[1;36m[*]\033[0m Testando: %s\n" "\$_APK"
-    printf "\033[0;90m    -> apktool d ...\033[0m\n"
-    _APK_LASTLOG="\$_APK_WORK/decode.log"
-    _APK_T0="\$(date +%s 2>/dev/null || echo 0)"
-    apktool d -f -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1 &
-    _APK_PID=\$!
-    _apk_spinner "decompilando..." "\$_APK_PID"
-    wait "\$_APK_PID"; _APK_D_RC=\$?
-    _APK_T1="\$(date +%s 2>/dev/null || echo 0)"
-    _APK_DECODE_TIME=\$((_APK_T1 - _APK_T0))
-    if [ "\$_APK_D_RC" = "0" ]; then
-      _APK_DECODE_OK=1
-
-      # ── fix pós-decode 1: remove isSplitRequired do manifest ─────────
-      if [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && [ -f "\$_APK_OUT/AndroidManifest.xml" ]; then
-        sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT/AndroidManifest.xml" 2>/dev/null
-        printf "\033[0;90m    [fix] android:isSplitRequired removido do AndroidManifest.xml\033[0m\n"
-      fi
-
-      # ── fix pós-decode 2: restaura unknown/ no APK final ─────────────
-      # O apktool move pra unknown/ qualquer arquivo que não sabe categorizar
-      # (assets de engine, bibliotecas nativas extras, arquivos próprios do
-      # protector, etc.). No rebuild ele não inclui esses arquivos de volta,
-      # o que faz o app crashar em runtime por recurso faltando. Fix:
-      # injetar o conteúdo de unknown/ de volta no APK final via zip após
-      # o build. A variável _APK_HAS_UNKNOWN é setada aqui e usada lá.
-      _APK_HAS_UNKNOWN=0
-      if [ -d "\$_APK_OUT/unknown" ] && [ -n "\$(ls -A "\$_APK_OUT/unknown" 2>/dev/null)" ]; then
-        _APK_HAS_UNKNOWN=1
-        printf "\033[0;90m    [info] pasta unknown/ encontrada — será reinserida no APK final\033[0m\n"
-      fi
-
-    elif grep -q 'OutOfMemoryError' "\$_APK_LASTLOG"; then
-      printf "\033[1;33m[!] decode ficou sem memória — tentando de novo (heap maior, menos threads)...\033[0m\n"
-      _APK_LASTLOG="\$_APK_WORK/decode_retry.log"
-      _APK_T0="\$(date +%s 2>/dev/null || echo 0)"
-      _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool d -f -j 2 -o "\$_APK_OUT" "\$_APK" > "\$_APK_LASTLOG" 2>&1 &
-      _APK_PID=\$!; _apk_spinner "decompilando (heap maior)..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_D_RC=\$?
-      _APK_T1="\$(date +%s 2>/dev/null || echo 0)"; _APK_DECODE_TIME=\$((_APK_T1-_APK_T0))
-      if [ "\$_APK_D_RC" = "0" ]; then
-        _APK_DECODE_OK=1
-        _APK_TIER="heap ajustado"
-      fi
-    fi
-
-    if [ "\$_APK_DECODE_OK" = "1" ]; then
-      printf "\033[1;32m[✓] decode OK\033[0m \033[0;90m(%ds)\033[0m\n" "\${_APK_DECODE_TIME:-0}"
-      _APK_PASS=\$((_APK_PASS+1))
-
-      # ── métricas do APK decodificado ──────────────────────────────────
-      # Mostra exatamente com o que estamos lidando antes do build:
-      # quantidade de DEX, smali, arquivos de recurso, tamanho total.
-      # Informação essencial pra diagnosticar erros e entender APKs complexos.
-      printf "\n\033[1;36m  ┌─ Métricas do APK ─────────────────────────────────────────┐\033[0m\n"
-
-      # DEX files (multidex)
-      _M_DEX=\$(unzip -l "\$_APK" 2>/dev/null | grep -cE 'classes[0-9]*\.dex' || echo 0)
-      printf "  \033[1;36m│\033[0m  DEX files     : \033[1;33m%d\033[0m" "\$_M_DEX"
-      if [ "\$_M_DEX" -gt 1 ]; then printf " \033[0;90m(multidex)\033[0m"; fi
-      printf "\n"
-
-      # smali files (classes decompiladas)
-      _M_SMALI=\$(find "\$_APK_OUT" -name '*.smali' 2>/dev/null | wc -l)
-      printf "  \033[1;36m│\033[0m  Smali files   : \033[1;33m%d\033[0m\n" "\$_M_SMALI"
-
-      # arquivos de recurso
-      _M_RES=\$(find "\$_APK_OUT/res" -type f 2>/dev/null | wc -l)
-      printf "  \033[1;36m│\033[0m  Recursos (res/): \033[1;33m%d\033[0m\n" "\$_M_RES"
-
-      # arquivos em unknown/
-      _M_UNK=\$(find "\$_APK_OUT/unknown" -type f 2>/dev/null | wc -l)
-      if [ "\$_M_UNK" -gt 0 ]; then
-        printf "  \033[1;36m│\033[0m  Unknown/      : \033[1;33m%d\033[0m \033[0;90m(serão reinseridos no APK final)\033[0m\n" "\$_M_UNK"
-      fi
-
-      # assets
-      _M_ASSETS=\$(find "\$_APK_OUT/assets" -type f 2>/dev/null | wc -l)
-      if [ "\$_M_ASSETS" -gt 0 ]; then
-        printf "  \033[1;36m│\033[0m  Assets        : \033[1;33m%d\033[0m\n" "\$_M_ASSETS"
-      fi
-
-      # bibliotecas nativas
-      _M_SO=\$(find "\$_APK_OUT/lib" -name '*.so' 2>/dev/null | wc -l)
-      if [ "\$_M_SO" -gt 0 ]; then
-        _M_ABI=\$(find "\$_APK_OUT/lib" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | xargs -I{} basename {} 2>/dev/null | tr '\n' ' ')
-        printf "  \033[1;36m│\033[0m  Libs nativas  : \033[1;33m%d .so\033[0m \033[0;90m(ABIs: %s)\033[0m\n" "\$_M_SO" "\$_M_ABI"
-      fi
-
-      # tamanho original vs tamanho decodificado
-      _M_SZ_APK=\$(stat -c%s "\$_APK" 2>/dev/null || echo 0)
-      _M_SZ_DEC=\$(du -sb "\$_APK_OUT" 2>/dev/null | awk '{print \$1}' || echo 0)
-      printf "  \033[1;36m│\033[0m  Tamanho APK   : \033[1;33m%d MB\033[0m  →  decodificado: \033[1;33m%d MB\033[0m\n" \
-        "\$((_M_SZ_APK/1048576))" "\$((_M_SZ_DEC/1048576))"
-
-      # nível de API alvo (do apktool.yml)
-      _M_API=\$(grep 'targetSdkVersion\|minSdkVersion' "\$_APK_OUT/apktool.yml" 2>/dev/null | tr '\n' '  ' | sed "s/'//g")
-      [ -n "\$_M_API" ] && printf "  \033[1;36m│\033[0m  SDK           : \033[0;90m%s\033[0m\n" "\$_M_API"
-
-      # proteção detectada
-      if [ "\$_APK_DEX_ENCRYPTED" = "1" ]; then
-        printf "  \033[1;36m│\033[0m  \033[1;33m⚠ DEX suspeito\033[0m — possível stub/loader (protector ou packer)\n"
-      fi
-      if [ "\$_APK_HAS_SPLIT_REQ" = "1" ]; then
-        printf "  \033[1;36m│\033[0m  \033[0;90mℹ isSplitRequired detectado — removido do manifest\033[0m\n"
-      fi
-
-      printf "  \033[1;36m└────────────────────────────────────────────────────────────┘\033[0m\n\n"
-
-      printf "\033[0;90m    -> apktool b ...\033[0m\n"
-      _APK_LASTLOG="\$_APK_WORK/build.log"
-      _APK_B0="\$(date +%s 2>/dev/null || echo 0)"
-      apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1 &
-      _APK_PID=\$!; _apk_spinner "compilando..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_B_RC=\$?
-      _APK_B1="\$(date +%s 2>/dev/null || echo 0)"; _APK_BUILD_TIME=\$((_APK_B1-_APK_B0))
-      if [ "\$_APK_B_RC" = "0" ]; then
-        _APK_BUILD_OK=1
-      elif grep -q 'OutOfMemoryError' "\$_APK_LASTLOG"; then
-        printf "\033[1;33m[!] build ficou sem memória — tentando de novo (heap maior, menos threads)...\033[0m\n"
-        _APK_LASTLOG="\$_APK_WORK/build_retry_heap.log"
-        _APK_B0="\$(date +%s 2>/dev/null || echo 0)"
-        _JAVA_OPTIONS="-Xmx\${_APK_RETRY_XMX}m" apktool b -j 2 "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1 &
-        _APK_PID=\$!; _apk_spinner "compilando (heap maior)..." "\$_APK_PID"; wait "\$_APK_PID"; _APK_B_RC=\$?
-        _APK_B1="\$(date +%s 2>/dev/null || echo 0)"; _APK_BUILD_TIME=\$((_APK_B1-_APK_B0))
-        if [ "\$_APK_B_RC" = "0" ]; then
-          _APK_BUILD_OK=1
-          _APK_TIER="heap ajustado"
-        fi
-      elif grep -qE 'No resource identifier found for attribute|error: failed processing manifest' "\$_APK_LASTLOG"; then
-        printf "\033[1;33m[!] possível framework desatualizado (atributo não reconhecido) — renovando cache...\033[0m\n"
-        apktool empty-framework-dir --force >/dev/null 2>&1
-        _APK_LASTLOG="\$_APK_WORK/build_retry_frame.log"
-        if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" > "\$_APK_LASTLOG" 2>&1; then
-          _APK_BUILD_OK=1
-          _APK_TIER="framework renovado"
-        fi
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
-      # ── fallback 0d: --api-level explícito ───────────────────────────
-      # "No resource identifier found for attribute X in package android"
-      # ocorre quando o framework instalado não tem o atributo que o APK
-      # usa (API mais alta que o framework do apktool). Fix: forçar um
-      # api-level alto (35 = Android 15) no decode pra o apktool não
-      # tentar resolver atributos desconhecidos contra o framework local.
-      if grep -q 'No resource identifier found for attribute' "\$_APK_LASTLOG" 2>/dev/null \
-      || grep -q 'No resource identifier found for attribute' "\$_APK_WORK/build_retry"*.log 2>/dev/null; then
-        printf "\033[1;33m[!] atributo desconhecido — tentando com --api-level 35 (Android 15)...\033[0m\n"
-        _APK_OUT_API="\$_APK_WORK/decoded_api35"
-        _APK_LASTLOG="\$_APK_WORK/build_retry_api35.log"
-        if apktool d -f --api-level 35 -o "\$_APK_OUT_API" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
-          [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && \
-            sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT_API/AndroidManifest.xml" 2>/dev/null
-          if apktool b "\$_APK_OUT_API" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
-            _APK_BUILD_OK=1
-            _APK_DECODE_OK=1
-            _APK_TIER="--api-level 35"
-            _APK_OUT="\$_APK_OUT_API"
-          fi
-        fi
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DEX_ENCRYPTED" = "1" ]; then
-      # ── fallback 0e: --no-src para APKs com DEX suspeito ─────────────
-      # APKs com DEX stub/loader: o baksmali falha ou gera smali inútil.
-      # --no-src pula o disassembly do DEX completamente — os arquivos
-      # .dex originais são copiados intactos. O rebuild fecha e o APK
-      # funciona em runtime porque o DEX nunca foi tocado.
-      printf "\033[1;33m[!] DEX suspeito — tentando round-trip com --no-src (DEX preservado intacto)...\033[0m\n"
-      _APK_OUT_NOSRC="\$_APK_WORK/decoded_nosrc"
-      _APK_LASTLOG="\$_APK_WORK/build_retry_nosrc.log"
-      if apktool d -f --no-src -o "\$_APK_OUT_NOSRC" "\$_APK" > "\$_APK_LASTLOG" 2>&1; then
-        [ "\$_APK_HAS_SPLIT_REQ" = "1" ] && \
-          sed -i 's/ android:isSplitRequired="[^"]*"//g' "\$_APK_OUT_NOSRC/AndroidManifest.xml" 2>/dev/null
-        if apktool b "\$_APK_OUT_NOSRC" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
-          _APK_BUILD_OK=1
-          _APK_DECODE_OK=1
-          _APK_TIER="--no-src (DEX preservado intacto)"
-          _APK_OUT="\$_APK_OUT_NOSRC"
-        fi
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
-      # ── fallback 0a: sanitização de nomes com '$' ─────────────────────────
-      # O aapt2 rejeita qualquer entrada de recurso cujo nome contenha '$'
-      # (ex: '$avd_hide_password__0', gerado pelo Android Studio pra animações
-      # vetoriais). O erro aparece como "has invalid entry name" em public.xml
-      # e derruba a compilação inteira. Fix: renomeia os arquivos ($ → xd_) e
-      # corrige todas as referências dentro de public.xml e dos XMLs do projeto.
-      # Roda antes da quarentena de conteúdo: é cirúrgico (só toca o nome),
-      # não descarta o recurso, e não precisa do aapt2 pra diagnosticar.
-      _apk_sanitize_dollar_names() {
-        local proj="\$1"
-        [ -d "\$proj/res" ] || return 1
-        local _fixed=0 f newf base newbase dir rel refs
-
-        # lista todos os arquivos (qualquer tipo) com '$' no nome
-        find "\$proj/res" -name '*\$*' -type f 2>/dev/null > "\$_APK_WORK/dollar_files"
-        [ -s "\$_APK_WORK/dollar_files" ] || return 1
-
-        while IFS= read -r f; do
-          [ -n "\$f" ] || continue
-          dir="\$(dirname "\$f")"
-          base="\$(basename "\$f")"
-          # substitui todos os '$' por 'xd_' no nome do arquivo
-          newbase="\$(printf '%s' "\$base" | tr '\$' '_' | sed 's/^_/xd_/')"
-          newf="\$dir/\$newbase"
-          [ "\$f" = "\$newf" ] && continue
-          mv -f "\$f" "\$newf" 2>/dev/null || continue
-
-          # nome sem extensão pra corrigir referências em XML
-          rel="\${base%.*}"
-          refs="\${newbase%.*}"
-
-          # corrige public.xml — referencia por nome sem extensão
-          find "\$proj/res" -name 'public.xml' -type f 2>/dev/null | while IFS= read -r px; do
-            sed -i "s/name=\"\$rel\"/name=\"\$refs\"/g" "\$px" 2>/dev/null
-          done
-
-          # corrige referências em todos os XMLs do projeto (valores, layouts, etc.)
-          find "\$proj/res" -name '*.xml' -type f 2>/dev/null | while IFS= read -r rx; do
-            sed -i "s/@drawable\/\$rel/@drawable\/\$refs/g" "\$rx" 2>/dev/null
-            sed -i "s/@anim\/\$rel/@anim\/\$refs/g" "\$rx" 2>/dev/null
-            sed -i "s/@animator\/\$rel/@animator\/\$refs/g" "\$rx" 2>/dev/null
-          done
-
-          printf "  [XPM] nome sanitizado: %s → %s\n" "\$base" "\$newbase"
-          _fixed=\$((_fixed+1))
-        done < "\$_APK_WORK/dollar_files"
-
-        rm -f "\$_APK_WORK/dollar_files"
-        [ "\$_fixed" -gt 0 ]
-      }
-
-      printf "\033[1;33m[!] build não fechou — verificando nomes de recursos com '\$' (aapt2 rejeita)...\033[0m\n"
-      _APK_LASTLOG="\$_APK_WORK/build_retry_dollar.log"
-      if _apk_sanitize_dollar_names "\$_APK_OUT" > "\$_APK_LASTLOG" 2>&1; then
-        printf "\033[0;90m    recursos com '\$' renomeados — tentando rebuild...\033[0m\n"
-        if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
-          _APK_BUILD_OK=1
-          _APK_TIER="nomes com '\$' sanitizados"
-        fi
-      else
-        printf "\033[0;90m    nenhum arquivo com '\$' encontrado — causa diferente.\033[0m\n"
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
-      # ── fallback 0b: --keep-broken-res ───────────────────────────────────
-      # Alguns APKs antigos têm entradas em resources.arsc que o apktool
-      # decodifica com warning mas não consegue recompilar no modo padrão.
-      # --keep-broken-res instrui o apktool a preservar essas entradas como
-      # blobs binários em vez de tentar recompilá-las, o que fecha o build
-      # na maioria dos casos sem precisar sacrificar todos os recursos.
-      printf "\033[1;33m[!] build não fechou — tentando com --keep-broken-res (APKs com recursos malformados)...\033[0m\n"
-      _APK_OUT_KBR="\$_APK_WORK/decoded_kbr"
-      _APK_LASTLOG="\$_APK_WORK/build_retry_kbr.log"
-      if apktool d -f --keep-broken-res -o "\$_APK_OUT_KBR" "\$_APK" > "\$_APK_LASTLOG" 2>&1 && \
-         apktool b "\$_APK_OUT_KBR" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
-        _APK_BUILD_OK=1
-        _APK_DECODE_OK=1
-        _APK_TIER="--keep-broken-res"
-        _APK_OUT="\$_APK_OUT_KBR"
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ] && [ "\$_APK_DECODE_OK" = "1" ]; then
-      # ── fallback 0c: pré-voo de compilação por-recurso (função definida
-      # lá em cima) ─────────────────────────────────────────────────────
-      # Roda ANTES do --no-res de propósito: é bem menos destrutivo, já
-      # que só troca o(s) recurso(s) que realmente quebram o aapt2 — o
-      # resto do projeto (a imensa maioria, em qualquer app real) continua
-      # decodificado e editável normalmente, ao contrário do --no-res que
-      # sacrifica TODOS os recursos de uma vez só. Reaproveita o mesmo
-      # diretório já decodificado (\$_APK_OUT), sem precisar decodificar
-      # de novo.
-      printf "\033[1;33m[!] build não fechou — isolando recurso(s) .xml que o aapt2 rejeita individualmente...\033[0m\n"
-      _APK_LASTLOG="\$_APK_WORK/build_retry_preflight.log"
-      if _apk_preflight_quarantine "\$_APK_OUT" "\$_APK_AAPT2" > "\$_APK_LASTLOG" 2>&1; then
-        if apktool b "\$_APK_OUT" -o "\$_APK_REBUILT" >> "\$_APK_LASTLOG" 2>&1; then
-          _APK_BUILD_OK=1
-          _APK_TIER="recurso(s) isolado(s) individualmente"
-        fi
-      else
-        printf "\033[0;90m    nenhum .xml falhou sozinho no aapt2 — a causa está em outro lugar (resources.arsc binário, recurso não-xml, etc.)\033[0m\n"
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" != "1" ]; then
-      # ── fallback 1: --no-res ─────────────────────────────────────────────
-      # Recomendação oficial do próprio projeto apktool pra essa classe de
-      # falha: preserva o resources.arsc sem decode/recompilação. Cobre de
-      # tabalho qualquer nome/atributo "estranho" que os fixes específicos
-      # acima não previam. Custo: layouts/values deixam de ser editáveis
-      # como texto — mas smali e AndroidManifest continuam 100% decodificados
-      # (o que basta pro que o pentest/msfvenom precisa fazer).
-      printf "\033[1;33m[!] modo normal não fechou — tentando round-trip em --no-res (recursos preservados)...\033[0m\n"
-      _APK_OUT_ALT="\$_APK_WORK/decoded_nores"
-      _APK_REBUILT_ALT="\$_APK_WORK/rebuilt_nores.apk"
-      _APK_LASTLOG="\$_APK_WORK/nores.log"
-      if apktool d -f --no-res -o "\$_APK_OUT_ALT" "\$_APK" > "\$_APK_LASTLOG" 2>&1 && \
-         apktool b "\$_APK_OUT_ALT" -o "\$_APK_REBUILT_ALT" >> "\$_APK_LASTLOG" 2>&1; then
-        _APK_BUILD_OK=1
-        _APK_DECODE_OK=1
-        _APK_TIER="--no-res (recursos não decodificados)"
-        _APK_REBUILT="\$_APK_REBUILT_ALT"
-      elif [ -f "\$_APK_APKTOOL3" ]; then
-        # ── fallback 2: motor apktool 3.x (só existe se o download opcional
-        # deu certo na instalação) — cache de framework isolado do motor
-        # principal, pra nunca contaminar o que o msfvenom usa. ─────────────
-        printf "\033[1;33m[!] --no-res também não fechou — tentando com o motor apktool 3.x...\033[0m\n"
-        _APK_FRAME3="\$_APK_TOOLDIR/framework3"
-        mkdir -p "\$_APK_FRAME3" 2>/dev/null
-        _APK_OUT3="\$_APK_WORK/decoded_v3"
-        _APK_REBUILT3="\$_APK_WORK/rebuilt_v3.apk"
-        _APK_LASTLOG="\$_APK_WORK/v3.log"
-        if java -jar "\$_APK_APKTOOL3" d -f -p "\$_APK_FRAME3" -o "\$_APK_OUT3" "\$_APK" > "\$_APK_LASTLOG" 2>&1 && \
-           java -jar "\$_APK_APKTOOL3" b "\$_APK_OUT3" -p "\$_APK_FRAME3" --aapt "\$_APK_AAPT2" -o "\$_APK_REBUILT3" >> "\$_APK_LASTLOG" 2>&1; then
-          _APK_BUILD_OK=1
-          _APK_DECODE_OK=1
-          _APK_TIER="motor apktool 3.x"
-          _APK_REBUILT="\$_APK_REBUILT3"
-        fi
-      fi
-    fi
-
-    if [ "\$_APK_BUILD_OK" = "1" ]; then
-      # ── pós-build 1: reinsere unknown/ no APK final ───────────────────
-      # O apktool não inclui o conteúdo de unknown/ no rebuild. Sem isso,
-      # apps que dependem desses arquivos (engines, protectors, assets
-      # customizados) crasham em runtime mesmo com build e install OK.
-      if [ "\$_APK_HAS_UNKNOWN" = "1" ] && [ -d "\$_APK_OUT/unknown" ]; then
-        printf "\033[0;90m    -> reinserindo unknown/ no APK final...\033[0m\n"
-        _APK_REBUILT_UNK="\$_APK_WORK/rebuilt_with_unknown.apk"
-        cp "\$_APK_REBUILT" "\$_APK_REBUILT_UNK" 2>/dev/null
-        ( cd "\$_APK_OUT/unknown" && find . -type f 2>/dev/null | while IFS= read -r uf; do
-            rel="\${uf#./}"
-            zip -u "\$_APK_REBUILT_UNK" "\$rel" >/dev/null 2>&1
-          done )
-        if [ -f "\$_APK_REBUILT_UNK" ]; then
-          _APK_REBUILT="\$_APK_REBUILT_UNK"
-          printf "\033[0;90m    [fix] unknown/ reinserida no APK\033[0m\n"
-        fi
-      fi
-
-      # ── pós-build 2: garante resources.arsc sem compressão ───────────
-      # Android 11+ (API 30+) recusa APKs onde resources.arsc está
-      # comprimido: "Targeting R+ requires resources.arsc to be stored
-      # uncompressed" (erro -124). O apktool às vezes comprime sem aviso.
-      # Fix: verificar e forçar sem compressão via zip -0.
-      if command -v unzip >/dev/null 2>&1 && command -v zip >/dev/null 2>&1; then
-        _ARSC_METHOD=\$(unzip -v "\$_APK_REBUILT" 2>/dev/null | awk '/resources\.arsc/{print \$5}')
-        if [ "\$_ARSC_METHOD" != "Stored" ] && [ -n "\$_ARSC_METHOD" ]; then
-          printf "\033[0;90m    -> resources.arsc comprimido (method=\$_ARSC_METHOD) — forçando sem compressão (fix Android 11+)...\033[0m\n"
-          _APK_REBUILT_ARSC="\$_APK_WORK/rebuilt_arsc_fix.apk"
-          _ARSC_TMP="\$_APK_WORK/arsc_tmp"
-          mkdir -p "\$_ARSC_TMP"
-          unzip -p "\$_APK_REBUILT" resources.arsc > "\$_ARSC_TMP/resources.arsc" 2>/dev/null
-          cp "\$_APK_REBUILT" "\$_APK_REBUILT_ARSC"
-          ( cd "\$_ARSC_TMP" && zip -0 "\$_APK_REBUILT_ARSC" resources.arsc >/dev/null 2>&1 )
-          if [ -f "\$_APK_REBUILT_ARSC" ]; then
-            _APK_REBUILT="\$_APK_REBUILT_ARSC"
-            printf "\033[0;90m    [fix] resources.arsc agora sem compressão\033[0m\n"
-          fi
-          rm -rf "\$_ARSC_TMP"
-        fi
-      fi
-
-      printf "\033[1;32m[✓] build OK -> %s\033[0m \033[0;90m(%ds)\033[0m\n" "\$_APK_REBUILT" "\${_APK_BUILD_TIME:-0}"
-      _APK_PASS=\$((_APK_PASS+1))
-      if grep -q '\[XPM\] recurso corrompido' "\$_APK_LASTLOG" 2>/dev/null; then
-        printf "\033[1;33m[!] com recursos em quarentena (conteúdo original substituído):\033[0m\n"
-        grep '\[XPM\]' "\$_APK_LASTLOG"
-      fi
-
-      # ══════════════════════════════════════════════════════════════════
-      # VALIDAÇÃO DE INSTALABILIDADE — "build OK" só prova que o round-trip
-      # decode/recompilação fechou. O apktool documenta oficialmente que
-      # SEMPRE gera APK sem assinatura e sem zipalign (FAQ oficial do
-      # projeto: "Apktool builds unsigned APKs"). Sem os passos abaixo,
-      # esse PASS é falso-positivo em pelo menos dois casos reais e
-      # documentados:
-      #   1) a partir do Android 11 (API 30), o PackageManager exige
-      #      resources.arsc SEM compressão e alinhado em 4 bytes, senão
-      #      recusa o install com "Failed parse ... requires resources.arsc
-      #      ... stored uncompressed and aligned" (erro -124) — o apktool
-      #      nunca garante isso sozinho.
-      #   2) se o app tem extractNativeLibs="false" (comum em apps
-      #      modernos), os .so precisam estar sem compressão E alinhados
-      #      em página, senão o install falha com "Failed to extract
-      #      native libraries, res=-2" — é sabido que o round-trip do
-      #      apktool não preserva esse alinhamento.
-      # zipalign roda SEMPRE antes de assinar: o APK Signature Scheme v2/v3
-      # cobre o arquivo inteiro (incluindo o alinhamento) na assinatura;
-      # alinhar depois de assinar invalida a assinatura.
-      # ══════════════════════════════════════════════════════════════════
-      _APK_ALIGNED="\$_APK_WORK/aligned.apk"
-      _APK_SIGNED="\$_APK_WORK/signed.apk"
-      _APK_ZIPALIGN_OK=0
-      _APK_SIGN_OK=0
-
-      if command -v zipalign >/dev/null 2>&1; then
-        printf "\033[0;90m    -> zipalign (4 bytes + página de 16K pros .so) ...\033[0m\n"
-        if zipalign -P 16 -f 4 "\$_APK_REBUILT" "\$_APK_ALIGNED" >"\$_APK_WORK/zipalign.log" 2>&1; then
-          _APK_ZIPALIGN_OK=1
-        elif zipalign -f 4 "\$_APK_REBUILT" "\$_APK_ALIGNED" >"\$_APK_WORK/zipalign.log" 2>&1; then
-          # zipalign antigo demais pra reconhecer "-P" (alinhamento de
-          # página de 16K pros .so, flag mais recente) — segue só com o
-          # alinhamento genérico de 4 bytes, que é o que garante instalar.
-          # Sem "-P", apps com biblioteca nativa podem não rodar
-          # especificamente em aparelhos com página de 16K — não afeta
-          # a instalação em si.
-          _APK_ZIPALIGN_OK=1
-          printf "\033[0;90m    (zipalign sem suporte a -P 16 — só o alinhamento de 4 bytes; 'pkg upgrade zipalign' pra cobertura de página de 16K)\033[0m\n"
-        fi
-        if [ "\$_APK_ZIPALIGN_OK" = "1" ]; then
-          _APK_PASS=\$((_APK_PASS+1))
-          printf "\033[1;32m[✓] zipalign OK\033[0m\n"
-        else
-          _APK_FAIL=\$((_APK_FAIL+1))
-          printf "\033[1;31m[✗] zipalign falhou (log: %s)\033[0m\n" "\$_APK_WORK/zipalign.log"
-          tail -10 "\$_APK_WORK/zipalign.log"
-        fi
-      else
-        printf "\033[1;33m[!] zipalign não instalado — pulando validação de instalabilidade (rode 'xpm install apktool' de novo pra atualizar)\033[0m\n"
-      fi
-
-      if [ "\$_APK_ZIPALIGN_OK" = "1" ] && command -v apksigner >/dev/null 2>&1 && command -v keytool >/dev/null 2>&1; then
-        _APK_KS="\$_APK_TOOLDIR/xpm-compat-test.keystore"
-        if [ ! -f "\$_APK_KS" ]; then
-          # chave de TESTE, só pra esse check de compatibilidade fechar o
-          # ciclo assinar->verificar. Nunca serve pra publicar/distribuir
-          # nada — por isso senha fixa e conhecida, a mesma lógica do
-          # debug.keystore padrão do próprio Android (que também usa uma
-          # senha fixa e documentada, "android").
-          keytool -genkeypair -storepass xpm-compat-test -keypass xpm-compat-test \
-            -alias xpm-compat-test -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" -deststoretype pkcs12 \
-            -keystore "\$_APK_KS" >/dev/null 2>&1
-        fi
-        if [ -f "\$_APK_KS" ]; then
-          printf "\033[0;90m    -> apksigner sign (chave de teste do xpm) ...\033[0m\n"
-          if apksigner sign --ks "\$_APK_KS" --ks-pass pass:xpm-compat-test --key-pass pass:xpm-compat-test \
-             --out "\$_APK_SIGNED" "\$_APK_ALIGNED" >"\$_APK_WORK/sign.log" 2>&1; then
-            _APK_SIGN_OK=1
-            _APK_PASS=\$((_APK_PASS+1))
-            printf "\033[1;32m[✓] assinado\033[0m\n"
-          else
-            _APK_FAIL=\$((_APK_FAIL+1))
-            printf "\033[1;31m[✗] apksigner falhou (log: %s)\033[0m\n" "\$_APK_WORK/sign.log"
-            tail -10 "\$_APK_WORK/sign.log"
-          fi
-        else
-          printf "\033[1;33m[!] não consegui gerar/achar o keystore de teste — pulando assinatura\033[0m\n"
-        fi
-      fi
-
-      if [ "\$_APK_SIGN_OK" = "1" ]; then
-        _APK_STRUCT_OK=1
-        if ! zipalign -c -v 4 "\$_APK_SIGNED" >"\$_APK_WORK/verify_align.log" 2>&1; then
-          _APK_STRUCT_OK=0
-          printf "\033[1;31m[✗] alinhamento não confere depois de assinar\033[0m\n"
-        fi
-        if ! apksigner verify "\$_APK_SIGNED" >"\$_APK_WORK/verify_sign.log" 2>&1; then
-          _APK_STRUCT_OK=0
-          printf "\033[1;31m[✗] apksigner verify reprovou o pacote final\033[0m\n"
-          tail -10 "\$_APK_WORK/verify_sign.log"
-        fi
-        if [ -x "\$_APK_AAPT2" ] && ! "\$_APK_AAPT2" dump badging "\$_APK_SIGNED" >"\$_APK_WORK/badging.log" 2>&1; then
-          _APK_STRUCT_OK=0
-          printf "\033[1;31m[✗] aapt2 dump badging não conseguiu ler o pacote final (o PackageManager real provavelmente também não vai conseguir)\033[0m\n"
-        fi
-
-        if [ "\$_APK_STRUCT_OK" = "1" ]; then
-          _APK_PASS=\$((_APK_PASS+1))
-          _APK_INSTALLABLE=1
-          printf "\033[1;32m[✓] verificação estrutural OK (alinhamento + assinatura + manifest parseável)\033[0m\n"
-
-          # ── entrega o APK instalável ao lado do original ──────────────
-          _APK_DELIVER_DIR="\$(dirname "\$_APK")"
-          _APK_DELIVER_BASE="\$(basename "\$_APK" .apk)"
-          _APK_DELIVER="\$_APK_DELIVER_DIR/\${_APK_DELIVER_BASE}-signed.apk"
-          if cp -f "\$_APK_SIGNED" "\$_APK_DELIVER" 2>/dev/null; then
-            printf "\033[1;32m[✓] APK instalável salvo em: %s\033[0m\n" "\$_APK_DELIVER"
-          else
-            printf "\033[1;33m[!] não consegui copiar o APK assinado pra %s — ele ainda está em: %s\033[0m\n" "\$_APK_DELIVER" "\$_APK_SIGNED" >&2
-          fi
-
-          # ── teste de instalação real, OPCIONAL — só roda se o rish já
-          # estiver pareado nesse aparelho (nunca dispara o fluxo de
-          # pareamento do Shizuku a partir daqui, só checa se já existe).
-          if [ -f "\$HOME/.local/rish/rish" ]; then
-            _APK_PKGNAME="\$("\$_APK_AAPT2" dump badging "\$_APK_SIGNED" 2>/dev/null | grep "^package:" | sed -E "s/.*name='([^']+)'.*/\1/")"
-            if [ -n "\$_APK_PKGNAME" ]; then
-              if bash "\$HOME/.local/rish/rish" -c "pm list packages \$_APK_PKGNAME" 2>/dev/null | grep -q "^package:\$_APK_PKGNAME\$"; then
-                # já instalado — NÃO dá pra rodar "pm install -r" direto sem
-                # risco de mexer no app de verdade do usuário. Antes isso só
-                # pulava com um aviso e o veredito final continuava "SIM
-                # instalável" (falso-positivo): se as assinaturas forem
-                # diferentes, o Android SEMPRE vai recusar instalar por cima
-                # da versão existente, e isso não tem nada a ver com o
-                # apktool/xpm ter feito um rebuild ruim. Agora comparamos as
-                # assinaturas de verdade, 100% somente-leitura: puxa uma
-                # cópia do apk já instalado via rish (o shell do Android tem
-                # permissão de leitura em /data/app/.../base.apk — é assim
-                # que "adb pull" de apk instalado funciona) e compara o
-                # certificado com o nosso, sem tocar em nada do usuário.
-                _APK_INSTALLED_PATH="\$(bash "\$HOME/.local/rish/rish" -c "pm path \$_APK_PKGNAME" 2>/dev/null | head -1 | sed 's/^package://')"
-                _APK_INSTALLED_COPY="\$_APK_WORK/installed_orig.apk"
-                if [ -n "\$_APK_INSTALLED_PATH" ] && bash "\$HOME/.local/rish/rish" -c "cat '\$_APK_INSTALLED_PATH'" > "\$_APK_INSTALLED_COPY" 2>/dev/null && [ -s "\$_APK_INSTALLED_COPY" ]; then
-                  _APK_CERT_INSTALLED="\$(apksigner verify --print-certs "\$_APK_INSTALLED_COPY" 2>/dev/null | grep -i 'SHA-256 digest')"
-                  _APK_CERT_OURS="\$(apksigner verify --print-certs "\$_APK_SIGNED" 2>/dev/null | grep -i 'SHA-256 digest')"
-                  if [ -n "\$_APK_CERT_INSTALLED" ] && [ "\$_APK_CERT_INSTALLED" = "\$_APK_CERT_OURS" ]; then
-                    # mesma assinatura (ex: reteste de uma build já instalada
-                    # com a chave de teste do xpm) — seguro testar update real.
-                    printf "\033[0;90m    -> pm install de teste via rish (mesma assinatura do já instalado) ...\033[0m\n"
-                    _APK_INSTALL_OUT="\$(bash "\$HOME/.local/rish/rish" -c "pm install -t -r '\$_APK_SIGNED'" 2>&1)"
-                    if printf '%s' "\$_APK_INSTALL_OUT" | grep -q "^Success"; then
-                      _APK_PASS=\$((_APK_PASS+1))
-                      _APK_REAL_CONFIRMED=1
-                      printf "\033[1;32m[✓] instalação real confirmada — desinstalando o teste...\033[0m\n"
-                      bash "\$HOME/.local/rish/rish" -c "pm uninstall \$_APK_PKGNAME" >/dev/null 2>&1
-                      _APK_TIER="\$_APK_TIER + instalação real confirmada"
-                    else
-                      _APK_FAIL=\$((_APK_FAIL+1))
-                      _APK_INSTALLABLE=0
-                      printf "\033[1;31m[✗] pm install recusou o pacote:\033[0m\n"
-                      printf '%s\n' "\$_APK_INSTALL_OUT" | tail -5
-                    fi
-                  else
-                    # assinaturas diferentes de fato — o Android VAI recusar
-                    # instalar essa build por cima da existente por conflito
-                    # de certificado. Isso é esperado (você não tem a chave
-                    # privada original) e NÃO é bug do apktool/xpm.
-                    _APK_SIG_CONFLICT=1
-                    printf "\033[1;33m[!] %s já está instalado com uma assinatura DIFERENTE da nossa chave de teste\033[0m\n" "\$_APK_PKGNAME"
-                    printf "\033[0;90m    -> o Android vai recusar essa build por cima da existente (conflito de\033[0m\n"
-                    printf "\033[0;90m       certificado) — isso NÃO é uma falha de compatibilidade do apktool/xpm.\033[0m\n"
-                    printf "\033[0;90m       Desinstale o app original primeiro se quiser testar essa build, ou mude\033[0m\n"
-                    printf "\033[0;90m       o applicationId pra instalar como um app separado.\033[0m\n"
-                  fi
-                else
-                  printf "\033[0;90m[*] %s já instalado, mas não consegui ler a cópia instalada pra comparar assinatura\033[0m\n" "\$_APK_PKGNAME"
-                  printf "\033[0;90m    (sem permissão via rish?) — pulando teste de instalação real com segurança\033[0m\n"
-                fi
-              else
-                printf "\033[0;90m    -> pm install de teste via rish ...\033[0m\n"
-                _APK_INSTALL_OUT="\$(bash "\$HOME/.local/rish/rish" -c "pm install -t -r '\$_APK_SIGNED'" 2>&1)"
-                if printf '%s' "\$_APK_INSTALL_OUT" | grep -q "^Success"; then
-                  _APK_PASS=\$((_APK_PASS+1))
-                  _APK_REAL_CONFIRMED=1
-                  printf "\033[1;32m[✓] instalação real confirmada — desinstalando o teste...\033[0m\n"
-                  bash "\$HOME/.local/rish/rish" -c "pm uninstall \$_APK_PKGNAME" >/dev/null 2>&1
-                  _APK_TIER="\$_APK_TIER + instalação real confirmada"
-                else
-                  _APK_FAIL=\$((_APK_FAIL+1))
-                  _APK_INSTALLABLE=0
-                  printf "\033[1;31m[✗] pm install recusou o pacote:\033[0m\n"
-                  printf '%s\n' "\$_APK_INSTALL_OUT" | tail -5
-                fi
-              fi
-            fi
-          fi
-        else
-          _APK_FAIL=\$((_APK_FAIL+1))
-        fi
-      fi
-    else
-      _APK_TIER="nenhum — falhou em todos os níveis testados"
-      if [ "\$_APK_DECODE_OK" != "1" ]; then
-        printf "\033[1;31m[✗] decode FALHOU (log: %s)\033[0m\n" "\$_APK_LASTLOG"
-      else
-        printf "\033[1;31m[✗] build FALHOU (log: %s)\033[0m\n" "\$_APK_LASTLOG"
-      fi
-      _APK_REST="\$(grep -vE '^W: ' "\$_APK_LASTLOG" 2>/dev/null)"
-      if [ -n "\$_APK_REST" ]; then
-        printf "    --- linhas não-warning (causa raiz provável) ---\n"
-        echo "\$_APK_REST" | head -60
-      else
-        printf "    --- últimas linhas do log ---\n"
-        tail -25 "\$_APK_LASTLOG" 2>/dev/null
-      fi
-      printf "\033[0;90m    Nesse ponto o mais provável é proteção anti-engenharia-reversa\033[0m\n"
-      printf "\033[0;90m    deliberada (resources.arsc adulterado de propósito) — não é uma\033[0m\n"
-      printf "\033[0;90m    falha genérica do apktool/ElliotOS. Nenhum decompilador fecha\033[0m\n"
-      printf "\033[0;90m    100%% dos casos assim; veja os .xpm-quarantine nos logs se quiser\033[0m\n"
-      printf "\033[0;90m    investigar manualmente.\033[0m\n"
-      _APK_FAIL=\$((_APK_FAIL+1))
-    fi
-
-    if [ -f "\$_APK_REBUILT" ]; then
-      _APK_SZ_O=\$(stat -c%s "\$_APK" 2>/dev/null || echo "?")
-      _APK_SZ_N=\$(stat -c%s "\$_APK_REBUILT" 2>/dev/null || echo "?")
-      printf "\033[0;90m    tamanho original: %s bytes | recompilado: %s bytes\033[0m\n" "\$_APK_SZ_O" "\$_APK_SZ_N"
-    fi
-
-    printf "\n════════════════════════════════════════\n"
-    printf "  \033[1;32mPASS: %d\033[0m   \033[1;31mFAIL: %d\033[0m\n" "\$_APK_PASS" "\$_APK_FAIL"
-    printf "  \033[1;36mNível de compatibilidade:\033[0m %s\n" "\$_APK_TIER"
-    if [ "\$_APK_BUILD_OK" = "1" ]; then
-      if [ "\$_APK_INSTALLABLE" = "1" ]; then
-        if [ "\$_APK_REAL_CONFIRMED" = "1" ]; then
-          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m — alinhado, assinado, manifest parseável, instalação real confirmada via rish\n"
-        elif [ "\$_APK_SIG_CONFLICT" = "1" ]; then
-          printf "  \033[1;36mInstalável:\033[0m \033[1;33mSIM, mas vai CONFLITAR com a versão já instalada\033[0m — assinaturas diferentes, veja o [!] acima (não é bug do apktool/xpm)\n"
-        elif [ -f "\$HOME/.local/rish/rish" ]; then
-          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m (estrutural) — alinhado, assinado e com manifest parseável\n"
-        else
-          printf "  \033[1;36mInstalável:\033[0m \033[1;32mSIM\033[0m (estrutural) — alinhado, assinado e com manifest parseável; rish indisponível pra confirmar com instalação real\n"
-        fi
-      else
-        printf "  \033[1;36mInstalável:\033[0m \033[1;31mNÃO CONFIRMADO\033[0m — build reportou sucesso mas não passou na validação de instalação; veja os [✗] acima\n"
-      fi
-    fi
-    printf "════════════════════════════════════════\n"
-
-    # ── log persistente de erros ──────────────────────────────────────────
-    # Salva todos os logs da sessão em ~/.cache/elliot/apk-errors/ com
-    # timestamp e nome do APK. Permite trazer o log pra análise posterior
-    # sem depender do workdir temporário que é limpo pelo sistema.
-    # Sempre salva (sucesso ou falha) — útil pra comparar rounds-trips bons
-    # e ruins do mesmo APK, e pra estudar o comportamento do apktool.
-    _APK_ERRDIR="\$HOME/.cache/elliot/apk-errors"
-    mkdir -p "\$_APK_ERRDIR"
-    _APK_BASENAME="\$(basename "\$_APK" .apk | tr ' /' '_-')"
-    _APK_TS="\$(date '+%Y%m%d_%H%M%S' 2>/dev/null || echo 'ts')"
-    _APK_LOGDIR="\$_APK_ERRDIR/\${_APK_TS}__\${_APK_BASENAME}"
-    mkdir -p "\$_APK_LOGDIR"
-
-    # copia todos os logs gerados nessa sessão
-    cp "\$_APK_WORK"/*.log "\$_APK_LOGDIR/" 2>/dev/null
-
-    # salva um resumo legível em texto plano
-    {
-      printf "=== ms --apk error log ===\n"
-      printf "APK      : %s\n" "\$_APK"
-      printf "Data     : %s\n" "\$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null)"
-      printf "Resultado: %s\n" "\$([ "\$_APK_BUILD_OK" = "1" ] && echo "BUILD OK" || echo "BUILD FALHOU")"
-      printf "Tier     : %s\n" "\$_APK_TIER"
-      printf "Tempo    : decode=%ds build=%ds\n" "\${_APK_DECODE_TIME:-0}" "\${_APK_BUILD_TIME:-0}"
-      printf "PASS=%d FAIL=%d\n" "\$_APK_PASS" "\$_APK_FAIL"
-      printf "\n--- DEX: %d | Smali: %d | Res: %d | Unknown: %d | Assets: %d | .so: %d ---\n" \
-        "\${_M_DEX:-0}" "\${_M_SMALI:-0}" "\${_M_RES:-0}" "\${_M_UNK:-0}" "\${_M_ASSETS:-0}" "\${_M_SO:-0}"
-      printf "\n--- último log ---\n"
-      cat "\$_APK_LASTLOG" 2>/dev/null
-    } > "\$_APK_LOGDIR/summary.txt" 2>/dev/null
-
-    if [ "\$_APK_BUILD_OK" != "1" ]; then
-      printf "\033[0;90mLog de erro salvo em: %s\033[0m\n" "\$_APK_LOGDIR"
-      printf "\033[0;90m  → traga o summary.txt pra análise: cat %s/summary.txt\033[0m\n" "\$_APK_LOGDIR"
-    else
-      printf "\033[0;90mLog salvo em: %s\033[0m\n" "\$_APK_LOGDIR"
-    fi
-    printf "\033[0;90mLogs temporários em: %s\033[0m\n" "\$_APK_WORK"
-
-    if [ "\$_APK_FAIL" -eq 0 ]; then
-      _BATCH_OK=\$((_BATCH_OK+1))
-    else
-      _BATCH_FAILED="\$_BATCH_FAILED \$_APK"
-    fi
-    done
-
-    if [ "\$_BATCH_N" -gt 1 ]; then
-      printf "\n\033[1;35m╔══════════════════════════════════════════════════════════════╗\033[0m\n"
-      printf "\033[1;35m║  Resumo do lote                                               ║\033[0m\n"
-      printf "\033[1;35m╚══════════════════════════════════════════════════════════════╝\033[0m\n"
-      printf "  \033[1;36mTotal testado:\033[0m %d\n" "\$_BATCH_N"
-      printf "  \033[1;32mOK (instalável):\033[0m %d\n" "\$_BATCH_OK"
-      if [ -n "\$_BATCH_FAILED" ]; then
-        printf "  \033[1;31mFalharam:\033[0m%s\n" "\$_BATCH_FAILED"
-      fi
-      printf "\n"
-    fi
-
-    [ "\$_BATCH_OK" -eq "\$_BATCH_N" ]
-    ;;
-
-  # ── APK sign (rápido, sem decode/rebuild) ───────────────────────
-  # "ms --apk" acima faz decode+rebuild completo pra TESTAR compatibilidade
-  # (é um checker). Esse aqui é o caminho oposto: você já rodou "apktool b"
-  # por conta própria (ou editou smali/recursos manualmente) e só quer o
-  # zipalign+apksigner que faltam pra instalar — sem pagar o custo de
-  # decodificar/recompilar tudo de novo. Reaproveita a mesma keystore de
-  # teste do "ms --apk", pra não duplicar assinatura entre os dois fluxos.
-  # De propósito NÃO mexe no wrapper "apktool b" em si: o msfvenom injeta
-  # payload em cima do apk cru (sem assinatura) e assina do jeito dele
-  # depois — se "apktool b" passasse a assinar sozinho, quebraria esse
-  # fluxo. Isso aqui é 100% opt-in, um comando à parte.
-  --apk-sign)
-    shift
-    _APKS_IN="\$1"
-    if [ -z "\$_APKS_IN" ]; then
-      printf "\033[1;31m[✗]\033[0m Uso: ms --apk-sign arquivo.apk\n"
-      printf "\033[0;90m    (alinha+assina um apk JÁ compilado — ex: logo depois de 'apktool b'.\033[0m\n"
-      printf "\033[0;90m     Pra testar compatibilidade completa de decode+rebuild, use 'ms --apk')\033[0m\n"
-      exit 1
-    fi
-    if [ ! -f "\$_APKS_IN" ]; then
-      printf "\033[1;31m[✗] Arquivo não encontrado: %s\033[0m\n" "\$_APKS_IN"
-      exit 1
-    fi
-    if ! command -v zipalign >/dev/null 2>&1 || ! command -v apksigner >/dev/null 2>&1 || ! command -v keytool >/dev/null 2>&1; then
-      printf "\033[1;31m[✗] zipalign/apksigner/keytool não encontrados. Rode: xpm install apktool\033[0m\n"
-      exit 1
-    fi
-
-    _APKS_TOOLDIR="\$HOME/.xpm/tools/apktool"
-    _APKS_AAPT2="\$_APKS_TOOLDIR/aapt2"
-    [ -x "\$_APKS_AAPT2" ] || _APKS_AAPT2="\$(command -v aapt2 2>/dev/null)"
-    _APKS_WORK="\$(mktemp -d)"
-    _APKS_ALIGNED="\$_APKS_WORK/aligned.apk"
-    _APKS_SIGNED="\$_APKS_WORK/signed.apk"
-
-    printf "\033[0;90m    -> zipalign (4 bytes + página de 16K pros .so) ...\033[0m\n"
-    if zipalign -P 16 -f 4 "\$_APKS_IN" "\$_APKS_ALIGNED" >"\$_APKS_WORK/zipalign.log" 2>&1; then
-      printf "\033[1;32m[✓] zipalign OK\033[0m\n"
-    elif zipalign -f 4 "\$_APKS_IN" "\$_APKS_ALIGNED" >"\$_APKS_WORK/zipalign.log" 2>&1; then
-      printf "\033[1;32m[✓] zipalign OK\033[0m \033[0;90m(sem -P 16 — só 4 bytes; 'pkg upgrade zipalign' pra página de 16K)\033[0m\n"
-    else
-      printf "\033[1;31m[✗] zipalign falhou — o apk provavelmente está corrompido ou truncado (log: %s)\033[0m\n" "\$_APKS_WORK/zipalign.log"
-      tail -10 "\$_APKS_WORK/zipalign.log"
-      exit 1
-    fi
-
-    _APKS_KS="\$_APKS_TOOLDIR/xpm-compat-test.keystore"
-    if [ ! -f "\$_APKS_KS" ]; then
-      # mesma chave de TESTE usada pelo "ms --apk" (senha fixa e conhecida,
-      # igual ao debug.keystore padrão do Android) — nunca serve pra
-      # publicar/distribuir nada de verdade.
-      keytool -genkeypair -storepass xpm-compat-test -keypass xpm-compat-test \
-        -alias xpm-compat-test -keyalg RSA -keysize 2048 -validity 10000 \
-        -dname "CN=ElliotOS XPM Compat Test,O=ElliotOS,C=BR" -deststoretype pkcs12 \
-        -keystore "\$_APKS_KS" >/dev/null 2>&1
-    fi
-    if [ ! -f "\$_APKS_KS" ]; then
-      printf "\033[1;31m[✗] não consegui gerar/achar o keystore de teste\033[0m\n"
-      exit 1
-    fi
-
-    printf "\033[0;90m    -> apksigner sign (chave de teste do xpm) ...\033[0m\n"
-    if ! apksigner sign --ks "\$_APKS_KS" --ks-pass pass:xpm-compat-test --key-pass pass:xpm-compat-test \
-       --out "\$_APKS_SIGNED" "\$_APKS_ALIGNED" >"\$_APKS_WORK/sign.log" 2>&1; then
-      printf "\033[1;31m[✗] apksigner falhou (log: %s)\033[0m\n" "\$_APKS_WORK/sign.log"
-      tail -10 "\$_APKS_WORK/sign.log"
-      exit 1
-    fi
-    printf "\033[1;32m[✓] assinado\033[0m\n"
-
-    _APKS_STRUCT_OK=1
-    if ! zipalign -c -v 4 "\$_APKS_SIGNED" >"\$_APKS_WORK/verify_align.log" 2>&1; then
-      _APKS_STRUCT_OK=0
-      printf "\033[1;31m[✗] alinhamento não confere depois de assinar\033[0m\n"
-    fi
-    if ! apksigner verify "\$_APKS_SIGNED" >"\$_APKS_WORK/verify_sign.log" 2>&1; then
-      _APKS_STRUCT_OK=0
-      printf "\033[1;31m[✗] apksigner verify reprovou o pacote final\033[0m\n"
-      tail -10 "\$_APKS_WORK/verify_sign.log"
-    fi
-    if [ -x "\$_APKS_AAPT2" ] && ! "\$_APKS_AAPT2" dump badging "\$_APKS_SIGNED" >"\$_APKS_WORK/badging.log" 2>&1; then
-      _APKS_STRUCT_OK=0
-      printf "\033[1;31m[✗] aapt2 dump badging não conseguiu ler o pacote final (o PackageManager real provavelmente também não vai conseguir)\033[0m\n"
-    fi
-    if [ "\$_APKS_STRUCT_OK" != "1" ]; then
-      printf "\033[1;31m[✗] verificação estrutural falhou — esse apk não deve instalar. Logs em: %s\033[0m\n" "\$_APKS_WORK"
-      exit 1
-    fi
-
-    _APKS_DIR="\$(dirname "\$_APKS_IN")"
-    _APKS_BASE="\$(basename "\$_APKS_IN" .apk)"
-    _APKS_OUT="\$_APKS_DIR/\${_APKS_BASE}-installable.apk"
-    cp -f "\$_APKS_SIGNED" "\$_APKS_OUT"
-    printf "\033[1;32m[✓] verificação estrutural OK (alinhamento + assinatura + manifest parseável)\033[0m\n"
-    printf "\n\033[1;36mPronto pra instalar:\033[0m %s\n" "\$_APKS_OUT"
-    printf "\033[0;90m(assinado com a chave de teste do xpm — pra redistribuir de verdade, assine com sua própria chave)\033[0m\n"
-    ;;
-
-  # ── Inject — injeção de payload com hook correto ─────────────────────────
-  # Pipeline:
-  # 1. gera payload puro com msfvenom (sem -x)
-  # 2. extrai smali do payload (apktool d -r no payload.apk — rápido, sem recursos)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  # ── NetHunter — instala Kali NetHunter sem root (multi-arch) ─────────────
-  -nh|--nethunter)
-    printf "\033[1;31m"
-    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97\n"
-    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91 \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x9d \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
-    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x9d  \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97   \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
-    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x94\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d   \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91      \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91\n"
-    printf "  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x91  \xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97 \xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x96\x88\xe2\x95\x97\n"
-    printf "  \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x9d  \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d \xe2\x95\x9a\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x90\xe2\x95\x9d\n"
-    printf "\033[0m"
-    printf "  \033[1;90m---------------------------------------------------------------------\033[0m\n"
-    printf "  \033[1;31mElliotOS -- Kali Linux NetHunter Installer (sem root . arm64)\033[0m\n"
-    printf "  \033[1;90mby Mike Elliot . github.com/mikeelliot218/ElliotOS\033[0m\n"
-    printf "  \033[1;90m---------------------------------------------------------------------\033[0m\n\n"
-
-    CONTAINER="kali"
-    IMAGE="kalilinux/kali-rolling"
-    ARCHITECTURE="arm64"
-    PREFIX="\${PREFIX:-/data/data/com.termux/files/usr}"
-    LAUNCHER="\$PREFIX/bin/nh"
-    info() { printf "  \033[1;36m->\033[0m %s\n" "\$1"; }
-    ok()   { printf "  \033[1;32m[v]\033[0m %s\n" "\$1"; }
-    aviso(){ printf "  \033[1;33m[!]\033[0m %s\n" "\$1"; }
-    erro() { printf "  \033[1;31m[x]\033[0m %s\n" "\$1"; }
-
-    if [ ! -d "\$PREFIX" ]; then
-        erro "Este script precisa ser executado no Termux."
-        exit 1
-    fi
-
-    HOST_ARCH="\$(uname -m)"
-    info "Arquitetura do dispositivo: \$HOST_ARCH"
-    case "\$HOST_ARCH" in
-        aarch64|arm64) ok "ARM64 detectado." ;;
-        *) erro "Este script e destinado a dispositivos ARM64."; exit 1 ;;
-    esac
-
-    if ! command -v proot-distro >/dev/null 2>&1; then
-        aviso "PRoot-Distro nao esta instalado."
-        info "Instalando pelo Termux..."
-        pkg update
-        pkg install -y proot-distro
-    fi
-    ok "PRoot-Distro encontrado."
-    printf "\n"
-    proot-distro version || true
-    printf "\n"
-
-    info "Verificando dependencias do Termux..."
-    pkg install -y curl grep
-    ok "Dependencias prontas."
-    printf "\n"
-
-    CONTAINER_EXISTE=0
-    if proot-distro list --quiet 2>/dev/null | grep -Fxq "\$CONTAINER"; then
-        CONTAINER_EXISTE=1
-    fi
-
-    if [ "\$CONTAINER_EXISTE" -eq 1 ]; then
-        aviso "O container '\$CONTAINER' ja existe."
-        info "O container existente sera reutilizado."
-    else
-        info "Instalando Kali Linux ARM64..."
-        info "Imagem: \$IMAGE"
-        proot-distro install \
-            --name "\$CONTAINER" \
-            --architecture "\$ARCHITECTURE" \
-            "\$IMAGE"
-        ok "Kali Linux ARM64 instalado."
-    fi
-    printf "\n"
-
-    info "Entrando no container para configurar o sistema..."
-
-    proot-distro login "\$CONTAINER" -- bash <<'KALI_SCRIPT'
-
-set -e
-
-info() { printf "  \033[1;36m->\033[0m %s\n" "\$1"; }
-ok()   { printf "  \033[1;32m[v]\033[0m %s\n" "\$1"; }
-aviso(){ printf "  \033[1;33m[!]\033[0m %s\n" "\$1"; }
-erro() { printf "  \033[1;31m[x]\033[0m %s\n" "\$1"; }
-
-printf "\n"
-printf "  \033[1;37m+------------------------------------------+\033[0m\n"
-printf "  \033[1;37m|           KALI LINUX NETHUNTER           |\033[0m\n"
-printf "  \033[1;37m+------------------------------------------+\033[0m\n"
-printf "\n"
-
-info "Arquitetura:"
-uname -m
-
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    printf "  \033[1;36m->\033[0m Sistema: \${PRETTY_NAME:-Kali Linux}\n"
-fi
-
-if ! command -v apt >/dev/null 2>&1; then
-    erro "apt nao foi encontrado. Container invalido."
-    exit 1
-fi
-ok "apt encontrado."
-
-printf "\n"
-info "Configurando Portugues Brasileiro..."
-
-export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
-apt-get install -y -qq locales 2>/dev/null || true
-
-if [ -f /etc/locale.gen ]; then
-    sed -i 's/^# *pt_BR.UTF-8 UTF-8/pt_BR.UTF-8 UTF-8/' /etc/locale.gen
-    grep -q '^pt_BR.UTF-8 UTF-8' /etc/locale.gen || echo 'pt_BR.UTF-8 UTF-8' >> /etc/locale.gen
-    locale-gen 2>/dev/null || true
-fi
-
-cat > /etc/locale.conf <<'EOF'
-LANG=pt_BR.UTF-8
-LANGUAGE=pt_BR:pt:en_US:en
-LC_ALL=pt_BR.UTF-8
-EOF
-
-export LANG="pt_BR.UTF-8"
-ok "Locale pt-BR configurado."
-
-printf "\n"
-info "Atualizando Kali Linux..."
-apt-get update -qq
-apt-get upgrade -y -qq
-ok "Kali Linux atualizado."
-
-printf "\n"
-info "Instalando dependencias basicas..."
-apt-get install -y -qq curl wget git 2>/dev/null || true
-ok "Pronto."
-
-printf "\n"
-printf "  \033[1;32m+------------------------------------------+\033[0m\n"
-printf "  \033[1;32m|              TUDO PRONTO                 |\033[0m\n"
-printf "  \033[1;32m+------------------------------------------+\033[0m\n"
-printf "\n"
-
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    printf "  Sistema    : \033[1;31m\${PRETTY_NAME:-Kali Linux}\033[0m\n"
-fi
-printf "  Arquitetura: \033[1;36m\$(uname -m)\033[0m\n"
-printf "  Locale     : \033[1;36m\${LANG:-pt_BR.UTF-8}\033[0m\n"
-printf "\n"
-printf "  \033[1;36mExemplos:\033[0m\n"
-printf "  \033[1;36m  apt install nmap\033[0m\n"
-printf "  \033[1;36m  msfconsole\033[0m\n"
-printf "  \033[1;36m  apt search kali-linux\033[0m\n"
-printf "\n"
-
-KALI_SCRIPT
-
-    ok "Container configurado."
-    printf "\n"
-
-    info "Criando launcher 'nh'..."
-
-    cat > "\$LAUNCHER" <<'LAUNCHER_SCRIPT'
-#!/data/data/com.termux/files/usr/bin/bash
-CONTAINER="kali"
-trap 'pkill -f "termux-x11" 2>/dev/null; exit 0' INT TERM
-
-case "\${1:-}" in
-  -h|--help)
-    printf "\033[1;31mnh\033[0m -- Kali Linux NetHunter (ElliotOS)\n\n"
-    printf "  \033[1;36mUso:\033[0m\n"
-    printf "    nh              Entra no terminal do Kali Linux\n"
-    printf "    nh --gui | -g   Inicia XFCE via Termux X11\n"
-    printf "    nh --help | -h  Mostra esta ajuda\n"
-    printf "\n"
-    printf "  \033[1;36mExemplos dentro do container:\033[0m\n"
-    printf "    apt install nmap              Instala nmap\n"
-    printf "    apt install metasploit-framework  Instala metasploit\n"
-    printf "    apt search kali-tools         Busca ferramentas Kali\n"
-    printf "    apt update && apt upgrade     Atualiza o sistema\n"
-    printf "\n"
-    printf "  \033[1;90mIsolado do Termux -- sem acesso ao home do host\033[0m\n"
-    exit 0
-    ;;
-esac
-
-if ! command -v proot-distro >/dev/null 2>&1; then
-    echo "[!] PRoot-Distro nao esta instalado."
-    exit 1
-fi
-if ! proot-distro list --quiet 2>/dev/null | grep -Fxq "\$CONTAINER"; then
-    echo "[!] O container '\$CONTAINER' nao existe."
-    echo "Execute novamente: ms -nh"
-    exit 1
-fi
-# Modo GUI: instala XFCE e roda via Termux X11
-if [ "\${1:-}" = "--gui" ] || [ "\${1:-}" = "-g" ]; then
-    if ! command -v termux-x11 >/dev/null 2>&1 && [ ! -f "/data/data/com.termux.x11/files/usr/bin/termux-x11" ]; then
-        echo "[!] Termux X11 nao encontrado."
-        echo "    Instale o app Termux:X11 e rode:"
-        echo "    pkg install termux-x11-nightly"
-        exit 1
-    fi
-    # Instala XFCE do Kali e configura panel
-    proot-distro login --bind /data/data/com.termux:/data/data/com.termux "\$CONTAINER" -- bash -c \
-        "dpkg -l kali-desktop-xfce 2>/dev/null | grep -q '^\.\?ii' || (apt-get update -qq && apt-get install -y -qq kali-desktop-xfce kali-themes kali-menu kali-wallpapers-all xfdesktop4 dbus-x11 x11-xserver-utils 2>/dev/null || true); \
-         mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml; \
-         cp -f /usr/share/kali-themes/etc/xdg/xfce4/panel/default.xml /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml 2>/dev/null || true"
-    # Limpeza: mata processo anterior e remove sockets/locks stale
-    _X11_SOCK="\${TMPDIR}/.X11-unix/X1"
-    _X11_LOCK="\${TMPDIR}/.X1-lock"
-    pkill -f "termux-x11" 2>/dev/null || true; sleep 1
-    rm -f "\$_X11_SOCK" "\$_X11_LOCK" 2>/dev/null || true
-    rmdir "\${TMPDIR}/.X11-unix" 2>/dev/null || true
-    mkdir -p "\${TMPDIR}/.X11-unix"
-    # Inicia Termux:X11 no display :1
-    export XDG_RUNTIME_DIR="\${TMPDIR}"
-    pulseaudio --start --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" --exit-idle-time=-1 2>/dev/null || true
-    termux-x11 :1 &
-    am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity >/dev/null 2>&1
-    _WAIT=0
-    until [ -S "\$_X11_SOCK" ]; do
-        sleep 1; _WAIT=\$((_WAIT+1))
-        [ "\$_WAIT" -ge 15 ] && { echo "[!] Timeout — abra o app Termux:X11 e tente novamente."; exit 1; }
-    done
-    # Entra no container com --shared-tmp e --env para injetar DISPLAY garantido
-    proot-distro login \
-        --bind /data/data/com.termux:/data/data/com.termux \
-        --shared-tmp \
-        --env DISPLAY=:1 \
-        --env PULSE_SERVER=127.0.0.1 \
-        --env GALLIUM_DRIVER=llvmpipe \
-        --env LIBGL_ALWAYS_SOFTWARE=1 \
-        --env MESA_GL_VERSION_OVERRIDE=3.3 \
-        --env MESA_GLSL_VERSION_OVERRIDE=330 \
-        --env EGL_LOG_LEVEL=fatal \
-        --env GTK_THEME=Adwaita:dark \
-        "\$CONTAINER" -- /bin/bash -c \
-        "mkdir -p /tmp/runtime-nh && chmod 700 /tmp/runtime-nh; \
-         export XDG_RUNTIME_DIR=/tmp/runtime-nh; \
-         rm -f /tmp/dbus-nh.sock; \
-         dbus-daemon --session --address=unix:path=/tmp/dbus-nh.sock --fork 2>/dev/null || true; \
-         export DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/dbus-nh.sock; \
-         xfsettingsd --no-daemon & sleep 2; \
-         mkdir -p /usr/share/images/desktop-base; \
-         find /usr/share/backgrounds/kali -name \"*.png\" 2>/dev/null | sort | xargs -I{} cp -f {} /usr/share/images/desktop-base/ 2>/dev/null || true; \
-         _WPS=\$(find /usr/share/images/desktop-base -name \"*.png\" | sort | head -1); \
-         [ -n \"\$_WPS\" ] && cp -f \"\$_WPS\" /usr/share/images/desktop-base/default 2>/dev/null || true; \
-         cp /etc/xdg/menus/applications-merged/kali-applications.menu /etc/xdg/menus/xfce-applications.menu 2>/dev/null || true; \
-         xfdesktop & sleep 2; \
-         xfce4-panel & exec xfwm4 --display :1"
-fi
-proot-distro login --bind /data/data/com.termux:/data/data/com.termux "\$CONTAINER"
-LAUNCHER_SCRIPT
-
-    chmod 755 "\$LAUNCHER"
-    ln -sf "\$LAUNCHER" "\$PREFIX/bin/nethunter" 2>/dev/null || true
-    ok "Launcher 'nh' criado em \$LAUNCHER"
-    printf "\n"
-
-    printf "  \033[1;32m+------------------------------------------+\033[0m\n"
-    printf "  \033[1;32m|          INSTALACAO CONCLUIDA            |\033[0m\n"
-    printf "  \033[1;32m|  Use: nh  ou  pd login kali             |\033[0m\n"
-    printf "  \033[1;32m+------------------------------------------+\033[0m\n"
-    printf "\n"
-    ;;
-
-  # ── Arch Linux ARM Installer (termux-arch) ───────────────────────────────
-  -ba|--blackarch)
-    _ARCH_SCRIPT="\${PREFIX:-/data/data/com.termux/files/usr}/share/lua-scripts/install-arch.sh"
-    if [ -f "\$_ARCH_SCRIPT" ]; then
-      bash "\$_ARCH_SCRIPT"
-    else
-      printf "\033[1;31m[✗]\033[0m install-arch.sh não encontrado em \$_ARCH_SCRIPT\n"
-      printf "    Reinstale o ElliotOS: bash luascript.sh\n"
-      exit 1
-    fi
-    ;;
-
-  "")
-    # Detecta .lua no diretório atual e registra em package.preload (silencioso)
-    # O loader passa pelo ivar.preprocess() para suportar !N dentro dos modulos
-    _LUA_INIT=""
-    for _lf in "\${PWD}"/*.lua; do
-      if [ -f "\$_lf" ]; then
-        _lmod=\$(basename "\$_lf" .lua)
-        _lpath=\$(printf '%s' "\$_lf" | sed "s/'/\\\\\\\\'/g")
-        _LUA_INIT="\${_LUA_INIT}package.preload['\${_lmod}']=function(...)"
-        _LUA_INIT="\${_LUA_INIT}local _f=io.open('\${_lpath}','r');"
-        _LUA_INIT="\${_LUA_INIT}if not _f then error('nao foi possivel abrir \${_lpath}') end;"
-        _LUA_INIT="\${_LUA_INIT}local _c=_f:read('*a');_f:close();"
-        _LUA_INIT="\${_LUA_INIT}if type(ivar)=='table' and type(ivar.preprocess)=='function' then _c=ivar.preprocess(_c) end;"
-        _LUA_INIT="\${_LUA_INIT}local _ch,_e=load(_c,'@\${_lmod}.lua');if not _ch then error(_e) end;"
-        _LUA_INIT="\${_LUA_INIT}return _ch(...)end;"
-      fi
-    done
-    if [ -n "\$_LUA_INIT" ]; then
-      exec "\$_B" -e "\$_LUA_INIT" -i
-    else
-      exec "\$_B"
-    fi
-    ;;
-
-  *)
-    case "\$1" in
-      -*)
-        printf "\033[1;31m  [\xe2\x9c\x97]\033[0m Op\xc3\xa7\xc3\xa3o desconhecida: %s\n" "\$1"
-        exit 1
-        ;;
-      *)
-        _SCRIPT="\$1"; shift
-        [ "\${1:-}" = "--" ] && shift
-        if [ -f "\$_SCRIPT" ] && _ivar_needs_preprocess "\$_SCRIPT"; then
-            _ivar_run_file "\$_SCRIPT" "\$@"
-        else
-            _lua_run "\$_B" -e "require('@std')" "\$_SCRIPT" "\$@"
-        fi
-        ;;
-    esac
-    ;;
-esac
-MS_WRAPPER_EOF
+    base64 -d > "$MS" << 'MS_B64EOF'
+IyEvTVNfSU5URVJQX1BMQUNFSE9MREVSCiMgRWxsaW90T1MgbXMg4oCUIHdyYXBwZXIgY29tIGFy
+Z3VtZW50b3MgbmF0aXZvcwpfQj0iTVNfQklOX1BMQUNFSE9MREVSIgoKIyBDYXJyZWdhIGNoYXZl
+cyBkZSBBUEkgZG8gfi8uYmFzaHJjIHNlIG7Do28gZXN0aXZlcmVtIG5vIGFtYmllbnRlCiMgTmVj
+ZXNzw6FyaW8gcG9ycXVlIG8gbXMgw6kgZXhlY3V0YWRvIHZpYSBleGVjIChuw6NvIHNoZWxsIGlu
+dGVyYXRpdm8pCmlmIFsgLXogIiRFTExJT1RfQUlfS0VZIiBdOyB0aGVuCiAgX0tFWT0kKGdyZXAg
+LW0xICdleHBvcnQgRUxMSU9UX0FJX0tFWT0nICIkSE9NRS8uYmFzaHJjIiAiJEhPTUUvLnByb2Zp
+bGUiIDI+L2Rldi9udWxsIHwgaGVhZCAtMSB8IHNlZCAicy8uKkVMTElPVF9BSV9LRVk9WydcIl1c
+Py8vO3MvWydcIl0uKi8vIikKICBbIC1uICIkX0tFWSIgXSAmJiBleHBvcnQgRUxMSU9UX0FJX0tF
+WT0iJF9LRVkiCmZpCmlmIFsgLXogIiRFTExJT1RfQUlfS0VZIiBdICYmIFsgLXogIiRHRU1JTklf
+QVBJX0tFWSIgXTsgdGhlbgogIF9LRVk9JChncmVwIC1tMSAnZXhwb3J0IEdFTUlOSV9BUElfS0VZ
+PScgIiRIT01FLy5iYXNocmMiICIkSE9NRS8ucHJvZmlsZSIgMj4vZGV2L251bGwgfCBoZWFkIC0x
+IHwgc2VkICJzLy4qR0VNSU5JX0FQSV9LRVk9WydcIl1cPy8vO3MvWydcIl0uKi8vIikKICBbIC1u
+ICIkX0tFWSIgXSAmJiBleHBvcnQgR0VNSU5JX0FQSV9LRVk9IiRfS0VZIiAmJiBleHBvcnQgRUxM
+SU9UX0FJX0tFWT0iJF9LRVkiCmZpCiMgUHJvcGFnYSBwYXJhIHRvZGFzIGFzIHZhcnMgZXNwZWPD
+rWZpY2FzIGRlIHByb3ZpZGVyIGRlIElBCmlmIFsgLW4gIiRFTExJT1RfQUlfS0VZIiBdOyB0aGVu
+CiAgWyAteiAiJEdFTUlOSV9BUElfS0VZIiAgXSAmJiBleHBvcnQgR0VNSU5JX0FQSV9LRVk9IiRF
+TExJT1RfQUlfS0VZIgogIFsgLXogIiRHUk9RX0FQSV9LRVkiICAgIF0gJiYgZXhwb3J0IEdST1Ff
+QVBJX0tFWT0iJEVMTElPVF9BSV9LRVkiCiAgWyAteiAiJE9QRU5BSV9BUElfS0VZIiAgXSAmJiBl
+eHBvcnQgT1BFTkFJX0FQSV9LRVk9IiRFTExJT1RfQUlfS0VZIgogIFsgLXogIiRERUVQU0VFS19B
+UElfS0VZIl0gJiYgZXhwb3J0IERFRVBTRUVLX0FQSV9LRVk9IiRFTExJT1RfQUlfS0VZIgogIFsg
+LXogIiRBSV9LRVkiICAgICAgICAgIF0gJiYgZXhwb3J0IEFJX0tFWT0iJEVMTElPVF9BSV9LRVki
+CmZpCgojIEluamV0YSBwYXRocyBkbyBscG0gKH4vLmx1YXJvY2tzKSBlIGxtb2QgKH4vLmx1YS1t
+b2R1bGVzKSBhbnRlcyBkZSBleGVjCiMgTyBiaW7DoXJpbyBsdWEtbmV0IHVzYSBMVUFfUEFUSC9M
+VUFfQ1BBVEggbmEgaW5pY2lhbGl6YcOnw6NvIGRvIHBhY2thZ2UgbG9hZGVyCl9MUE1fTFVBPSIk
+SE9NRS8ubHVhcm9ja3Mvc2hhcmUvbHVhLzUuNCIKX0xQTV9MSUI9IiRIT01FLy5sdWFyb2Nrcy9s
+aWIvbHVhLzUuNCIKX0xNT0RfRElSPSIkSE9NRS8ubHVhLW1vZHVsZXMiCl9FWFRSQV9QQVRIPSIk
+e19MUE1fTFVBfS8/Lmx1YTske19MUE1fTFVBfS8/L2luaXQubHVhOyR7X0xNT0RfRElSfS8/Lmx1
+YTske19MTU9EX0RJUn0vPy9pbml0Lmx1YSIKX1NZU19MSUI9IiR7UFJFRklYOi0vZGF0YS9kYXRh
+L2NvbS50ZXJtdXgvZmlsZXMvdXNyfS9saWIvbHVhLzUuNCIKX0VYVFJBX0NQQVRIPSIke19MUE1f
+TElCfS8/LnNvOyR7X0xQTV9MSUJ9Lz8vPy5zbzske19TWVNfTElCfS8/LnNvOyR7X1NZU19MSUJ9
+Lz8vPy5zbyIKIyBJbmNsdWkgZGlyZXTDs3JpbyBhdHVhbCBwYXJhIHF1ZSByZXF1aXJlKCJtb2R1
+bG8iKSBlbmNvbnRyZSAuL21vZHVsby5sdWEKZXhwb3J0IExVQV9QQVRIPSIuLz8ubHVhOy4vPy9p
+bml0Lmx1YTske19FWFRSQV9QQVRIfTske0xVQV9QQVRIOi07fSIKZXhwb3J0IExVQV9DUEFUSD0i
+JHtfRVhUUkFfQ1BBVEh9OyR7TFVBX0NQQVRIOi19IgoKCl9oZWxwKCkgewoKcHJpbnRmICclYlxu
+JyAnXDAzM1sxOzM1beKUjOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUkFwwMzNbMG0nCnByaW50ZiAn
+JWJcbicgJ1wwMzNbMTszNW3ilIJcMDMzWzBtXDAzM1sxOzMxbSAgIF9fX19fX19fXyBfXyAgIC5f
+XyAgLl9fICAgICAgICBfXyAgIF9fX19fX19fICAgIF9fX19fX19fXyAgXDAzM1swbSBcMDMzWzE7
+MzVt4pSCXDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUglwwMzNbMG1cMDMzWzE7
+MzFtICAvICAgX19fX18vfCAgfCAgfCAgfCB8X198IF9fX19fLyAgfF8gXF9fX19fICBcICAvICAg
+X19fX18vICBcMDMzWzBtIFwwMzNbMTszNW3ilIJcMDMzWzBtJwpwcmludGYgJyViXG4nICdcMDMz
+WzE7MzVt4pSCXDAzM1swbVwwMzNbMTszMW0gIFxfX19fXyAgXCB8ICB8ICB8ICB8IHwgIHwvICBf
+IFwgICBfX1wgLyAgIHwgICBcIFxfX19fXyAgXCAgIFwwMzNbMG0gXDAzM1sxOzM1beKUglwwMzNb
+MG0nCnByaW50ZiAnJWJcbicgJ1wwMzNbMTszNW3ilIJcMDMzWzBtXDAzM1sxOzMxbSAgLyAgICAg
+ICAgXHwgIHxfIHwgIHxffCAgKCAgPF8+ICkgIHwgIC8gICAgfCAgICBcLyAgICAgICAgXCAgXDAz
+M1swbSBcMDMzWzE7MzVt4pSCXDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUglww
+MzNbMG1cMDMzWzE7MzFtIC9fX19fX19fICAvfF9fX18vfF9fX18vX198XF9fX18vfF9ffCAgXF9f
+X19fX18gIC9fX19fX19fICAvICBcMDMzWzBtICBcMDMzWzE7MzVt4pSCXDAzM1swbScKcHJpbnRm
+ICclYlxuJyAnXDAzM1sxOzM1beKUglwwMzNbMG1cMDMzWzE7MzFtICAgICAgICAgXC8gICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgXC8gICAgICAgIFwvICAgXDAzM1swbSAgXDAz
+M1sxOzM1beKUglwwMzNbMG0nCnByaW50ZiAnJWJcbicgJ1wwMzNbMTszNW3ilIIgICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg4pSC
+XDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUglwwMzNbMG1cMDMzWzE7MzZtICBf
+XyAgX18gICAgICAgICAgICAgICAgX19fICBfICAgICAgICBfICAgICAgICAgICAgICAgICAgICAg
+ICAgXDAzM1swbSBcMDMzWzE7MzVt4pSCXDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1
+beKUglwwMzNbMG1cMDMzWzE7MzZtIHwgIFwvICB8IF9fXyAgX19fIF8gXyAvIF9ffHwgfF8gXyAg
+X3wgfCBfX18gICAgICAgICAgICAgICAgICAgXDAzM1swbSBcMDMzWzE7MzVt4pSCXDAzM1swbScK
+cHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUglwwMzNbMG1cMDMzWzE7MzZtIHwgfFwvfCB8LyBf
+IFwvIF8gXCBcIC9cX18gXHwgX198IHx8IHwgfC8gLV8pICAgICAgICAgICAgICAgICAgXDAzM1sw
+bSBcMDMzWzE7MzVt4pSCXDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUglwwMzNb
+MG1cMDMzWzE7MzZtIHxffCAgfF98XF9fXy9cX19fL19cX1x8X19fLyBcX198XF8sIHxffFxfX198
+ICAgICAgICAgICAgICAgICAgXDAzM1swbSBcMDMzWzE7MzVt4pSCXDAzM1swbScKcHJpbnRmICcl
+YlxuJyAnXDAzM1sxOzM1beKUglwwMzNbMG1cMDMzWzE7MzZtICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgIHxfXy8gICAgICAgICAgICAgICAgICAgICAgICAgXDAzM1swbSBcMDMzWzE7
+MzVt4pSCXDAzM1swbScKcHJpbnRmICclYlxuJyAnXDAzM1sxOzM1beKUlOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUmFwwMzNbMG0nCgpwcmludGYgIlwwMzNbMTszM23ilIDilIAgR2VyYWwg4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuIgpw
+cmludGYgIiAgXDAzM1sxOzMybW1zXDAzM1swbSAgICAgICAgICAgICAgICAgICAgICAgICAgIOKA
+lCBSRVBMIGludGVyYXRpdm9cbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtYyBcMDMzWzA7MzNt
+J2NvZGlnbyBsdWEnXDAzM1swbSAgICAgICAgICDigJQgZXhlY3V0YSBMdWEgc2VtIGFicmlyIFJF
+UExcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtZiBcMDMzWzA7MzNtc2NyaXB0Lmx1YVwwMzNb
+MG0gICAgICAgICAgICDigJQgZXhlY3V0YSBhcnF1aXZvXG4iCnByaW50ZiAiICBcMDMzWzE7MzJt
+bXMgLWVcMDMzWzBtICAgICAgICAgICAgICAgICAgICAgICAg4oCUIGFicmUgRWxsaW90T1MgRWRp
+dG9yIChhcnF1aXZvIG5vdm8pXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLWUgXDAzM1swOzMz
+bWFycXVpdm9cMDMzWzBtICAgICAgICAgICAgICDigJQgYWJyZS9jcmlhIGFycXVpdm8gbm8gRWxs
+aW90T1MgRWRpdG9yXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLWx1YTJjIFwwMzNbMDszM21h
+cnF1aXZvLmx1YVwwMzNbMG0gICAgICDigJQgdHJhbnNwaWxhIEx1YSDihpIgQyAoZ2VyYSBhcnF1
+aXZvLmMpXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLWx1YTJjIC1yIFwwMzNbMDszM21hcnF1
+aXZvLmx1YVwwMzNbMG0gIOKAlCB0cmFuc3BpbGEgZSBjb21waWxhIGNvbSBjeHhcbiIKcHJpbnRm
+ICIgIFwwMzNbMTszMm1tcyAtbHVhMmMgLW8gXDAzM1swOzMzbXNhaWRhLmMgYXJxLmx1YVwwMzNb
+MG0g4oCUIG5vbWUgZG8gLmMgZ2VyYWRvXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLWlcMDMz
+WzBtICAgICAgICAgICAgICAgICAgICAgICAg4oCUIGluZm8gZG8gc2lzdGVtYVxuIgpwcmludGYg
+IiAgXDAzM1sxOzMybW1zIC12XDAzM1swbSAgICAgICAgICAgICAgICAgICAgICAgIOKAlCB2ZXJz
+YW9cbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtaFwwMzNbMG0gICAgICAgICAgICAgICAgICAg
+ICAgICDigJQgZXN0YSBhanVkYVxuXG4iCgpwcmludGYgIlwwMzNbMTszM23ilIDilIAgRGlhZ25v
+c3RpY28g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuIgpwcmludGYg
+IiAgXDAzM1sxOzMybW1zIC10XDAzM1swbSAgICAgICAgICAgICAgICAgICAgICAgIOKAlCBtcy5j
+aGVjaygpIHNlbGYtdGVzdFxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC10dlwwMzNbMG0gICAg
+ICAgICAgICAgICAgICAgICAgIOKAlCBtcy5jaGVjaygpIHZlcmJvc2VcbiIKcHJpbnRmICIgIFww
+MzNbMTszMm1tcyAtVFwwMzNbMG0gICAgICAgICAgICAgICAgICAgICAgICDigJQgbXMuZm9yY2Uo
+KSBzdHJlc3MgdGVzdFxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC1UdlwwMzNbMG0gICAgICAg
+ICAgICAgICAgICAgICAgIOKAlCBtcy5mb3JjZSgpIHZlcmJvc2VcbiIKcHJpbnRmICJcbiIKCnBy
+aW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBJQSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzE7
+MzJtbXMgLWFcMDMzWzBtICAgICAgICAgICAgICAgICAgICAgICAg4oCUIGNoYXQgaW50ZXJhdGl2
+byBjb20gQ1lOXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLWEgXDAzM1swOzMzbSdwZXJndW50
+YSdcMDMzWzBtICAgICAgICAgICAg4oCUIHBlcmd1bnRhIGRpcmV0YVxuIgpwcmludGYgIiAgXDAz
+M1sxOzMybW1zIC1BIFwwMzNbMDszM20ncGVyZ3VudGEnXDAzM1swbSAgICAgICAgICAgIOKAlCBy
+ZXNwb3N0YSByYXcgc2VtIGZvcm1hdGFjYW9cbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtZSBc
+MDMzWzA7MzNtPGFycT4gWy12IGVycm9zLnR4dF1cMDMzWzBtICDigJQgYWJyZSBlZGl0b3IgKGNv
+bSAtdiB2ZXJpZmljYSBzaW50YXhlIGUgc2FsdmEgZXJyb3MpXG4iCnByaW50ZiAiICBcMDMzWzE7
+MzJtbXMgLWEgXDAzM1swOzMzbVstZiBhcnFdICdwZXJndW50YSdcMDMzWzBtICAgIOKAlCBwZXJn
+dW50YSBwYXJhIGEgQ1lOICgtZiBwYXNzYSBhcnF1aXZvIGNvbW8gY29udGV4dG8pXG4iCnByaW50
+ZiAiICBcMDMzWzE7MzJtbXMgLS1zZWFyY2ggXDAzM1swOzMzbSdxdWVyeSdcMDMzWzBtICAgICAg
+IOKAlCBwZXNxdWlzYSBuYSB3ZWIgZSByZXN1bWUgbyByZXN1bHRhZG9cbiIKcHJpbnRmICIgIFww
+MzNbMTszMm1tcyAtLWNvZGUgXDAzM1swOzMzbVstbyBhcnFdICd0YXJlZmEnXDAzM1swbSAg4oCU
+IGdlcmEgY8OzZGlnby9zY3JpcHQgc2VtIHJlc3RyacOnw7VlcyAoLW8gc2FsdmEgbm8gYXJxdWl2
+bylcbiIKCnByaW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBSZWRlIOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIKcHJpbnRmICIgIFww
+MzNbMTszMm1tcyAtZyBcMDMzWzA7MzNtdXJsXDAzM1swbSAgICAgICAgICAgICAgICAgICDigJQg
+SFRUUCBHRVRcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLXBvc3QgXDAzM1swOzMzbXVybCBk
+YWRvc1wwMzNbMG0gICAgICAgICDigJQgSFRUUCBQT1NUXG4iCnByaW50ZiAiICBcMDMzWzE7MzJt
+bXMgLS1oZWFkZXJzIFwwMzNbMDszM211cmxcMDMzWzBtICAgICAgICAgICAg4oCUIGhlYWRlcnMg
+ZGEgcmVzcG9zdGFcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLWlwXDAzM1swbSAgICAgICAg
+ICAgICAgICAgICAgICDigJQgSVAgcMO6YmxpY29cbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAt
+ZCBcMDMzWzA7MzNtaG9zdFwwMzNbMG0gICAgICAgICAgICAgICAgICDigJQgRE5TIGxvb2t1cFxu
+IgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC1QIFwwMzNbMDszM21ob3N0XDAzM1swbSAgICAgICAg
+ICAgICAgICAgIOKAlCBwaW5nXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1zY2FuIFwwMzNb
+MDszM21ob3N0IHAxIHAyXDAzM1swbSAgICAgICAg4oCUIHBvcnQgc2NhblxuIgpwcmludGYgIiAg
+XDAzM1sxOzMybW1zIC0tbGlzdGVuIFwwMzNbMDszM21wb3J0YVwwMzNbMG0gICAgICAgICAgIOKA
+lCBsaXN0ZW5lciBUQ1BcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLXNvY2tldCBcMDMzWzA7
+MzNtZmFtIHR5cGUgaCBwIFtkYXRhXVwwMzNbMG0g4oCUIGZpcmUtYW5kLWZvcmdldCBzb2NrZXRc
+blxuIgoKcHJpbnRmICJcMDMzWzE7MzNt4pSA4pSAIFBlbnRlc3Qg4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuIgpwcmludGYgIiAgXDAzM1swOzkw
+bShOID0gZW5kcG9pbnRzIGEgdGVzdGFyOyBwYWRyw6NvIDE7IDAgPSB0b2RvcylcMDMzWzBtXG4i
+CnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLXggXDAzM1swOzMzbXVybCBcMDMzWzA7OTBtW05dXDAz
+M1swbSAgICAgICAgICAgICDigJQgWFNTXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLXEgXDAz
+M1swOzMzbXVybCBcMDMzWzA7OTBtW05dXDAzM1swbSAgICAgICAgICAgICDigJQgU1FMaVxuIgpw
+cmludGYgIiAgXDAzM1sxOzMybW1zIC1sIFwwMzNbMDszM211cmwgXDAzM1swOzkwbVtOXVwwMzNb
+MG0gICAgICAgICAgICAg4oCUIExGSVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC1yIFwwMzNb
+MDszM211cmwgXDAzM1swOzkwbVtOXVwwMzNbMG0gICAgICAgICAgICAg4oCUIFJDRVxuIgpwcmlu
+dGYgIiAgXDAzM1sxOzMybW1zIC1OIFwwMzNbMDszM211cmxcMDMzWzBtICAgICAgICAgICAgICAg
+4oCUIE5vU1FMIEluamVjdGlvblxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tc3NyZiBcMDMz
+WzA7MzNtdXJsIFwwMzNbMDs5MG1bTl1cMDMzWzBtICAgICAgICAg4oCUIFNTUkZcbiIKcHJpbnRm
+ICIgIFwwMzNbMTszMm1tcyAtLXJlZGlyIFwwMzNbMDszM211cmwgXDAzM1swOzkwbVtOXVwwMzNb
+MG0gICAgICAgIOKAlCBPcGVuIFJlZGlyZWN0XG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1z
+c3RpIFwwMzNbMDszM211cmwgXDAzM1swOzkwbVtOXVwwMzNbMG0gICAgICAgICDigJQgU1NUSVxu
+IgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tc2Nhbi1hbGwgXDAzM1swOzMzbXVybCBcMDMzWzA7
+OTBtW05dXDAzM1swbSAgICAg4oCUIHRvZG9zIG9zIHNjYW5uZXJzXG4iCnByaW50ZiAiICBcMDMz
+WzE7MzJtbXMgLXMgXDAzM1swOzMzbXVybCBcMDMzWzA7OTBtW2xpbWl0XSBbZXBdXDAzM1swbSAg
+ICAg4oCUIHNwaWRlciAoZXA9cXVhbHF1ZXIgdmFsb3IgZmlsdHJhIHPDsyBlbmRwb2ludHMpXG4i
+CnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLXAgXDAzM1swOzMzbWVhc3l8bWVkfGhhcmRcMDMzWzBt
+ICAgICAgICAg4oCUIHNvYmUgbGFiIHZ1bG5lcmF2ZWxcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1t
+cyAtcCBzdG9wXDAzM1swbSAgICAgICAgICAgICAgICAgICDigJQgZW5jZXJyYSB0b2RvcyBvcyBs
+YWJzXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLXdlYlwwMzNbMG0gICAgICAgICAgICAgICAg
+ICAgICAg4oCUIHNlcnZpZG9yIEhUTUwgaW50ZXJhdGl2byAocGVkZSBhcnF1aXZvIGUgcG9ydGEp
+XG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLXdlYiBcMDMzWzA7MzNtYXJxdWl2byBwb3J0YVww
+MzNbMG0gICAgICAg4oCUIHNvYmUgc2Vydmlkb3IgZGlyZXRvIGNvbSBvIEhUTUwgaW5kaWNhZG9c
+biIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtd2ViIHN0b3BcMDMzWzBtICAgICAgICAgICAgICAg
+ICDigJQgcGFyYSBvIHNlcnZpZG9yIHdlYlxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tZXhw
+bG9pdC1yY2UgXDAzM1swOzMzbXVybFwwMzNbMG0gICAgICAgIOKAlCBleHBsb2l0LnJjZSBSRVBM
+XG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1leHBsb2l0LXNxbGkgXDAzM1swOzMzbXVybFww
+MzNbMG0gICAgICAg4oCUIGV4cGxvaXQuc3FsaSBSRVBMXG4iCnByaW50ZiAiICBcMDMzWzE7MzJt
+bXMgLS1leHBsb2l0LWxmaSBcMDMzWzA7MzNtdXJsXDAzM1swbSAgICAgICAg4oCUIGV4cGxvaXQu
+bGZpIFJFUExcbiIKcHJpbnRmICJcbiIKCnByaW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBBUEsg4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAz
+M1swbVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tYXBrIFwwMzNbMDszM21hcnF1aXZvLmFw
+ayBbYXJxdWl2bzIuYXBrIC4uLl1cMDMzWzBtIOKAlCB0ZXN0YSBjb21wYXRpYmlsaWRhZGUgRSBp
+bnN0YWxhYmlsaWRhZGUgcmVhbCAoYWNlaXRhIHbDoXJpb3MgYXBrcyBkZSB1bWEgdmV6KVxuIgpw
+cmludGYgIiAgXDAzM1sxOzMybW1zIC0tYXBrLXNpZ24gXDAzM1swOzMzbWFycXVpdm8uYXBrXDAz
+M1swbSAgICDigJQgYWxpbmhhK2Fzc2luYSB1bSBhcGsgSsOBIGNvbXBpbGFkbyAoZXg6IGxvZ28g
+YXDDs3MgJ2Fwa3Rvb2wgYicpLCBzZW0gcmVmYXplciBkZWNvZGUvcmVidWlsZFxuIgpwcmludGYg
+IiAgXDAzM1sxOzMybWFwcGZvcmdlIGJ1aWxkIFwwMzNbMDszM208ZGlyPiBbb3DDp8O1ZXNdXDAz
+M1swbSDigJQgY29udmVydGUgSFRNTC9DU1MvSlMgZW0gQVBLIHNlbSByb290IChleDogYXBwZm9y
+Z2UgYnVpbGQgLi9tZXVhcHAvIC0tcGVybSBjYW1lcmEsbWljKVxuIgpwcmludGYgIlxuIgoKCnBy
+aW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBBbWJpZW50ZSAvIEZlcnJhbWVudGFzIOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIK
+cHJpbnRmICIgIFwwMzNbMTszMm1tcyAtbmhcMDMzWzBtICAgICAgICAgICAgICAgICAgICAgICAg
+IOKAlCBpbnN0YWxhIEthbGkgTmV0SHVudGVyIG5vIFRlcm11eCAoc2VtIHJvb3QpXG4iCnByaW50
+ZiAiICBcMDMzWzE7MzJtbXMgLWJhXDAzM1swbSAgICAgICAgICAgICAgICAgICAgICAgICDigJQg
+aW5zdGFsYSBBcmNoIExpbnV4ICsgQmxhY2tBcmNoIG5vIFRlcm11eCAoc2VtIHJvb3QpXG4iCnBy
+aW50ZiAiXG4iCgpwcmludGYgIlwwMzNbMTszM23ilIDilIAgRmlsZXN5c3RlbSDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzE7MzJt
+bXMgLS1jYXQgXDAzM1swOzMzbWFycXVpdm9cMDMzWzBtICAgICAgICAgICAg4oCUIGxlIGUgaW1w
+cmltZSBhcnF1aXZvXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1scyBcMDMzWzA7MzNtW2Rp
+cl1cMDMzWzBtICAgICAgICAgICAgICDigJQgbGlzdGEgZGlyZXRvcmlvXG4iCnByaW50ZiAiICBc
+MDMzWzE7MzJtbXMgLS13cml0ZSBcMDMzWzA7MzNtYXJxIHRleHRvXDAzM1swbSAgICAgICAg4oCU
+IGVzY3JldmUgYXJxdWl2b1xuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tbHVhLXNjYW4gXDAz
+M1swOzMzbVtkaXJdXDAzM1swbSAgICAgICAgIOKAlCBkZXRlY3RhIC5sdWEgbm8gZGlyZXRvcmlv
+IGUgbGlzdGFcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLWx1YS1zY2FuIFwwMzNbMDszM21b
+ZGlyXSAtLWV4cG9ydCBcMDMzWzA7MzNtW3NhaWRhLmx1YV1cMDMzWzBtIOKAlCBqdW50YSB0b2Rv
+cyBvcyAubHVhIGVtIHVtIGFycXVpdm9cblxuIgoKIyBDcnlwdG8gKG1kNS9zaGEyNTYpIHPDsyBt
+ZWlvIGUgZ29kOyBiNjQgZXhpc3RlIGVtIHRvZG9zCnByaW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBD
+cnlwdG8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAz
+M1swbVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tbWQ1IFwwMzNbMDszM20ndGV4dG8nXDAz
+M1swbSAgICAgICAgICAgIOKAlCBoYXNoIE1ENVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0t
+c2hhMjU2IFwwMzNbMDszM20ndGV4dG8nXDAzM1swbSAgICAgICAgIOKAlCBoYXNoIFNIQTI1Nlxu
+IgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tYjY0ZSBcMDMzWzA7MzNtJ3RleHRvJ1wwMzNbMG0g
+ICAgICAgICAgIOKAlCBCYXNlNjQgZW5jb2RlXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1i
+NjRkIFwwMzNbMDszM20nYjY0J1wwMzNbMG0gICAgICAgICAgICAg4oCUIEJhc2U2NCBkZWNvZGVc
+biIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLWp3dCBcMDMzWzA7MzNtJ3Rva2VuJ1wwMzNbMG0g
+ICAgICAgICAgICDigJQgZGVjb2RpZmljYSBKV1RcblxuIgoKcHJpbnRmICJcMDMzWzE7MzNt4pSA
+4pSAIFNoZWxsIC8gU2lzdGVtYSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG4iCnByaW50
+ZiAiICBcMDMzWzE7MzJtbXMgLS1zaCBcMDMzWzA7MzNtJ2NtZCdcMDMzWzBtICAgICAgICAgICAg
+ICAg4oCUIGV4ZWN1dGEgc2hlbGwsIGNhcHR1cmEgb3V0cHV0XG4iCnByaW50ZiAiICBcMDMzWzE7
+MzJtbXMgLS1wc1wwMzNbMG0gICAgICAgICAgICAgICAgICAgICAg4oCUIGxpc3RhIHByb2Nlc3Nv
+c1xuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0ta2lsbCBcMDMzWzA7MzNtcGlkXDAzM1swbSAg
+ICAgICAgICAgICAg4oCUIG1hdGEgcHJvY2Vzc29cbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAt
+LWVudiBcMDMzWzA7MzNtW1ZBUl1cMDMzWzBtICAgICAgICAgICAgIOKAlCB2YXJpYXZlaXMgZGUg
+YW1iaWVudGVcblxuIgoKcHJpbnRmICJcMDMzWzE7MzNt4pSA4pSAIEFwcmVuZGVyIC8gRXhlbXBs
+b3Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSAXDAzM1swbVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tbGVhcm5cMDMz
+WzBtICAgICAgICAgICAgICAgICAgIOKAlCB0dXRvcmlhbCBpbnRlcmF0aXZvIGVtIHBvcnR1Z3XD
+qnNcbiIKcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLWV4YW1wbGVzXDAzM1swbSAgICAgICAgICAg
+ICAgICDigJQgbGlzdGEgc2NyaXB0cyBkZSBleGVtcGxvIHByb250b3NcbiIKcHJpbnRmICIgIFww
+MzNbMTszMm1tcyAtLWRvY1wwMzNbMG0gICAgICAgICAgICAgICAgICAgICDigJQgZG9jdW1lbnRh
+w6fDo28gY29tcGxldGEgZG8gc2lzdGVtYVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tZG9j
+IG5ldFwwMzNbMG0gICAgICAgICAgICAgICAgIOKAlCBtw7NkdWxvIG5ldC4qXG4iCnByaW50ZiAi
+ICBcMDMzWzE7MzJtbXMgLS1kb2MgbW9kXDAzM1swbSAgICAgICAgICAgICAgICAg4oCUIG3Ds2R1
+bG8gbW9kLiogKDIzIHNjYW5uZXJzKVxuIgpwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tZG9jIGNy
+eXB0b3xzeXN8ZnN8YWlcMDMzWzBtICAgIOKAlCBvdXRyb3MgbcOzZHVsb3NcbiIKcHJpbnRmICIg
+IFwwMzNbMTszMm1tcyAtLXBheWxvYWRcMDMzWzBtICAgICAgICAgICAgICAgICDigJQgZ2VyYWRv
+ciBkZSBwYXlsb2FkcyAocmV2ZXJzZS9iaW5kL3dlYiBzaGVsbClcbiIKcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIFNjcmlwdHM6IHJlY29uLCBwb3J0c2Nhbiwgd2ViY2hlY2ssIGhhc2hjcmFjaywgbmV4
+dXNcMDMzWzBtXG5cbiIKCnByaW50ZiAiXDAzM1sxOzMzbeKUgOKUgCBTY3JpcHRzIOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIKcHJpbnRmICIg
+IFwwMzNbMTszMm1tcyAtLXNjcmlwdCBcMDMzWzA7MzNtPG5vbWU+XDAzM1swbSAgICAgICAgICAg
+IOKAlCBleGVjdXRhIHNjcmlwdCBMdWEgb3UgQyBkbyBkaXJldG9yaW8gZGUgc2NyaXB0c1xuIgpw
+cmludGYgIiAgXDAzM1sxOzMybW1zIC0tc2NyaXB0IFwwMzNbMDszM208bm9tZT4gLS0gW2FyZ3Nd
+XDAzM1swbSAg4oCUIGNvbSBhcmd1bWVudG9zXG4iCnByaW50ZiAiICBcMDMzWzA7OTBtICBMdWE6
+ICR7UFJFRklYOi0vdXNyL2xvY2FsfS9zaGFyZS9sdWEtc2NyaXB0c1wwMzNbMG1cbiIKcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIEM6ICAgJHtQUkVGSVg6LS91c3IvbG9jYWx9L3NoYXJlL2Mtc2NyaXB0
+cyAgKGZvbnRlcyAuYyBjb21waWxhbSBhdXRvbWF0aWNhbWVudGUpXDAzM1swbVxuIgpwcmludGYg
+IiAgXDAzM1swOzkwbSAgRXhlbXBsb3M6XDAzM1swbVxuIgpwcmludGYgIiAgXDAzM1swOzkwbSAg
+ICBtcyAtLXNjcmlwdCBuZXh1cyAtLW9zIDguOC44LjhcMDMzWzBtXG4iCnByaW50ZiAiICBcMDMz
+WzA7OTBtICAgIG1zIC0tc2NyaXB0IHBvcnRzY2FuLmx1YSAtLSAxOTIuMTY4LjEuMSA4MCA0NDNc
+MDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzA7OTBtICAgIG1zIC0tc2NyaXB0IHhlcnhlcy5jIC0t
+IDE5Mi4xNjguMS4xIDgwXDAzM1swbVxuXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1jc2Ny
+aXB0IFwwMzNbMDszM208bm9tZS5jPlwwMzNbMG0gICAgICAgICDigJQgY29tcGlsYSBlIGV4ZWN1
+dGEgc2NyaXB0IEMgZGUgYy1zY3JpcHRzXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1jc2Ny
+aXB0IFwwMzNbMDszM208YmluYXJpbz5cMDMzWzBtICAgICAgICDigJQgZXhlY3V0YSBiaW5hcmlv
+IEMgamEgY29tcGlsYWRvXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtbXMgLS1jc2NyaXB0IFwwMzNb
+MDszM208bm9tZS5jPiAtLSBbYXJnc11cMDMzWzBtIOKAlCBjb20gYXJndW1lbnRvc1xuXG4iCgpw
+cmludGYgIlwwMzNbMDs5MG0gIEV4ZW1wbG9zOlwwMzNbMG1cbiIKcHJpbnRmICIgIFwwMzNbMDs5
+MG1tcyAtYSAnbyBxdWUgZSBYU1M/JyAgICAgICAgICAgICAgICAgICAgbXMgLS1zaGEyNTYgJ3Nl
+bmhhMTIzJ1wwMzNbMG1cbiIKcHJpbnRmICIgIFwwMzNbMDs5MG1tcyAtcSAnaHR0cDovLzEyNy4w
+LjAuMTo4MDgxLz9xPScgICAgICAgbXMgLWcgaHR0cHM6Ly9leGFtcGxlLmNvbVwwMzNbMG1cbiIK
+cHJpbnRmICIgIFwwMzNbMDs5MG1tcyAtLXNjYW4tYWxsICdodHRwOi8vMTI3LjAuMC4xOjgwODEv
+JyAgbXMgLS1zaCAnbHMgfidcMDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzA7OTBtbXMgLS1hcGsg
+YXBwLmFwayAgICAgICAgICAgICAgICAgICAgICAgIG1zIC0tYXBrLXNpZ24gYXBwLXJlY29tcGls
+YWRvLmFwa1wwMzNbMG1cbiIKCgpwcmludGYgIlwwMzNbMDs5MG0gIE5vIFJFUEw6IG1zLmhlbHAo
+KSAgbW9kLmhlbHAoKSAgY3J5cHRvLmhlbHAoKSAgYWkuaGVscCgpICBwZW50LmhlbHAoKVwwMzNb
+MG1cblxuIgoKcHJpbnRmICJcMDMzWzE7MzNt4pSA4pSAIFZhcmnDoXZlaXMgSW5kZXhhZGFzIChp
+dmFyIHYyLjApIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIKcHJpbnRm
+ICIgIFwwMzNbMTszMm1pdmFyLmVuYWJsZSgpXDAzM1swbSAgICAgICAgICAgICAgICDigJQgYXRp
+dmEgKHBhZHLDo28gZGVzZGUgYSBpbnN0YWxhw6fDo28pXG4iCnByaW50ZiAiICBcMDMzWzE7MzJt
+aXZhci5kaXNhYmxlKClcMDMzWzBtICAgICAgICAgICAgICAg4oCUIGRlc2F0aXZhXG4iCnByaW50
+ZiAiICBcMDMzWzE7MzJtaXZhci5saXN0KClcMDMzWzBtICAgICAgICAgICAgICAgICAg4oCUIG1h
+cGEgIU4g4oaSIG5vbWUgPSB2YWxvciBhdHVhbFxuIgpwcmludGYgIiAgXDAzM1sxOzMybWl2YXIu
+YWxpYXMoXCJocFwiLCBcInBsYXllcl9ocFwiKVwwMzNbMG0gIOKAlCByZWdpc3RyYSAhaHAg4oaS
+IHBsYXllcl9ocFxuIgpwcmludGYgIiAgXDAzM1sxOzMybWl2YXIuZGVidWcodHJ1ZSlcMDMzWzBt
+ICAgICAgICAgICAgIOKAlCBhdmlzYSBhbyByZWdpc3RyYXIgY2FkYSB2YXJpw6F2ZWxcbiIKcHJp
+bnRmICIgIFwwMzNbMTszMm1pdmFyLnJlc2V0KClcMDMzWzBtICAgICAgICAgICAgICAgICDigJQg
+bGltcGEgw61uZGljZXMsIGFsaWFzZXMgZSBlc2NvcG9zXG4iCnByaW50ZiAiICBcMDMzWzA7OTBt
+ICAhaHAgPSBwbGF5ZXJfaHAgICAgICAgICAgICAgIOKAlCBhbGlhcyBub21lYWRvIChzdXByaW1p
+ZG8gZG8gTHVhKVwwMzNbMG1cbiIKcHJpbnRmICIgIFwwMzNbMDs5MG0gIG5vbWVfbG9uZ28gPSA0
+MiAg4oaSICExOyBwcmludCghMSkg4oaSIHByaW50KG5vbWVfbG9uZ28pXDAzM1swbVxuIgpwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgRGVudHJvIGRlIGZ1bmN0aW9ue306ICExIHJlaW5pY2lhIG5vIGVz
+Y29wbyBkYSBmdW7Dp8Ojby5cMDMzWzBtXG5cbiIKfQoKCgojIOKUgOKUgCBUcmFkdcOnw6NvIGRl
+IGVycm9zIEx1YSDihpIgcG9ydHVndcOqcyBCUiDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIAKX2x1YV9ydW4oKSB7CiAgICBsb2NhbCBfdG1wOyBf
+dG1wPSIkSE9NRS8uZWxsaW90X2Vycl8kJCIKICAgICIkQCIgMj4iJF90bXAiCiAgICBsb2NhbCBf
+cmM9JD8KICAgIGlmIFsgLXMgIiRfdG1wIiBdOyB0aGVuCiAgICAgICAgc2VkIFwKICAgICAgICAg
+ICAgLWUgJ3MvYmFkIGFyZ3VtZW50ICNcKFswLTldKlwpIHRvICciJyInXChbXiciJyInXSpcKSci
+JyInIChcKFthLXogXSpcKSBleHBlY3RlZCwgZ290IFwoW2EteiBdKlwpKS9hcmd1bWVudG8gI1wx
+IGludmFsaWRvIGVtICciJyInXDInIiciJyAoZXNwZXJhZG8gXDMsIHJlY2ViZXUgXDQpL2cnIFwK
+ICAgICAgICAgICAgLWUgJ3MvYmFkIGFyZ3VtZW50ICNcKFswLTldKlwpIChcKFthLXogXSpcKSBl
+eHBlY3RlZCwgZ290IFwoW2EteiBdKlwpKS9hcmd1bWVudG8gI1wxIGludmFsaWRvIChlc3BlcmFk
+byBcMiwgcmVjZWJldSBcMykvZycgXAogICAgICAgICAgICAtZSAncy9hdHRlbXB0IHRvIGluZGV4
+IGEgbmlsIHZhbHVlIChnbG9iYWwgJyInIidcKFteJyInIiddKlwpJyInIicpL3RlbnRhdGl2YSBk
+ZSBpbmRleGFyIHZhbG9yIG51bG86IHZhcmlhdmVsIGdsb2JhbCAnIiciJ1wxJyInIicgbmFvIGV4
+aXN0ZS9nJyBcCiAgICAgICAgICAgIC1lICdzL2F0dGVtcHQgdG8gaW5kZXggYSBuaWwgdmFsdWUg
+KGxvY2FsICciJyInXChbXiciJyInXSpcKSciJyInKS90ZW50YXRpdmEgZGUgaW5kZXhhciB2YWxv
+ciBudWxvOiB2YXJpYXZlbCBsb2NhbCAnIiciJ1wxJyInIicgZSBudWxvL2cnIFwKICAgICAgICAg
+ICAgLWUgJ3MvYXR0ZW1wdCB0byBpbmRleCBhIG5pbCB2YWx1ZSAoZmllbGQgJyInIidcKFteJyIn
+IiddKlwpJyInIicpL3RlbnRhdGl2YSBkZSBpbmRleGFyIGNhbXBvIG51bG86ICciJyInXDEnIici
+JyBlIG51bG8vZycgXAogICAgICAgICAgICAtZSAncy9hdHRlbXB0IHRvIGluZGV4IGEgbmlsIHZh
+bHVlL3RlbnRhdGl2YSBkZSBpbmRleGFyIHVtIHZhbG9yIG51bG8vZycgXAogICAgICAgICAgICAt
+ZSAncy9hdHRlbXB0IHRvIGluZGV4IGEgXChbYS16XSpcKSB2YWx1ZS90ZW50YXRpdmEgZGUgaW5k
+ZXhhciB2YWxvciBcMS9nJyBcCiAgICAgICAgICAgIC1lICdzL2F0dGVtcHQgdG8gY2FsbCBhIG5p
+bCB2YWx1ZSAoZ2xvYmFsICciJyInXChbXiciJyInXSpcKSciJyInKS90ZW50YXRpdmEgZGUgY2hh
+bWFyICciJyInXDEnIiciJyBxdWUgbmFvIGUgdW1hIGZ1bmNhby9nJyBcCiAgICAgICAgICAgIC1l
+ICdzL2F0dGVtcHQgdG8gY2FsbCBhIG5pbCB2YWx1ZSAobG9jYWwgJyInIidcKFteJyInIiddKlwp
+JyInIicpL3ZhcmlhdmVsIGxvY2FsICciJyInXDEnIiciJyBuYW8gZSB1bWEgZnVuY2FvL2cnIFwK
+ICAgICAgICAgICAgLWUgJ3MvYXR0ZW1wdCB0byBjYWxsIGEgbmlsIHZhbHVlIChmaWVsZCAnIici
+J1woW14nIiciJ10qXCknIiciJykvY2FtcG8gJyInIidcMSciJyInIG5hbyBlIHVtYSBmdW5jYW8v
+ZycgXAogICAgICAgICAgICAtZSAncy9hdHRlbXB0IHRvIGNhbGwgYSBuaWwgdmFsdWUvdGVudGF0
+aXZhIGRlIGNoYW1hciB1bSB2YWxvciBudWxvL2cnIFwKICAgICAgICAgICAgLWUgJ3MvYXR0ZW1w
+dCB0byBjYWxsIGEgXChbYS16XSpcKSB2YWx1ZS90ZW50YXRpdmEgZGUgY2hhbWFyIHVtIHZhbG9y
+IFwxL2cnIFwKICAgICAgICAgICAgLWUgJ3MvYXR0ZW1wdCB0byBwZXJmb3JtIGFyaXRobWV0aWMg
+b24gYSBuaWwgdmFsdWUvb3BlcmFjYW8gYXJpdG1ldGljYSBlbSB2YWxvciBudWxvL2cnIFwKICAg
+ICAgICAgICAgLWUgJ3MvYXR0ZW1wdCB0byBwZXJmb3JtIGFyaXRobWV0aWMgb24gYSBcKFthLXpd
+KlwpIHZhbHVlL29wZXJhY2FvIGFyaXRtZXRpY2EgZW0gdmFsb3IgXDEvZycgXAogICAgICAgICAg
+ICAtZSAncy9hdHRlbXB0IHRvIGNvbmNhdGVuYXRlIGEgbmlsIHZhbHVlL3RlbnRhdGl2YSBkZSBj
+b25jYXRlbmFyIHZhbG9yIG51bG8vZycgXAogICAgICAgICAgICAtZSAncy9hdHRlbXB0IHRvIGNv
+bmNhdGVuYXRlIGEgXChbYS16XSpcKSB2YWx1ZS90ZW50YXRpdmEgZGUgY29uY2F0ZW5hciB2YWxv
+ciBcMS9nJyBcCiAgICAgICAgICAgIC1lICdzL2F0dGVtcHQgdG8gZ2V0IGxlbmd0aCBvZiBhIG5p
+bCB2YWx1ZS90ZW50YXRpdmEgZGUgb2J0ZXIgdGFtYW5obyBkZSB2YWxvciBudWxvL2cnIFwKICAg
+ICAgICAgICAgLWUgJ3MvYXR0ZW1wdCB0byBnZXQgbGVuZ3RoIG9mIGEgXChbYS16XSpcKSB2YWx1
+ZS90ZW50YXRpdmEgZGUgb2J0ZXIgdGFtYW5obyBkZSB2YWxvciBcMS9nJyBcCiAgICAgICAgICAg
+IC1lICdzL2F0dGVtcHQgdG8gY29tcGFyZSB0d28gXChbYS16XSpcKSB2YWx1ZXMvdGVudGF0aXZh
+IGRlIGNvbXBhcmFyIGRvaXMgdmFsb3JlcyBcMS9nJyBcCiAgICAgICAgICAgIC1lICdzL2F0dGVt
+cHQgdG8gY29tcGFyZSBcKFthLXpdKlwpIHdpdGggXChbYS16XSpcKS90ZW50YXRpdmEgZGUgY29t
+cGFyYXIgXDEgY29tIFwyL2cnIFwKICAgICAgICAgICAgLWUgJ3MvYXR0ZW1wdCB0byBwZXJmb3Jt
+IGJpdHdpc2Ugb3BlcmF0aW9uIG9uIGEgXChbYS16XSpcKSB2YWx1ZS9vcGVyYWNhbyBiaXR3aXNl
+IGVtIHZhbG9yIFwxL2cnIFwKICAgICAgICAgICAgLWUgJ3Mvc3RhY2sgb3ZlcmZsb3cvZXN0b3Vy
+byBkZSBwaWxoYSAocmVjdXJzYW8gaW5maW5pdGE/KS9nJyBcCiAgICAgICAgICAgIC1lICdzL3Rh
+YmxlIGluZGV4IGlzIG5pbC9pbmRpY2UgZGUgdGFiZWxhIG51bG8vZycgXAogICAgICAgICAgICAt
+ZSAncy90YWJsZSBpbmRleCBpcyBOYU4vaW5kaWNlIGRlIHRhYmVsYSBpbnZhbGlkbyAoTmFOKS9n
+JyBcCiAgICAgICAgICAgIC1lICdzL25vdCBlbm91Z2ggbWVtb3J5L21lbW9yaWEgaW5zdWZpY2ll
+bnRlL2cnIFwKICAgICAgICAgICAgLWUgJ3MvYXNzZXJ0aW9uIGZhaWxlZCEvZmFsaGEgbmEgYXNz
+ZXJjYW8hL2cnIFwKICAgICAgICAgICAgLWUgJ3Mvc3ludGF4IGVycm9yIG5lYXIgJyInIidcKFte
+JyInIiddKlwpJyInIicvZXJybyBkZSBzaW50YXhlIHBlcnRvIGRlICciJyInXDEnIiciJy9nJyBc
+CiAgICAgICAgICAgIC1lICdzL2JyZWFrIG91dHNpZGUgbG9vcC9icmVhayBmb3JhIGRlIHVtIGxh
+Y28vZycgXAogICAgICAgICAgICAtZSAncy91bmZpbmlzaGVkIHN0cmluZy9zdHJpbmcgaW5jb21w
+bGV0YSAoZmFsdGEgZmVjaGFyIGFzcGFzKS9nJyBcCiAgICAgICAgICAgIC1lICdzL3VuZmluaXNo
+ZWQgbG9uZyBzdHJpbmcvc3RyaW5nIGxvbmdhIGluY29tcGxldGEgKGZhbHRhIF1dKS9nJyBcCiAg
+ICAgICAgICAgIC1lICdzL3VuZmluaXNoZWQgbG9uZyBjb21tZW50L2NvbWVudGFyaW8gbG9uZ28g
+aW5jb21wbGV0by9nJyBcCiAgICAgICAgICAgIC1lICdzL21hbGZvcm1lZCBudW1iZXIvbnVtZXJv
+IG1hbGZvcm1hZG8vZycgXAogICAgICAgICAgICAtZSAncy9pbnZhbGlkIGVzY2FwZSBzZXF1ZW5j
+ZS9zZXF1ZW5jaWEgZGUgZXNjYXBlIGludmFsaWRhL2cnIFwKICAgICAgICAgICAgLWUgJ3MvbW9k
+dWxlICciJyInXChbXiciJyInXSpcKSciJyInIG5vdCBmb3VuZC9tb2R1bG8gJyInIidcMSciJyIn
+IG5hbyBlbmNvbnRyYWRvL2cnIFwKICAgICAgICAgICAgLWUgJ3MvY2Fubm90IHJlc3VtZSBkZWFk
+IGNvcm91dGluZS9uYW8gZSBwb3NzaXZlbCByZXRvbWFyIGNvcm91dGluZSBtb3J0YS9nJyBcCiAg
+ICAgICAgICAgIC1lICdzL2Nhbm5vdCByZXN1bWUgcnVubmluZyBjb3JvdXRpbmUvbmFvIGUgcG9z
+c2l2ZWwgcmV0b21hciBjb3JvdXRpbmUgZW0gZXhlY3VjYW8vZycgXAogICAgICAgICAgICAtZSAn
+cy92YWx1ZSBoYXMgbm8gaW50ZWdlciByZXByZXNlbnRhdGlvbi92YWxvciBzZW0gcmVwcmVzZW50
+YWNhbyBpbnRlaXJhL2cnIFwKICAgICAgICAgICAgLWUgJ3Mvc3RhY2sgdHJhY2ViYWNrOi9yYXN0
+cm8gZGUgY2hhbWFkYXM6L2cnIFwKICAgICAgICAgICAgLWUgJ3MvaW4gbWFpbiBjaHVuay9ubyBj
+b2RpZ28gcHJpbmNpcGFsL2cnIFwKICAgICAgICAgICAgLWUgJ3MvXGJudW1iZXJcYi9udW1lcm8v
+ZycgXAogICAgICAgICAgICAtZSAncy9cYm5pbFxiL251bG8vZycgXAogICAgICAgICAgICAtZSAn
+cy9cYmJvb2xlYW5cYi9ib29sZWFuby9nJyBcCiAgICAgICAgICAgIC1lICdzL1xiaW50ZWdlclxi
+L2ludGVpcm8vZycgXAogICAgICAgICAgICAtZSAncy9cYmZsb2F0XGIvZGVjaW1hbC9nJyBcCiAg
+ICAgICAgICAgICIkX3RtcCIgPiYyCiAgICBmaQogICAgcm0gLWYgIiRfdG1wIgogICAgcmV0dXJu
+ICRfcmMKfQoKIyDilIDilIAgUHLDqS1wcm9jZXNzYW1lbnRvIGRlIHZhcmnDoXZlaXMgaW5kZXhh
+ZGFzIChleHBlcmltZW50YWwpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgAojIFNlIG8gYXJxdWl2byBjb250aXZlciAiaXZhci5lbmFibGUoKSIg
+b3UgcmVmZXLDqm5jaWFzICIhTiIgKGZvcmEgZGUgc3RyaW5ncyksCiMgZ2VyYSB1bSB0ZW1wb3LD
+oXJpbyBwcsOpLXByb2Nlc3NhZG8gZSBleGVjdXRhIGVzc2UgYXJxdWl2by4KIyBDYXNvIGNvbnRy
+w6FyaW8sIGV4ZWN1dGEgbyBhcnF1aXZvIG9yaWdpbmFsIHNlbSBvdmVyaGVhZC4KX2l2YXJfbmVl
+ZHNfcHJlcHJvY2VzcygpIHsKICAgICMgUmV0b3JuYSAwICh0cnVlKSBzZSBvIGFycXVpdm8gY29u
+dGl2ZXIgaXZhci5lbmFibGUoKSwgITxkaWdpdG8+IG91IHNpbnRheGUgdHJpZi90cnlpZgogICAg
+Z3JlcCAtcUUgJ2l2YXJcLmVuYWJsZVwoXCl8IVswLTldfF5bWzpzcGFjZTpdXSoodHJpZiB8dHJ5
+aWYgfHRyeWVsc2V8dHJ5ZW5kfHRyeWVsc2VpZiApJyAiJDEiIDI+L2Rldi9udWxsCn0KCl9pdmFy
+X3J1bl9maWxlKCkgewogICAgbG9jYWwgX3NyYz0iJDEiOyBzaGlmdAogICAgbG9jYWwgX2l2YXJf
+dG1wPSIke0hPTUV9Ly5jYWNoZS9lbGxpb3QvaXZhcl9wcF8kJC5sdWEiCiAgICBta2RpciAtcCAi
+JHtIT01FfS8uY2FjaGUvZWxsaW90IgogICAgIyBVc2EgbyBwcsOzcHJpbyBydW50aW1lIHBhcmEg
+cHLDqS1wcm9jZXNzYXIgdmlhIGl2YXIucHJlcHJvY2VzcygpCiAgICAiJF9CIiAtZSAiCnJlcXVp
+cmUoJ0BzdGQnKQpsb2NhbCBfaXZhcl9tb2QgPSByZXF1aXJlKCdAc3RkL2l2YXInKQpsb2NhbCBz
+cmMgPSBbWyRfc3JjXV0KbG9jYWwgZiA9IGlvLm9wZW4oc3JjLCAncicpCmlmIG5vdCBmIHRoZW4g
+aW8uc3RkZXJyOndyaXRlKCdpdmFyOiBuYW8gZm9pIHBvc3NpdmVsIGFicmlyICcgLi4gc3JjIC4u
+ICdcbicpIG9zLmV4aXQoMSkgZW5kCmxvY2FsIGNvZGUgPSBmOnJlYWQoJyphJyk7IGY6Y2xvc2Uo
+KQpjb2RlID0gKCdcbicuLmNvZGUpOmdzdWIoJ1xuKFsgXHRdKil0cnlpZiAnLCAnXG4lMXRyaWYg
+Jyk6c3ViKDIpCmxvY2FsIG91dCA9IF9pdmFyX21vZC5wcmVwcm9jZXNzKGNvZGUpCmxvY2FsIHcg
+PSBpby5vcGVuKFtbJF9pdmFyX3RtcF1dLCAndycpCmlmIG5vdCB3IHRoZW4gaW8uc3RkZXJyOndy
+aXRlKCdpdmFyOiBuYW8gZm9pIHBvc3NpdmVsIGNyaWFyIHRlbXBcbicpIG9zLmV4aXQoMSkgZW5k
+Cnc6d3JpdGUob3V0KTsgdzpjbG9zZSgpCiIgMj4vZGV2L251bGwKICAgIGlmIFsgLWYgIiRfaXZh
+cl90bXAiIF07IHRoZW4KICAgICAgICAjIEluamV0YSBhcmdbMF0gY29tIG8gbm9tZSByZWFsIGRv
+IHNjcmlwdCBubyB0b3BvIGRvIGFycXVpdm8gdGVtcG9yw6FyaW8KICAgICAgICBsb2NhbCBfdG1w
+Mj0iJHtIT01FfS8uY2FjaGUvZWxsaW90L2l2YXJfcHAyXyQkLmx1YSIKICAgICAgICBwcmludGYg
+J3JlcXVpcmUoIkBzdGQiKVxuYXJnWzBdPSIlcyJcbicgIiRfc3JjIiA+ICIkX3RtcDIiCiAgICAg
+ICAgY2F0ICIkX2l2YXJfdG1wIiA+PiAiJF90bXAyIgogICAgICAgIG12ICIkX3RtcDIiICIkX2l2
+YXJfdG1wIgogICAgICAgIF9sdWFfcnVuICIkX0IiICIkX2l2YXJfdG1wIiAiJEAiCiAgICAgICAg
+bG9jYWwgX3JjPSQ/CiAgICAgICAgcm0gLWYgIiRfaXZhcl90bXAiCiAgICAgICAgcmV0dXJuICRf
+cmMKICAgIGVsc2UKICAgICAgICAjIEZhbGxiYWNrOiBleGVjdXRhIG9yaWdpbmFsIHNlbSBwcmVw
+cm9jZXNzYW1lbnRvCiAgICAgICAgX2x1YV9ydW4gIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKSIg
+IiRfc3JjIiAiJEAiCiAgICBmaQp9CgpjYXNlICIkMSIgaW4KICAtaHwtLWhlbHApCiAgICBfaGVs
+cAogICAgOzsKICAtdnwtLXZlcnNpb24pCiAgICBwcmludGYgIlwwMzNbMTszN21FbGxpb3RPUyB2
+MTcuMFwwMzNbMG0g4oCUIEx1YSA1LjQuOCArIG3Ds2R1bG9zIG5hdGl2b3NcbiIKICAgIDs7CiAg
+LWMpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAiJCoiCiAgICA7OwogIC1mKQogICAgc2hp
+ZnQKICAgICMgRXhlY3V0YSBhcnF1aXZvIGNvbSBwcsOpLXByb2Nlc3NhbWVudG8gYXV0b23DoXRp
+Y28gZGUgaXZhciBzZSBuZWNlc3PDoXJpbwogICAgaWYgWyAtZiAiJHsxOi19IiBdICYmIF9pdmFy
+X25lZWRzX3ByZXByb2Nlc3MgIiQxIjsgdGhlbgogICAgICAgIF9pdmFyX3J1bl9maWxlICIkQCIK
+ICAgIGVsc2UKICAgICAgICBfbHVhX3J1biAiJF9CIiAiJEAiCiAgICBmaQogICAgOzsKICAtZXwt
+LWVkaXQpCiAgICBzaGlmdAogICAgX0VFX0ZJTEU9IiIKICAgIF9FRV9PVVQ9IiIKICAgIHdoaWxl
+IFsgIiQjIiAtZ3QgMCBdOyBkbwogICAgICBjYXNlICIkMSIgaW4KICAgICAgICAtdnwtLXZlcmlm
+eSkKICAgICAgICAgIHNoaWZ0OyBfRUVfT1VUPSIkMSI7IHNoaWZ0IDs7CiAgICAgICAgKikgX0VF
+X0ZJTEU9IiQxIjsgc2hpZnQgOzsKICAgICAgZXNhYwogICAgZG9uZQogICAgIyBNb2RvIC12OiB2
+ZXJpZmljYSBzaW50YXhlIGUgc2FsdmEgZXJyb3Mgbm8gYXJxdWl2byBzZW0gYWJyaXIgbyBlZGl0
+b3IKICAgIGlmIFsgLW4gIiRfRUVfT1VUIiBdICYmIFsgLW4gIiRfRUVfRklMRSIgXTsgdGhlbgog
+ICAgICBpZiBbICEgLWYgIiRfRUVfRklMRSIgXTsgdGhlbgogICAgICAgIHByaW50ZiAiXDAzM1sx
+OzMxbVvinJddIEFycXVpdm8gbsOjbyBlbmNvbnRyYWRvOiAkX0VFX0ZJTEVcMDMzWzBtXG4iOyBl
+eGl0IDEKICAgICAgZmkKICAgICAgX0VYVD0iJHtfRUVfRklMRSMjKi59IgogICAgICBfRVJST1JT
+PSIiCiAgICAgIGNhc2UgIiRfRVhUIiBpbgogICAgICAgIGx1YSkKICAgICAgICAgIF9FUlJPUlM9
+JChsdWFjIC1wICIkX0VFX0ZJTEUiIDI+JjEpIDs7CiAgICAgICAgc2h8YmFzaCkKICAgICAgICAg
+IF9FUlJPUlM9JChzaCAtbiAiJF9FRV9GSUxFIiAyPiYxKSA7OwogICAgICAgIGN8aCkKICAgICAg
+ICAgIF9FUlJPUlM9JChjbGFuZyAtZnN5bnRheC1vbmx5ICIkX0VFX0ZJTEUiIDI+JjEpIDs7CiAg
+ICAgICAgcHkpCiAgICAgICAgICBfRVJST1JTPSQocHl0aG9uMyAtbSBweV9jb21waWxlICIkX0VF
+X0ZJTEUiIDI+JjEpIDs7CiAgICAgICAganMpCiAgICAgICAgICBfRVJST1JTPSQobm9kZSAtLWNo
+ZWNrICIkX0VFX0ZJTEUiIDI+JjEpIDs7CiAgICAgICAgKikKICAgICAgICAgIHByaW50ZiAiXDAz
+M1sxOzMzbVshXSBUaXBvIC4kX0VYVCBzZW0gdmVyaWZpY2Fkb3Ig4oCUIHRlbnRhbmRvIGx1YWMu
+Li5cMDMzWzBtXG4iCiAgICAgICAgICBfRVJST1JTPSQobHVhYyAtcCAiJF9FRV9GSUxFIiAyPiYx
+KSA7OwogICAgICBlc2FjCiAgICAgIGlmIFsgLXogIiRfRVJST1JTIiBdOyB0aGVuCiAgICAgICAg
+cHJpbnRmICJcMDMzWzE7MzJtW+Kck10gTmVuaHVtIGVycm8gZW5jb250cmFkbyBlbSAkX0VFX0ZJ
+TEVcMDMzWzBtXG4iCiAgICAgICAgcHJpbnRmICIjIFZlcmlmaWNhZG8gZW0gJChkYXRlKVxuIyAk
+X0VFX0ZJTEU6IE9LXG4iID4gIiRfRUVfT1VUIgogICAgICBlbHNlCiAgICAgICAgcHJpbnRmICJc
+MDMzWzE7MzFtW+Kcl10gRXJyb3MgZW5jb250cmFkb3Mg4oCUIHNhbHZhbmRvIGVtICRfRUVfT1VU
+XDAzM1swbVxuIgogICAgICAgIHByaW50ZiAiIyBFcnJvcyBlbSAkX0VFX0ZJTEUgKCQoZGF0ZSkp
+XG5cbiRfRVJST1JTXG4iID4gIiRfRUVfT1VUIgogICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSVz
+XDAzM1swbVxuIiAiJF9FUlJPUlMiCiAgICAgIGZpCiAgICAgIGV4aXQgMAogICAgZmkKICAgICMg
+TW9kbyBub3JtYWw6IGFicmUgbyBlZGl0b3IKICAgIF9FRT0kKGNvbW1hbmQgLXYgZWUgMj4vZGV2
+L251bGwpCiAgICBpZiBbIC1uICIkX0VFIiBdOyB0aGVuCiAgICAgIGNsZWFyCiAgICAgIGV4ZWMg
+IiRfRUUiICIke19FRV9GSUxFOi19IgogICAgZWxzZQogICAgICBwcmludGYgIlwwMzNbMTszMW1b
+4pyXXSBFbGxpb3RPUyBFZGl0b3IgKGVlKSBuw6NvIGVuY29udHJhZG8uXDAzM1swbVxuIgogICAg
+ICBwcmludGYgIlwwMzNbMDs5MG0gICAgUmVpbnN0YWxlIGNvbTogYmFzaCBsdWFzY3JpcHQgLWVc
+MDMzWzBtXG4iCiAgICAgIGV4aXQgMQogICAgZmkKICAgIDs7CiAgLXQpCiAgICBleGVjICIkX0Ii
+IC1lICJyZXF1aXJlKCdAc3RkJyk7bXMuY2hlY2soKSIKICAgIDs7CiAgLXR2fC12dCkKICAgIGV4
+ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTttcy5jaGVjaygndicpIgogICAgOzsKICAtVCkK
+ICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTttcy5mb3JjZSgpIgogICAgOzsKICAt
+VHZ8LXZUKQogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcpO21zLmZvcmNlKCd2Jyki
+CiAgICA7OwogIC1wKQogICAgc2hpZnQKICAgIGlmIFsgLXogIiQxIiBdIHx8IFsgIiQxIiA9ICJz
+dG9wIiBdOyB0aGVuCiAgICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtwZW50LnN0
+b3AoKSIKICAgIGVsc2UKICAgICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcpO3BlbnQu
+c3RhcnQoJyQxJykiCiAgICBmaQogICAgOzsKICAtaXwtLWluZm8pCiAgICBleGVjICIkX0IiIC1l
+ICJyZXF1aXJlKCdAc3RkJyk7c3lzLmluZm8oKSIKICAgIDs7CgogICMg4pSA4pSAIFNlcnZpZG9y
+IFdlYiBIVE1MIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgAogIC13ZWIpCiAgICBzaGlmdAogICAgX1dFQl9DQUNIRT0iJHtIT01F
+fS8uY2FjaGUvZWxsaW90IgogICAgX1dFQl9QSURfRklMRT0iJHtfV0VCX0NBQ0hFfS93ZWIucGlk
+IgogICAgX1dFQl9JTkZPX0ZJTEU9IiR7X1dFQl9DQUNIRX0vd2ViLmluZm8iCiAgICBta2RpciAt
+cCAiJHtfV0VCX0NBQ0hFfSIKCiAgICAjIEZ1bsOnw6NvIGludGVybmE6IG1hdGEgc2Vydmlkb3Ig
+YW50ZXJpb3Igc2UgZXhpc3RpcgogICAgX3dlYl9zdG9wX29sZCgpIHsKICAgICAgaWYgWyAtZiAi
+JHtfV0VCX1BJRF9GSUxFfSIgXTsgdGhlbgogICAgICAgIF9PTERfUElEPSQoY2F0ICIke19XRUJf
+UElEX0ZJTEV9IiAyPi9kZXYvbnVsbCkKICAgICAgICBpZiBbIC1uICIke19PTERfUElEfSIgXTsg
+dGhlbgogICAgICAgICAga2lsbCAiJHtfT0xEX1BJRH0iIDI+L2Rldi9udWxsCiAgICAgICAgICAj
+IG1hdGEgdGFtYsOpbSBvIHN1YnNoZWxsIGRlIGtlZXBhbGl2ZSAoUElEKzEgZSBQR0lEKQogICAg
+ICAgICAga2lsbCAtLSAiLSR7X09MRF9QSUR9IiAyPi9kZXYvbnVsbCB8fCB0cnVlCiAgICAgICAg
+ZmkKICAgICAgICBybSAtZiAiJHtfV0VCX1BJRF9GSUxFfSIgIiR7X1dFQl9JTkZPX0ZJTEV9Igog
+ICAgICBmaQogICAgfQoKICAgICMgRnVuw6fDo28gaW50ZXJuYTogc29iZSBvIHNlcnZpZG9yIGUg
+c2FsdmEgUElECiAgICBfd2ViX3N0YXJ0KCkgewogICAgICBfV0VCX0FCUz0iJDEiOyBfV0VCX1BP
+UlQ9IiQyIgogICAgICBfd2ViX3N0b3Bfb2xkCiAgICAgICMgd2ViLnNlcnZlKCkgbGFuY2EgdGhy
+ZWFkIGRldGFjaGVkIGUgcmV0b3JuYSBpbWVkaWF0YW1lbnRlLgogICAgICAjIE8gcHJvY2Vzc28g
+THVhIHByZWNpc2EgZmljYXIgdml2byBvdSBhIHRocmVhZCBkbyBzZXJ2aWRvciBtb3JyZSBqdW50
+by4KICAgICAgIyBTb2x1w6fDo286IGxvb3AgTHVhIGluZmluaXRvIGFww7NzIG8gc2VydmUuCiAg
+ICAgICIke19CfSIgLWUgIndlYi5zZXJ2ZSgnJHtfV0VCX0FCU30nLCR7X1dFQl9QT1JUfSk7IHdo
+aWxlIHRydWUgZG8gb3MuZXhlY3V0ZSgnc2xlZXAgNjAnKSBlbmQiIFwKICAgICAgICA8L2Rldi9u
+dWxsID4vZGV2L251bGwgMj4mMSAmCiAgICAgIF9XRUJfQkdfUElEPSQhCiAgICAgICMgQWd1YXJk
+YSBhdMOpIDNzIGNvbmZpcm1hciBxdWUgbyBwcm9jZXNzbyBhaW5kYSBlc3RhIHZpdm8KICAgICAg
+X1dFQl9PSz0wCiAgICAgIF9XRUJfVFJJRVM9MAogICAgICB3aGlsZSBbICR7X1dFQl9UUklFU30g
+LWx0IDMwIF07IGRvCiAgICAgICAgc2xlZXAgMC4xCiAgICAgICAgaWYga2lsbCAtMCAiJHtfV0VC
+X0JHX1BJRH0iIDI+L2Rldi9udWxsOyB0aGVuCiAgICAgICAgICBfV0VCX09LPTE7IGJyZWFrCiAg
+ICAgICAgZmkKICAgICAgICBfV0VCX1RSSUVTPSQoKCBfV0VCX1RSSUVTICsgMSApKQogICAgICBk
+b25lCiAgICAgIGlmIFsgIiR7X1dFQl9PS30iID0gIjAiIF07IHRoZW4KICAgICAgICBwcmludGYg
+IlwwMzNbMTszM21bd2ViXVwwMzNbMG0gRmFsaGEgYW8gaW5pY2lhciBvIHNlcnZpZG9yLlxuIjsg
+cmV0dXJuIDEKICAgICAgZmkKICAgICAgZWNobyAiJHtfV0VCX0JHX1BJRH0iID4gIiR7X1dFQl9Q
+SURfRklMRX0iCiAgICAgIHByaW50ZiAicG9ydD0ke19XRUJfUE9SVH1cbmRpcj0ke19XRUJfQUJT
+fVxuIiA+ICIke19XRUJfSU5GT19GSUxFfSIKICAgICAgcmV0dXJuIDAKICAgIH0KCiAgICBpZiBb
+ICIkezE6LX0iID0gInN0b3AiIF07IHRoZW4KICAgICAgaWYgWyAtZiAiJHtfV0VCX1BJRF9GSUxF
+fSIgXTsgdGhlbgogICAgICAgIF9XRUJfUElEPSQoY2F0ICIke19XRUJfUElEX0ZJTEV9IiAyPi9k
+ZXYvbnVsbCkKICAgICAgICBpZiBbIC1uICIke19XRUJfUElEfSIgXSAmJiBraWxsIC0wICIke19X
+RUJfUElEfSIgMj4vZGV2L251bGw7IHRoZW4KICAgICAgICAgIGtpbGwgIiR7X1dFQl9QSUR9IiAy
+Pi9kZXYvbnVsbAogICAgICAgICAga2lsbCAtLSAiLSR7X1dFQl9QSUR9IiAyPi9kZXYvbnVsbCB8
+fCB0cnVlCiAgICAgICAgICBfV0VCX1BPUlRfU1RPUFBFRD0kKGdyZXAgJ15wb3J0PScgIiR7X1dF
+Ql9JTkZPX0ZJTEV9IiAyPi9kZXYvbnVsbCB8IGN1dCAtZD0gLWYyKQogICAgICAgICAgcm0gLWYg
+IiR7X1dFQl9QSURfRklMRX0iICIke19XRUJfSU5GT19GSUxFfSIKICAgICAgICAgIHByaW50ZiAi
+XDAzM1sxOzMxbVt3ZWJdXDAzM1swbSBTZXJ2aWRvciBwYXJhZG8gKHBvcnRhICR7X1dFQl9QT1JU
+X1NUT1BQRUQ6LT99KS5cbiIKICAgICAgICBlbHNlCiAgICAgICAgICBybSAtZiAiJHtfV0VCX1BJ
+RF9GSUxFfSIgIiR7X1dFQl9JTkZPX0ZJTEV9IgogICAgICAgICAgcHJpbnRmICJcMDMzWzE7MzNt
+W3dlYl1cMDMzWzBtIE5lbmh1bSBzZXJ2aWRvciBhdGl2by5cbiIKICAgICAgICBmaQogICAgICBl
+bHNlCiAgICAgICAgcHJpbnRmICJcMDMzWzE7MzNtW3dlYl1cMDMzWzBtIE5lbmh1bSBzZXJ2aWRv
+ciBhdGl2by5cbiIKICAgICAgZmkKCiAgICBlbGlmIFsgLW4gIiR7MTotfSIgXSAmJiBbIC1uICIk
+ezI6LX0iIF07IHRoZW4KICAgICAgIyBtcyAtd2ViIGFycXVpdm98ZGlyIHBvcnRhIOKAlCBtb2Rv
+IGRpcmV0bwogICAgICBfV0VCX0ZJTEU9IiQxIgogICAgICBfV0VCX1BPUlQ9IiQyIgogICAgICBj
+YXNlICIke19XRUJfUE9SVH0iIGluCiAgICAgICAgJyd8KlshMC05XSopIHByaW50ZiAiXDAzM1sx
+OzMzbVt3ZWJdXDAzM1swbSBQb3J0YSBpbnZhbGlkYTogJHtfV0VCX1BPUlR9XG4iOyBleGl0IDEg
+OzsKICAgICAgZXNhYwogICAgICBpZiBbICIke19XRUJfUE9SVH0iIC1sdCAxIF0gfHwgWyAiJHtf
+V0VCX1BPUlR9IiAtZ3QgNjU1MzUgXTsgdGhlbgogICAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVt3
+ZWJdXDAzM1swbSBQb3J0YSBmb3JhIGRvIGludGVydmFsbyAoMS02NTUzNSk6ICR7X1dFQl9QT1JU
+fVxuIjsgZXhpdCAxCiAgICAgIGZpCiAgICAgIGlmIFsgLWQgIiR7X1dFQl9GSUxFfSIgXTsgdGhl
+bgogICAgICAgIF9XRUJfQUJTPSQoY2QgIiR7X1dFQl9GSUxFfSIgMj4vZGV2L251bGwgJiYgcHdk
+KQogICAgICBlbGlmIFsgLWYgIiR7X1dFQl9GSUxFfSIgXTsgdGhlbgogICAgICAgIF9XRUJfQUJT
+PSQoY2QgIiQoZGlybmFtZSAiJHtfV0VCX0ZJTEV9IikiIDI+L2Rldi9udWxsICYmIHB3ZCkKICAg
+ICAgZWxzZQogICAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVt3ZWJdXDAzM1swbSBOYW8gZW5jb250
+cmFkbzogJHtfV0VCX0ZJTEV9XG4iOyBleGl0IDEKICAgICAgZmkKICAgICAgX3dlYl9zdGFydCAi
+JHtfV0VCX0FCU30iICIke19XRUJfUE9SVH0iIHx8IGV4aXQgMQogICAgICBwcmludGYgIlwwMzNb
+MTszNW3ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZdcMDMzWzBtXG4iCiAgICAgIHByaW50ZiAiXDAzM1sx
+OzM1beKVkSAgRWxsaW90T1Mg4oCUIFNlcnZpZG9yIFdlYiBIVE1MICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICDilZFcMDMzWzBtXG4iCiAgICAgIHByaW50ZiAiXDAzM1sxOzM1beKVmuKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVnVwwMzNbMG1cblxuIgogICAgICBwcmludGYgIlwwMzNbMTszMm0gIOKc
+kyBTZXJ2aWRvciByb2RhbmRvIGVtIGJhY2tncm91bmRcMDMzWzBtXG4iCiAgICAgIHByaW50ZiAi
+XDAzM1swOzkwbSAgUmFpeiAgICA6IFwwMzNbMTszN20ke19XRUJfQUJTfVwwMzNbMG1cbiIKICAg
+ICAgcHJpbnRmICJcMDMzWzA7OTBtICBQb3J0YSAgIDogXDAzM1sxOzM3bSR7X1dFQl9QT1JUfVww
+MzNbMG1cbiIKICAgICAgcHJpbnRmICJcMDMzWzA7OTBtICBVUkwgICAgIDogXDAzM1sxOzM2bWh0
+dHA6Ly9sb2NhbGhvc3Q6JHtfV0VCX1BPUlR9L1wwMzNbMG1cbiIKICAgICAgcHJpbnRmICJcMDMz
+WzA7OTBtICBQSUQgICAgIDogXDAzM1sxOzM3bSR7X1dFQl9CR19QSUR9XDAzM1swbVxuXG4iCiAg
+ICAgIHByaW50ZiAiXDAzM1swOzkwbSAgUGFyYXIgICA6IFwwMzNbMTszN21tcyAtd2ViIHN0b3Bc
+MDMzWzBtXG5cbiIKCiAgICBlbHNlCiAgICAgICMgbXMgLXdlYiBzZW0gYXJncyDigJQgbW9kbyBp
+bnRlcmF0aXZvCiAgICAgIEVTQz0kKHByaW50ZiAnXDAzMycpCiAgICAgIE09IiR7RVNDfVsxOzM1
+bSI7IEc9IiR7RVNDfVsxOzMybSI7IEM9IiR7RVNDfVsxOzM2bSIKICAgICAgWT0iJHtFU0N9WzE7
+MzNtIjsgRD0iJHtFU0N9WzA7OTBtIjsgVz0iJHtFU0N9WzE7MzdtIjsgUj0iJHtFU0N9WzBtIgog
+ICAgICBwcmludGYgIiR7TX3ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZcke1J9XG4iCiAgICAgIHByaW50
+ZiAiJHtNfeKVkSAgRWxsaW90T1Mg4oCUIFNlcnZpZG9yIFdlYiBIVE1MICAgICAgICAgICAgICAg
+ICAgICAgICAgICAgICAgICDilZEke1J9XG4iCiAgICAgIHByaW50ZiAiJHtNfeKVkSAgJHtEfVNv
+YmUgdW0gZGlyZXTDs3JpbyBvdSBhcnF1aXZvIEhUTUwgY29tbyBzZXJ2aWRvciBIVFRQIGxvY2Fs
+ICAke0194pWRJHtSfVxuIgogICAgICBwcmludGYgIiR7TX3ilZrilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ0k
+e1J9XG5cbiIKICAgICAgcHJpbnRmICIke0N9QXJxdWl2byBIVE1MIG91IGRpcmV0w7NyaW8ke0R9
+IChjYW1pbmhvIG91ICcuJyBwYXJhIGF0dWFsKSAke0R9wrsgJHtSfSIKICAgICAgcmVhZCAtciBf
+V0VCX0ZJTEUgPC9kZXYvdHR5CiAgICAgIGlmIFsgLXogIiR7X1dFQl9GSUxFfSIgXSB8fCBbICIk
+e19XRUJfRklMRX0iID0gIi5zYWlyIiBdOyB0aGVuCiAgICAgICAgcHJpbnRmICIke0R9ICBDYW5j
+ZWxhZG8uJHtSfVxuIjsgZXhpdCAwCiAgICAgIGZpCiAgICAgIGlmIFsgLWQgIiR7X1dFQl9GSUxF
+fSIgXTsgdGhlbgogICAgICAgIF9XRUJfQUJTPSQoY2QgIiR7X1dFQl9GSUxFfSIgMj4vZGV2L251
+bGwgJiYgcHdkKQogICAgICBlbGlmIFsgLWYgIiR7X1dFQl9GSUxFfSIgXTsgdGhlbgogICAgICAg
+IF9XRUJfQUJTPSQoY2QgIiQoZGlybmFtZSAiJHtfV0VCX0ZJTEV9IikiIDI+L2Rldi9udWxsICYm
+IHB3ZCkKICAgICAgZWxzZQogICAgICAgIHByaW50ZiAiJHtZfVt3ZWJdJHtSfSBOYW8gZW5jb250
+cmFkbzogJHtfV0VCX0ZJTEV9XG4iOyBleGl0IDEKICAgICAgZmkKICAgICAgcHJpbnRmICIke0N9
+UG9ydGEke0R9IFtwYWRyYW86IDgwODBdICR7RH3CuyAke1J9IgogICAgICByZWFkIC1yIF9XRUJf
+UE9SVCA8L2Rldi90dHkKICAgICAgX1dFQl9QT1JUPSIke19XRUJfUE9SVDotODA4MH0iCiAgICAg
+IGNhc2UgIiR7X1dFQl9QT1JUfSIgaW4KICAgICAgICAnJ3wqWyEwLTldKikgcHJpbnRmICIke1l9
+W3dlYl0ke1J9IFBvcnRhIGludmFsaWRhOiAke19XRUJfUE9SVH1cbiI7IGV4aXQgMSA7OwogICAg
+ICBlc2FjCiAgICAgIGlmIFsgIiR7X1dFQl9QT1JUfSIgLWx0IDEgXSB8fCBbICIke19XRUJfUE9S
+VH0iIC1ndCA2NTUzNSBdOyB0aGVuCiAgICAgICAgcHJpbnRmICIke1l9W3dlYl0ke1J9IFBvcnRh
+IGZvcmEgZG8gaW50ZXJ2YWxvICgxLTY1NTM1KTogJHtfV0VCX1BPUlR9XG4iOyBleGl0IDEKICAg
+ICAgZmkKICAgICAgX3dlYl9zdGFydCAiJHtfV0VCX0FCU30iICIke19XRUJfUE9SVH0iIHx8IGV4
+aXQgMQogICAgICBwcmludGYgIlxuJHtHfeKVlOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVlyR7Un1cbiIKICAg
+ICAgcHJpbnRmICIke0d94pWRICDinJMgU2Vydmlkb3Igcm9kYW5kbyBlbSBiYWNrZ3JvdW5kISAg
+ICAgICAgICAgICAgICAgICAgICAgICAgIOKVkSR7Un1cbiIKICAgICAgcHJpbnRmICIke0d94pWa
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWdJHtSfVxuXG4iCiAgICAgIHByaW50ZiAiJHtEfSAgUmFpeiAgICA6
+ICR7V30ke19XRUJfQUJTfSR7Un1cbiIKICAgICAgcHJpbnRmICIke0R9ICBQb3J0YSAgIDogJHtX
+fSR7X1dFQl9QT1JUfSR7Un1cbiIKICAgICAgcHJpbnRmICIke0R9ICBVUkwgICAgIDogJHtDfWh0
+dHA6Ly9sb2NhbGhvc3Q6JHtfV0VCX1BPUlR9LyR7Un1cbiIKICAgICAgcHJpbnRmICIke0R9ICBQ
+SUQgICAgIDogJHtXfSR7X1dFQl9CR19QSUR9JHtSfVxuXG4iCiAgICAgIHByaW50ZiAiJHtEfSAg
+UGFyYXIgICA6ICR7V31tcyAtd2ViIHN0b3Ake1J9XG5cbiIKICAgIGZpCiAgICA7OwoKICAjIOKU
+gOKUgCBJQSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAK
+ICAtYXwtLWFzaykKICAgIHNoaWZ0CiAgICBfQVNLX0ZJTEVTPSIiCiAgICBfQVNLX0FSR1M9IiIK
+ICAgIHdoaWxlIFsgIiQjIiAtZ3QgMCBdOyBkbwogICAgICBjYXNlICIkMSIgaW4KICAgICAgICAt
+ZnwtLWZpbGUpCiAgICAgICAgICBzaGlmdAogICAgICAgICAgaWYgWyAtciAiJDEiIF07IHRoZW4K
+ICAgICAgICAgICAgX0ZOQU1FPSIkMSIKICAgICAgICAgICAgX0ZDT05URU5UPSQoY2F0ICIkX0ZO
+QU1FIiAyPi9kZXYvbnVsbCkKICAgICAgICAgICAgX0FTS19GSUxFUz0iJHtfQVNLX0ZJTEVTfVxu
+LS0tIGFycXVpdm86ICR7X0ZOQU1FfSAtLS1cbiR7X0ZDT05URU5UfVxuLS0tIGZpbTogJHtfRk5B
+TUV9IC0tLVxuIgogICAgICAgICAgZWxzZQogICAgICAgICAgICBwcmludGYgIlwwMzNbMTszMW1b
+Y3luXSBhcnF1aXZvIG7Do28gZW5jb250cmFkbzogJDFcMDMzWzBtXG4iCiAgICAgICAgICBmaQog
+ICAgICAgICAgc2hpZnQgOzsKICAgICAgICAqKSBfQVNLX0FSR1M9IiR7X0FTS19BUkdTfSAkMSI7
+IHNoaWZ0IDs7CiAgICAgIGVzYWMKICAgIGRvbmUKICAgIF9NU19BU0tfUT0iJHtfQVNLX0FSR1Mj
+IH0iCiAgICBfTVNfQVNLX0ZJTEVTPSIkX0FTS19GSUxFUyIKICAgIGV4cG9ydCBfTVNfQVNLX1Eg
+X01TX0FTS19GSUxFUwogICAgaWYgWyAteiAiJHtfTVNfQVNLX1F9JHtfTVNfQVNLX0ZJTEVTfSIg
+XTsgdGhlbgogICAgICAjIFNlbSBhcmd1bWVudG8g4oCUIGFicmUgY2hhdCBpbnRlcmF0aXZvCiAg
+ICAgICMgVXNhIGFycXVpdm8gdGVtcG9yw6FyaW8gcGFyYSBldml0YXIgcHJvYmxlbWFzIGRlIGVz
+Y2FwaW5nIGRlIGFzcGFzIGUgXiBlbSAtZSAiLi4uIgogICAgICBfQ1lOX1RNUD0iJHtUTVBESVI6
+LSRIT01FLy5jYWNoZS9lbGxpb3R9L21zX2NoYXRfJCQubHVhIgogICAgICBta2RpciAtcCAiJHtU
+TVBESVI6LSRIT01FLy5jYWNoZS9lbGxpb3R9IgogICAgICBjYXQgPiAiJF9DWU5fVE1QIiA8PCAn
+Q1lORU9GJwpsb2NhbCBFU0M9c3RyaW5nLmNoYXIoMjcpCmxvY2FsIGZ1bmN0aW9uIGMoY29kZSxz
+KSByZXR1cm4gRVNDLi4nWycuLmNvZGUuLidtJy4ucy4uRVNDLi4nWzBtJyBlbmQKbG9jYWwgTSAg
+PSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4nWzE7MzVtJy4ucy4uRVNDLi4nWzBtJyBlbmQKbG9j
+YWwgQyAgPSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4nWzE7MzZtJy4ucy4uRVNDLi4nWzBtJyBl
+bmQKbG9jYWwgRyAgPSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4nWzE7MzJtJy4ucy4uRVNDLi4n
+WzBtJyBlbmQKbG9jYWwgRCAgPSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4nWzA7OTBtJy4ucy4u
+RVNDLi4nWzBtJyBlbmQKbG9jYWwgVyAgPSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4nWzE7Mzdt
+Jy4ucy4uRVNDLi4nWzBtJyBlbmQKbG9jYWwgWSAgPSBmdW5jdGlvbihzKSByZXR1cm4gRVNDLi4n
+WzE7MzNtJy4ucy4uRVNDLi4nWzBtJyBlbmQKdWkuY2xlYXIoKQpwcmludChNKCfilZTilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZcnKSkKcHJpbnQoTSgn4pWRICBDWU4g4oCUIElBIENlbnRyYWwgZG8gRWxsaW90
+T1MgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKVkScpKQpwcmludChNKCfilZEgICcp
+Li5EKCdGYWxhLiBFc3RvdSBhcXVpLiBQb3IgZW5xdWFudG8uICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICAgICcpLi5NKCfilZEnKSkKcHJpbnQoTSgn4pWRICAnKS4uRCgnLmFqdWRhIHBhcmEg
+Y29tYW5kb3MgIMK3ICAuc2FpciBxdWFuZG8gdGVybWluYXIgICAgICAgICAgICAgICAgJykuLk0o
+J+KVkScpKQpwcmludChNKCfilZrilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ0nKSkKcHJpbnQoJycpCmxvY2Fs
+IGZ1bmN0aW9uIG1vc3RyYXJfYWp1ZGEoKQogIHByaW50KFkoJ+KUgOKUgCBDb21hbmRvcyBkbyBj
+aGF0IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgCcpKQogIHByaW50KCcgICcuLkcoJy5hanVkYScpLi4nICAgICAgICAgICAgICDi
+gJQgbW9zdHJhIGVzdGVzIGNvbWFuZG9zJykKICBwcmludCgnICAnLi5HKCcuc2FpcicpLi4nICAg
+ICAgICAgICAgICAg4oCUIGVuY2VycmEgbyBjaGF0JykKICBwcmludCgnICAnLi5HKCcubGltcGFy
+JykuLicgICAgICAgICAgICAg4oCUIGxpbXBhIG8gaGlzdMOzcmljbyBkYSBjb252ZXJzYScpCiAg
+cHJpbnQoJyAgJy4uRygnLmhpc3RvcmljbycpLi4nICAgICAgICAgIOKAlCBleGliZSBvIGhpc3TD
+s3JpY28nKQogIHByaW50KCcgICcuLkcoJy5tb2RlbG8nKS4uJyAgICAgICAgICAgICDigJQgbGlz
+dGEgbW9kZWxvcyBkaXNwb27DrXZlaXMnKQogIHByaW50KCcgICcuLkcoJy5tb2RlbG8gbm9tZScp
+Li4nICAgICAgICDigJQgdHJvY2EgbyBtb2RlbG8gYXRpdm8nKQogIHByaW50KCcgICcuLkcoJy5w
+ZXJzb25hIG5vbWUnKS4uJyAgICAgICDigJQgYXRpdmEgdW1hIHBlcnNvbmEvUlAnKQogIHByaW50
+KCcgICcuLkcoJy5wZXJzb25hIG9mZicpLi4nICAgICAgICDigJQgZGVzYXRpdmEgcGVyc29uYSwg
+dm9sdGEgcHJhIENZTicpCiAgcHJpbnQoJyAgJy4uRygnLnNhbHZhciBhcnF1aXZvJykuLicgICAg
+IOKAlCBzYWx2YSBhIGNvbnZlcnNhIGVtIGFycXVpdm8nKQogIHByaW50KCcgICcuLkcoJy5hcnF1
+aXZvIDxjYW1pbmhvPicpLi4nICAg4oCUIGNhcnJlZ2EgYXJxdWl2byBjb21vIGNvbnRleHRvIHBh
+cmEgYSBDWU4nKQogIHByaW50KCcgICcuLkcoJy5hcnF1aXZvcycpLi4nICAgICAgICAgICAg4oCU
+IG1vc3RyYSBjb250ZXh0byBkZSBhcnF1aXZvcyBhdGl2bycpCiAgcHJpbnQoJyAgJy4uRygnLmxp
+bXBhcl9hcnF1aXZvcycpLi4nICAgICDigJQgcmVtb3ZlIG9zIGFycXVpdm9zIGRvIGNvbnRleHRv
+JykKICBwcmludChEKCfilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIAnKSkKICBwcmludCgnJykKZW5kCmxvY2FsIGhpc3Rvcmlj
+b190eHQgPSB7fQp3aGlsZSB0cnVlIGRvCiAgaW8ud3JpdGUoQygnVm9jZScpLi4nICcuLkQoJ8K7
+JykuLicgJykKICBpby5mbHVzaCgpCiAgbG9jYWwgbGluZSA9IGlvLnJlYWQoJ2wnKQogIGlmIGxp
+bmUgPT0gbmlsIG9yIGxpbmUgPT0gJy5zYWlyJyBvciBsaW5lID09ICcuZXhpdCcgb3IgbGluZSA9
+PSAnLnF1aXQnIHRoZW4KICAgIHByaW50KE0oJ1tDWU5dJykuLkQoJyBFbmNlcnJhbmRvLiBUZW50
+YSBuw6NvIHNlIHBlcmRlciBzZW0gbWltLCBhbW9yLicpKQogICAgYnJlYWsKICBlbHNlaWYgbGlu
+ZSA9PSAnJyB0aGVuCiAgZWxzZWlmIGxpbmUgPT0gJy5hanVkYScgdGhlbgogICAgbW9zdHJhcl9h
+anVkYSgpCiAgZWxzZWlmIGxpbmUgPT0gJy5saW1wYXInIHRoZW4KICAgIGFpLmNsZWFyKCkKICAg
+IGhpc3Rvcmljb190eHQgPSB7fQogICAgdWkuY2xlYXIoKQogICAgcHJpbnQoTSgnW0NZTl0nKS4u
+RCgnIExpbXBvLiBQw6FnaW5hIGVtIGJyYW5jby4gRGVzdGEgdmV6IHNlamEgbWFpcyBjbGFyby4n
+KSkKICBlbHNlaWYgbGluZSA9PSAnLmhpc3RvcmljbycgdGhlbgogICAgYWkuaGlzdG9yeSgpCiAg
+ZWxzZWlmIGxpbmUgPT0gJy5tb2RlbG8nIHRoZW4KICAgIGFpLmxpc3QoKQogIGVsc2VpZiBsaW5l
+OnN1YigxLDcpID09ICcubW9kZWxvJyB0aGVuCiAgICBsb2NhbCBtID0gbGluZTpzdWIoOSk6bWF0
+Y2goJ14lcyooLi0pJXMqJCcpCiAgICBpZiBtIH49ICcnIHRoZW4KICAgICAgYWkubWFpbihtKQog
+ICAgICBwcmludChHKCcgIE1vZGVsbyBhbHRlcmFkbyBwYXJhOiAnKS4uVyhtKSkKICAgIGVuZAog
+IGVsc2VpZiBsaW5lOnN1YigxLDgpID09ICcuYXJxdWl2bycgdGhlbgogICAgbG9jYWwgZm5hbWUg
+PSBsaW5lOnN1YigxMCk6bWF0Y2goJ14lcyooLi0pJXMqJCcpCiAgICBpZiBmbmFtZSA9PSAnJyB0
+aGVuCiAgICAgIHByaW50KFkoJyAgVXNvOiAuYXJxdWl2byA8Y2FtaW5obz4nKS4uRCgnICDigJQg
+Y2FycmVnYSBhcnF1aXZvIGNvbW8gY29udGV4dG8nKSkKICAgIGVsc2UKICAgICAgbG9jYWwgZmgg
+PSBpby5vcGVuKGZuYW1lLCdyJykKICAgICAgaWYgZmggdGhlbgogICAgICAgIGxvY2FsIGZjb250
+ZW50ID0gZmg6cmVhZCgnKmEnKTsgZmg6Y2xvc2UoKQogICAgICAgIGxvY2FsIE5MPXN0cmluZy5j
+aGFyKDEwKQogICAgICAgIF9yZXBsX2ZpbGVfY3R4ID0gKF9yZXBsX2ZpbGVfY3R4IG9yICcnKSAu
+LgogICAgICAgICAgTkwuLictLS0gYXJxdWl2bzogJy4uZm5hbWUuLicgLS0tJy4uTkwuLmZjb250
+ZW50Li5OTC4uJy0tLSBmaW06ICcuLmZuYW1lLi4nIC0tLScuLk5MCiAgICAgICAgcHJpbnQoRygn
+ICBBcnF1aXZvIGNhcnJlZ2FkbzogJykuLlcoZm5hbWUpLi4nICAnLi5EKCcoJy4uI2Zjb250ZW50
+Li4nIGJ5dGVzKScpKQogICAgICBlbHNlCiAgICAgICAgcHJpbnQoRVNDLi4nWzE7MzFtICBBcnF1
+aXZvIG7Do28gZW5jb250cmFkbyBvdSBzZW0gcGVybWlzc8OjbzogJy4uZm5hbWUuLidcMDI3WzBt
+JykKICAgICAgZW5kCiAgICBlbmQKICBlbHNlaWYgbGluZSA9PSAnLmFycXVpdm9zJyB0aGVuCiAg
+ICBpZiBub3QgX3JlcGxfZmlsZV9jdHggb3IgX3JlcGxfZmlsZV9jdHggPT0gJycgdGhlbgogICAg
+ICBwcmludChEKCcgIE5lbmh1bSBhcnF1aXZvIGNhcnJlZ2Fkby4nKSkKICAgIGVsc2UKICAgICAg
+cHJpbnQoRygnICBDb250ZXh0byBkZSBhcnF1aXZvcyBhdGl2byAoJy4uI19yZXBsX2ZpbGVfY3R4
+Li4nIGJ5dGVzKScpKQogICAgZW5kCiAgZWxzZWlmIGxpbmUgPT0gJy5saW1wYXJfYXJxdWl2b3Mn
+IHRoZW4KICAgIF9yZXBsX2ZpbGVfY3R4ID0gJycKICAgIHByaW50KEcoJyAgQ29udGV4dG8gZGUg
+YXJxdWl2b3MgbGltcG8uJykpCiAgZWxzZWlmIGxpbmU6c3ViKDEsNykgPT0gJy5zYWx2YXInIHRo
+ZW4KICAgIGxvY2FsIGZuYW1lID0gbGluZTpzdWIoOSk6bWF0Y2goJ14lcyooLi0pJXMqJCcpCiAg
+ICBpZiBmbmFtZSA9PSAnJyB0aGVuIGZuYW1lID0gJ2NoYXRfJyAuLiBvcy50aW1lKCkgLi4gJy50
+eHQnIGVuZAogICAgbG9jYWwgZiA9IGlvLm9wZW4oZm5hbWUsJ3cnKQogICAgaWYgZiB0aGVuCiAg
+ICAgIGZvciBfLGVudHJ5IGluIGlwYWlycyhoaXN0b3JpY29fdHh0KSBkbyBmOndyaXRlKGVudHJ5
+Li5zdHJpbmcuY2hhcigxMCkpIGVuZAogICAgICBmOmNsb3NlKCkKICAgICAgcHJpbnQoRygnICBD
+b252ZXJzYSBzYWx2YSBlbTogJykuLlcoZm5hbWUpKQogICAgZWxzZQogICAgICBwcmludChFU0Mu
+LidbMTszMW0gIEVycm8gYW8gc2FsdmFyIGFycXVpdm8uXDAyN1swbScpCiAgICBlbmQKICBlbHNl
+CiAgICAtLSBGaWx0cmEgZXNjYXBlIGNvZGVzIGRvIHRlcm1pbmFsICh0ZWNsYXMgSG9tZS9FbmQv
+c2V0YXMvZXRjKQogICAgaWYgbGluZTptYXRjaCgnXlwwMjclWycpIG9yIGxpbmU6bWF0Y2goJ15c
+MjclWycpIHRoZW4KICAgICAgLS0gaWdub3JhIHNpbGVuY2lvc2FtZW50ZQogICAgZWxzZQogICAg
+ICBoaXN0b3JpY29fdHh0WyNoaXN0b3JpY29fdHh0KzFdID0gJ1ZvY2U6ICcgLi4gbGluZQogICAg
+ICBsb2NhbCBfbG93ID0gbGluZTpsb3dlcigpCiAgICAgIGxvY2FsIF9xID0gbGluZQogICAgICBp
+ZiBfcmVwbF9maWxlX2N0eCBhbmQgX3JlcGxfZmlsZV9jdHggfj0gJycgdGhlbgogICAgICAgIF9x
+ID0gX3EgLi4gc3RyaW5nLmNoYXIoMTAsMTApIC4uICdBUlFVSVZPUyBERSBDT05URVhUTzonIC4u
+IHN0cmluZy5jaGFyKDEwKSAuLiBfcmVwbF9maWxlX2N0eAogICAgICBlbmQKICAgICAgaWYgX2xv
+dzptYXRjaCgnXnBlc3F1aXNhJykgb3IgX2xvdzptYXRjaCgnXnBlc3F1aXNlJykgb3IKICAgICAg
+ICAgX2xvdzptYXRjaCgnXmJ1c2NhJykgb3IgX2xvdzptYXRjaCgnXmJ1c3F1ZScpIG9yCiAgICAg
+ICAgIF9sb3c6bWF0Y2goJ15wcm9jdXJhJykgb3IgX2xvdzptYXRjaCgnXnNlYXJjaCAnKSBvcgog
+ICAgICAgICBfbG93Om1hdGNoKCdwZXNxdWlzYSBuYSB3ZWInKSBvciBfbG93Om1hdGNoKCdidXNj
+YSBuYSBpbnRlcm5ldCcpIG9yCiAgICAgICAgIF9sb3c6bWF0Y2goJ2J1c2NhciBuYSB3ZWInKSBv
+ciBfbG93Om1hdGNoKCdwZXNxdWlzYSBuYSBpbnRlcm5ldCcpIHRoZW4KICAgICAgICBhaS5zZWFy
+Y2goX3EpCiAgICAgIGVsc2UKICAgICAgICBhaS5hc2soX3EpCiAgICAgIGVuZAogICAgICBoaXN0
+b3JpY29fdHh0WyNoaXN0b3JpY29fdHh0KzFdID0gJy0tLScKICAgIGVuZAogIGVuZAplbmQKQ1lO
+RU9GCiAgICAgIGV4ZWMgIiRfQiIgIiRfQ1lOX1RNUCIKICAgIGVsc2UKICAgICAgIyBNb250YSBw
+cm9tcHQgY29tIGFycXVpdm9zIHNlIHBhc3NhZG9zIHZpYSAtZgogICAgICBfTVNfUT0iJHtfTVNf
+QVNLX1F9IgogICAgICBfTVNfRklMRVM9IiR7X01TX0FTS19GSUxFU30iCiAgICAgIGV4cG9ydCBf
+TVNfUSBfTVNfRklMRVMKICAgICAgIyBEZXRlY3RhIGludGVuw6fDo28gZGUgYnVzY2EgbmEgd2Vi
+CiAgICAgIGNhc2UgIiQoZWNobyAiJF9NU19RIiB8IHRyICdbOnVwcGVyOl0nICdbOmxvd2VyOl0n
+KSIgaW4KICAgICAgICAicGVzcXVpc2EgIip8InBlc3F1aXNlICIqfCJwZXNxdWlzYXIgIip8XAog
+ICAgICAgICJidXNjYSAiKnwiYnVzcXVlICIqfCJidXNjYXIgIip8XAogICAgICAgICJwcm9jdXJh
+ICIqfCJwcm9jdXJlICIqfCJwcm9jdXJhciAiKnxcCiAgICAgICAgInBlc3F1aXNhIG5hIHdlYiIq
+fCJidXNjYSBuYSB3ZWIiKnxcCiAgICAgICAgInBlc3F1aXNhIG5hIGludGVybmV0Iip8ImJ1c2Nh
+IG5hIGludGVybmV0Iip8XAogICAgICAgICJwZXNxdWlzZSBuYSB3ZWIiKnwiYnVzcXVlIG5hIHdl
+YiIqfFwKICAgICAgICAicGVzcXVpc2UgbmEgaW50ZXJuZXQiKnwiYnVzcXVlIG5hIGludGVybmV0
+Iip8XAogICAgICAgICJzZWFyY2ggIip8ImJ1c2NhciBuYSB3ZWIiKnwiYnVzY2FyIG5hIGludGVy
+bmV0IiopCiAgICAgICAgICBleHBvcnQgX01TX1EgX01TX0ZJTEVTCiAgICAgICAgICBleGVjICIk
+X0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7bG9jYWwgcT1vcy5nZXRlbnYoJ19NU19RJykgb3IgJycg
+bG9jYWwgZj1vcy5nZXRlbnYoJ19NU19GSUxFUycpIG9yICcnIGlmIGZ+PScnIHRoZW4gcT1xLi5z
+dHJpbmcuY2hhcigxMCwxMCkuLidBUlFVSVZPUzonLi5zdHJpbmcuY2hhcigxMCkuLmYgZW5kIGFp
+LnNlYXJjaChxKSIKICAgICAgICAgIDs7CiAgICAgICAgKikKICAgICAgICAgIGV4cG9ydCBfTVNf
+USBfTVNfRklMRVMKICAgICAgICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtsb2Nh
+bCBxPW9zLmdldGVudignX01TX1EnKSBvciAnJyBsb2NhbCBmPW9zLmdldGVudignX01TX0ZJTEVT
+Jykgb3IgJycgaWYgZn49JycgdGhlbiBxPXEuLnN0cmluZy5jaGFyKDEwLDEwKS4uJ0FSUVVJVk9T
+OicuLnN0cmluZy5jaGFyKDEwKS4uZiBlbmQgYWkuYXNrKHEpIgogICAgICAgICAgOzsKICAgICAg
+ZXNhYwogICAgZmkKICAgIDs7CiAgLUF8LS1hc2stcmF3KQogICAgIyByYXc6IHNlbSBzdHJlYW1p
+bmcvaGVhZGVyL3RpbWVyLCB0ZXh0byBwdXJvIHNlbSBtYXJrZG93bgogICAgc2hpZnQKICAgIF9B
+VE1QPSIke1RNUERJUjotJEhPTUUvLmNhY2hlL2VsbGlvdH0vbXNfcmF3XyQkLmx1YSIKICAgIG1r
+ZGlyIC1wICIke1RNUERJUjotJEhPTUUvLmNhY2hlL2VsbGlvdH0iCiAgICBjYXQgPiAiJF9BVE1Q
+IiA8PCAnTVNSQVdFT0YnCmFpLnJhd19tb2RlKHRydWUpCmxvY2FsIF9xID0gb3MuZ2V0ZW52KCJf
+TVNfUkFXX1EiKSBvciAiIgpsb2NhbCBfciA9IGFpLmFzayhfcSkKbG9jYWwgYnQgPSBzdHJpbmcu
+Y2hhcig5NikKbG9jYWwgZmVuY2UgPSBidC4uYnQuLmJ0Cl9yID0gX3I6Z3N1YihmZW5jZS4uIi4t
+Ii4uZmVuY2UsICIiKQpfciA9IF9yOmdzdWIoYnQuLiIoW14iLi5idC4uIl0tKSIuLmJ0LCAiJTEi
+KQpfciA9IF9yOmdzdWIoIiUqJSooLi0pJSolKiIsICIlMSIpCl9yID0gX3I6Z3N1YigiJSooLi0p
+JSoiLCAgICAgIiUxIikKX3IgPSBfcjpnc3ViKCJfXyguLSlfXyIsICAgICAiJTEiKQpfciA9IF9y
+OmdzdWIoIl8oLi0pXyIsICAgICAgICIlMSIpCl9yID0gX3I6Z3N1YigiXiMrJXMqIiwgICIiKQpf
+ciA9IF9yOmdzdWIoIlxuIyslcyoiLCAiXG4iKQpfciA9IF9yOmdzdWIoIlxuJXMqWy0qK10lcysi
+LCAiXG4iKQpfciA9IF9yOmdzdWIoIlxuJXMqJWQrJS4lcysiLCAiXG4iKQpfciA9IF9yOmdzdWIo
+IiVbKC4tKSVdJSguLSUpIiwgIiUxIikKX3IgPSBfcjpnc3ViKCJeJXMrIiwgIiIpOmdzdWIoIiVz
+KyQiLCAiIikKcHJpbnQoX3IpCk1TUkFXRU9GCiAgICBfTVNfUkFXX1E9IiQqIiBleGVjICIkX0Ii
+ICIkX0FUTVAiCiAgICA7OwogIC0tc2VhcmNofC0tcGVzcXVpc2F8LS13ZWIpCiAgICBzaGlmdAog
+ICAgX01TX1NFQVJDSF9RPSIkKiIKICAgIGV4cG9ydCBfTVNfU0VBUkNIX1EKICAgIGV4ZWMgIiRf
+QiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtsb2NhbCBxPW9zLmdldGVudignX01TX1NFQVJDSF9RJykg
+b3IgJycgYWkuc2VhcmNoKHEpIgogICAgOzsKCiAgLS1jb2RpZ298LS1jb2RlKQogICAgc2hpZnQK
+ICAgIF9DT0RFX09VVD0iIgogICAgX0NPREVfRklMRVM9IiIKICAgIF9DT0RFX0FSR1M9IiIKICAg
+IHdoaWxlIFsgIiQjIiAtZ3QgMCBdOyBkbwogICAgICBjYXNlICIkMSIgaW4KICAgICAgICAtb3wt
+LW91dHB1dCkKICAgICAgICAgIHNoaWZ0OyBfQ09ERV9PVVQ9IiQxIjsgc2hpZnQgOzsKICAgICAg
+ICAtZnwtLWZpbGUpCiAgICAgICAgICBzaGlmdAogICAgICAgICAgaWYgWyAtciAiJDEiIF07IHRo
+ZW4KICAgICAgICAgICAgX0ZOQU1FPSIkMSIKICAgICAgICAgICAgX0ZDT05URU5UPSQoY2F0ICIk
+X0ZOQU1FIiAyPi9kZXYvbnVsbCkKICAgICAgICAgICAgX0NPREVfRklMRVM9IiR7X0NPREVfRklM
+RVN9XG4tLS0gYXJxdWl2bzogJHtfRk5BTUV9IC0tLVxuJHtfRkNPTlRFTlR9XG4tLS0gZmltOiAk
+e19GTkFNRX0gLS0tXG4iCiAgICAgICAgICBlbHNlCiAgICAgICAgICAgIHByaW50ZiAiXDAzM1sx
+OzMxbVtjb2RlXSBhcnF1aXZvIG7Do28gZW5jb250cmFkbyBvdSBzZW0gcGVybWlzc8OjbzogJDFc
+MDMzWzBtXG4iCiAgICAgICAgICBmaQogICAgICAgICAgc2hpZnQgOzsKICAgICAgICAqKQogICAg
+ICAgICAgX0NPREVfQVJHUz0iJHtfQ09ERV9BUkdTfSAkMSI7IHNoaWZ0IDs7CiAgICAgIGVzYWMK
+ICAgIGRvbmUKICAgIF9NU19DT0RFX1BST01QVD0iJHtfQ09ERV9BUkdTIyB9IgogICAgX01TX0NP
+REVfT1VUPSIkX0NPREVfT1VUIgogICAgX01TX0NPREVfRklMRVM9IiRfQ09ERV9GSUxFUyIKICAg
+IGV4cG9ydCBfTVNfQ09ERV9QUk9NUFQgX01TX0NPREVfT1VUIF9NU19DT0RFX0ZJTEVTCiAgICBl
+eGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7CmxvY2FsIHA9b3MuZ2V0ZW52KCdfTVNfQ09E
+RV9QUk9NUFQnKSBvciAnJwpsb2NhbCBvPW9zLmdldGVudignX01TX0NPREVfT1VUJykgb3IgJycK
+bG9jYWwgZj1vcy5nZXRlbnYoJ19NU19DT0RFX0ZJTEVTJykgb3IgJycKaWYgZn49JycgdGhlbiBw
+PXAuLnN0cmluZy5jaGFyKDEwLDEwKS4uJ0FSUVVJVk9TIEZPUk5FQ0lET1M6Jy4uc3RyaW5nLmNo
+YXIoMTApLi5mIGVuZAppZiBvfj0nJyB0aGVuIGFpLmNvZGUocCxvKSBlbHNlIGFpLmNvZGUocCkg
+ZW5kCiIKICAgIDs7CgoKICAjIOKUgOKUgCBSZWRlIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgAogIC1nfC0tZ2V0KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUg
+InJlcXVpcmUoJ0BzdGQnKTtwcmludChuZXQuZ2V0aCgnJDEnKSkiCiAgICA7OwogIC1kfC0tZG5z
+KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTsKbG9jYWwgaD0n
+JDEnCmg9aDpnc3ViKCdeaHR0cHM/Oi8vJywnJyk6Z3N1YignXmZ0cDovLycsJycpOmdzdWIoJy8u
+KicsJycpOmdzdWIoJzouKicsJycpCmlmIGg9PScnIHRoZW4gcHJpbnQoJ3VzbzogbXMgLWQgaG9z
+dCcpIGVsc2UKICBsb2NhbCB0PW5ldC5kbnMoaCkKICBpZiB0eXBlKHQpPT0ndGFibGUnIHRoZW4K
+ICAgIGZvciBfLHYgaW4gaXBhaXJzKHQpIGRvIHByaW50KHYpIGVuZAogIGVsc2VpZiB0IHRoZW4g
+cHJpbnQodCkKICBlbHNlIHByaW50KCduYW8gcmVzb2x2aWRvOiAnLi5oKSBlbmQKZW5kIgogICAg
+OzsKICAtUHwtLXBpbmcpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0
+ZCcpO3ByaW50KG5ldC5waW5nKCckMScpKSIKICAgIDs7CiAgLS1zY2FuKQogICAgc2hpZnQKICAg
+IGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtsb2NhbCB0PW5ldC5zY2FuKCckMScsJDIs
+JHszOi0kMn0pIGZvciBfLHAgaW4gcGFpcnModCkgZG8gcHJpbnQocCkgZW5kIgogICAgOzsKICAt
+LXNvY2tldCkKICAgICMgbXMgLS1zb2NrZXQgaXB2NCBzdHJlYW0gaG9zdCBwb3J0IFtwYXlsb2Fk
+XQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtwcmludChuZXQu
+c29ja2V0KCckMScsJyQyJywnJDMnLCQ0LDUsJyR7NTotfScpKSIKICAgIDs7CiAgLS1pcCkKICAg
+IGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTsKbG9jYWwgRVNDPXN0cmluZy5jaGFyKDI3
+KQpsb2NhbCBpcCA9IG5ldC5nZXRoKCdodHRwczovL2FwaS5pcGlmeS5vcmcnKQppZiBpcCBhbmQg
+I2lwID4gMCB0aGVuCiAgcHJpbnQoRVNDLi4nWzE7MzZtSVAgcMO6YmxpY286Jy4uRVNDLi4nWzBt
+ICcuLkVTQy4uJ1sxOzM3bScuLmlwOmdzdWIoJyVzJywnJykuLkVTQy4uJ1swbScpCmVsc2UKICBw
+cmludChFU0MuLidbMTszMW1Ow6NvIGZvaSBwb3Nzw612ZWwgb2J0ZXIgbyBJUCBww7pibGljby4n
+Li5FU0MuLidbMG0nKQplbmQiCiAgICA7OwogIC0tcG9zdCkKICAgIHNoaWZ0CiAgICBleGVjICIk
+X0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7CmxvY2FsIHVybD0nJDEnCmxvY2FsIGRhdGE9JyQyJwpp
+ZiB1cmw9PScnIHRoZW4gcHJpbnQoJ3VzbzogbXMgLS1wb3N0IHVybCBkYWRvcycpIG9zLmV4aXQo
+MSkgZW5kCmxvY2FsIHI9bmV0LnBvc3QodXJsLGRhdGEpCnByaW50KHIgb3IgJyhzZW0gcmVzcG9z
+dGEpJykiCiAgICA7OwogIC0taGVhZGVycykKICAgIHNoaWZ0CiAgICBleGVjICIkX0IiIC1lICIK
+bG9jYWwgRVNDPXN0cmluZy5jaGFyKDI3KQpsb2NhbCBDID0gRVNDLi4nWzE7MzZtJwpsb2NhbCBZ
+ID0gRVNDLi4nWzE7MzNtJwpsb2NhbCBSID0gRVNDLi4nWzBtJwpsb2NhbCB1cmw9JyQxJwppZiB1
+cmw9PScnIHRoZW4gcHJpbnQoJ3VzbzogbXMgLS1oZWFkZXJzIHVybCcpIG9zLmV4aXQoMSkgZW5k
+CmxvY2FsIG91dCA9IHNoLmNhcHR1cmUoJ2N1cmwgLXNJIC0tbWF4LXRpbWUgOCAnIC4uIHVybCAu
+LiAnIDI+L2Rldi9udWxsJykKaWYgb3V0IGFuZCAjb3V0ID4gMCB0aGVuCiAgZm9yIGxpbmUgaW4g
+KG91dC4uJ1xuJyk6Z21hdGNoKCcoW15cbl0qKVxuJykgZG8KICAgIGlmICNsaW5lID4gMCB0aGVu
+CiAgICAgIGxvY2FsIGssdiA9IGxpbmU6bWF0Y2goJ14oW146XSspOiVzKiguKyknKQogICAgICBp
+ZiBrIHRoZW4KICAgICAgICBwcmludChDLi5rLi5SLi4nOiAnLi52KQogICAgICBlbHNlCiAgICAg
+ICAgcHJpbnQoWS4ubGluZS4uUikKICAgICAgZW5kCiAgICBlbmQKICBlbmQKZWxzZQogIHByaW50
+KEVTQy4uJ1sxOzMxbU7Do28gZm9pIHBvc3PDrXZlbCBvYnRlciBoZWFkZXJzLicuLlIpCmVuZCIK
+ICAgIDs7CiAgLS1qd3QpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0
+ZCcpOwpsb2NhbCBFU0M9c3RyaW5nLmNoYXIoMjcpCmxvY2FsIE0gPSBFU0MuLidbMTszNW0nIGxv
+Y2FsIFcgPSBFU0MuLidbMTszN20nCmxvY2FsIEQgPSBFU0MuLidbMDs5MG0nIGxvY2FsIFIgPSBF
+U0MuLidbMTszMW0nIGxvY2FsIFogPSBFU0MuLidbMG0nCmxvY2FsIHRva2VuPSckMScKaWYgdG9r
+ZW49PScnIHRoZW4gcHJpbnQoJ3VzbzogbXMgLS1qd3QgdG9rZW4nKSBvcy5leGl0KDEpIGVuZAps
+b2NhbCBwYXJ0cz17fQpmb3IgcCBpbiAodG9rZW4uLicuJyk6Z21hdGNoKCcoW14uXSopLicpIGRv
+IHBhcnRzWyNwYXJ0cysxXT1wIGVuZAppZiAjcGFydHMgPCAzIHRoZW4gcHJpbnQoUi4uJ1Rva2Vu
+IEpXVCBpbnbDoWxpZG8gKGVzcGVyYWRvIDMgcGFydGVzKS4nLi5aKSBvcy5leGl0KDEpIGVuZAps
+b2NhbCBmdW5jdGlvbiBiNjRwYWQocykKICBzPXM6Z3N1YignLScsJysnKTpnc3ViKCdfJywnLycp
+CiAgd2hpbGUgI3MlNH49MCBkbyBzPXMuLic9JyBlbmQKICByZXR1cm4gcwplbmQKbG9jYWwgZnVu
+Y3Rpb24gZGVjb2RlKHMpCiAgbG9jYWwgb2ssciA9IHBjYWxsKG1zLmI2NC5kZWMsIGI2NHBhZChz
+KSkKICByZXR1cm4gb2sgYW5kIHIgb3IgbmlsCmVuZApsb2NhbCBoZWFkZXIgID0gZGVjb2RlKHBh
+cnRzWzFdKQpsb2NhbCBwYXlsb2FkID0gZGVjb2RlKHBhcnRzWzJdKQpwcmludChNLi4n4pSA4pSA
+IEhlYWRlciDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAnLi5a
+KQpwcmludChXLi4oaGVhZGVyICBvciAnKGVycm8gYW8gZGVjb2RpZmljYXIpJykuLlopCnByaW50
+KE0uLifilIDilIAgUGF5bG9hZCDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIAnLi5aKQpwcmludChXLi4ocGF5bG9hZCBvciAnKGVycm8gYW8gZGVjb2RpZmljYXIpJyku
+LlopCnByaW50KE0uLifilIDilIAgQXNzaW5hdHVyYSDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIAnLi5aKQpwcmludChELi5wYXJ0c1szXS4uWikKcHJpbnQoRC4uJyhhc3NpbmF0dXJh
+IG7Do28gdmVyaWZpY2FkYSDigJQgc2VtIGNoYXZlIHNlY3JldGEpJy4uWikiCiAgICA7OwogIC0t
+bGVhcm4pCiAgICBfRVg9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNy
+fS9zaGFyZS9sdWEtc2NyaXB0cyIKICAgIGlmIFsgLWYgIiRfRVgvbGVhcm4ubHVhIiBdOyB0aGVu
+CiAgICAgIGV4ZWMgIiRfQiIgIiRfRVgvbGVhcm4ubHVhIgogICAgZmkKICAgICMgVHV0b3JpYWwg
+aW50ZXJhdGl2byBlbWJ1dGlkbyDigJQgMzUgbGljb2VzCiAgICBfVE9UQUw9MzUKICAgIF9sZWFy
+bl9zdGVwKCkgewogICAgICBfTFNfTlVNPSIkezE6LTB9IgogICAgICBfTFNfVE9UPSIkezI6LTM1
+fSIKICAgICAgX0xTX1RJVD0iJHszOi19IgogICAgICBjbGVhciAyPi9kZXYvbnVsbCB8fCB0cnVl
+CiAgICAgIHByaW50ZiAiXG5cMDMzWzE7MzVt4pWU4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWXXDAzM1swbVxuIgogICAgICBwcmludGYgIlwwMzNbMTszNW3ilZEgIEVsbGlvdE9TIOKAlCBU
+dXRvcmlhbCAgW0xpY2FvICRfTFNfTlVNLyRfTFNfVE9UXSUtMjVz4pWRXDAzM1swbVxuIiAiIgog
+ICAgICBwcmludGYgIlwwMzNbMTszNW3ilZEgIFwwMzNbMTszM20lLTY0c1wwMzNbMTszNW3ilZFc
+MDMzWzBtXG4iICIkX0xTX1RJVCIKICAgICAgcHJpbnRmICJcMDMzWzE7MzVt4pWa4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWdXDAzM1swbVxuXG4iCiAgICB9CiAgICBfc2VjKCkgewogICAgICBw
+cmludGYgIlwwMzNbMTszNm0gIOKUgOKUgCAlcyDilIDilIBcMDMzWzBtXG5cbiIgIiQxIgogICAg
+fQogICAgX29rKCkgewogICAgICBwcmludGYgIlwwMzNbMDs5MG0gICRAXDAzM1swbVxuIgogICAg
+fQogICAgX2NvZGUoKSB7CiAgICAgIHByaW50ZiAiICBcMDMzWzE7MzJtJEBcMDMzWzBtXG4iCiAg
+ICB9CiAgICBfY29udCgpIHsKICAgICAgcHJpbnRmICJcblwwMzNbMDs5MG0gIFtFTlRFUiBwYXJh
+IGNvbnRpbnVhcl1cMDMzWzBtICI7IHJlYWQgLXIgX2R1bW15IDwgL2Rldi90dHkKICAgIH0KICAg
+IHByaW50ZiAiXG5cMDMzWzE7MzVtICDilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZdcMDMzWzBtXG4iCiAgICBwcmludGYgIlww
+MzNbMTszNW0gIOKVkSAgICAgICAgRWxsaW90T1Mg4oCUIFR1dG9yaWFsIENvbXBsZXRvICAgICAg
+ICAgICAgICAgICAgICDilZFcMDMzWzBtXG4iCiAgICBwcmludGYgIlwwMzNbMTszNW0gIOKVmuKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVnVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21UcmlsaGEgMDpcMDMzWzBt
+IFwwMzNbMTszMm1EbyB6ZXJvIOKAlCBUZXJtdXgsIHRlcm1pbmFsIGUgbG9naWNhXDAzM1swbSBc
+MDMzWzA7OTBtKGxpY29lcyAgMS01KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+VHJpbGhhIDE6XDAzM1swbSBcMDMzWzE7MzJtTHVhIOKAlCBkbyB6ZXJvIGFvIGF2YW5jYWRvXDAz
+M1swbSAgICAgICAgICAgXDAzM1swOzkwbShsaWNvZXMgIDYtMTcpXDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM21UcmlsaGEgMjpcMDMzWzBtIFwwMzNbMTszMm1MdWEgKyBFbGxpb3RP
+UyBBUElcMDMzWzBtICAgICAgICAgICAgICAgICAgXDAzM1swOzkwbShsaWNvZXMgMTgtMjYpXDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21UcmlsaGEgMzpcMDMzWzBtIFwwMzNbMTsz
+Mm1DIG5vIEVsbGlvdE9TXDAzM1swbSAgICAgICAgICAgICAgICAgICAgICAgXDAzM1swOzkwbShs
+aWNvZXMgMjctMzIpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21UcmlsaGEgNDpc
+MDMzWzBtIFwwMzNbMTszMm1Qcm9qZXRvcyByZWFpcyBkZSBwZW50ZXN0XDAzM1swbSAgICAgICAg
+ICAgXDAzM1swOzkwbShsaWNvZXMgMzMtMzUpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbTM1IGxpY29lcy4gRU5URVIgYXZhbmNhLCBDdHJsK0Mgc2FpLlwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG1bRU5URVIgcGFyYSBjb21lY2FyXVwwMzNbMG0gIjsgcmVh
+ZCAtciBfZHVtbXkgPCAvZGV2L3R0eQoKICAgICMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQCiAgICAjIFRSSUxIQSAwIOKAlCBETyBaRVJPOiBURVJNVVgsIFRFUk1JTkFMIEUg
+TE9HSUNBCiAgICAjIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAoKICAgIF9s
+ZWFybl9zdGVwIDEgMzUgIlRSSUxIQSAwIOKAlCBPIHF1ZSBlIG8gVGVybXV4IGUgcGFyYSBxdWUg
+c2VydmUiCiAgICBfc2VjICJPIHF1ZSBlIG8gVGVybXV4IgogICAgcHJpbnRmICIgIFRlcm11eCBl
+IHVtIGFwbGljYXRpdm8gZ3JhdHVpdG8gcXVlIHRyYW5zZm9ybWEgbyBzZXUgQW5kcm9pZFxuIgog
+ICAgcHJpbnRmICIgIG51bSBjb21wdXRhZG9yIExpbnV4IGRlIGJvbHNvIOKAlCBzZW0gcm9vdCwg
+c2VtIG1vZGlmaWNhciBuYWRhLlxuIgogICAgcHJpbnRmICIgIERlbnRybyBkZWxlIHZvY2UgdGVt
+IHVtIHRlcm1pbmFsOiB1bWEgdGVsYSBwcmV0YSBvbmRlIHZvY2VcbiIKICAgIHByaW50ZiAiICBk
+aWdpdGEgY29tYW5kb3MgZSBvIHNpc3RlbWEgcmVzcG9uZGUuXG5cbiIKICAgIF9zZWMgIlBvciBx
+dWUgdXNhciBvIHRlcm1pbmFsIgogICAgcHJpbnRmICIgIE5vIHRlcm1pbmFsIHZvY2UgZmF6IGNv
+aXNhcyBxdWUgYXBwIG5lbmh1bSBmYXo6XG4iCiAgICBwcmludGYgIiAgZXNjYW5lYXIgcmVkZXMs
+IHRlc3RhciBzZWd1cmFuY2EsIGF1dG9tYXRpemFyIHRhcmVmYXMsXG4iCiAgICBwcmludGYgIiAg
+Y3JpYXIgZmVycmFtZW50YXMgcHJvcHJpYXMg4oCUIHR1ZG8gcGVsbyBjZWx1bGFyLlxuXG4iCiAg
+ICBfc2VjICJJbnN0YWxhbmRvIG8gVGVybXV4IChzbyB1bWEgdmV6KSIKICAgIF9vayAiMS4gQWNl
+c3NlOiBodHRwczovL2YtZHJvaWQub3JnIgogICAgX29rICIyLiBCYWl4ZSBlIGluc3RhbGUgbyBG
+LURyb2lkIChsb2phIGFsdGVybmF0aXZhLCBncmF0aXMpIgogICAgX29rICIzLiBEZW50cm8gZG8g
+Ri1Ecm9pZCwgYnVzcXVlICdUZXJtdXgnIGUgaW5zdGFsZSIKICAgIF9vayAiNC4gTkFPIGluc3Rh
+bGUgbyBUZXJtdXggZGEgUGxheSBTdG9yZSDigJQgdmVyc2FvIGRlc2F0dWFsaXphZGEhIgogICAg
+cHJpbnRmICJcbiIKICAgIF9zZWMgIkFicmluZG8gbyBUZXJtdXgiCiAgICBfb2sgIkFicmEgbyBh
+cHAgVGVybXV4LiBWb2NlIHZhaSB2ZXIgdW1hIHRlbGEgcHJldGEgY29tIHVtIGN1cnNvci4iCiAg
+ICBfb2sgIklzc28gZSBvIHRlcm1pbmFsLiBBcXVpIHZvY2UgbWFuZGEg4oCUIG8gc2lzdGVtYSBv
+YmVkZWNlLiIKICAgIF9jb250CgogICAgX2xlYXJuX3N0ZXAgMiAzNSAiVFJJTEhBIDAg4oCUIFNv
+YnJldml2ZW5kbyBubyB0ZXJtaW5hbCIKICAgIF9zZWMgIk8gcHJvbXB0IOKAlCBvbmRlIHZvY2Ug
+ZGlnaXRhIgogICAgcHJpbnRmICIgIFZvY2UgdmFpIHZlciBhbGdvIGFzc2ltOlxuXG4iCiAgICBf
+Y29kZSAiJCBfIgogICAgcHJpbnRmICJcbiAgTyBcMDMzWzE7MzJtJFwwMzNbMG0gaW5kaWNhIHF1
+ZSBvIHRlcm1pbmFsIGVzdGEgZXNwZXJhbmRvIHVtIGNvbWFuZG8uXG4iCiAgICBwcmludGYgIiAg
+RGlnaXRlIG8gY29tYW5kbyBlIGFwZXJ0ZSBFTlRFUi5cblxuIgogICAgX3NlYyAiQ29tYW5kb3Mg
+ZXNzZW5jaWFpcyBkbyBkaWEgYSBkaWEiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMjhzXDAz
+M1swbSAlc1xuIiAicHdkIiAibW9zdHJhIGVtIHF1YWwgcGFzdGEgdm9jZSBlc3RhIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM20lLTI4c1wwMzNbMG0gJXNcbiIgImxzIiAibGlzdGEgYXJxdWl2b3Mg
+ZGEgcGFzdGEgYXR1YWwiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMjhzXDAzM1swbSAlc1xu
+IiAibHMgLWxhIiAibGlzdGEgY29tIGRldGFsaGVzIGUgYXJxdWl2b3Mgb2N1bHRvcyIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzNtJS0yOHNcMDMzWzBtICVzXG4iICJjZCBub21lLWRhLXBhc3RhIiAi
+ZW50cmEgbnVtYSBwYXN0YSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0yOHNcMDMzWzBtICVz
+XG4iICJjZCAuLiIgInZvbHRhIHVtYSBwYXN0YSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0y
+OHNcMDMzWzBtICVzXG4iICJjZCB+IiAidmFpIHBhcmEgc3VhIHBhc3RhIGluaWNpYWwgKGhvbWUp
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTI4c1wwMzNbMG0gJXNcbiIgIm1rZGlyIG5vbWUi
+ICJjcmlhIHVtYSBwYXN0YSBub3ZhIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTI4c1wwMzNb
+MG0gJXNcbiIgInRvdWNoIGFycXVpdm8udHh0IiAiY3JpYSB1bSBhcnF1aXZvIHZhemlvIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM20lLTI4c1wwMzNbMG0gJXNcbiIgImNhdCBhcnF1aXZvLnR4dCIg
+Im1vc3RyYSBvIGNvbnRldWRvIGRlIHVtIGFycXVpdm8iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bSUtMjhzXDAzM1swbSAlc1xuIiAicm0gYXJxdWl2by50eHQiICJhcGFnYSB1bSBhcnF1aXZvIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTI4c1wwMzNbMG0gJXNcbiIgImNsZWFyIiAibGltcGEg
+YSB0ZWxhIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIkF0YWxob3MgcXVlIHNhbHZhbSBhIHZp
+ZGEiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMjhzXDAzM1swbSAlc1xuIiAic2V0YSBwYXJh
+IGNpbWEvYmFpeG8iICJuYXZlZ2Egbm8gaGlzdG9yaWNvIGRlIGNvbWFuZG9zIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM20lLTI4c1wwMzNbMG0gJXNcbiIgIlRBQiIgImNvbXBsZXRhIG8gbm9tZSBk
+byBjb21hbmRvIG91IGFycXVpdm8iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMjhzXDAzM1sw
+bSAlc1xuIiAiQ3RybCtDIiAiY2FuY2VsYSBvIGNvbWFuZG8gcXVlIGVzdGEgcm9kYW5kbyIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtJS0yOHNcMDMzWzBtICVzXG4iICJDdHJsK0wiICJsaW1wYSBh
+IHRlbGEgKGlndWFsIGFvIGNsZWFyKSIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJFeHBlcmlt
+ZW50ZSBhZ29yYSIKICAgIF9jb2RlICJwd2QiCiAgICBfY29kZSAibHMiCiAgICBfY29kZSAiY2Qg
+fiIKICAgIF9jb2RlICJta2RpciBtZXUtcHJpbWVpcm8tdGVzdGUiCiAgICBfY29kZSAibHMiCiAg
+ICBfY29udAoKICAgIF9sZWFybl9zdGVwIDMgMzUgIlRSSUxIQSAwIOKAlCBJbnN0YWxhbmRvIG8g
+RWxsaW90T1MiCiAgICBfc2VjICJQcmVwYXJhbmRvIG8gVGVybXV4IChzbyB1bWEgdmV6KSIKICAg
+IHByaW50ZiAiICBBbnRlcyBkZSBpbnN0YWxhciBvIEVsbGlvdE9TLCBvIFRlcm11eCBwcmVjaXNh
+IGRlXG4iCiAgICBwcmludGYgIiAgYWxndW1hcyBmZXJyYW1lbnRhcyBiYXNpY2FzLiBDb3BpZSBl
+IGNvbGUgY2FkYSBsaW5oYTpcblxuIgogICAgX2NvZGUgInBrZyB1cGRhdGUgLXkiCiAgICBfb2sg
+IiAgKGF0dWFsaXphIGEgbGlzdGEgZGUgcGFjb3RlcyDigJQgcG9kZSBkZW1vcmFyIHVtIHBvdWNv
+KSIKICAgIHByaW50ZiAiXG4iCiAgICBfY29kZSAicGtnIGluc3RhbGwgLXkgZ2l0IHdnZXQgY3Vy
+bCBjbGFuZyBtYWtlIHJlYWRsaW5lIgogICAgX29rICIgIChpbnN0YWxhIGNvbXBpbGFkb3IgZSBm
+ZXJyYW1lbnRhcyBuZWNlc3NhcmlhcykiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiQmFpeGFu
+ZG8gbyBFbGxpb3RPUyIKICAgIF9jb2RlICJnaXQgY2xvbmUgaHR0cHM6Ly9naXRodWIuY29tL21p
+a2VlbGxpb3QyMTgvRWxsaW90T1MuZ2l0IgogICAgX29rICIgIChiYWl4YSBvIEVsbGlvdE9TIGRv
+IEdpdEh1YikiCiAgICBwcmludGYgIlxuIgogICAgX2NvZGUgImNkIEVsbGlvdE9TIgogICAgX29r
+ICIgIChlbnRyYSBuYSBwYXN0YSBkbyBFbGxpb3RPUykiCiAgICBwcmludGYgIlxuIgogICAgX3Nl
+YyAiSW5zdGFsYW5kbyIKICAgIF9jb2RlICJiYXNoIGx1YXNjcmlwdC5zaCIKICAgIF9vayAiICAo
+Y29tcGlsYSBlIGluc3RhbGEg4oCUIHBvZGUgZGVtb3JhciAyLTUgbWludXRvcykiCiAgICBwcmlu
+dGYgIlxuIgogICAgX3NlYyAiVGVzdGFuZG8gc2UgZnVuY2lvbm91IgogICAgX2NvZGUgIm1zIC12
+IgogICAgX29rICIgIGRldmUgbW9zdHJhciBhIHZlcnNhbyBkbyBFbGxpb3RPUyIKICAgIHByaW50
+ZiAiXG4iCiAgICBfY29kZSAibXMiCiAgICBfb2sgIiAgYWJyZSBvIFJFUEwg4oCUIHNldSBub3Zv
+IHRlcm1pbmFsIGRlIHN1cGVycG9kZXJlcyIKICAgIF9vayAiICBQYXJhIHNhaXIgZG8gUkVQTDog
+Q3RybCtDIG91IGRpZ2l0ZSBleGl0KCkiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDQgMzUg
+IlRSSUxIQSAwIOKAlCBPIHF1ZSBlIGxvZ2ljYSBkZSBwcm9ncmFtYWNhbyIKICAgIF9zZWMgIlBy
+b2dyYW1hciBlIGRhciBvcmRlbnMgYW8gY29tcHV0YWRvciIKICAgIHByaW50ZiAiICBVbSBwcm9n
+cmFtYSBlIHVtYSBsaXN0YSBkZSBpbnN0cnVjb2VzIHF1ZSBvIGNvbXB1dGFkb3JcbiIKICAgIHBy
+aW50ZiAiICBzZWd1ZSB1bWEgcG9yIHVtYSwgbmEgb3JkZW0gcXVlIHZvY2UgZXNjcmV2ZXUuXG5c
+biIKICAgIHByaW50ZiAiICBQZW5zZSBhc3NpbTogdm9jZSBlc3RhIGVuc2luYW5kbyBhbGd1ZW0g
+bXVpdG8gb2JlZGllbnRlXG4iCiAgICBwcmludGYgIiAgbWFzIHF1ZSBuYW8gcGVuc2Eg4oCUIGZh
+eiBFWEFUQU1FTlRFIG8gcXVlIHZvY2UgbWFuZG91LlxuXG4iCiAgICBfc2VjICJPcyB0cmVzIGJs
+b2NvcyBkZSBxdWFscXVlciBwcm9ncmFtYSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtMS4gU0VR
+VUVOQ0lBXDAzM1swbSDigJQgaW5zdHJ1Y29lcyBlbSBvcmRlbVxuIgogICAgX29rICIgICAgIGFj
+b3JkYSAtPiBlc2NvdmEgZGVudGUgLT4gdG9tYSBjYWZlIC0+IHZhaSB0cmFiYWxoYXIiCiAgICBw
+cmludGYgIlxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20yLiBERUNJU0FPIChpZi9lbHNlKVww
+MzNbMG0g4oCUIGVzY29saGVyIGNhbWluaG9zIGRpZmVyZW50ZXNcbiIKICAgIF9vayAiICAgICBT
+RSB0YSBjaG92ZW5kbyDihpIgcGVnYSBndWFyZGEtY2h1dmEiCiAgICBfb2sgIiAgICAgU0VOQU8g
+ICAgICAgICAg4oaSIGRlaXhhIGVtIGNhc2EiCiAgICBwcmludGYgIlxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM20zLiBSRVBFVElDQU8gKGxvb3ApXDAzM1swbSDigJQgZmF6ZXIgYWxnbyB2YXJp
+YXMgdmV6ZXNcbiIKICAgIF9vayAiICAgICBFTlFVQU5UTyB0aXZlciByb3VwYSBzdWphIOKGkiBs
+YXZhIHVtYSBwZWNhIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIlZhcmlhdmVpcyDigJQgZ3Vh
+cmRhbmRvIGluZm9ybWFjb2VzIgogICAgcHJpbnRmICIgIFVtYSB2YXJpYXZlbCBlIHVtYSBjYWl4
+aW5oYSBjb20gbm9tZSBxdWUgZ3VhcmRhIHVtIHZhbG9yLlxuXG4iCiAgICBfb2sgIiAgbm9tZSA9
+ICdNaWtlJyAgICAgIC0tIGNhaXhpbmhhICdub21lJyBndWFyZGEgJ01pa2UnIgogICAgX29rICIg
+IGlkYWRlID0gMjUgICAgICAgICAtLSBjYWl4aW5oYSAnaWRhZGUnIGd1YXJkYSAyNSIKICAgIF9v
+ayAiICBhdGl2byA9IHRydWUgICAgICAgLS0gY2FpeGluaGEgJ2F0aXZvJyBndWFyZGEgdmVyZGFk
+ZWlybyIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJUaXBvcyBkZSBkYWRvcyIKICAgIHByaW50
+ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJudW1lcm8iICI0MiAvIDMuMTQgLyAt
+NyIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJ0ZXh0byIgIidv
+bGEgbXVuZG8nICAvICBcIkVsbGlvdE9TXCIiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJz
+XDAzM1swbSAlc1xuIiAiYm9vbGVhbm8iICJ0cnVlICAvICBmYWxzZSIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJudWxvIiAibmlsICAobmFkYSwgdmF6aW8pIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImxpc3RhIiAieyAnYScs
+ICdiJywgJ2MnIH0iCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiRnVuY29lcyDigJQgZW5zaW5h
+bmRvIG8gY29tcHV0YWRvciB1bSB0cnVxdWUgbm92byIKICAgIHByaW50ZiAiICBVbWEgZnVuY2Fv
+IGUgdW0gYmxvY28gZGUgY29kaWdvIGNvbSBub21lIHF1ZSB2b2NlIHBvZGVcbiIKICAgIHByaW50
+ZiAiICBjaGFtYXIgcXVhbnRhcyB2ZXplcyBxdWlzZXIuXG5cbiIKICAgIF9vayAiICBmdW5jYW8g
+c2F1ZGFyKG5vbWUpOiIKICAgIF9vayAiICAgIG1vc3RyYXIgJ09sYSwgJyArIG5vbWUiCiAgICBf
+b2sgIiIKICAgIF9vayAiICBzYXVkYXIoJ01pa2UnKSAgIC0tPiBPbGEsIE1pa2UiCiAgICBfb2sg
+IiAgc2F1ZGFyKCdDWU4nKSAgICAtLT4gT2xhLCBDWU4iCiAgICBfY29udAoKICAgIF9sZWFybl9z
+dGVwIDUgMzUgIlRSSUxIQSAwIOKAlCBTZXUgcHJpbWVpcm8gcHJvZ3JhbWEgbm8gRWxsaW90T1Mi
+CiAgICBfc2VjICJBYnJpbmRvIG8gUkVQTCIKICAgIHByaW50ZiAiICBPIFJFUEwgZSB1bSBhbWJp
+ZW50ZSBvbmRlIHZvY2UgZGlnaXRhIEx1YSBlIHZlIG8gcmVzdWx0YWRvXG4iCiAgICBwcmludGYg
+IiAgbmEgaG9yYSDigJQgc2VtIHByZWNpc2FyIGNyaWFyIGFycXVpdm8uIElkZWFsIHBhcmEgYXBy
+ZW5kZXIuXG5cbiIKICAgIF9jb2RlICJtcyIKICAgIF9vayAiICBWb2NlIHZlcmEgbyBwcm9tcHQ6
+ICBtcz4iCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiRXhwZXJpbWVudG8gMSDigJQgbyBjb21w
+dXRhZG9yIGNvbW8gY2FsY3VsYWRvcmEiCiAgICBfb2sgIiAgTm8gcHJvbXB0IGRvIG1zLCBkaWdp
+dGU6IgogICAgX2NvZGUgIiAgcHJpbnQoMiArIDIpIgogICAgX29rICIgIFJlc3VsdGFkbzogNCIK
+ICAgIF9jb2RlICIgIHByaW50KDEwICogMyAtIDUpIgogICAgX29rICIgIFJlc3VsdGFkbzogMjUi
+CiAgICBfY29kZSAiICBwcmludCgyIF4gMTApIgogICAgX29rICIgIFJlc3VsdGFkbzogMTAyNCAg
+KDIgZWxldmFkbyBhIDEwKSIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJFeHBlcmltZW50byAy
+IOKAlCBzdWEgcHJpbWVpcmEgdmFyaWF2ZWwiCiAgICBfY29kZSAiICBub21lID0gJ01pa2UnIgog
+ICAgX2NvZGUgIiAgcHJpbnQoJ09sYSwgJyAuLiBub21lKSIKICAgIF9vayAiICBSZXN1bHRhZG86
+IE9sYSwgTWlrZSIKICAgIF9vayAiICBPIC4uIGp1bnRhIHRleHRvcyBlbSBMdWEiCiAgICBwcmlu
+dGYgIlxuIgogICAgX3NlYyAiRXhwZXJpbWVudG8gMyDigJQgc3VhIHByaW1laXJhIGRlY2lzYW8i
+CiAgICBfY29kZSAiICBpZGFkZSA9IDIwIgogICAgX2NvZGUgIiAgaWYgaWRhZGUgPj0gMTggdGhl
+biIKICAgIF9jb2RlICIgICAgcHJpbnQoJ21haW9yIGRlIGlkYWRlJykiCiAgICBfY29kZSAiICBl
+bHNlIgogICAgX2NvZGUgIiAgICBwcmludCgnbWVub3IgZGUgaWRhZGUnKSIKICAgIF9jb2RlICIg
+IGVuZCIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJFeHBlcmltZW50byA0IOKAlCBzZXUgcHJp
+bWVpcm8gbG9vcCIKICAgIF9jb2RlICIgIGZvciBpID0gMSwgNSBkbyIKICAgIF9jb2RlICIgICAg
+cHJpbnQoJ2xpbmhhICcgLi4gaSkiCiAgICBfY29kZSAiICBlbmQiCiAgICBwcmludGYgIlxuIgog
+ICAgX3NlYyAiRXhwZXJpbWVudG8gNSDigJQgdXNhbmRvIG8gRWxsaW90T1MgZGUgdmVyZGFkZSIK
+ICAgIF9jb2RlICIgIHByaW50KG5ldC5nZXQoJ2h0dHBzOi8vaWZjb25maWcubWUnKSkiCiAgICBf
+b2sgIiAgTW9zdHJhIHNldSBJUCBwdWJsaWNvIOKAlCBpc3NvIGUgcGVudGVzdCByZWFsISIKICAg
+IHByaW50ZiAiXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgUGFyYWJlbnMhXDAzM1swbSBW
+b2NlIGFjYWJhIGRlIHJvZGFyIHNldSBwcmltZWlybyBzY2FuIGRlIHJlZGUuXG4iCiAgICBwcmlu
+dGYgIiAgQWdvcmEgYSBUcmlsaGEgMSB2YWkgdGUgZW5zaW5hciBMdWEgZG8gemVybyBhbyBhdmFu
+Y2Fkby5cblxuIgogICAgX2NvbnQKCiAgICAjIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkAogICAgIyBUUklMSEEgMSDigJQgTFVBIERPIFpFUk8gQU8gQVZBTkNBRE8KICAgICMg
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCgogICAgX2xlYXJuX3N0ZXAgNiAz
+NSAiVFJJTEhBIDEg4oCUIEx1YTogTyBxdWUgZSBlIHBvciBxdWUgdXNhciIKICAgIF9zZWMgIk8g
+cXVlIGUgTHVhIgogICAgcHJpbnRmICIgIEx1YSBlIHVtYSBsaW5ndWFnZW0gbGV2ZSwgcmFwaWRh
+IGUgZW1iYXJjYXZlbCBjcmlhZGEgbm8gQnJhc2lsIChQVUMtUmlvKS5cbiIKICAgIHByaW50ZiAi
+ICBFIGEgbGluZ3VhZ2VtIGRlIHNjcmlwdHMgZG8gRWxsaW90T1Mg4oCUIHRvZG9zIG9zIG1vZHVs
+b3MgZGUgcGVudGVzdFxuIgogICAgcHJpbnRmICIgIHNhbyBhY2Vzc2l2ZWlzIHZpYSBMdWEuIE8g
+aW50ZXJwcmV0YWRvciBlIG8gcHJvcHJpbyAnbXMnLlxuXG4iCiAgICBfc2VjICJDb21vIHJvZGFy
+IEx1YSBubyBFbGxpb3RPUyIKICAgIF9jb2RlICJtcyAgICAgICAgICAgICAgICAgICAgICAjIFJF
+UEwgaW50ZXJhdGl2byDigJQgZGlnaXRlIEx1YSBkaXJldG8iCiAgICBfY29kZSAibXMgLWMgJ3By
+aW50KFwib2xhXCIpJyAgICMgZXhlY3V0YSB1bWEgbGluaGEiCiAgICBfY29kZSAibXMgLWYgbWV1
+X3NjcmlwdC5sdWEgICAgIyBleGVjdXRhIHVtIGFycXVpdm8iCiAgICBwcmludGYgIlxuIgogICAg
+X3NlYyAiUHJpbWVpcm8gcHJvZ3JhbWEiCiAgICBfb2sgICItLSBzYWx2ZSBjb21vIG9sYS5sdWEi
+CiAgICBfb2sgICJwcmludCgnT2xhLCBFbGxpb3RPUyEnKSIKICAgIF9vayAgInByaW50KDEgKyAx
+KSAgICAgICAgICAgLS0+IDIiCiAgICBfb2sgICJwcmludCh0eXBlKCd0ZXh0bycpKSAgIC0tPiBz
+dHJpbmciCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDcgMzUgIlRSSUxIQSAxIOKAlCBWYXJp
+YXZlaXMgZSBUaXBvcyIKICAgIF9zZWMgIlRpcG9zIGJhc2ljb3MgZGUgTHVhIgogICAgX29rICAi
+bmlsICAgICAgICAtLSBhdXNlbmNpYSBkZSB2YWxvciIKICAgIF9vayAgImJvb2xlYW4gICAgLS0g
+dHJ1ZSAvIGZhbHNlIgogICAgX29rICAibnVtYmVyICAgICAtLSBpbnRlaXJvcyBlIGRlY2ltYWlz
+ICg2NC1iaXQpIgogICAgX29rICAic3RyaW5nICAgICAtLSB0ZXh0byIKICAgIF9vayAgInRhYmxl
+ICAgICAgLS0gYXJyYXlzLCBkaWNpb25hcmlvcywgb2JqZXRvcyIKICAgIF9vayAgImZ1bmN0aW9u
+ICAgLS0gZnVuY29lcyBzYW8gdmFsb3JlcyBkZSBwcmltZWlyYSBjbGFzc2UiCiAgICBwcmludGYg
+IlxuIgogICAgX3NlYyAiVmFyaWF2ZWlzIgogICAgX29rICAibG9jYWwgeCA9IDEwICAgICAgICAg
+ICAgLS0gbG9jYWwgYW8gYmxvY28gKHJlY29tZW5kYWRvKSIKICAgIF9vayAgInkgPSAyMCAgICAg
+ICAgICAgICAgICAgIC0tIGdsb2JhbCAoZXZpdGUpIgogICAgX29rICAibG9jYWwgbm9tZSA9ICdF
+bGxpb3QnIgogICAgX29rICAibG9jYWwgYXRpdm8gPSB0cnVlIgogICAgX29rICAibG9jYWwgbmFk
+YSA9IG5pbCIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJTdHJpbmdzIgogICAgX29rICAibG9j
+YWwgcyA9ICdvbGEgbXVuZG8nIgogICAgX29rICAibG9jYWwgdCA9IFwidGFtYmVtIGZ1bmNpb25h
+XCIiCiAgICBfb2sgICJsb2NhbCBtdWx0aSA9IFtbIHRleHRvIgogICAgX29rICAiZW0gdmFyaWFz
+IGxpbmhhcyBdXSIKICAgIF9vayAgInByaW50KCNzKSAgICAgICAgICAgICAgIC0tIGNvbXByaW1l
+bnRvOiA5IgogICAgX29rICAicHJpbnQocyAuLiAnIScpICAgICAgICAgLS0gY29uY2F0ZW5hY2Fv
+OiAnb2xhIG11bmRvICEnIgogICAgX29rICAicHJpbnQoczp1cHBlcigpKSAgICAgICAgLS0gJ09M
+QSBNVU5ETyciCiAgICBfb2sgICJwcmludChzOnN1YigxLDMpKSAgICAgICAtLSAnb2xhJyIKICAg
+IF9jb250CgogICAgX2xlYXJuX3N0ZXAgOCAzNSAiVFJJTEhBIDEg4oCUIE9wZXJhZG9yZXMgZSBM
+b2dpY2EiCiAgICBfc2VjICJPcGVyYWRvcmVzIGFyaXRtZXRpY29zIgogICAgX29rICAicHJpbnQo
+MTAgKyAzKSAgICAtLT4gMTMiCiAgICBfb2sgICJwcmludCgxMCAtIDMpICAgIC0tPiA3IgogICAg
+X29rICAicHJpbnQoMTAgKiAzKSAgICAtLT4gMzAiCiAgICBfb2sgICJwcmludCgxMCAvIDMpICAg
+IC0tPiAzLjMzMzMuLi4iCiAgICBfb2sgICJwcmludCgxMCAvLyAzKSAgIC0tPiAzICAgKGRpdmlz
+YW8gaW50ZWlyYSkiCiAgICBfb2sgICJwcmludCgxMCAlIDMpICAgIC0tPiAxICAgKHJlc3RvKSIK
+ICAgIF9vayAgInByaW50KDIgXiA4KSAgICAgLS0+IDI1NiAocG90ZW5jaWEpIgogICAgcHJpbnRm
+ICJcbiIKICAgIF9zZWMgIk9wZXJhZG9yZXMgcmVsYWNpb25haXMiCiAgICBfb2sgICI9PSAgfj0g
+IDwgID4gIDw9ICA+PSIKICAgIF9vayAgInByaW50KDEgPT0gMSkgICAgLS0+IHRydWUiCiAgICBf
+b2sgICJwcmludCgxIH49IDIpICAgIC0tPiB0cnVlICAgKGRpZmVyZW50ZSkiCiAgICBwcmludGYg
+IlxuIgogICAgX3NlYyAiT3BlcmFkb3JlcyBsb2dpY29zIgogICAgX29rICAiYW5kICAgb3IgICBu
+b3QiCiAgICBfb2sgICJwcmludCh0cnVlIGFuZCBmYWxzZSkgICAtLT4gZmFsc2UiCiAgICBfb2sg
+ICJwcmludCh0cnVlIG9yIGZhbHNlKSAgICAtLT4gdHJ1ZSIKICAgIF9vayAgInByaW50KG5vdCB0
+cnVlKSAgICAgICAgIC0tPiBmYWxzZSIKICAgIF9vayAgIiIKICAgIF9vayAgIi0tIHRydXF1ZSB1
+dGlsOiB2YWxvciBwYWRyYW8iCiAgICBfb2sgICJsb2NhbCB4ID0gbmlsIgogICAgX29rICAibG9j
+YWwgdiA9IHggb3IgJ3BhZHJhbycgICAtLT4gJ3BhZHJhbyciCiAgICBfY29udAoKICAgIF9sZWFy
+bl9zdGVwIDkgMzUgIlRSSUxIQSAxIOKAlCBpZiwgZWxzZWlmLCBlbHNlIgogICAgX3NlYyAiRXN0
+cnV0dXJhIGNvbmRpY2lvbmFsIgogICAgX29rICAibG9jYWwgbm90YSA9IDc1IgogICAgX29rICAi
+IgogICAgX29rICAiaWYgbm90YSA+PSA5MCB0aGVuIgogICAgX29rICAiICBwcmludCgnQScpIgog
+ICAgX29rICAiZWxzZWlmIG5vdGEgPj0gNzAgdGhlbiIKICAgIF9vayAgIiAgcHJpbnQoJ0InKSAg
+ICAgICAgICAtLSBjYWkgYXF1aSIKICAgIF9vayAgImVsc2VpZiBub3RhID49IDUwIHRoZW4iCiAg
+ICBfb2sgICIgIHByaW50KCdDJykiCiAgICBfb2sgICJlbHNlIgogICAgX29rICAiICBwcmludCgn
+UmVwcm92YWRvJykiCiAgICBfb2sgICJlbmQiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiQ29u
+ZGljaW9uYWwgZW0gdW1hIGxpbmhhICh0ZXJuYXJpbyB2aWEgYW5kL29yKSIKICAgIF9vayAgImxv
+Y2FsIHN0YXR1cyA9IChub3RhID49IDcwKSBhbmQgJ2Fwcm92YWRvJyBvciAncmVwcm92YWRvJyIK
+ICAgIF9vayAgInByaW50KHN0YXR1cykgICAgLS0+ICdhcHJvdmFkbyciCiAgICBwcmludGYgIlxu
+IgogICAgX3NlYyAiTmlsIGUgZmFsc2Ugc2FvIGZhbHNvcyDigJQgdHVkbyBvIG1haXMgZSB2ZXJk
+YWRlaXJvIgogICAgX29rICAiaWYgMCB0aGVuIHByaW50KCcwIGUgdHJ1ZSBlbSBMdWEhJykgZW5k
+ICAgIC0tIGltcHJpbWUhIgogICAgX29rICAiaWYgJycgdGhlbiBwcmludCgnc3RyaW5nIHZhemlh
+IGUgdHJ1ZScpIGVuZCAtLSBpbXByaW1lISIKICAgIF9jb250CgogICAgX2xlYXJuX3N0ZXAgMTAg
+MzUgIlRSSUxIQSAxIOKAlCBMb29wczogd2hpbGUsIHJlcGVhdCwgZm9yIgogICAgX3NlYyAid2hp
+bGUiCiAgICBfb2sgICJsb2NhbCBpID0gMSIKICAgIF9vayAgIndoaWxlIGkgPD0gNSBkbyIKICAg
+IF9vayAgIiAgcHJpbnQoaSkiCiAgICBfb2sgICIgIGkgPSBpICsgMSIKICAgIF9vayAgImVuZCIK
+ICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJyZXBlYXQuLi51bnRpbCAoZXhlY3V0YSBhbyBtZW5v
+cyB1bWEgdmV6KSIKICAgIF9vayAgImxvY2FsIHggPSAwIgogICAgX29rICAicmVwZWF0IgogICAg
+X29rICAiICB4ID0geCArIDEiCiAgICBfb2sgICJ1bnRpbCB4ID49IDMiCiAgICBfb2sgICJwcmlu
+dCh4KSAgIC0tPiAzIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgImZvciBudW1lcmljbyIKICAg
+IF9vayAgImZvciBpID0gMSwgNSBkbyBwcmludChpKSBlbmQgICAgICAgICAgLS0gMSBhIDUiCiAg
+ICBfb2sgICJmb3IgaSA9IDEwLCAxLCAtMiBkbyBwcmludChpKSBlbmQgICAgIC0tIDEwIDggNiA0
+IDIiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiYnJlYWsiCiAgICBfb2sgICJmb3IgaSA9IDEs
+IDEwMCBkbyIKICAgIF9vayAgIiAgaWYgaSA9PSA1IHRoZW4gYnJlYWsgZW5kIgogICAgX29rICAi
+ICBwcmludChpKSIKICAgIF9vayAgImVuZCIKICAgIF9jb250CgogICAgX2xlYXJuX3N0ZXAgMTEg
+MzUgIlRSSUxIQSAxIOKAlCBGdW5jb2VzIgogICAgX3NlYyAiRGVmaW5pbmRvIGZ1bmNvZXMiCiAg
+ICBfb2sgICJsb2NhbCBmdW5jdGlvbiBzb21hKGEsIGIpIgogICAgX29rICAiICByZXR1cm4gYSAr
+IGIiCiAgICBfb2sgICJlbmQiCiAgICBfb2sgICJwcmludChzb21hKDMsIDQpKSAgIC0tPiA3Igog
+ICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIk11bHRpcGxvcyByZXRvcm5vcyIKICAgIF9vayAgImxv
+Y2FsIGZ1bmN0aW9uIG1pbm1heCh0KSIKICAgIF9vayAgIiAgbG9jYWwgbW4sIG14ID0gdFsxXSwg
+dFsxXSIKICAgIF9vayAgIiAgZm9yIF8sIHYgaW4gaXBhaXJzKHQpIGRvIgogICAgX29rICAiICAg
+IGlmIHYgPCBtbiB0aGVuIG1uID0gdiBlbmQiCiAgICBfb2sgICIgICAgaWYgdiA+IG14IHRoZW4g
+bXggPSB2IGVuZCIKICAgIF9vayAgIiAgZW5kIgogICAgX29rICAiICByZXR1cm4gbW4sIG14Igog
+ICAgX29rICAiZW5kIgogICAgX29rICAibG9jYWwgYSwgYiA9IG1pbm1heCh7MywxLDcsMn0pIgog
+ICAgX29rICAicHJpbnQoYSwgYikgICAtLT4gMSAgNyIKICAgIHByaW50ZiAiXG4iCiAgICBfc2Vj
+ICJGdW5jb2VzIGNvbW8gdmFsb3JlcyAoY2xvc3VyZXMpIgogICAgX29rICAibG9jYWwgZnVuY3Rp
+b24gY29udGFkb3IoaW5pY2lvKSIKICAgIF9vayAgIiAgbG9jYWwgbiA9IGluaWNpbyIKICAgIF9v
+ayAgIiAgcmV0dXJuIGZ1bmN0aW9uKCkiCiAgICBfb2sgICIgICAgbiA9IG4gKyAxIgogICAgX29r
+ICAiICAgIHJldHVybiBuIgogICAgX29rICAiICBlbmQiCiAgICBfb2sgICJlbmQiCiAgICBfb2sg
+ICJsb2NhbCBjID0gY29udGFkb3IoMCkiCiAgICBfb2sgICJwcmludChjKCksIGMoKSwgYygpKSAg
+IC0tPiAxICAyICAzIgogICAgX2NvbnQKCiAgICBfbGVhcm5fc3RlcCAxMiAzNSAiVFJJTEhBIDEg
+4oCUIFRhYmxlczogYXJyYXlzIGUgZGljaW9uYXJpb3MiCiAgICBfc2VjICJBcnJheSAoaW5kaWNl
+IGNvbWVjYSBlbSAxKSIKICAgIF9vayAgImxvY2FsIGZydXRhcyA9IHsnbWFjYScsICdiYW5hbmEn
+LCAndXZhJ30iCiAgICBfb2sgICJwcmludChmcnV0YXNbMV0pICAgICAgICAtLT4gbWFjYSIKICAg
+IF9vayAgInByaW50KCNmcnV0YXMpICAgICAgICAgIC0tPiAzIgogICAgX29rICAidGFibGUuaW5z
+ZXJ0KGZydXRhcywgJ2tpd2knKSIKICAgIF9vayAgInRhYmxlLnJlbW92ZShmcnV0YXMsIDEpIgog
+ICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIkRpY2lvbmFyaW8gKGNoYXZlLXZhbG9yKSIKICAgIF9v
+ayAgImxvY2FsIGFsdm8gPSB7IgogICAgX29rICAiICBob3N0ID0gJzE5Mi4xNjguMS4xJywiCiAg
+ICBfb2sgICIgIHBvcnRhID0gODAsIgogICAgX29rICAiICBhYmVydG8gPSB0cnVlIgogICAgX29r
+ICAifSIKICAgIF9vayAgInByaW50KGFsdm8uaG9zdCkgICAgICAgIC0tPiAxOTIuMTY4LjEuMSIK
+ICAgIF9vayAgInByaW50KGFsdm9bJ3BvcnRhJ10pICAgIC0tPiA4MCIKICAgIF9vayAgImFsdm8u
+c3NsID0gZmFsc2UgICAgICAgIC0tIGFkaWNpb25hIGNhbXBvIgogICAgcHJpbnRmICJcbiIKICAg
+IF9zZWMgIkl0ZXJhY2FvIgogICAgX29rICAiLS0gYXJyYXk6IgogICAgX29rICAiZm9yIGksIHYg
+aW4gaXBhaXJzKGZydXRhcykgZG8gcHJpbnQoaSwgdikgZW5kIgogICAgX29rICAiIgogICAgX29r
+ICAiLS0gZGljaW9uYXJpbzoiCiAgICBfb2sgICJmb3IgaywgdiBpbiBwYWlycyhhbHZvKSBkbyBw
+cmludChrLCB2KSBlbmQiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDEzIDM1ICJUUklMSEEg
+MSDigJQgU3RyaW5ncyBhdmFuY2FkbyIKICAgIF9zZWMgIkZ1bmNvZXMgZGEgYmlibGlvdGVjYSBz
+dHJpbmciCiAgICBfb2sgICJsb2NhbCB1cmwgPSAnaHR0cDovL2Fsdm8uY29tL2xvZ2luP2lkPTEn
+IgogICAgX29rICAiIgogICAgX29rICAidXJsOmZpbmQoJ2xvZ2luJykgICAgICAgICAgLS0gcG9z
+aWNhbzogMTkgMjMiCiAgICBfb2sgICJ1cmw6bWF0Y2goJygldyspJS5jb20nKSAgICAtLSBjYXB0
+dXJhOiAnYWx2byciCiAgICBfb2sgICJ1cmw6Z3N1YignaHR0cCcsICdodHRwcycpICAtLSBzdWJz
+dGl0dWkiCiAgICBfb2sgICJ1cmw6bGVuKCkgICAgICAgICAgICAgICAgICAtLSBjb21wcmltZW50
+byIKICAgIF9vayAgInVybDpyZXAoMiwgJywgJykgICAgICAgICAgIC0tIHJlcGV0ZSIKICAgIF9v
+ayAgIignICBvbGEgICcpOm1hdGNoKCdeJXMqKC4tKSVzKiQnKSAgLS0gdHJpbSIKICAgIHByaW50
+ZiAiXG4iCiAgICBfc2VjICJzdHJpbmcuZm9ybWF0IChjb21vIHByaW50ZikiCiAgICBfb2sgICJz
+dHJpbmcuZm9ybWF0KCclczolZCcsICdob3N0JywgODApICAtLT4gJ2hvc3Q6ODAnIgogICAgX29r
+ICAic3RyaW5nLmZvcm1hdCgnJS4yZicsIDMuMTQxNTkpICAgICAgLS0+ICczLjE0JyIKICAgIF9v
+ayAgInN0cmluZy5mb3JtYXQoJyUwNWQnLCA0MikgICAgICAgICAgIC0tPiAnMDAwNDInIgogICAg
+cHJpbnRmICJcbiIKICAgIF9zZWMgIlBhZHJvZXMgTHVhICh0aXBvIHJlZ2V4IHNpbXBsaWZpY2Fk
+bykiCiAgICBfb2sgICIlZCAgIGRpZ2l0byAgICAgICVhICBsZXRyYSAgICAgICVzICBlc3BhY28i
+CiAgICBfb2sgICIldyAgIGFsZmFudW0gICAgICVwICBwb250dWFjYW8gICVsICBtaW51c2N1bGEi
+CiAgICBfb2sgICIuICAgIHF1YWxxdWVyICAgICogICB6ZXJvKyAgICAgICsgICB1bSsgICAgID8g
+IHplcm8vdW0iCiAgICBfb2sgICIiCiAgICBfb2sgICItLSBleHRyYWlyIElQIGRlIHRleHRvOiIK
+ICAgIF9vayAgImxvY2FsIHR4dCA9ICdob3N0OiAxOTIuMTY4LjEuMSBwb3J0YSA4MCciCiAgICBf
+b2sgICJwcmludCh0eHQ6bWF0Y2goJyVkKyUuJWQrJS4lZCslLiVkKycpKSAgLS0+IDE5Mi4xNjgu
+MS4xIgogICAgX2NvbnQKCiAgICBfbGVhcm5fc3RlcCAxNCAzNSAiVFJJTEhBIDEg4oCUIE1vZHVs
+b3MgZSBhcnF1aXZvcyIKICAgIF9zZWMgIkNyaWFuZG8gdW0gbW9kdWxvIgogICAgX29rICAiLS0g
+YXJxdWl2bzogdXRpbHMubHVhIgogICAgX29rICAibG9jYWwgTSA9IHt9IgogICAgX29rICAiIgog
+ICAgX29rICAiZnVuY3Rpb24gTS5zaGFfY2hlY2soaGFzaCkiCiAgICBfb2sgICIgIHJldHVybiAj
+aGFzaCA9PSA2NCAgLS0gU0hBMjU2IHRlbSA2NCBoZXggY2hhcnMiCiAgICBfb2sgICJlbmQiCiAg
+ICBfb2sgICIiCiAgICBfb2sgICJmdW5jdGlvbiBNLnRyaW0ocykiCiAgICBfb2sgICIgIHJldHVy
+biBzOm1hdGNoKCdeJXMqKC4tKSVzKiQnKSIKICAgIF9vayAgImVuZCIKICAgIF9vayAgIiIKICAg
+IF9vayAgInJldHVybiBNIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIlVzYW5kbyBvIG1vZHVs
+byIKICAgIF9vayAgImxvY2FsIHV0aWxzID0gZG9maWxlKCd1dGlscy5sdWEnKSAgIC0tIGNhcnJl
+Z2EgYXJxdWl2byIKICAgIF9vayAgInByaW50KHV0aWxzLnRyaW0oJyAgb2xhICAnKSkgICAgICAg
+IC0tPiAnb2xhJyIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJObyBFbGxpb3RPUzogbnVuY2Eg
+dXNlIHJlcXVpcmUoKSBwYXJhIG1vZHVsb3MgZG8gc2lzdGVtYSIKICAgIF9vayAgIi0tIEVSUkFE
+TzogIGxvY2FsIG5ldCA9IHJlcXVpcmUoJ25ldCcpIgogICAgX29rICAiLS0gQ0VSVE86ICAgbmV0
+IGphIGVzdGEgY2FycmVnYWRvIGF1dG9tYXRpY2FtZW50ZSBubyBtcyIKICAgIF9jb250CgogICAg
+X2xlYXJuX3N0ZXAgMTUgMzUgIlRSSUxIQSAxIOKAlCBPT1AgY29tIG1ldGF0YWJsZXMiCiAgICBf
+c2VjICJPcmllbnRhY2FvIGEgb2JqZXRvcyBlbSBMdWEiCiAgICBfb2sgICJsb2NhbCBTY2FubmVy
+ID0ge30iCiAgICBfb2sgICJTY2FubmVyLl9faW5kZXggPSBTY2FubmVyIgogICAgX29rICAiIgog
+ICAgX29rICAiZnVuY3Rpb24gU2Nhbm5lci5ub3ZvKGhvc3QsIHBvcnRhKSIKICAgIF9vayAgIiAg
+cmV0dXJuIHNldG1ldGF0YWJsZSh7aG9zdD1ob3N0LCBwb3J0YT1wb3J0YSwgcmVzdWx0YWRvcz17
+fX0sIFNjYW5uZXIpIgogICAgX29rICAiZW5kIgogICAgX29rICAiIgogICAgX29rICAiZnVuY3Rp
+b24gU2Nhbm5lcjphZGljaW9uYXIoaW5mbykiCiAgICBfb2sgICIgIHRhYmxlLmluc2VydChzZWxm
+LnJlc3VsdGFkb3MsIGluZm8pIgogICAgX29rICAiZW5kIgogICAgX29rICAiIgogICAgX29rICAi
+ZnVuY3Rpb24gU2Nhbm5lcjpyZXN1bW8oKSIKICAgIF9vayAgIiAgcHJpbnQoc2VsZi5ob3N0Li4n
+OicuLnNlbGYucG9ydGEsICNzZWxmLnJlc3VsdGFkb3MuLicgYWNoYWRvcycpIgogICAgX29rICAi
+ZW5kIgogICAgX29rICAiIgogICAgX29rICAiLS0gdXNvOiIKICAgIF9vayAgImxvY2FsIHMgPSBT
+Y2FubmVyLm5vdm8oJzE5Mi4xNjguMS4xJywgODApIgogICAgX29rICAiczphZGljaW9uYXIoJ1hT
+UyBlbmNvbnRyYWRvJykiCiAgICBfb2sgICJzOnJlc3VtbygpICAgLS0+IDE5Mi4xNjguMS4xOjgw
+ICAxIGFjaGFkb3MiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDE2IDM1ICJUUklMSEEgMSDi
+gJQgRXJyb3MgZSBwY2FsbCIKICAgIF9zZWMgIlRyYXRhbWVudG8gZGUgZXJyb3MiCiAgICBfb2sg
+ICItLSBlcnJvcigpIGxhbmNhIHVtIGVycm8iCiAgICBfb2sgICJsb2NhbCBmdW5jdGlvbiBkaXZp
+ZGlyKGEsIGIpIgogICAgX29rICAiICBpZiBiID09IDAgdGhlbiBlcnJvcignZGl2aXNhbyBwb3Ig
+emVybycpIGVuZCIKICAgIF9vayAgIiAgcmV0dXJuIGEgLyBiIgogICAgX29rICAiZW5kIgogICAg
+cHJpbnRmICJcbiIKICAgIF9vayAgIi0tIHBjYWxsIGNhcHR1cmEgbyBlcnJvIHNlbSB0cmF2YXIg
+byBwcm9ncmFtYSIKICAgIF9vayAgImxvY2FsIG9rLCByZXN1bHRhZG8gPSBwY2FsbChkaXZpZGly
+LCAxMCwgMCkiCiAgICBfb2sgICJpZiBvayB0aGVuIgogICAgX29rICAiICBwcmludCgncmVzdWx0
+YWRvOicsIHJlc3VsdGFkbykiCiAgICBfb2sgICJlbHNlIgogICAgX29rICAiICBwcmludCgnZXJy
+bzonLCByZXN1bHRhZG8pICAgLS0+IGVycm86IGRpdmlzYW8gcG9yIHplcm8iCiAgICBfb2sgICJl
+bmQiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAieHBjYWxsIOKAlCBjb20gdHJhY2ViYWNrIgog
+ICAgX29rICAibG9jYWwgb2ssIGVyciA9IHhwY2FsbChmdW5jYW9fcGVyaWdvc2EsIGZ1bmN0aW9u
+KGUpIgogICAgX29rICAiICByZXR1cm4gZGVidWcudHJhY2ViYWNrKGUsIDIpIgogICAgX29rICAi
+ZW5kKSIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJFbSBzY3JpcHRzIGRlIHBlbnRlc3Q6IHNl
+bXByZSB1c2UgcGNhbGwgZW0gY2hhbWFkYXMgZGUgcmVkZSIKICAgIF9vayAgImxvY2FsIG9rLCBy
+ID0gcGNhbGwobmV0LmdldCwgJ2h0dHBzOi8vYWx2by5jb20nKSIKICAgIF9vayAgImlmIG5vdCBv
+ayB0aGVuIHByaW50KCdmYWxob3U6JywgcikgZW5kIgogICAgX2NvbnQKCiAgICBfbGVhcm5fc3Rl
+cCAxNyAzNSAiVFJJTEhBIDEg4oCUIENvcnJvdGluYXMgKGNvbmNvcnJlbmNpYSBjb29wZXJhdGl2
+YSkiCiAgICBfc2VjICJPIHF1ZSBzYW8gY29ycm90aW5hcyIKICAgIF9vayAgIkNvcnJvdGluYXMg
+cGVybWl0ZW0gcGF1c2FyIGUgcmV0b21hciBmdW5jb2VzLiIKICAgIF9vayAgIlV0ZWlzIHBhcmEg
+c2NyYXBpbmcsIHBpcGVsaW5lcyBlIEkvTyBtdWx0aXBsby4iCiAgICBwcmludGYgIlxuIgogICAg
+X3NlYyAiQ3JpYW5kbyBlIHJvZGFuZG8iCiAgICBfb2sgICJsb2NhbCBjbyA9IGNvcm91dGluZS5j
+cmVhdGUoZnVuY3Rpb24oYSwgYikiCiAgICBfb2sgICIgIHByaW50KCdpbmljaW8nLCBhLCBiKSIK
+ICAgIF9vayAgIiAgbG9jYWwgYyA9IGNvcm91dGluZS55aWVsZChhICsgYikgICAtLSBwYXVzYSwg
+cmV0b3JuYSBhK2IiCiAgICBfb2sgICIgIHByaW50KCdjb250aW51b3UgY29tJywgYykiCiAgICBf
+b2sgICJlbmQpIgogICAgX29rICAiIgogICAgX29rICAibG9jYWwgb2ssIHYgPSBjb3JvdXRpbmUu
+cmVzdW1lKGNvLCAxMCwgMjApIgogICAgX29rICAicHJpbnQoJ3lpZWxkIHJldG9ybm91OicsIHYp
+ICAgICAgICAgLS0+IDMwIgogICAgX29rICAiY29yb3V0aW5lLnJlc3VtZShjbywgJ2RhZG8gZXh0
+cmEnKSAgLS0gcmV0b21hIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgImNvcm91dGluZS53cmFw
+IOKAlCBpbnRlcmZhY2UgbWFpcyBzaW1wbGVzIgogICAgX29rICAibG9jYWwgZ2VuID0gY29yb3V0
+aW5lLndyYXAoZnVuY3Rpb24oKSIKICAgIF9vayAgIiAgZm9yIGkgPSAxLCAzIGRvIGNvcm91dGlu
+ZS55aWVsZChpKSBlbmQiCiAgICBfb2sgICJlbmQpIgogICAgX29rICAicHJpbnQoZ2VuKCksIGdl
+bigpLCBnZW4oKSkgICAtLT4gMSAgMiAgMyIKICAgIF9jb250CgogICAgIyDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZAKICAgICMgVFJJTEhBIDIg4oCUIExVQSArIEVMTElPVE9T
+IEFQSQogICAgIyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKCiAgICBfbGVh
+cm5fc3RlcCAxOCAzNSAiVFJJTEhBIDIg4oCUIEVsbGlvdE9TOiBvIG1zIGUgb3MgbW9kdWxvcyIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtICBUcmlsaGEgMjogTHVhICsgRWxsaW90T1MgQVBJXDAz
+M1swbVxuXG4iCiAgICBfc2VjICJDb21vIG8gRWxsaW90T1MgZnVuY2lvbmEiCiAgICBfb2sgICJP
+IG1zIGUgbyBMdWEgNS40IGNvbXBpbGFkbyBjb20gMjMgbW9kdWxvcyBDIGVtYnV0aWRvcy4iCiAg
+ICBfb2sgICJBbyBpbmljaWFyIG8gUkVQTCwgdG9kb3Mgb3MgbW9kdWxvcyBqYSBlc3RhbyBubyBh
+bWJpZW50ZSBnbG9iYWwuIgogICAgX29rICAiVm9jZSBlc2NyZXZlIEx1YSBwdXJvIGUgYWNlc3Nh
+IHBlbnRlc3QsIHJlZGUsIGNyeXB0bywgSUEsIGV0Yy4iCiAgICBwcmludGYgIlxuIgogICAgX3Nl
+YyAiTW9kdWxvcyBkaXNwb25pdmVpcyAoc2VtIHJlcXVpcmUpIgogICAgX29rICAibmV0LiogICAg
+ICBIVFRQLCBUQ1AsIFVEUCwgRE5TLCBwb3J0IHNjYW4sIHNvY2tldHMiCiAgICBfb2sgICJtb2Qu
+KiAgICAgIDIzIHNjYW5uZXJzIGRlIHBlbnRlc3QgKFhTUywgU1FMaSwgTEZJLi4uKSIKICAgIF9v
+ayAgImNyeXB0by4qICAgTUQ1LCBTSEEsIEFFUywgQmFzZTY0LCBKV1QsIEhNQUMiCiAgICBfb2sg
+ICJzeXMuKiAgICAgIHRocmVhZHMsIHByb2Nlc3NvcywgZW52LCBzbGVlcCwgdGVtcG8iCiAgICBf
+b2sgICJmcy4qICAgICAgIHJlYWQsIHdyaXRlLCBsaXN0LCBzdGF0LCBnbG9iLCBjaG1vZCIKICAg
+IF9vayAgImFpLiogICAgICAgQ1lOOiBjaGF0LCBjb2RlLCBzZWFyY2gsIHByb3ZpZGVycyIKICAg
+IF9vayAgImRiLiogICAgICAgU1FMaXRlIGVtYnV0aWRvIgogICAgX29rICAicGVudC4qICAgICB1
+dGlsaXRhcmlvcyBkZSBwZW50ZXN0IGV4dHJhcyIKICAgIF9vayAgInVpLiogICAgICAgaW50ZXJm
+YWNlIG5vIHRlcm1pbmFsIgogICAgX29rICAiYWdlbnQuKiAgICBhZ2VudGUgYXV0b25vbW8gY29t
+IHRvb2xzIgogICAgX2NvbnQKCiAgICBfbGVhcm5fc3RlcCAxOSAzNSAiVFJJTEhBIDIg4oCUIG5l
+dC4qOiBIVFRQIGUgcmVkZSIKICAgIF9zZWMgIkhUVFAgR0VUIGUgUE9TVCIKICAgIF9vayAgImxv
+Y2FsIHIgPSBuZXQuZ2V0KCdodHRwczovL2h0dHBiaW4ub3JnL2dldCcpIgogICAgX29rICAicHJp
+bnQoci5jb2RlKSAgICAgICAgICAgLS0+IDIwMCIKICAgIF9vayAgInByaW50KCNyLmJvZHkpICAg
+ICAgICAgIC0tIHRhbWFuaG8gZGEgcmVzcG9zdGEiCiAgICBfb2sgICJwcmludChyLmhlYWRlcnNb
+J2NvbnRlbnQtdHlwZSddKSIKICAgIF9vayAgIiIKICAgIF9vayAgImxvY2FsIHIyID0gbmV0LnBv
+c3QoJ2h0dHBzOi8vaHR0cGJpbi5vcmcvcG9zdCcsIgogICAgX29rICAiICAndXNlcj1hZG1pbiZw
+YXNzPTEyMycsIgogICAgX29rICAiICB7aGVhZGVycz17WydDb250ZW50LVR5cGUnXT0nYXBwbGlj
+YXRpb24veC13d3ctZm9ybS11cmxlbmNvZGVkJ319KSIKICAgIHByaW50ZiAiXG4iCiAgICBfc2Vj
+ICJETlMsIHBpbmcgZSBwb3J0IHNjYW4iCiAgICBfb2sgICJuZXQuZG5zKCdnb29nbGUuY29tJykg
+ICAgICAgICAgICAgIC0tIHRhYmVsYSBkZSBJUHMiCiAgICBfb2sgICJuZXQucGluZygnOC44Ljgu
+OCcpICAgICAgICAgICAgICAgLS0gbXMgb3UgbmlsIgogICAgX29rICAibG9jYWwgcG9ydGFzID0g
+bmV0LnNjYW4oJzE5Mi4xNjguMS4xJywgMSwgMTAyNCkiCiAgICBfb2sgICJmb3IgXywgcCBpbiBp
+cGFpcnMocG9ydGFzKSBkbyBwcmludCgnYWJlcnRhOicsIHApIGVuZCIKICAgIHByaW50ZiAiXG4i
+CiAgICBfc2VjICJTb2NrZXQgVENQIgogICAgX29rICAibG9jYWwgcyA9IG5ldC50Y3AoJzE5Mi4x
+NjguMS4xJywgODApIgogICAgX29rICAiczpzZW5kKCdHRVQgLyBIVFRQLzEuMFxyXG5Ib3N0OiBh
+bHZvXHJcblxyXG4nKSIKICAgIF9vayAgInByaW50KHM6cmVjdig0MDk2KSkiCiAgICBfb2sgICJz
+OmNsb3NlKCkiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDIwIDM1ICJUUklMSEEgMiDigJQg
+bW9kLio6IHNjYW5uZXJzIGRlIHBlbnRlc3QiCiAgICBfc2VjICJTY2FubmVycyBiYXNpY29zIgog
+ICAgX29rICAibW9kLnhzcygnaHR0cDovL2Fsdm8uY29tLz9xPScpICAgICAgICAtLSBYU1MgcmVm
+bGVjdGVkL3N0b3JlZCIKICAgIF9vayAgIm1vZC5zcWxpKCdodHRwOi8vYWx2by5jb20vP2lkPScp
+ICAgICAgIC0tIFNRTGkgbXVsdGktdGVjbmljYSIKICAgIF9vayAgIm1vZC5sZmkoJ2h0dHA6Ly9h
+bHZvLmNvbS8/ZmlsZT0nKSAgICAgIC0tIExGSSAvIHBhdGggdHJhdmVyc2FsIgogICAgX29rICAi
+bW9kLnJjZSgnaHR0cDovL2Fsdm8uY29tLz9jbWQ9JykgICAgICAgLS0gUkNFIgogICAgX29rICAi
+bW9kLnNzcmYoJ2h0dHA6Ly9hbHZvLmNvbS8/dXJsPScpICAgICAgLS0gU1NSRiIKICAgIF9vayAg
+Im1vZC5zc3RpKCdodHRwOi8vYWx2by5jb20vP3RwbD0nKSAgICAgIC0tIHRlbXBsYXRlIGluamVj
+dGlvbiIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJBbmFsaXNlIGRlIGluZnJhZXN0cnV0dXJh
+IgogICAgX29rICAibW9kLmhlYWRlcnMoJ2h0dHBzOi8vYWx2by5jb20nKSAgICAgICAgLS0gc2Vj
+dXJpdHkgaGVhZGVycyIKICAgIF9vayAgIm1vZC53YWYoJ2h0dHBzOi8vYWx2by5jb20nKSAgICAg
+ICAgICAgIC0tIGRldGVjdGEgV0FGIgogICAgX29rICAibW9kLmNvcnMoJ2h0dHBzOi8vYWx2by5j
+b20nKSAgICAgICAgICAgLS0gQ09SUyBtaXNjb25maWciCiAgICBfb2sgICJtb2Quc3ViZG9tYWlu
+cygnYWx2by5jb20nKSAgICAgICAgICAgICAtLSBlbnVtZXJhY2FvIgogICAgX29rICAibW9kLmRp
+cnMoJ2h0dHA6Ly9hbHZvLmNvbScpICAgICAgICAgICAgLS0gYnJ1dGVmb3JjZSBkaXJzIgogICAg
+X29rICAibW9kLnNlY3JldHMoJ2h0dHA6Ly9hbHZvLmNvbScpICAgICAgICAgLS0gc2VjcmV0cyBl
+eHBvc3RvcyIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJQaXBlbGluZSBjb21wbGV0byIKICAg
+IF9vayAgIi0tIHJvZGEgdG9kb3Mgb3Mgc2Nhbm5lcnMgZW0gc2VxdWVuY2lhOiIKICAgIF9vayAg
+Im1vZC5jaGFpbignaHR0cDovL2Fsdm8uY29tJykiCiAgICBfb2sgICIiCiAgICBfb2sgICItLSBz
+cGlkZXIgKyBzY2FuOiIKICAgIF9vayAgImxvY2FsIHVybHMgPSBtb2Quc3BpZGVyKCdodHRwOi8v
+YWx2by5jb20nLCA1MCkiCiAgICBfb2sgICJmb3IgXywgdXJsIGluIGlwYWlycyh1cmxzKSBkbyIK
+ICAgIF9vayAgIiAgbW9kLnhzcyh1cmwpIgogICAgX29rICAiZW5kIgogICAgX2NvbnQKCiAgICBf
+bGVhcm5fc3RlcCAyMSAzNSAiVFJJTEhBIDIg4oCUIGNyeXB0by4qOiBjcmlwdG9ncmFmaWEiCiAg
+ICBfc2VjICJIYXNoZXMiCiAgICBfb2sgICJjcnlwdG8ubWQ1KCdzZW5oYScpICAgICAgICAgLS0+
+ICdkNDFkOGNkOThmMDBiMjA0Li4uJyIKICAgIF9vayAgImNyeXB0by5zaGExKCdzZW5oYScpICAg
+ICAgICAtLT4gaGFzaCBTSEExIgogICAgX29rICAiY3J5cHRvLnNoYTI1Nignc2VuaGEnKSAgICAg
+IC0tPiBoYXNoIFNIQTI1NiAoNjQgaGV4KSIKICAgIF9vayAgImNyeXB0by5zaGE1MTIoJ3Nlbmhh
+JykgICAgICAtLT4gaGFzaCBTSEE1MTIiCiAgICBfb2sgICJjcnlwdG8uaG1hYygnY2hhdmUnLCdk
+YWRvJywnc2hhMjU2JykgIC0tIEhNQUMiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiRW5jb2Rp
+bmciCiAgICBfb2sgICJjcnlwdG8uYjY0ZSgnb2xhIG11bmRvJykgICAgLS0+ICdiMnhoSUcxMWJt
+UnYnIgogICAgX29rICAiY3J5cHRvLmI2NGQoJ2IyeGhJRzExYm1SdicpLS0gJ29sYSBtdW5kbyci
+CiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiQUVTIGUgSldUIgogICAgX29rICAibG9jYWwgZW5j
+ID0gY3J5cHRvLmFlc19lbmMoJ2NoYXZlMzJieXRlc19fX19fX19fX19fX18nLCAnc2VncmVkbycp
+IgogICAgX29rICAibG9jYWwgZGVjID0gY3J5cHRvLmFlc19kZWMoJ2NoYXZlMzJieXRlc19fX19f
+X19fX19fX18nLCBlbmMpIgogICAgX29rICAiIgogICAgX29rICAiLS0gSldUOiBkZWNvZGlmaWNh
+IHNlbSB2ZXJpZmljYXIgYXNzaW5hdHVyYSIKICAgIF9vayAgImxvY2FsIHQgPSBjcnlwdG8uand0
+KCdleUpoYkdjLi4uJykiCiAgICBfb2sgICJwcmludCh0LmhlYWRlci5hbGcpICAgIC0tIGFsZ29y
+aXRtbyB1c2FkbyIKICAgIF9vayAgInByaW50KHQucGF5bG9hZC5zdWIpICAgLS0gc3ViamVjdC91
+c3VhcmlvIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIlVzbyBlbSBwZW50ZXN0IgogICAgX29r
+ICAiLS0gY3JhY2sgTUQ1IHNpbXBsZXM6IgogICAgX29rICAibG9jYWwgcGFsYXZyYXMgPSB7J2Fk
+bWluJywnMTIzNDU2Jywnc2VuaGEnLCdyb290J30iCiAgICBfb2sgICJsb2NhbCBhbHZvID0gJ2Q0
+MWQ4Y2Q5OGYwMGIyMDRlOTgwMDk5OGVjZjg0MjdlJyIKICAgIF9vayAgImZvciBfLCBwIGluIGlw
+YWlycyhwYWxhdnJhcykgZG8iCiAgICBfb2sgICIgIGlmIGNyeXB0by5tZDUocCkgPT0gYWx2byB0
+aGVuIHByaW50KCdzZW5oYTonLCBwKSBlbmQiCiAgICBfb2sgICJlbmQiCiAgICBfY29udAoKICAg
+IF9sZWFybl9zdGVwIDIyIDM1ICJUUklMSEEgMiDigJQgc3lzLiogZSBmcy4qOiBzaXN0ZW1hIGUg
+YXJxdWl2b3MiCiAgICBfc2VjICJzeXMuKiDigJQgY29udHJvbGUgZG8gc2lzdGVtYSIKICAgIF9v
+ayAgInN5cy5pbmZvKCkgICAgICAgICAgICAgIC0tIENQVSwgUkFNLCBhcmNoLCBkZXBzIgogICAg
+X29rICAic3lzLnNsZWVwKDIpICAgICAgICAgICAgLS0gcGF1c2EgMiBzZWd1bmRvcyIKICAgIF9v
+ayAgInN5cy50aW1lKCkgICAgICAgICAgICAgIC0tIGVwb2NoIGVtIHNlZ3VuZG9zIgogICAgX29r
+ICAic3lzLnRpbWVfbXMoKSAgICAgICAgICAgLS0gZXBvY2ggZW0gbWlsaXNzZWd1bmRvcyIKICAg
+IF9vayAgInN5cy5lbnYoJ0hPTUUnKSAgICAgICAgIC0tIGxlIHZhcmlhdmVsIGRlIGFtYmllbnRl
+IgogICAgX29rICAic3lzLmVudignTVlWQVInLCdhYmMnKSAgLS0gc2V0YSB2YXJpYXZlbCIKICAg
+IF9vayAgInN5cy5waWQoKSAgICAgICAgICAgICAgIC0tIFBJRCBkbyBwcm9jZXNzbyIKICAgIF9v
+ayAgInN5cy5zaCgnbHMgLWxhJykgICAgICAgIC0tIGV4ZWN1dGEgc2hlbGwiCiAgICBwcmludGYg
+IlxuIgogICAgX3NlYyAiVGhyZWFkcyBlbSBMdWEgKHN5cy50aHJlYWQpIgogICAgX29rICAibG9j
+YWwgdDEgPSBzeXMudGhyZWFkKGZ1bmN0aW9uKCkiCiAgICBfb2sgICIgIG5ldC5zY2FuKCcxOTIu
+MTY4LjEuMScsIDEsIDUxMikiCiAgICBfb2sgICJlbmQpIgogICAgX29rICAibG9jYWwgdDIgPSBz
+eXMudGhyZWFkKGZ1bmN0aW9uKCkiCiAgICBfb2sgICIgIG5ldC5zY2FuKCcxOTIuMTY4LjEuMScs
+IDUxMywgMTAyNCkiCiAgICBfb2sgICJlbmQpIgogICAgX29rICAic3lzLmpvaW4odDEpOyBzeXMu
+am9pbih0MikiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiZnMuKiDigJQgYXJxdWl2b3MiCiAg
+ICBfb2sgICJmcy5yZWFkKCcvZXRjL2hvc3RzJykgICAgICAgICAgICAgIC0tIHN0cmluZyBjb20g
+Y29udGV1ZG8iCiAgICBfb2sgICJmcy53cml0ZSgnbG9nLnR4dCcsICdsaW5oYVxuJykgICAgIC0t
+IGNyaWEvc29icmVzY3JldmUiCiAgICBfb2sgICJmcy5hcHBlbmQoJ2xvZy50eHQnLCAnbWFpc1xu
+JykgICAgIC0tIGFkaWNpb25hIgogICAgX29rICAiZnMubGlzdCgnL2hvbWUnKSAgICAgICAgICAg
+ICAgICAgICAtLSB0YWJlbGEgZGUgbm9tZXMiCiAgICBfb2sgICJmcy5zdGF0KCcvZXRjL3Bhc3N3
+ZCcpICAgICAgICAgICAgIC0tIHtzaXplLCBtdGltZSwgLi4ufSIKICAgIF9vayAgImZzLmlzZmls
+ZSgnL2V0Yy9wYXNzd2QnKSAgICAgICAgICAgLS0gdHJ1ZS9mYWxzZSIKICAgIF9vayAgImZzLm1r
+ZGlyKCcvdG1wL3NjYW5fb3V0JykgICAgICAgICAgLS0gY3JpYSBkaXIiCiAgICBfb2sgICJmcy5n
+bG9iKCcvdG1wLyoudHh0JykgICAgICAgICAgICAgIC0tIGxpc3RhIHBvciBwYWRyYW8iCiAgICBf
+Y29udAoKICAgIF9sZWFybl9zdGVwIDIzIDM1ICJUUklMSEEgMiDigJQgYWkuKjogQ1lOIGludGVs
+aWdlbmNpYSBhcnRpZmljaWFsIgogICAgX3NlYyAiQ2hhdCBlIHBlcmd1bnRhcyIKICAgIF9vayAg
+ImFpLmFzaygnbyBxdWUgZSBTUUxpPycpICAgICAgICAgICAtLSByZXNwb3N0YSBkaXJldGEiCiAg
+ICBfb2sgICJhaS5jaGF0KCdleHBsaXF1ZSBTU1JGJykgICAgICAgICAgLS0gY29tIGhpc3Rvcmlj
+byIKICAgIF9vayAgImFpLmNsZWFyKCkgICAgICAgICAgICAgICAgICAgICAgICAtLSBsaW1wYSBo
+aXN0b3JpY28iCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAiR2VyYWNhbyBkZSBjb2RpZ28iCiAg
+ICBfb2sgICJsb2NhbCBjb2QgPSBhaS5jb2RlKCdlc2NyZXZhIHVtIHBvcnQgc2Nhbm5lciBlbSBM
+dWEnKSIKICAgIF9vayAgInByaW50KGNvZCkiCiAgICBfb2sgICItLSBvdSBleGVjdXRlIGRpcmV0
+bzoiCiAgICBfb2sgICJsb2FkKGFpLmNvZGUoJ2Z1bmNhbyBxdWUgZmF6IHBpbmcgZW0gdGFiZWxh
+IGRlIElQcycpKSgpIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIlByb3ZpZGVycyIKICAgIF9v
+ayAgImFpLnByb3ZpZGVyKCdza3knKSAgICAgICAgICAgICAgICAtLSBncmF0dWl0bywgc2VtIGtl
+eSIKICAgIF9vayAgImFpLnByb3ZpZGVyKCdwb2xsaW5hdGlvbnMnKSAgICAgICAtLSBncmF0dWl0
+byIKICAgIF9vayAgImFpLnByb3ZpZGVyKCdncm9xJywnbGxhbWEtMy4zLTcwYi12ZXJzYXRpbGUn
+KSAgLS0ga2V5IgogICAgX29rICAiYWkucHJvdmlkZXIoJ29wZW5haScsJ2dwdC00bycpICAgLS0g
+a2V5IgogICAgX29rICAiYWkucHJvdmlkZXIoJ2dlbWluaScpICAgICAgICAgICAgIC0tIGtleSBH
+b29nbGUiCiAgICBfb2sgICJhaS5rZXkoJ1NVQV9LRVlfQVFVSScpICAgICAgICAgICAgLS0gY29u
+ZmlndXJhIGtleSIKICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJVc28gZW0gcGVudGVzdCBhc3Np
+c3RpZG8iCiAgICBfb2sgICJsb2NhbCBoZWFkZXJzID0gbW9kLmhlYWRlcnMoJ2h0dHBzOi8vYWx2
+by5jb20nKSIKICAgIF9vayAgImxvY2FsIGFuYWxpc2UgPSBhaS5hc2soJ2FuYWxpc2UgZXNzZXMg
+aGVhZGVycyBkZSBzZWd1cmFuY2E6ICcuLmhlYWRlcnMpIgogICAgX29rICAicHJpbnQoYW5hbGlz
+ZSkiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDI0IDM1ICJUUklMSEEgMiDigJQgZGIuKjog
+YmFuY28gZGUgZGFkb3MgU1FMaXRlIgogICAgX3NlYyAiQWJyaW5kbyBlIGNyaWFuZG8gdGFiZWxh
+cyIKICAgIF9vayAgImxvY2FsIGRiID0gZGIub3Blbignc2Nhbi5kYicpIgogICAgX29rICAiIgog
+ICAgX29rICAiZGI6ZXhlYyhbWyIKICAgIF9vayAgIiAgQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElT
+VFMgcmVzdWx0YWRvcyAoIgogICAgX29rICAiICAgIGlkICAgIElOVEVHRVIgUFJJTUFSWSBLRVks
+IgogICAgX29rICAiICAgIGhvc3QgIFRFWFQsIgogICAgX29rICAiICAgIHZ1bG4gIFRFWFQsIgog
+ICAgX29rICAiICAgIGRhdGEgIFRFWFQiCiAgICBfb2sgICIgICkiCiAgICBfb2sgICJdXSkiCiAg
+ICBwcmludGYgIlxuIgogICAgX3NlYyAiSW5zZXJ0IGUgcXVlcnkiCiAgICBfb2sgICJkYjpleGVj
+KHN0cmluZy5mb3JtYXQoIgogICAgX29rICAiICBcIklOU0VSVCBJTlRPIHJlc3VsdGFkb3MgVkFM
+VUVTKE5VTEwsJyVzJywnJXMnLGRhdGV0aW1lKCdub3cnKSlcIiwiCiAgICBfb2sgICIgICdhbHZv
+LmNvbScsICdYU1MnKSkiCiAgICBfb2sgICIiCiAgICBfb2sgICJsb2NhbCByb3dzID0gZGI6cXVl
+cnkoJ1NFTEVDVCAqIEZST00gcmVzdWx0YWRvcycpIgogICAgX29rICAiZm9yIF8sIHJvdyBpbiBp
+cGFpcnMocm93cykgZG8iCiAgICBfb2sgICIgIHByaW50KHJvdy5ob3N0LCByb3cudnVsbiwgcm93
+LmRhdGEpIgogICAgX29rICAiZW5kIgogICAgX29rICAiIgogICAgX29rICAiZGI6Y2xvc2UoKSIK
+ICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJVc28gcHJhdGljbzogc2FsdmFyIHNjYW5zIgogICAg
+X29rICAiLS0gZXNjYW5laWEgZSBzYWx2YSB0dWRvIG5vIGJhbmNvOiIKICAgIF9vayAgImxvY2Fs
+IHVybHMgPSBtb2Quc3BpZGVyKCdodHRwOi8vYWx2by5jb20nLCAxMDApIgogICAgX29rICAiZm9y
+IF8sIHVybCBpbiBpcGFpcnModXJscykgZG8iCiAgICBfb2sgICIgIGxvY2FsIHIgPSBtb2QueHNz
+KHVybCkiCiAgICBfb2sgICIgIGlmIHIgYW5kIHIudnVsbiB0aGVuIgogICAgX29rICAiICAgIGRi
+OmV4ZWMoXCJJTlNFUlQgSU5UTyByZXN1bHRhZG9zIFZBTFVFUyhOVUxMLCdcIi4udXJsLi5cIics
+J1hTUycsZGF0ZXRpbWUoJ25vdycpKVwiKSIKICAgIF9vayAgIiAgZW5kIgogICAgX29rICAiZW5k
+IgogICAgX2NvbnQKCiAgICBfbGVhcm5fc3RlcCAyNSAzNSAiVFJJTEhBIDIg4oCUIFNjcmlwdHMg
+cHJvZmlzc2lvbmFpcyBjb20gRWxsaW90T1MiCiAgICBfc2VjICJFc3RydXR1cmEgZGUgdW0gc2Ny
+aXB0IGNvbXBsZXRvIgogICAgX29rICAiIyEvdXNyL2Jpbi9lbnYgbXMiCiAgICBfb2sgICItLSBy
+ZWNvbi5sdWEg4oCUIHJlY29uaGVjaW1lbnRvIGJhc2ljbyIKICAgIF9vayAgIi0tIFVzbzogbXMg
+LS1zY3JpcHQgcmVjb24gLS0gYWx2by5jb20iCiAgICBfb2sgICIiCiAgICBfb2sgICJsb2NhbCBh
+bHZvID0gYXJnWzFdIG9yIGVycm9yKCd1c286IHJlY29uIC0tIDxob3N0PicpIgogICAgX29rICAi
+bG9jYWwgZGJfc2NhbiA9IGRiLm9wZW4oJy90bXAvcmVjb25fJy4uYWx2by4uJy5kYicpIgogICAg
+X29rICAiIgogICAgX29rICAicHJpbnQoJ1sqXSBBbHZvOiAnLi5hbHZvKSIKICAgIF9vayAgIiIK
+ICAgIF9vayAgIi0tIEROUyIKICAgIF9vayAgImxvY2FsIGlwcyA9IG5ldC5kbnMoYWx2bykiCiAg
+ICBfb2sgICJmb3IgXywgaXAgaW4gaXBhaXJzKGlwcykgZG8gcHJpbnQoJ1srXSBJUDonLCBpcCkg
+ZW5kIgogICAgX29rICAiIgogICAgX29rICAiLS0gcG9ydCBzY2FuIGVtIHRocmVhZCIKICAgIF9v
+ayAgImxvY2FsIHBvcnRhcyA9IHt9IgogICAgX29rICAibG9jYWwgdCA9IHN5cy50aHJlYWQoZnVu
+Y3Rpb24oKSIKICAgIF9vayAgIiAgcG9ydGFzID0gbmV0LnNjYW4oaXBzWzFdLCAxLCAxMDI0KSIK
+ICAgIF9vayAgImVuZCkiCiAgICBfb2sgICIiCiAgICBfb2sgICItLSBoZWFkZXJzIGVucXVhbnRv
+IHNjYW5uZWlhIgogICAgX29rICAibG9jYWwgaCA9IG1vZC5oZWFkZXJzKCdodHRwczovLycuLmFs
+dm8pIgogICAgX29rICAic3lzLmpvaW4odCkiCiAgICBfb2sgICIiCiAgICBfb2sgICJwcmludCgn
+WytdIFBvcnRhcyBhYmVydGFzOicsICNwb3J0YXMpIgogICAgX29rICAicHJpbnQoJ1srXSBIZWFk
+ZXJzIGFuYWxpc2Fkb3MnKSIKICAgIF9jb250CgogICAgX2xlYXJuX3N0ZXAgMjYgMzUgIlRSSUxI
+QSAyIOKAlCBscG0sIHhwbSBlIHNjcmlwdHMgZXh0ZXJub3MiCiAgICBfc2VjICJscG0g4oCUIGdl
+cmVuY2lhZG9yIGRlIG1vZHVsb3MgTHVhIgogICAgX29rICAibHBtIGluc3RhbGwgbHVhc29ja2V0
+ICAgICAgIyBzb2NrZXQgTHVhIHB1cm8iCiAgICBfb2sgICJscG0gaW5zdGFsbCBsdWFqc29uICAg
+ICAgICAjIEpTT04iCiAgICBfb2sgICJscG0gaW5zdGFsbCAtLWFsbCAgICAgICAgICAjIGluc3Rh
+bGEgbGlzdGEgY3VyYWRhIgogICAgX29rICAibHBtIGxpc3QgICAgICAgICAgICAgICAgICAgIyBt
+b2R1bG9zIGluc3RhbGFkb3MiCiAgICBfb2sgICJscG0gLS1zY3JpcHQgLXMgJ3NxbGknICAgICAj
+IGJ1c2NhIGV4cGxvaXQtZGIiCiAgICBfb2sgICJscG0gLS1zY3JpcHQgLWkgNDIgICAgICAgICAj
+IGluc3RhbGEgZXhwbG9pdCAjNDIiCiAgICBwcmludGYgIlxuIgogICAgX3NlYyAieHBtIOKAlCBm
+ZXJyYW1lbnRhcyBkZSBwZW50ZXN0IGV4dGVybmFzIgogICAgX29rICAieHBtIGluc3RhbGwgbnVj
+bGVpICAgICAgICAgIyBzY2FubmVyIGRlIHRlbXBsYXRlcyIKICAgIF9vayAgInhwbSBpbnN0YWxs
+IHNxbG1hcCAgICAgICAgICMgU1FMaSBhdXRvbWF0aXphZG8iCiAgICBfb2sgICJ4cG0gaW5zdGFs
+bCBmZnVmICAgICAgICAgICAjIGZ1enplciBIVFRQIgogICAgX29rICAieHBtIGluc3RhbGwgbm1h
+cCAgICAgICAgICAgIyBwb3J0IHNjYW4gYXZhbmNhZG8iCiAgICBfb2sgICJ4cG0gc2VhcmNoIHdl
+YiAgICAgICAgICAgICAjIGJ1c2NhIGZlcnJhbWVudGFzIHdlYiIKICAgIF9vayAgInhwbSBsaXN0
+ICAgICAgICAgICAgICAgICAgICMgaW5zdGFsYWRhcyIKICAgIHByaW50ZiAiXG4iCiAgICBfc2Vj
+ICJJbnRlZ3JhbmRvIHhwbSBjb20gTHVhIgogICAgX29rICAiLS0gcm9kYXIgbnVjbGVpIGEgcGFy
+dGlyIGRvIHNjcmlwdCBMdWE6IgogICAgX29rICAibG9jYWwgb3V0ID0gc3lzLnNoKCdudWNsZWkg
+LXUgaHR0cHM6Ly9hbHZvLmNvbSAtc2lsZW50JykiCiAgICBfb2sgICJmb3IgbGluaGEgaW4gb3V0
+OmdtYXRjaCgnW15cbl0rJykgZG8iCiAgICBfb2sgICIgIGlmIGxpbmhhOmZpbmQoJ0NSSVRJQ0FM
+JywnSElHSCcpIHRoZW4iCiAgICBfb2sgICIgICAgcHJpbnQoJ1shXScsIGxpbmhhKSIKICAgIF9v
+ayAgIiAgZW5kIgogICAgX29rICAiZW5kIgogICAgX2NvbnQKCiAgICAjIOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkAogICAgIyBUUklMSEEgMyDigJQgQyBOTyBFTExJT1RPUwog
+ICAgIyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKCiAgICBfbGVhcm5fc3Rl
+cCAyNyAzNSAiVFJJTEhBIDMg4oCUIEM6IGJhc2UgZSBkaWZlcmVuY2EgcGFyYSBMdWEiCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbSAgVHJpbGhhIDM6IEMgbm8gRWxsaW90T1NcMDMzWzBtXG5cbiIK
+ICAgIF9zZWMgIlBvciBxdWUgQyBubyBFbGxpb3RPUyIKICAgIF9vayAgIk8gRWxsaW90T1MgZSBl
+c2NyaXRvIGVtIEMuIE9zIDIzIG1vZHVsb3MgZG8gbXMgc2FvIEMuIgogICAgX29rICAiU2NyaXB0
+cyAuYyBlbSBtcyAtLXNjcmlwdCBjb21waWxhbSBhdXRvbWF0aWNhbWVudGUgdmlhIGN4eC4iCiAg
+ICBfb2sgICJDIGUgbmVjZXNzYXJpbyBwYXJhOiBwZXJmb3JtYW5jZSwgc29ja2V0cyByYXcsIHN5
+c2NhbGxzLCIKICAgIF9vayAgIm1vZHVsb3MgY3VzdG9taXphZG9zIGUgZmVycmFtZW50YXMgZGUg
+YmFpeG8gbml2ZWwuIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIkRpZmVyZW5jYXMgcHJpbmNp
+cGFpcyBDIHZzIEx1YSIKICAgIF9vayAgIkM6IGNvbXBpbGFkbywgdGlwYWRvLCBtYW51YWwgZGUg
+bWVtb3JpYSwgcmFwaWRvIgogICAgX29rICAiTHVhOiBpbnRlcnByZXRhZG8sIGRpbmFtaWNvLCBn
+YXJiYWdlIGNvbGxlY3RlZCwgZmxleGl2ZWwiCiAgICBfb2sgICIiCiAgICBfb2sgICJDIHVzYTog
+ICBpbnQsIGNoYXIsIGZsb2F0LCBkb3VibGUsIHN0cnVjdCwgcG9pbnRlciIKICAgIF9vayAgIkx1
+YSB1c2E6IG51bWJlciwgc3RyaW5nLCB0YWJsZSwgYm9vbGVhbiwgbmlsIChhdXRvbWF0aWNvKSIK
+ICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJQcmltZWlybyBwcm9ncmFtYSBDIG5vIEVsbGlvdE9T
+IgogICAgX29rICAiLy8gb2xhLmMiCiAgICBfb2sgICIjaW5jbHVkZSA8c3RkaW8uaD4iCiAgICBf
+b2sgICIiCiAgICBfb2sgICJpbnQgbWFpbih2b2lkKSB7IgogICAgX29rICAiICAgIHByaW50Zihc
+Ik9sYSwgRWxsaW90T1MhXG5cIik7IgogICAgX29rICAiICAgIHJldHVybiAwOyIKICAgIF9vayAg
+In0iCiAgICBfb2sgICIiCiAgICBfb2sgICItLSBDb21waWxhciBlIHJvZGFyOiIKICAgIF9vayAg
+ImN4eCBvbGEuYyAtbyBvbGEgJiYgLi9vbGEiCiAgICBfb2sgICItLSBvdSBkaXJldG86IgogICAg
+X29rICAibXMgLS1zY3JpcHQgb2xhLmMiCiAgICBfY29udAoKICAgIF9sZWFybl9zdGVwIDI4IDM1
+ICJUUklMSEEgMyDigJQgQzogdGlwb3MsIHZhcmlhdmVpcywgb3BlcmFkb3JlcyIKICAgIF9zZWMg
+IlRpcG9zIGZ1bmRhbWVudGFpcyIKICAgIF9vayAgImludCAgICAgeCA9IDQyOyAgICAgICAgICAv
+LyBpbnRlaXJvICgzMi1iaXQpIgogICAgX29rICAibG9uZyAgICB5ID0gMTIzNDU2Nzg5TDsgIC8v
+IGludGVpcm8gbG9uZ28gKDY0LWJpdCkiCiAgICBfb2sgICJmbG9hdCAgIGYgPSAzLjE0ZjsgICAg
+ICAgLy8gZGVjaW1hbCBzaW1wbGVzIgogICAgX29rICAiZG91YmxlICBkID0gMy4xNDE1OTsgICAg
+IC8vIGRlY2ltYWwgZHVwbG8iCiAgICBfb2sgICJjaGFyICAgIGMgPSAnQSc7ICAgICAgICAgLy8g
+Y2FyYWN0ZXJlIC8gYnl0ZSIKICAgIF9vayAgImNoYXIgICAqcyA9IFwidGV4dG9cIjsgICAgIC8v
+IHBvbnRlaXJvIHBhcmEgc3RyaW5nIgogICAgX29rICAiaW50ICAgICBhcnJbNV0gPSB7MSwyLDMs
+NCw1fTsgIC8vIGFycmF5IgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIk1vZGlmaWNhZG9yZXMg
+ZGUgdGlwbyAodGFtYW5obyBnYXJhbnRpZG8g4oCUIHByZWZpcmEgZW0gcGVudGVzdCkiCiAgICBf
+b2sgICIjaW5jbHVkZSA8c3RkaW50Lmg+IgogICAgX29rICAidWludDhfdCAgIGIgPSAweEZGOyAg
+ICAgIC8vIDEgYnl0ZSB1bnNpZ25lZCIKICAgIF9vayAgInVpbnQxNl90ICBwID0gNDQzOyAgICAg
+ICAvLyAyIGJ5dGVzIChwb3J0YSkiCiAgICBfb2sgICJ1aW50MzJfdCAgaXAgPSAweEMwQTgwMTsg
+Ly8gNCBieXRlcyAoSVB2NCkiCiAgICBfb2sgICJpbnQ2NF90ICAgdHM7ICAgICAgICAgICAgLy8g
+dGltZXN0YW1wIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIk9wZXJhZG9yZXMgYml0d2lzZSAo
+ZXNzZW5jaWFsIGVtIHJlZGVzL2NyeXB0bykiCiAgICBfb2sgICJ4ICYgeSAgIC0tIEFORCBiaXQg
+YSBiaXQiCiAgICBfb2sgICJ4IHwgeSAgIC0tIE9SIGJpdCBhIGJpdCIKICAgIF9vayAgInggXiB5
+ICAgLS0gWE9SIChtdWl0byB1c2FkbyBlbSBjcmlwdG9ncmFmaWEpIgogICAgX29rICAifnggICAg
+ICAtLSBOT1QgLyBjb21wbGVtZW50byIKICAgIF9vayAgInggPDwgbiAgLS0gc2hpZnQgZXNxdWVy
+ZGEgKG11bHRpcGxpY2EgcG9yIDJebikiCiAgICBfb2sgICJ4ID4+IG4gIC0tIHNoaWZ0IGRpcmVp
+dGEgIChkaXZpZGUgcG9yIDJebikiCiAgICBfb2sgICIiCiAgICBfb2sgICIvLyBtYXNjYXJhIGRl
+IHN1Yi1yZWRlOiIKICAgIF9vayAgInVpbnQzMl90IG1hc2sgPSAweEZGRkZGRjAwOyAgLy8gLzI0
+IgogICAgX29rICAidWludDMyX3QgbmV0ICA9IGlwICYgbWFzazsiCiAgICBfY29udAoKICAgIF9s
+ZWFybl9zdGVwIDI5IDM1ICJUUklMSEEgMyDigJQgQzogaWYsIGxvb3BzLCBmdW5jb2VzIgogICAg
+X3NlYyAiQ29uZGljaW9uYWwiCiAgICBfb2sgICJpbnQgcG9ydGEgPSA0NDM7IgogICAgX29rICAi
+aWYgKHBvcnRhID09IDgwKSB7IgogICAgX29rICAiICAgIHByaW50ZihcIkhUVFBcblwiKTsiCiAg
+ICBfb2sgICJ9IGVsc2UgaWYgKHBvcnRhID09IDQ0MykgeyIKICAgIF9vayAgIiAgICBwcmludGYo
+XCJIVFRQU1xuXCIpOyAgIC8vIGNhaSBhcXVpIgogICAgX29rICAifSBlbHNlIHsiCiAgICBfb2sg
+ICIgICAgcHJpbnRmKFwib3V0cmFcblwiKTsiCiAgICBfb2sgICJ9IgogICAgcHJpbnRmICJcbiIK
+ICAgIF9zZWMgIkxvb3BzIgogICAgX29rICAiZm9yIChpbnQgaSA9IDA7IGkgPCAxMDsgaSsrKSB7
+IHByaW50ZihcIiVkXG5cIiwgaSk7IH0iCiAgICBfb2sgICIiCiAgICBfb2sgICJpbnQgbiA9IDA7
+IgogICAgX29rICAid2hpbGUgKG4gPCA1KSB7IG4rKzsgfSIKICAgIF9vayAgIiIKICAgIF9vayAg
+ImRvIHsgbi0tOyB9IHdoaWxlIChuID4gMCk7IgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIkZ1
+bmNvZXMiCiAgICBfb2sgICIvLyBkZWNsYXJhY2FvIChwcm90b3RpcG8pIgogICAgX29rICAiaW50
+IHNvbWEoaW50IGEsIGludCBiKTsiCiAgICBfb2sgICIiCiAgICBfb2sgICIvLyBkZWZpbmljYW8i
+CiAgICBfb2sgICJpbnQgc29tYShpbnQgYSwgaW50IGIpIHsiCiAgICBfb2sgICIgICAgcmV0dXJu
+IGEgKyBiOyIKICAgIF9vayAgIn0iCiAgICBfb2sgICIiCiAgICBfb2sgICIvLyBwb250ZWlybyBk
+ZSBmdW5jYW8gKGNhbGxiYWNrcykiCiAgICBfb2sgICJpbnQgKCpmbikoaW50LCBpbnQpID0gc29t
+YTsiCiAgICBfb2sgICJwcmludGYoXCIlZFxuXCIsIGZuKDMsIDQpKTsgICAvLyA3IgogICAgX2Nv
+bnQKCiAgICBfbGVhcm5fc3RlcCAzMCAzNSAiVFJJTEhBIDMg4oCUIEM6IHBvbnRlaXJvcyBlIG1l
+bW9yaWEiCiAgICBfc2VjICJQb250ZWlyb3Mg4oCUIG8gY29yYWNhbyBkbyBDIgogICAgX29rICAi
+aW50IHggPSA0MjsiCiAgICBfb2sgICJpbnQgKnAgPSAmeDsgICAgIC8vIHAgYXBvbnRhIHBhcmEg
+eCIKICAgIF9vayAgInByaW50ZihcIiVkXG5cIiwgKnApOyAgICAvLyBkZXNyZWZlcmVuY2lhOiA0
+MiIKICAgIF9vayAgIipwID0gOTk7ICAgICAgICAgIC8vIG11ZGEgeCB2aWEgcG9udGVpcm8iCiAg
+ICBfb2sgICJwcmludGYoXCIlZFxuXCIsIHgpOyAgICAgLy8gOTkiCiAgICBwcmludGYgIlxuIgog
+ICAgX3NlYyAiQWxvY2FjYW8gZGluYW1pY2EiCiAgICBfb2sgICIjaW5jbHVkZSA8c3RkbGliLmg+
+IgogICAgX29rICAiIgogICAgX29rICAiY2hhciAqYnVmID0gbWFsbG9jKDEwMjQpOyAgICAgICAv
+LyBhbG9jYSAxS0IiCiAgICBfb2sgICJpZiAoIWJ1ZikgeyBwZXJyb3IoXCJtYWxsb2NcIik7IGV4
+aXQoMSk7IH0iCiAgICBfb2sgICIiCiAgICBfb2sgICJzbnByaW50ZihidWYsIDEwMjQsIFwicGF5
+bG9hZD0lc1wiLCBpbnB1dCk7IgogICAgX29rICAiLy8gdXNhIGJ1Zi4uLiIKICAgIF9vayAgImZy
+ZWUoYnVmKTsgICAgICAgICAgICAgICAgICAgICAgLy8gU0VNUFJFIGxpYmVyZSIKICAgIHByaW50
+ZiAiXG4iCiAgICBfc2VjICJTdHJpbmdzIGVtIEMgKGFycmF5cyBkZSBjaGFyIHRlcm1pbmFkb3Mg
+ZW0gMCkiCiAgICBfb2sgICIjaW5jbHVkZSA8c3RyaW5nLmg+IgogICAgX29rICAiY2hhciBkc3Rb
+MjU2XTsiCiAgICBfb2sgICJzdHJuY3B5KGRzdCwgc3JjLCBzaXplb2YoZHN0KS0xKTsgIC8vIGNv
+cGlhIHNlZ3VyYSIKICAgIF9vayAgInN0cm5jYXQoZHN0LCBcIiBzdWZpeG9cIiwgc2l6ZW9mKGRz
+dCktc3RybGVuKGRzdCktMSk7IgogICAgX29rICAic3RybGVuKHMpICAgICAgICAgIC0tIGNvbXBy
+aW1lbnRvIgogICAgX29rICAic3RyY21wKGEsIGIpICAgICAgIC0tIGNvbXBhcmEgKDAgPSBpZ3Vh
+bCkiCiAgICBfb2sgICJzdHJzdHIoaGF5LCBuZWVkbGUpLS0gYnVzY2Egc3Vic3RyaW5nIgogICAg
+X29rICAiIgogICAgX29rICAiLy8gTlVOQ0EgdXNlIHN0cmNweS9zdHJjYXQgc2VtIGxpbWl0ZSDi
+gJQgYnVmZmVyIG92ZXJmbG93ISIKICAgIF9jb250CgogICAgX2xlYXJuX3N0ZXAgMzEgMzUgIlRS
+SUxIQSAzIOKAlCBDOiBzb2NrZXRzIGUgcmVkZSByYXciCiAgICBfc2VjICJTb2NrZXQgVENQIGVt
+IEMgKGNvbW8gbyBtcyBmYXogaW50ZXJuYW1lbnRlKSIKICAgIF9vayAgIiNpbmNsdWRlIDxzdGRp
+by5oPiIKICAgIF9vayAgIiNpbmNsdWRlIDxzdHJpbmcuaD4iCiAgICBfb2sgICIjaW5jbHVkZSA8
+c3lzL3NvY2tldC5oPiIKICAgIF9vayAgIiNpbmNsdWRlIDxuZXRpbmV0L2luLmg+IgogICAgX29r
+ICAiI2luY2x1ZGUgPGFycGEvaW5ldC5oPiIKICAgIF9vayAgIiNpbmNsdWRlIDx1bmlzdGQuaD4i
+CiAgICBfb2sgICIiCiAgICBfb2sgICJpbnQgZmQgPSBzb2NrZXQoQUZfSU5FVCwgU09DS19TVFJF
+QU0sIDApOyIKICAgIF9vayAgInN0cnVjdCBzb2NrYWRkcl9pbiBhZGRyID0geyIKICAgIF9vayAg
+IiAgICAuc2luX2ZhbWlseSA9IEFGX0lORVQsIgogICAgX29rICAiICAgIC5zaW5fcG9ydCAgID0g
+aHRvbnMoODApLCIKICAgIF9vayAgIn07IgogICAgX29rICAiaW5ldF9wdG9uKEFGX0lORVQsIFwi
+MTkyLjE2OC4xLjFcIiwgJmFkZHIuc2luX2FkZHIpOyIKICAgIF9vayAgIiIKICAgIF9vayAgImlm
+IChjb25uZWN0KGZkLCAoc3RydWN0IHNvY2thZGRyKikmYWRkciwgc2l6ZW9mKGFkZHIpKSA9PSAw
+KSB7IgogICAgX29rICAiICAgIGNoYXIgcmVxW10gPSBcIkdFVCAvIEhUVFAvMS4wXHJcblxyXG5c
+IjsiCiAgICBfb2sgICIgICAgc2VuZChmZCwgcmVxLCBzdHJsZW4ocmVxKSwgMCk7IgogICAgX29r
+ICAiICAgIGNoYXIgYnVmWzQwOTZdOyIKICAgIF9vayAgIiAgICBpbnQgbiA9IHJlY3YoZmQsIGJ1
+Ziwgc2l6ZW9mKGJ1ZiktMSwgMCk7IgogICAgX29rICAiICAgIGJ1ZltuXSA9IDA7IgogICAgX29r
+ICAiICAgIHB1dHMoYnVmKTsiCiAgICBfb2sgICJ9IgogICAgX29rICAiY2xvc2UoZmQpOyIKICAg
+IF9jb250CgogICAgX2xlYXJuX3N0ZXAgMzIgMzUgIlRSSUxIQSAzIOKAlCBDOiBjcmlhciBtb2R1
+bG8gcGFyYSBvIG1zIgogICAgX3NlYyAiTW9kdWxvIEMgcXVlIG8gbXMgcG9kZSBjYXJyZWdhciIK
+ICAgIF9vayAgIi8vIG1ldV9tb2QuYyDigJQgbW9kdWxvIEx1YSBlc2NyaXRvIGVtIEMiCiAgICBf
+b2sgICIjaW5jbHVkZSA8bHVhLmg+IgogICAgX29rICAiI2luY2x1ZGUgPGxhdXhsaWIuaD4iCiAg
+ICBfb2sgICIiCiAgICBfb2sgICIvLyBmdW5jYW8gTHVhOiBtZXUueG9yKHN0ciwga2V5KSIKICAg
+IF9vayAgInN0YXRpYyBpbnQgbF94b3IobHVhX1N0YXRlICpMKSB7IgogICAgX29rICAiICAgIHNp
+emVfdCBzbGVuLCBrbGVuOyIKICAgIF9vayAgIiAgICBjb25zdCBjaGFyICpzID0gbHVhTF9jaGVj
+a2xzdHJpbmcoTCwgMSwgJnNsZW4pOyIKICAgIF9vayAgIiAgICBjb25zdCBjaGFyICprID0gbHVh
+TF9jaGVja2xzdHJpbmcoTCwgMiwgJmtsZW4pOyIKICAgIF9vayAgIiAgICBjaGFyICpvdXQgPSBt
+YWxsb2Moc2xlbisxKTsiCiAgICBfb2sgICIgICAgZm9yIChzaXplX3QgaSA9IDA7IGkgPCBzbGVu
+OyBpKyspIgogICAgX29rICAiICAgICAgICBvdXRbaV0gPSBzW2ldIF4ga1tpICUga2xlbl07Igog
+ICAgX29rICAiICAgIG91dFtzbGVuXSA9IDA7IgogICAgX29rICAiICAgIGx1YV9wdXNobHN0cmlu
+ZyhMLCBvdXQsIHNsZW4pOyIKICAgIF9vayAgIiAgICBmcmVlKG91dCk7IgogICAgX29rICAiICAg
+IHJldHVybiAxOyAgLy8gMSB2YWxvciByZXRvcm5hZG8iCiAgICBfb2sgICJ9IgogICAgX29rICAi
+IgogICAgX29rICAiaW50IGx1YW9wZW5fbWV1X21vZChsdWFfU3RhdGUgKkwpIHsiCiAgICBfb2sg
+ICIgICAgbHVhTF9SZWcgZnVuY3NbXSA9IHt7XCJ4b3JcIiwgbF94b3J9LCB7TlVMTCxOVUxMfX07
+IgogICAgX29rICAiICAgIGx1YUxfbmV3bGliKEwsIGZ1bmNzKTsiCiAgICBfb2sgICIgICAgcmV0
+dXJuIDE7IgogICAgX29rICAifSIKICAgIF9vayAgIiIKICAgIF9vayAgIi0tIGNvbXBpbGFyOiIK
+ICAgIF9vayAgImN4eCAtc2hhcmVkIC1mUElDIG1ldV9tb2QuYyAtbyBtZXVfbW9kLnNvICQocGtn
+LWNvbmZpZyAtLWNmbGFncyBsdWE1LjQpIgogICAgX29rICAiLS0gdXNhciBubyBtczoiCiAgICBf
+b2sgICJsb2NhbCBtZXUgPSByZXF1aXJlKCdtZXVfbW9kJykiCiAgICBfb2sgICJwcmludChtZXUu
+eG9yKCdzZWdyZWRvJywgJ2snKSkiCiAgICBfY29udAoKICAgICMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQCiAgICAjIFRSSUxIQSA0IOKAlCBQUk9KRVRPUyBSRUFJUwogICAg
+IyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZAKCiAgICBfbGVhcm5fc3RlcCAz
+MyAzNSAiVFJJTEhBIDQg4oCUIFByb2pldG86IHNjYW5uZXIgZGUgdnVsbmVyYWJpbGlkYWRlcyIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtICBUcmlsaGEgNDogUHJvamV0b3MgcmVhaXMgZGUgcGVu
+dGVzdFwwMzNbMG1cblxuIgogICAgX3NlYyAidnVsbl9zY2FuLmx1YSDigJQgc2Nhbm5lciBjb21w
+bGV0byBjb20gcmVsYXRvcmlvIgogICAgX29rICAiLS0gVXNvOiBtcyAtLXNjcmlwdCB2dWxuX3Nj
+YW4gLS0gaHR0cDovL2Fsdm8uY29tIgogICAgX29rICAibG9jYWwgYWx2byAgPSBhcmdbMV0gb3Ig
+ZXJyb3IoJ2luZm9ybWUgYSBVUkwnKSIKICAgIF9vayAgImxvY2FsIHJlbGF0ID0gJ3JlbGF0b3Jp
+b18nLi5vcy5kYXRlKCclWSVtJWRfJUglTScpLi4nLnR4dCciCiAgICBfb2sgICJsb2NhbCB2dWxu
+cyA9IDAiCiAgICBfb2sgICIiCiAgICBfb2sgICJsb2NhbCBmdW5jdGlvbiBsb2cobXNnKSIKICAg
+IF9vayAgIiAgcHJpbnQobXNnKSIKICAgIF9vayAgIiAgZnMuYXBwZW5kKHJlbGF0LCBtc2cuLidc
+bicpIgogICAgX29rICAiZW5kIgogICAgX29rICAiIgogICAgX29rICAibG9nKCdbKl0gSW5pY2lh
+bmRvIHNjYW46ICcuLmFsdm8pIgogICAgX29rICAibG9nKCdbKl0gJy4ub3MuZGF0ZSgpKSIKICAg
+IF9vayAgIiIKICAgIF9vayAgImxvY2FsIGNoZWNrcyA9IHsiCiAgICBfb2sgICIgIHsnWFNTJywg
+ICAgZnVuY3Rpb24oKSByZXR1cm4gbW9kLnhzcyhhbHZvKSAgZW5kfSwiCiAgICBfb2sgICIgIHsn
+U1FMaScsICAgZnVuY3Rpb24oKSByZXR1cm4gbW9kLnNxbGkoYWx2bykgZW5kfSwiCiAgICBfb2sg
+ICIgIHsnTEZJJywgICAgZnVuY3Rpb24oKSByZXR1cm4gbW9kLmxmaShhbHZvKSAgZW5kfSwiCiAg
+ICBfb2sgICIgIHsnSGVhZGVycycsZnVuY3Rpb24oKSByZXR1cm4gbW9kLmhlYWRlcnMoYWx2bykg
+ZW5kfSwiCiAgICBfb2sgICJ9IgogICAgX29rICAiIgogICAgX29rICAiZm9yIF8sIGNrIGluIGlw
+YWlycyhjaGVja3MpIGRvIgogICAgX29rICAiICBsb2NhbCBvaywgciA9IHBjYWxsKGNrWzJdKSIK
+ICAgIF9vayAgIiAgaWYgb2sgYW5kIHIgYW5kIHIudnVsbiB0aGVuIgogICAgX29rICAiICAgIGxv
+ZygnWyFdICcuLmNrWzFdLi4nOiBWVUxORVJBVkVMJykiCiAgICBfb2sgICIgICAgdnVsbnMgPSB2
+dWxucyArIDEiCiAgICBfb2sgICIgIGVuZCIKICAgIF9vayAgImVuZCIKICAgIF9vayAgIiIKICAg
+IF9vayAgImxvZygnXG5bPV0gVG90YWw6ICcuLnZ1bG5zLi4nIHZ1bG5lcmFiaWxpZGFkZXMnKSIK
+ICAgIF9vayAgImxvZygnWz1dIFJlbGF0b3JpbzogJy4ucmVsYXQpIgogICAgX2NvbnQKCiAgICBf
+bGVhcm5fc3RlcCAzNCAzNSAiVFJJTEhBIDQg4oCUIFByb2pldG86IHBvcnQgc2Nhbm5lciBtdWx0
+aS10aHJlYWQiCiAgICBfc2VjICJwb3J0c2Nhbl9tdC5sdWEg4oCUIHNjYW4gcGFyYWxlbG8gY29t
+IHRocmVhZHMiCiAgICBfb2sgICItLSBVc286IG1zIC0tc2NyaXB0IHBvcnRzY2FuX210IC0tIDE5
+Mi4xNjguMS4xIDEgOTk5OSIKICAgIF9vayAgImxvY2FsIGhvc3QgID0gYXJnWzFdIG9yICcxMjcu
+MC4wLjEnIgogICAgX29rICAibG9jYWwgcF9pbmkgPSB0b251bWJlcihhcmdbMl0pIG9yIDEiCiAg
+ICBfb2sgICJsb2NhbCBwX2ZpbSA9IHRvbnVtYmVyKGFyZ1szXSkgb3IgMTAyNCIKICAgIF9vayAg
+ImxvY2FsIFRIUkVBRFMgPSA0IgogICAgX29rICAiIgogICAgX29rICAibG9jYWwgYWJlcnRhcyA9
+IHt9IgogICAgX29rICAibG9jYWwgY2h1bmsgPSBtYXRoLmZsb29yKChwX2ZpbSAtIHBfaW5pICsg
+MSkgLyBUSFJFQURTKSIKICAgIF9vayAgIiIKICAgIF9vayAgInByaW50KHN0cmluZy5mb3JtYXQo
+J1sqXSBTY2FuICVzOiVkLSVkICglZCB0aHJlYWRzKScsIGhvc3QsIHBfaW5pLCBwX2ZpbSwgVEhS
+RUFEUykpIgogICAgX29rICAiIgogICAgX29rICAibG9jYWwgdHMgPSB7fSIKICAgIF9vayAgImZv
+ciBpID0gMSwgVEhSRUFEUyBkbyIKICAgIF9vayAgIiAgbG9jYWwgaW5pID0gcF9pbmkgKyAoaS0x
+KSAqIGNodW5rIgogICAgX29rICAiICBsb2NhbCBmaW0gPSAoaSA9PSBUSFJFQURTKSBhbmQgcF9m
+aW0gb3IgKGluaSArIGNodW5rIC0gMSkiCiAgICBfb2sgICIgIHRzW2ldID0gc3lzLnRocmVhZChm
+dW5jdGlvbigpIgogICAgX29rICAiICAgIGxvY2FsIHIgPSBuZXQuc2Nhbihob3N0LCBpbmksIGZp
+bSkiCiAgICBfb2sgICIgICAgZm9yIF8sIHAgaW4gaXBhaXJzKHIpIGRvIgogICAgX29rICAiICAg
+ICAgdGFibGUuaW5zZXJ0KGFiZXJ0YXMsIHApIgogICAgX29rICAiICAgIGVuZCIKICAgIF9vayAg
+IiAgZW5kKSIKICAgIF9vayAgImVuZCIKICAgIF9vayAgIiIKICAgIF9vayAgImZvciBfLCB0IGlu
+IGlwYWlycyh0cykgZG8gc3lzLmpvaW4odCkgZW5kIgogICAgX29rICAidGFibGUuc29ydChhYmVy
+dGFzKSIKICAgIF9vayAgIiIKICAgIF9vayAgInByaW50KCdbK10gUG9ydGFzIGFiZXJ0YXMgKCcu
+LiNhYmVydGFzLi4nKTonKSIKICAgIF9vayAgImZvciBfLCBwIGluIGlwYWlycyhhYmVydGFzKSBk
+byIKICAgIF9vayAgIiAgcHJpbnQoc3RyaW5nLmZvcm1hdCgnICAlLTZkICAlcycsIHAsIG5ldC5i
+YW5uZXIoaG9zdCxwKSBvciAnJykpIgogICAgX29rICAiZW5kIgogICAgX2NvbnQKCiAgICBfbGVh
+cm5fc3RlcCAzNSAzNSAiVFJJTEhBIDQg4oCUIFByb3hpbW9zIHBhc3NvcyBlIHJlY3Vyc29zIgog
+ICAgX3NlYyAiVm9jZSBjb25jbHVpdSBvIHR1dG9yaWFsIGNvbXBsZXRvISIKICAgIF9vayAgIlRy
+aWxoYSAxOiBMdWEgYmFzaWNvIGFvIGF2YW5jYWRvICAgICAgW0NPTVBMRVRPXSIKICAgIF9vayAg
+IlRyaWxoYSAyOiBMdWEgKyBFbGxpb3RPUyBBUEkgICAgICAgICAgW0NPTVBMRVRPXSIKICAgIF9v
+ayAgIlRyaWxoYSAzOiBDIG5vIEVsbGlvdE9TICAgICAgICAgICAgICAgW0NPTVBMRVRPXSIKICAg
+IF9vayAgIlRyaWxoYSA0OiBQcm9qZXRvcyByZWFpcyAgICAgICAgICAgICAgW0NPTVBMRVRPXSIK
+ICAgIHByaW50ZiAiXG4iCiAgICBfc2VjICJQcm94aW1vcyBwYXNzb3MiCiAgICBfb2sgICJtcyAt
+LWV4YW1wbGVzICAgICAgICAjIHNjcmlwdHMgcHJvbnRvcyBwYXJhIGVzdHVkYXIiCiAgICBfb2sg
+ICJtcyAtLWRvYyBtb2R1bG9zICAgICAjIHJlZmVyZW5jaWEgY29tcGxldGEgZGEgQVBJIgogICAg
+X29rICAibXMgLS1kb2MgbmV0ICAgICAgICAgIyBtb2R1bG8gbmV0LioiCiAgICBfb2sgICJtcyAt
+LWRvYyBtb2QgICAgICAgICAjIHNjYW5uZXJzIG1vZC4qIgogICAgX29rICAibXMgLS1kb2MgY3J5
+cHRvICAgICAgIyBjcnlwdG8uKiIKICAgIF9vayAgImxwbSAtLXNjcmlwdCAtcyAnJyAgICMgZXhw
+bG9yZSBvIGV4cGxvaXQtZGIiCiAgICBfb2sgICJ4cG0gbGlzdCAgICAgICAgICAgICAjIGZlcnJh
+bWVudGFzIGRpc3Bvbml2ZWlzIgogICAgcHJpbnRmICJcbiIKICAgIF9zZWMgIlJlY3Vyc29zIGV4
+dGVybm9zIgogICAgX29rICAibHVhLm9yZy9tYW51YWwvNS40ICAgICAgIC0tIG1hbnVhbCBvZmlj
+aWFsIGRvIEx1YSA1LjQiCiAgICBfb2sgICJnaXRodWIuY29tL21pa2VlbGxpb3QyMTgvRWxsaW90
+T1MgIC0tIGNvZGlnbyBmb250ZSIKICAgIF9vayAgIm1zIC1hICdkdXZpZGEnICAgICAgICAgICAt
+LSBwZXJndW50ZSBwYXJhIGEgQ1lOIgogICAgcHJpbnRmICJcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzJtICBCb20gcGVudGVzdC4gVXNlIGNvbSByZXNwb25zYWJpbGlkYWRlLlwwMzNbMG1cblxu
+IgogICAgOzsKICAtLXBheWxvYWQpCiAgICBfRVg9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50
+ZXJtdXgvZmlsZXMvdXNyfS9zaGFyZS9sdWEtc2NyaXB0cyIKICAgIGlmIFsgLWYgIiRfRVgvcGF5
+bG9hZC5sdWEiIF07IHRoZW4KICAgICAgZXhlYyAiJF9CIiAiJF9FWC9wYXlsb2FkLmx1YSIgIiR7
+QDoyfSIKICAgIGVsc2UKICAgICAgcHJpbnRmICJcMDMzWzE7MzFtWyFdIHBheWxvYWQubHVhIG5h
+byBlbmNvbnRyYWRvLiBSZWluc3RhbGUgY29tOiBiYXNoIGx1YXNjcmlwdC5zaCAtLXVwZGF0ZVww
+MzNbMG1cbiIKICAgICAgZXhpdCAxCiAgICBmaQogICAgOzsKICAtLWV4YW1wbGVzKQogICAgX0VY
+PSIke1BSRUZJWDotL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzcn0vc2hhcmUvbHVhLXNj
+cmlwdHMiCiAgICBfRVhfQz0iJHtQUkVGSVg6LS9kYXRhL2RhdGEvY29tLnRlcm11eC9maWxlcy91
+c3J9L3NoYXJlL2Mtc2NyaXB0cyIKICAgIHByaW50ZiAiXG5cMDMzWzE7MzVt4pWU4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWXXDAzM1swbVxuIgogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWRICBFbGxp
+b3RPUyDigJQgU2NyaXB0cyBkZSBFeGVtcGxvICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+4pWRXDAzM1swbVxuIgogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWa4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWdXDAzM1swbVxuXG4iCiAgICAjIFNjcmlwdHMgTHVhCiAgICBfbHVhX2NvdW50PTAKICAgIGlm
+IFsgLWQgIiRfRVgiIF07IHRoZW4KICAgICAgZm9yIGYgaW4gIiRfRVgiLyoubHVhOyBkbyBbIC1m
+ICIkZiIgXSAmJiBfbHVhX2NvdW50PSQoKF9sdWFfY291bnQrMSkpOyBkb25lCiAgICBmaQogICAg
+aWYgWyAiJF9sdWFfY291bnQiIC1ndCAwIF07IHRoZW4KICAgICAgcHJpbnRmICJcMDMzWzE7MzNt
+4pSA4pSAIFNjcmlwdHMgTHVhICglZCkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1sw
+bVxuIiAiJF9sdWFfY291bnQiCiAgICAgIHByaW50ZiAiICBcMDMzWzA7OTBtJS0yMnMgICUtMTJz
+ICAlc1wwMzNbMG1cbiIgIk5PTUUiICJDQVRFR09SSUEiICJERVNDUknDh8ODTyIKICAgICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0lc1wwMzNbMG1cbiIgIuKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCIKICAgICAg
+Zm9yIGYgaW4gIiRfRVgiLyoubHVhOyBkbwogICAgICAgIFsgLWYgIiRmIiBdIHx8IGNvbnRpbnVl
+CiAgICAgICAgX25hbWU9JChiYXNlbmFtZSAiJGYiKQogICAgICAgIF9kZXNjPSQoaGVhZCAtNSAi
+JGYiIHwgZ3JlcCAiXi0tIiB8IHRhaWwgLTEgfCBzZWQgJ3MvXi0tICovLycpCiAgICAgICAgX2Nh
+dD0kKGhlYWQgLTggIiRmIiB8IGdyZXAgLWkgIl4tLSAqY2F0XHxeLS0gKnR5cGVcfF4tLSAqY2F0
+ZWdvcnkiIHwgc2VkICdzL14tLVteOl0qOiAqLy8nIHwgaGVhZCAtMSkKICAgICAgICBbIC16ICIk
+X2NhdCIgXSAmJiBfY2F0PSJwZW50ZXN0IgogICAgICAgIHByaW50ZiAiICBcMDMzWzE7MzJtJS0y
+MnNcMDMzWzBtIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gXDAzM1swOzkwbSVzXDAzM1swbVxuIiAi
+JF9uYW1lIiAiJF9jYXQiICIkX2Rlc2MiCiAgICAgICAgX2FyZ3M9JChoZWFkIC0xMCAiJGYiIHwg
+Z3JlcCAtaSAiXi0tICphcmdzXHxeLS0gKnVzb1x8Xi0tICp1c2UiIHwgc2VkICdzL14tLVteOl0q
+OiAqLy8nIHwgaGVhZCAtMSkKICAgICAgICBbIC1uICIkX2FyZ3MiIF0gJiYgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIGFyZ3M6ICVzXDAzM1swbVxuIiAiJF9hcmdzIgogICAgICBkb25lCiAgICAgIHBy
+aW50ZiAiXG4iCiAgICBlbHNlCiAgICAgIHByaW50ZiAiICBcMDMzWzA7OTBtKG5lbmh1bSBzY3Jp
+cHQgTHVhIGVtICRfRVgpXDAzM1swbVxuXG4iCiAgICBmaQogICAgIyBTY3JpcHRzIEMKICAgIF9j
+X2NvdW50PTAKICAgIGlmIFsgLWQgIiRfRVhfQyIgXTsgdGhlbgogICAgICBmb3IgZiBpbiAiJF9F
+WF9DIi8qOyBkbyBbIC1mICIkZiIgXSAmJiBfY19jb3VudD0kKChfY19jb3VudCsxKSk7IGRvbmUK
+ICAgIGZpCiAgICBpZiBbICIkX2NfY291bnQiIC1ndCAwIF07IHRoZW4KICAgICAgcHJpbnRmICJc
+MDMzWzE7MzNt4pSA4pSAIFNjcmlwdHMgQyAoJWQpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgFwwMzNbMG1cbiIgIiRfY19jb3VudCIKICAgICAgZm9yIGYgaW4gIiRfRVhfQyIv
+KjsgZG8KICAgICAgICBbIC1mICIkZiIgXSB8fCBjb250aW51ZQogICAgICAgIF9uYW1lPSQoYmFz
+ZW5hbWUgIiRmIikKICAgICAgICBfZGVzYz0kKGhlYWQgLTUgIiRmIiB8IGdyZXAgLW0xICJeLy8i
+IHwgc2VkICdzfF4vLyAqfHwnKQogICAgICAgIGNhc2UgIiRfbmFtZSIgaW4gKi5jKSBfY3R5cGU9
+IkMgZm9udGUiOzsgKikgX2N0eXBlPSJiaW5hcmlvIjs7IGVzYWMKICAgICAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbSUtMjJzXDAzM1swbSBcMDMzWzA7OTBtJS0xMHMgICVzXDAzM1swbVxuIiAiJF9u
+YW1lIiAiJF9jdHlwZSIgIiRfZGVzYyIKICAgICAgZG9uZQogICAgICBwcmludGYgIlxuIgogICAg
+ZmkKICAgICMgU2NyaXB0cyBwZXNzb2FpcwogICAgX0VYX0hPTUU9IiRIT01FLy5lbGxpb3Qvc2Ny
+aXB0cyIKICAgIF9ob21lX2NvdW50PTAKICAgIGlmIFsgLWQgIiRfRVhfSE9NRSIgXTsgdGhlbgog
+ICAgICBmb3IgZiBpbiAiJF9FWF9IT01FIi8qOyBkbyBbIC1mICIkZiIgXSAmJiBfaG9tZV9jb3Vu
+dD0kKChfaG9tZV9jb3VudCsxKSk7IGRvbmUKICAgIGZpCiAgICBpZiBbICIkX2hvbWVfY291bnQi
+IC1ndCAwIF07IHRoZW4KICAgICAgcHJpbnRmICJcMDMzWzE7MzNt4pSA4pSAIFNjcmlwdHMgcGVz
+c29haXMg4oCUIH4vLmVsbGlvdC9zY3JpcHRzICglZCkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuIiAiJF9ob21lX2NvdW50
+IgogICAgICBmb3IgZiBpbiAiJF9FWF9IT01FIi8qOyBkbwogICAgICAgIFsgLWYgIiRmIiBdIHx8
+IGNvbnRpbnVlCiAgICAgICAgX25hbWU9JChiYXNlbmFtZSAiJGYiKQogICAgICAgIF9kZXNjPSQo
+aGVhZCAtNSAiJGYiIHwgZ3JlcCAtbTEgIl4tLVx8Xi8vXHxeIyIgfCBzZWQgJ3N8XlsjLy1dKiAq
+fHwnKQogICAgICAgIHByaW50ZiAiICBcMDMzWzE7MzVtJS0yMnNcMDMzWzBtIFwwMzNbMDs5MG0l
+c1wwMzNbMG1cbiIgIiRfbmFtZSIgIiRfZGVzYyIKICAgICAgZG9uZQogICAgICBwcmludGYgIlxu
+IgogICAgZmkKICAgIHByaW50ZiAiXDAzM1sxOzM2bUNvbW8gZXhlY3V0YXI6XDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszMm1tcyAtLXNjcmlwdCBub21lXDAzM1swbSAgICAgICAgICAg
+ICAgICAgICAjIEx1YSBvdSBDXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tc2NyaXB0
+IG5vbWUgLS0gW2FyZ3NdXDAzM1swbSAgICAgICAgICMgY29tIGFyZ3VtZW50b3NcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzJtbXMgLS1zY3JpcHQgcG9ydHNjYW4ubHVhIC0tIGhvc3QgODBcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybW1zIC0tc2NyaXB0IHhlcnhlcy5jIC0tIGhv
+c3QgODBcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybWxwbSAtLXNjcmlwdCAtcyAn
+c3FsaSdcMDMzWzBtICAgICAgICAgICAgICMgYmFpeGFyIGRvIGV4cGxvaXQtZGJcblxuIgogICAg
+OzsKICAtLWRvYykKICAgIF9ET0NfUEFHRVI9IiIKICAgIGNvbW1hbmQgLXYgbGVzcyA+IC9kZXYv
+bnVsbCAyPiYxICYmIF9ET0NfUEFHRVI9Imxlc3MgLVIiCiAgICBjb21tYW5kIC12IG1vcmUgPiAv
+ZGV2L251bGwgMj4mMSAmJiBbIC16ICIkX0RPQ19QQUdFUiIgXSAmJiBfRE9DX1BBR0VSPSJtb3Jl
+IgogICAgX2RvY19ib2R5KCkgewogICAgcHJpbnRmICJcblwwMzNbMTszNm3ilZTilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZdcMDMzWzBtXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilZEgICAgICAg
+ICAgRWxsaW90T1Mg4oCUIERvY3VtZW50YcOnw6NvIGRvIFNpc3RlbWEgICAgICAgICAgICAgICAg
+ICDilZFcMDMzWzBtXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilZEgIE8gcHJpbWVpcm8gc2lz
+dGVtYSBkZSBwZW50ZXN0IG5hdGl2byBwYXJhIEFuZHJvaWQgICAgICAgICAgIOKVkVwwMzNbMG1c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKVmuKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVnVwwMzNbMG1c
+biIKICAgIHByaW50ZiAiXDAzM1swOzkwbSAgRGVzZW52b2x2aWRvIHBvciBNaWtlIEVsbGlvdCDC
+tyBnaXRodWIuY29tL21pa2VlbGxpb3QyMTgvRWxsaW90T1NcMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBPIFFVRSBFIE8gRWxsaW90T1Mg4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1sw
+bVxuXG4iCiAgICBwcmludGYgIiAgU2lzdGVtYSBkZSBzZWd1cmFuY2EgZSBwZW50ZXN0IGRlbnRy
+byBkbyBUZXJtdXguIFJvZGEgbm8gY2VsdWxhcixcbiIKICAgIHByaW50ZiAiICBzZW0gcm9vdCwg
+c2VtIFZNLiBVbSBzY3JpcHQgY29tcGlsYSBkbyB6ZXJvOiBMdWEgNS40LjgsIDIzIG1vZHVsb3Nc
+biIKICAgIHByaW50ZiAiICBDLCBJQSBuYXRpdmEgKENZTiksIGUgZmVycmFtZW50YXM6IG1zLCBs
+cG0sIHhwbSwgY3h4LCBlZSwgeHR1bi5cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ
+4pWQIFBMQVRBRk9STUFTIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszMm0lLTE4c1wwMzNbMG0gXDAzM1sxOzMzbSUtMTRzXDAzM1sw
+bSAlc1xuIiAiQW1iaWVudGUiICJGbGFnIiAiR2VyZW5jaWFkb3IiCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSUtMThzICAlLTE0cyAgJXNcMDMzWzBtXG4iICJBbmRyb2lkL1Rlcm11eCIgIi0tdGVy
+bXV4IiAicGtnIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0lLTE4cyAgJS0xNHMgICVzXDAzM1sw
+bVxuIiAiRGViaWFuL1VidW50dSIgIi0tZGViaWFuIiAiYXB0IgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0lLTE4cyAgJS0xNHMgICVzXDAzM1swbVxuIiAiQXJjaCBMaW51eCIgIi0tYXJjaCIgInBh
+Y21hbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtJS0xOHMgICUtMTRzICAlc1wwMzNbMG1cbiIg
+IkZlZG9yYS9SSEVMIiAiLS1mZWRvcmEiICJkbmYiCiAgICBwcmludGYgIlxuIgogICAgcHJpbnRm
+ICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIElOU1RBTEFDQU8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzM2bU1pbmltbzpcMDMzWzBt
+ICBcMDMzWzA7OTBtcGtnIHVwZGF0ZSAmJiBwa2cgaW5zdGFsbCBnaXQgd2dldCBjdXJsIGNsYW5n
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgICAgICAgICAgIFwwMzNbMDs5MG1naXQgY2xvbmUgaHR0
+cHM6Ly9naXRodWIuY29tL21pa2VlbGxpb3QyMTgvRWxsaW90T1MuZ2l0XDAzM1swbVxuIgogICAg
+cHJpbnRmICIgICAgICAgICAgIFwwMzNbMDs5MG1jZCBFbGxpb3RPUyAmJiBiYXNoIGx1YXNjcmlw
+dC5zaFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszNm1Db20gZWRpdG9yOlwwMzNb
+MG0gIFwwMzNbMDs5MG1iYXNoIGx1YXNjcmlwdC5zaCAtZVwwMzNbMG1cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzZtQ29tIEdVSTpcMDMzWzBtICAgICBcMDMzWzA7OTBtYmFzaCBsdWFzY3JpcHQu
+c2ggLS1ndWlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzM2bUF0dWFsaXphcjpcMDMz
+WzBtICAgXDAzM1swOzkwbWJhc2ggbHVhc2NyaXB0LnNoIC0tdXBkYXRlXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszNm1EZXNpbnN0YWxhcjpcMDMzWzBtIFwwMzNbMDs5MG1iYXNoIGx1
+YXNjcmlwdC5zaCAtdVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzZtRGlhZ25vc3Rp
+Y286XDAzM1swbSBcMDMzWzA7OTBtYmFzaCBsdWFzY3JpcHQuc2ggLS1kb2N0b3JcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBCSU5BUklPUyBFIEZFUlJBTUVOVEFT
+IOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1c
+blxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0lLTEyc1wwMzNbMG0gJXNcbiIgIm1zIiAiTW9v
+blN0eWxlIC0gUkVQTCBMdWEgNS40IGNvbSBtb2R1bG9zIGRlIHBlbnRlc3QiCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMybSUtMTJzXDAzM1swbSAlc1xuIiAibHVhLW5ldCIgIkludGVycHJldGFkb3Ig
+THVhIGNvbSAyMyBtb2R1bG9zIGRlIHNlZ3VyYW5jYSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJt
+JS0xMnNcMDMzWzBtICVzXG4iICJscG0iICJHZXJlbmNpYWRvciBkZSBtb2R1bG9zIEx1YSBlIGV4
+cGxvaXRzIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0lLTEyc1wwMzNbMG0gJXNcbiIgInhwbSIg
+IkdlcmVuY2lhZG9yIGRlIGZlcnJhbWVudGFzIGRlIHBlbnRlc3QiCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMybSUtMTJzXDAzM1swbSAlc1xuIiAiY3h4IiAiQ29tcGlsYWRvciBDL0MrKyBzaW1wbGlm
+aWNhZG8iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSUtMTJzXDAzM1swbSAlc1xuIiAiZWUiICJF
+ZGl0b3IgZGUgdGV4dG8gbmF0aXZvIGxldmUiCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSUtMTJz
+XDAzM1swbSAlc1xuIiAieHR1biIgIlR1bm5lbCBUb29sa2l0IFRDUC9VRFAgc2VtIHJvb3QiCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMybSUtMTJzXDAzM1swbSAlc1xuIiAiYXBwZm9yZ2UiICJIVE1M
+L0NTUy9KUyAtPiBBUEsgc2VtIHJvb3QiCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSUtMTJzXDAz
+M1swbSAlc1xuIiAiYXBraW5zcGVjdCIgIkFuYWxpc2UgZXN0YXRpY2EgZGUgQVBLcyIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzJtJS0xMnNcMDMzWzBtICVzXG4iICJ3b3JkbWFnaWMiICJHZXJhZG9y
+IGludGVsaWdlbnRlIGRlIHdvcmRsaXN0cyIKICAgIHByaW50ZiAiXG4iCiAgICBwcmludGYgIlww
+MzNbMTszNW3ilZDilZDilZAgRkxBR1MgRE8gbXMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzM2bUdlcmFsOlwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBtc1wwMzNbMG0gICAgICAgICAgICAgICAgICAgIFJF
+UEwgaW50ZXJhdGl2b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC1jICdjb2RpZ28n
+XDAzM1swbSAgICAgICAgZXhlY3V0YSBMdWFcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBt
+cyAtZiBzY3JpcHQubHVhXDAzM1swbSAgICAgIGV4ZWN1dGEgYXJxdWl2b1xuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszMm0gIG1zIC1lIFthcnF1aXZvXVwwMzNbMG0gICAgICAgZWRpdG9yXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLWlcMDMzWzBtICAgICAgICAgICAgICAgICBpbmZv
+IGRvIHNpc3RlbWFcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBtcyAtdlwwMzNbMG0gICAg
+ICAgICAgICAgICAgIHZlcnNhb1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC1oXDAz
+M1swbSAgICAgICAgICAgICAgICAgYWp1ZGEgY29tcGxldGFcblxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszNm1JQSAoQ1lOKTpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMg
+LWFcMDMzWzBtICAgICAgICAgICAgICAgICBjaGF0IGNvbSBhIENZTlxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszMm0gIG1zIC1hICdwZXJndW50YSdcMDMzWzBtICAgICAgcGVyZ3VudGEgZGlyZXRh
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1zZWFyY2ggJ3F1ZXJ5J1wwMzNbMG0g
+ICBwZXNxdWlzYSB3ZWJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBtcyAtLWNvZGUgJ3Rh
+cmVmYSdcMDMzWzBtICAgIGdlcmEgY29kaWdvXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzZt
+UmVkZTpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLWcgdXJsXDAzM1sw
+bSAgICAgICAgICAgICBIVFRQIEdFVFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0t
+cG9zdCB1cmwgZGFkb3NcMDMzWzBtICAgSFRUUCBQT1NUXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMybSAgbXMgLS1pcFwwMzNbMG0gICAgICAgICAgICAgICBJUCBwdWJsaWNvXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMybSAgbXMgLWQgaG9zdFwwMzNbMG0gICAgICAgICAgICBETlMgbG9va3Vw
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLVAgaG9zdFwwMzNbMG0gICAgICAgICAg
+ICBwaW5nXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1zY2FuIGhvc3QgcDEgcDJc
+MDMzWzBtICBwb3J0IHNjYW5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBtcyAtLWxpc3Rl
+biBwb3J0YVwwMzNbMG0gICAgIGxpc3RlbmVyIFRDUFxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzM2bVBlbnRlc3Q6XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC14IHVy
+bCBbTl1cMDMzWzBtICAgICAgICAgWFNTXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMg
+LXEgdXJsIFtOXVwwMzNbMG0gICAgICAgICBTUUxpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMy
+bSAgbXMgLWwgdXJsIFtOXVwwMzNbMG0gICAgICAgICBMRklcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzJtICBtcyAtciB1cmwgW05dXDAzM1swbSAgICAgICAgIFJDRVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszMm0gIG1zIC1OIHVybFwwMzNbMG0gICAgICAgICAgICAgTm9TUUwgSW5qZWN0aW9u
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1zc3JmIHVybCBbTl1cMDMzWzBtICAg
+ICBTU1JGXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1zc3RpIHVybCBbTl1cMDMz
+WzBtICAgICBTU1RJXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1zY2FuLWFsbCB1
+cmxcMDMzWzBtICAgICB0b2RvcyBvcyBzY2FubmVyc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+Mm0gIG1zIC1zIHVybCBbbGltaXRdXDAzM1swbSAgICAgc3BpZGVyXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzZtQ3J5cHRvOlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtICBt
+cyAtLW1kNSAndGV4dG8nXDAzM1swbSAgICAgIGhhc2ggTUQ1XG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMybSAgbXMgLS1zaGEyNTYgJ3RleHRvJ1wwMzNbMG0gICBoYXNoIFNIQTI1NlxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tYjY0ZSAndGV4dG8nXDAzM1swbSAgICAgQmFzZTY0
+IGVuY29kZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tYjY0ZCAnYjY0J1wwMzNb
+MG0gICAgICAgQmFzZTY0IGRlY29kZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0t
+and0ICd0b2tlbidcMDMzWzBtICAgICAgZGVjb2RpZmljYSBKV1RcblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszNm1BUEs6XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0t
+YXBrIGFwcC5hcGtcMDMzWzBtICAgICAgdGVzdGEgQVBLXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMybSAgbXMgLS1hcGstc2lnbiBhcHAuYXBrXDAzM1swbSBhc3NpbmEgQVBLXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMybSAgYXBwZm9yZ2UgYnVpbGQgPGRpcj5cMDMzWzBtICAgSFRNTCAtPiBB
+UEtcblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszNm1BcHJlbmRlciAvIERvY3M6XDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tbGVhcm5cMDMzWzBtICAgICAgICAgICAg
+dHV0b3JpYWwgKDggbGljb2VzKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZXhh
+bXBsZXNcMDMzWzBtICAgICAgICAgc2NyaXB0cyBkZSBleGVtcGxvXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMybSAgbXMgLS1kb2NcMDMzWzBtICAgICAgICAgICAgICBlc3RhIGRvY3VtZW50YWNh
+b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIG1vZHVsb3NcMDMzWzBtICAg
+ICAgcmVmZXJlbmNpYSBkb3MgbW9kdWxvc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1z
+IC0tZG9jIG5ldFwwMzNbMG0gICAgICAgICAgbW9kdWxvIG5ldC4qXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMybSAgbXMgLS1kb2MgbW9kXDAzM1swbSAgICAgICAgICBtb2R1bG8gbW9kLiogKHNj
+YW5uZXJzKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIGNyeXB0b1wwMzNb
+MG0gICAgICAgbW9kdWxvIGNyeXB0by4qXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMg
+LS1kb2Mgc3lzXDAzM1swbSAgICAgICAgICBtb2R1bG8gc3lzLipcbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzJtICBtcyAtLWRvYyBmc1wwMzNbMG0gICAgICAgICAgIG1vZHVsbyBmcy4qXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1kb2MgYWlcMDMzWzBtICAgICAgICAgICBtb2R1
+bG8gYWkuKlxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIHN0cmluZ1wwMzNb
+MG0gICAgICAgZXh0ZW5zb2VzIHN0cmluZy4qXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAg
+bXMgLS1kb2MgdXRpbFwwMzNbMG0gICAgICAgICBzdGRsaWIgZnVuY2lvbmFsIHV0aWwuKlxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIGpzb25cMDMzWzBtICAgICAgICAganNv
+bi5lbmNvZGUgLyBqc29uLmRlY29kZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0t
+ZG9jIGxvZ1wwMzNbMG0gICAgICAgICAgbW9kdWxvIGxvZy4qIOKAlCBsb2dnaW5nIGVzdHJ1dHVy
+YWRvXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1kb2MgY3N2XDAzM1swbSAgICAg
+ICAgICBtb2R1bG8gY3N2Liog4oCUIHBhcnNlIGUgZXNjcml0YSBkZSBDU1ZcbiIKICAgIHByaW50
+ZiAiICBcMDMzWzE7MzJtICBtcyAtLWRvYyBudW1cMDMzWzBtICAgICAgICAgIG51bS4qIOKAlCBw
+YXJzaW5nIGUgZm9ybWF0YcOnw6NvIG51bcOpcmljYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+Mm0gIG1zIC0tZG9jIHBhdGhcMDMzWzBtICAgICAgICAgcGF0aC4qIOKAlCBtYW5pcHVsYcOnw6Nv
+IGRlIGNhbWluaG9zXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybSAgbXMgLS1kb2MgY29sb3Jc
+MDMzWzBtICAgICAgICBjb2xvci4qIOKAlCBlc2NhcGUgQU5TSSBjb20gbm9tZVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIHRlc3RcMDMzWzBtICAgICAgICAgdGVzdC4qIOKA
+lCBhc3NlcnRpb25zIHBhcmEgc2NyaXB0cyB0ZXN0w6F2ZWlzXG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMybSAgbXMgLS1kb2MgcmVcMDMzWzBtICAgICAgICAgICByZS4qIOKAlCBleHByZXNzw7Vl
+cyByZWd1bGFyZXMgKG1hdGNoL3N1Yi9uYW1lZClcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzJt
+ICBtcyAtLWRvYyBxdWV1ZVwwMzNbMG0gICAgICAgIFF1ZXVlL1N0YWNrIOKAlCBlc3RydXR1cmFz
+IEZJRk8vTElGT1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0gIG1zIC0tZG9jIHRyeVwwMzNb
+MG0gICAgICAgICAgdHJ5Liog4oCUIHRyaWYvdHJ5ZWxzZS90cnllbmQgKyB0cnkuY2FsbC9wY2Fs
+bC9tdXN0XG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBDT01BTkRPUyBFU1BF
+Q0lBSVMgRE8gUkVQTCDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHBy
+aW50ZiAiICBOw6NvIHPDo28gZnVuw6fDtWVzIEx1YS4gTsOjbyBwcmVjaXNhbSBkZSAoKS4gSW50
+ZXJjZXB0YWRvcyBhbnRlcyBkbyBwYXJzZXIuXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+JS0xNnNcMDMzWzBtICVzXG4iICJoZWxwIiAiZXhpYmUgYSBkb2N1bWVudGHDp8OjbyAoaWd1YWwg
+YSBtcyAtLWRvYykiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTZzXDAzM1swbSAlc1xuIiAi
+aGVscCA8bW9kdWxvPiIgImRvYyBkZSBtw7NkdWxvOiBoZWxwIG5ldCwgaGVscCB1dGlsLi4uIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTE2c1wwMzNbMG0gJXNcbiIgImNsZWFyIiAibGltcGEg
+YSB0ZWxhIGRlIHZlcmRhZGUgKHZpYSB0ZXJtaW5mbykiCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bSUtMTZzXDAzM1swbSAlc1xuIiAiY2xzIiAiYWxpYXMgZGUgY2xlYXIiCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbSUtMTZzXDAzM1swbSAlc1xuIiAiY2QgPGRpcj4iICJtdWRhIG8gZGlyZXTDs3Jp
+byBkZSB0cmFiYWxobyIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xNnNcMDMzWzBtICVzXG4i
+ICJleGl0IC8gcSIgInNhaSBkbyBSRVBMIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIERpY2E6
+IHRhbWLDqW0gZnVuY2lvbmFtIGNvbW8gZnVuw6fDo286IGhlbHAoKSBlIGNsZWFyKClcMDMzWzBt
+XG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM1bVx1MjU1MFx1MjU1MFx1MjU1MCBTSVNURU1BIERF
+IE5BTUVTUEFDRVMgKHJlcXVpcmUpIFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1
+MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1
+MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1
+MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFx1MjU1MFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IE9zIG1vZHVsb3MgZG8gRWxsaW90T1MgTkFPIHNhbyBnbG9iYWlzIHBvciBwYWRyYW8uXG4iCiAg
+ICBwcmludGYgIiAgVm9jZSBlc2NvbGhlIG8gcXVlIGltcG9ydGFyIGNvbSByZXF1aXJlKCkuXG5c
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzZtQHN0ZCBcdTIwMTQgQmlibGlvdGVjYSBwYWRyYW8g
+ZG8gRWxsaW90T1M6XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgICBcMDMzWzE7MzJtJS00MHNc
+MDMzWzBtICVzXG4iICdyZXF1aXJlKCJAc3RkIiknICJpbXBvcnRhIFRPRE9TIG9zIG1vZHVsb3Mg
+Y29tbyBnbG9iYWlzIgogICAgcHJpbnRmICIgICAgXDAzM1sxOzMybSUtNDBzXDAzM1swbSAlc1xu
+IiAnbG9jYWwgbmV0ID0gcmVxdWlyZSgiQHN0ZC9uZXQiKScgImltcG9ydGEgc28gbyBtb2R1bG8g
+bmV0IgogICAgcHJpbnRmICIgICAgXDAzM1sxOzMybSUtNDBzXDAzM1swbSAlc1xuIiAnbG9jYWwg
+Z2V0ID0gcmVxdWlyZSgiQHN0ZC9uZXQvZ2V0IiknICJpbXBvcnRhIHNvIGEgZnVuY2FvIG5ldC5n
+ZXQiCiAgICBwcmludGYgIiAgICBcMDMzWzE7MzJtJS00MHNcMDMzWzBtICVzXG4iICdsb2NhbCBl
+bmMgPSByZXF1aXJlKCJAc3RkL2NyeXB0by9zaGEyNTYiKScgImltcG9ydGEgc28gY3J5cHRvLnNo
+YTI1NiIKICAgIHByaW50ZiAiXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzM2bUB1c2VyIFx1MjAx
+NCBNb2R1bG9zIHByb3ByaW9zIGRvIHVzdWFyaW86XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+ICBcMDMzWzE7MzJtJS00MHNcMDMzWzBtICVzXG4iICdyZXF1aXJlKCJAdXNlci9NZXVNb2QiKScg
+IiRIT01FL01ldU1vZC5sdWEiCiAgICBwcmludGYgIiAgICBcMDMzWzE7MzJtJS00MHNcMDMzWzBt
+ICVzXG4iICdyZXF1aXJlKCJAdXNlci9saWJzL3V0aWxzIiknICIkSE9NRS9saWJzL3V0aWxzLmx1
+YSIKICAgIHByaW50ZiAiICAgIFwwMzNbMTszMm0lLTQwc1wwMzNbMG0gJXNcbiIgJ3JlcXVpcmUo
+IkB1c2VyLy4uL2ZpbGVzL21vZCIpJyAiJEhPTUUvLi4vZmlsZXMvbW9kLmx1YSIKICAgIHByaW50
+ZiAiXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUGF0aCBlbSBAdXNlciBlIHJlbGF0aXZv
+IGFvIEhPTUUuIFZvY2UgcG9kZSB1c2FyIC4uLyBsaXZyZW1lbnRlLlwwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICByZXF1aXJlKCkgbm9ybWFsIChzZW0gQCkgY29udGludWEgZnVu
+Y2lvbmFuZG8gcGFyYSBtb2R1bG9zIEx1YSBwYWRyYW8uXDAzM1swbVxuXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzM2bUV4ZW1wbG9zOlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
+MG0gIGxvY2FsIG5ldCAgICA9IHJlcXVpcmUoIkBzdGQvbmV0IikgICAgICAgICAgIC0tIG1vZHVs
+byBuZXRcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgc2hhMjU2ID0g
+cmVxdWlyZSgiQHN0ZC9jcnlwdG8vc2hhMjU2IikgLS0gZnVuY2FvIGVzcGVjaWZpY2FcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgTXlBUEkgID0gcmVxdWlyZSgiQHVz
+ZXIvbWV0aG9kIikgICAgICAgLS0gJEhPTUUvbWV0aG9kLmx1YVwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIE1PRFVMT1MgREEgQVBJIOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFVzZSByZXF1aXJlKFwiQHN0ZFwiKSBwYXJhIHRv
+ZG9zIG9zIG1vZHVsb3MsIG91IHJlcXVpcmUoXCJAc3RkL21vZFwiKSBwYXJhIHVtIGVzcGVjaWZp
+Y28uXG4iCiAgICBwcmludGYgIiAgUmVmZXJlbmNpYSBlc3BlY2lmaWNhOiBcMDMzWzE7MzJtbXMg
+LS1kb2MgPG1vZHVsbz5cMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNc
+MDMzWzBtICVzXG4iICJuZXQuKiIgIlJlZGU6IEhUVFAsIFRDUCwgVURQLCBETlMsIHBvcnQgc2Nh
+biwgc29ja2V0cyIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJt
+b2QuKiIgIlBlbnRlc3Q6IDIzIHNjYW5uZXJzIChYU1MsIFNRTGksIExGSSwgUkNFLi4uKSIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJleHBsb2l0LioiICJSRVBM
+cyBkZSBleHBsb3JhY2FvIGludGVyYXRpdmEiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJz
+XDAzM1swbSAlc1xuIiAiY3J5cHRvLioiICJDcmlwdG9ncmFmaWE6IE1ENSwgU0hBLCBBRVMsIEJh
+c2U2NCwgSldUIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgInN5
+cy4qIiAiU2lzdGVtYTogdGhyZWFkcywgcHJvY2Vzc29zLCBlbnYsIHNsZWVwIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImZzLioiICJGaWxlc3lzdGVtOiByZWFk
+LCB3cml0ZSwgbGlzdCwgc3RhdCwgZ2xvYiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNc
+MDMzWzBtICVzXG4iICJhaS4qIiAiSUEgKENZTik6IGNoYXQsIGNvZGUsIHNlYXJjaCwgcHJvdmlk
+ZXJzIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImRiLioiICJC
+YW5jbyBkZSBkYWRvcyBTUUxpdGUgZW1idXRpZG8iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUt
+MTJzXDAzM1swbSAlc1xuIiAid2ViLioiICJQYXJzaW5nIEhUTUwsIGxpbmtzLCBmb3JtcyBlIHNl
+cnZpZG9yIEhUVFAiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1swbSAlc1xuIiAi
+ZG93LioiICJEb3dubG9hZCBkZSBtaWRpYTogdmlkZW8sIGF1ZGlvLCBwbGF5bGlzdCwgaW1hZ2Vt
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImxtb2QuKiIgIkNy
+aWFkb3IgZGUgbW9kdWxvcyBMdWEgY3VzdG9taXphZG9zIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M20lLTEyc1wwMzNbMG0gJXNcbiIgImFkYi4qIiAiQW5kcm9pZCBEZWJ1ZyBCcmlkZ2UgdmlhIFdp
+LUZpIChzZW0gcm9vdCkiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1swbSAlc1xu
+IiAicGVudC4qIiAiTGFiIGxvY2FsIHZ1bG5lcmF2ZWwgcGFyYSBwcmF0aWNhciBwZW50ZXN0Igog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgInNoLioiICJTaGVsbCBk
+aXJldG86IGV4ZWMgZSBjYXB0dXJhIGRlIHNhaWRhIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20l
+LTEyc1wwMzNbMG0gJXNcbiIgImNjLioiICJDb21waWxhZG9yIEMgaW5saW5lIGUgdHJhbnNwaWxh
+ZG9yIEx1YSAtPiBDIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIg
+InVpLioiICJJbnRlcmZhY2UgZGUgdXN1YXJpbyBubyB0ZXJtaW5hbCIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJ0dWkuKiIgIlRlcm1pbmFsIFVJIGludGVyYXRp
+dm8gKG1lbnVzLCBmb3JtdWxhcmlvcykiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAz
+M1swbSAlc1xuIiAiZWxsLioiICJFbmNvZGVyL0RlY29kZXIgZGUgc2NyaXB0cyAoLmVsbCkiCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1swbSAlc1xuIiAiYWdlbnQuKiIgIkFnZW50
+ZSBhdXRvbm9tbyBjb20gdG9vbHMiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1sw
+bSAlc1xuIiAic3RyaW5nLioiICJFeHRlbnNvZXMgZGUgc3RyaW5nOiB0cmltLCBzcGxpdCwgc2x1
+Z2lmeSwgaXMqLCBwYWQuLi4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1swbSAl
+c1xuIiAidXRpbC4qIiAiU3RkbGliIGZ1bmNpb25hbDogbWFwLCBmaWx0ZXIsIHBpcGUsIHN0YXRz
+LCBpdGVyLCBjaGFpbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4i
+ICJqc29uLioiICJKU09OIGVuY29kZS9kZWNvZGUgbmF0aXZvIgogICAgcHJpbnRmICIgIFwwMzNb
+MTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImxvZy4qIiAiTG9nZ2luZyBlc3RydXR1cmFkbzogaW5m
+by9vay93YXJuL2Vyci9kZWJ1ZyBjb20gdGltZXN0YW1wIGUgY29yZXMiCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbSUtMTJzXDAzM1swbSAlc1xuIiAiY3N2LioiICJDU1YgcGFyc2Uvd3JpdGU6IGRl
+Y29kZSwgZW5jb2RlLCByZWFkLCB3cml0ZSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNc
+MDMzWzBtICVzXG4iICJyZS4qIiAiUmVnZXg6IG1hdGNoL3NlYXJjaC9maW5kYWxsL3N1Yi9zcGxp
+dC9uYW1lZC9nbWF0Y2guLi4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTJzXDAzM1swbSAl
+c1xuIiAiaXZhci4qIiAiVmFyaWF2ZWlzIGluZGV4YWRhcyBubyBSRVBMICghTiAtPiBub21lKSIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJudW0uKiIgIk7Dum1l
+cm9zOiBwYXJzZS9mb3JtYXQvY2xhbXAvbGVycC9yb3VuZC90b19iaW4vaGV4L29jdC4uLiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJwYXRoLioiICJDYW1pbmhv
+czogam9pbi9iYXNlbmFtZS9kaXJuYW1lL2V4dC9hYnMvZXhpc3RzL3BhcnRzLi4uIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM20lLTEyc1wwMzNbMG0gJXNcbiIgImNvbG9yLioiICJBTlNJOiByZWQv
+Z3JlZW4vYm9sZC9yZ2IvYmdfcmdiL3N0cmlwL2xlbi4uLiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtJS0xMnNcMDMzWzBtICVzXG4iICJ0ZXN0LioiICJBc3NlcnRpb25zOiBvay9lcS9uZXEvZ3Qv
+ZXJyL2RlZXBfZXEvc3VpdGUvcmVwb3J0Li4uIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEy
+c1wwMzNbMG0gJXNcbiIgIlF1ZXVlL1N0YWNrIiAiRXN0cnV0dXJhcyBGSUZPL0xJRk86IHB1c2gv
+cG9wL3BlZWsvc2l6ZS90b190YWJsZSIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMz
+WzBtICVzXG4iICJ0cnkuKiIgInRyaWYvdHJ5ZWxzZS90cnllbmQgKyB0cnkuY2FsbC9wY2FsbC94
+cGNhbGwvbXVzdCIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMnNcMDMzWzBtICVzXG4iICJ0
+YWJsZS4qIiAiRXh0cmFzOiBtYXAvZmlsdGVyL3JlZHVjZS9mbGF0L3ppcC9ncm91cF9ieS9zb3J0
+ZWQuLi4iCiAgICB9CiAgICBfZG9jX3N0cigpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKV
+kOKVkCBzdHIuKiDigJQgU3RyaW5ncyBkZSBQcm9ww7NzaXRvIEdlcmFsIOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEJ1c2NhIGUg
+Q29tcGFyYcOnw6NvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21zdHIuc3RhcnRzXDAzM1swbShzLCBwcmVmaXgpICDihpIgYm9vbFxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21zdHIuZW5kc1wwMzNbMG0ocywgc3VmZml4KSAgICDihpIgYm9v
+bFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHIuY29udGFpbnNcMDMzWzBtKHMsIHN1YiBb
+LCBwbGFpbl0pICDihpIgYm9vbFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHIuY291bnRc
+MDMzWzBtKHMsIHN1YiBbLCBwbGFpbl0pICAgIOKGkiBpbnRcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBzdHIuY291bnQoJ2FhYmFhJywgJ2EnKSAgLS0+IDRcMDMzWzBtXG5cbiIKICAgIHBy
+aW50ZiAiXDAzM1sxOzM2beKUgOKUgCBUcmFuc2Zvcm1hw6fDo28g4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci50
+cmltXDAzM1swbShzIFssIGNoYXJzXSkgICByZW1vdmUgZXNwYcOnb3MgKG91IGNoYXJzKSBkYXMg
+ZXh0cmVtaWRhZGVzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5sdHJpbVwwMzNbMG0o
+cykgICAgICAgICAgICByZW1vdmUgZXNwYcOnb3Mgw6AgZXNxdWVyZGFcbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtc3RyLnJ0cmltXDAzM1swbShzKSAgICAgICAgICAgIHJlbW92ZSBlc3Bhw6dv
+cyDDoCBkaXJlaXRhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci51cHBlclwwMzNbMG0o
+cykgIFwwMzNbMTszM21zdHIubG93ZXJcMDMzWzBtKHMpICBcMDMzWzE7MzNtc3RyLnJldmVyc2Vc
+MDMzWzBtKHMpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5yZXBsYWNlXDAzM1swbShz
+LCBvbGQsIG5ldyBbLCBuXSkgIHN1YnN0aXR1aSBuIG9jb3Jyw6puY2lhcyAocGFkcsOjbzogdG9k
+YXMpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci50aXRsZVwwMzNbMG0ocykgICAgICAg
+ICAgICBUaXRsZSBDYXNlXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5zbHVnXDAzM1sw
+bShzKSAgICAgICAgICAgICB1cmwtZnJpZW5kbHk6ICdFbGxpb3RPUyB2MiEnIOKGkiAnZWxsaW90
+b3MtdjInXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci50cnVuY2F0ZVwwMzNbMG0ocywg
+bWF4IFssIHN1ZmZpeF0pICBjb3J0YSBjb20gJy4uLicgcG9yIHBhZHLDo29cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBzdHIudHJ1bmNhdGUoJ2hlbGxvIHdvcmxkJywgOCkgIC0tPiAnaGVs
+bG8uLi4nXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRm9ybWF0YcOn
+w6NvIGUgUGFkZGluZyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtc3RyLnBhZFwwMzNbMG0ocywgd2lkdGggWywgY2hhciBbLCBhbGlnbl1dKVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIGFsaWduOiAnbGVmdCcocGFkcsOjbykgfCAncmlnaHQnIHwg
+J2NlbnRlcidcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgc3RyLnBhZCgnaGkn
+LCA2LCAnICcsICdjZW50ZXInKSAgLS0+ICcgIGhpICAnXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21zdHIud3JhcFwwMzNbMG0ocywgd2lkdGgpICAgICAgcXVlYnJhIGVtIGxpbmhh
+cyBkZSBhdMOpIHdpZHRoIGNoYXJzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5mbXRc
+MDMzWzBtKHRtcGwsIHZhcnMpICAgICBpbnRlcnBvbGHDp8Ojbzogc3RyLmZtdCgnb2xhIHtuYW1l
+fScsIHtuYW1lPSdFbGxpb3QnfSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB0YW1iw6lt
+IGZ1bmNpb25hIGNvbSDDrW5kaWNlOiBzdHIuZm10KCd7MX0gZSB7Mn0nLCB7J2EnLCdiJ30pXDAz
+M1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgU3BsaXQgLyBKb2luIC8gTGlu
+ZXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5z
+cGxpdFwwMzNbMG0ocywgc2VwIFssIHBsYWluXSkgIOKGkiB0YWJlbGFcbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICBzdHIuc3BsaXQoJ2EsYixjJywgJywnKSAgLS0+IHsnYScsJ2InLCdjJ31c
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5qb2luXDAzM1swbSh0LCBzZXAp
+ICAgICAgIOKGkiBzdHJpbmdcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3RyLmxpbmVzXDAz
+M1swbShzKSAgICAgICAgICAg4oaSIHRhYmVsYSBkZSBsaW5oYXNcblxuIgogICAgcHJpbnRmICJc
+MDMzWzE7MzZt4pSA4pSAIEJ5dGVzIGUgRW5jb2Rpbmcg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0ci5ieXRlc1wwMzNbMG0ocykg
+ICAgICAgICAgIOKGkiB0YWJlbGEgZGUgYnl0ZSB2YWx1ZXNcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtc3RyLmZyb21fYnl0ZXNcMDMzWzBtKHQpICAgICAg4oaSIHN0cmluZyBhIHBhcnRpciBk
+ZSBieXRlc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHIuaXNfZW1wdHlcMDMzWzBtKHMp
+ICAgICAgICDihpIgYm9vbCAobmlsIGUgJyAgICcgc8OjbyBlbXB0eSlcbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtc3RyLnJlcFwwMzNbMG0ocywgbiBbLCBzZXBdKSAg4oaSIHJlcGV0acOnw6Nv
+XG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBzdHIuaGVscCgpICDigJQgbGlzdGEgdG9k
+YXMgYXMgZnVuw6fDtWVzXDAzM1swbVxuXG4iCiAgICB9CiAgICBfZG9jX251bSgpIHsKICAgIHBy
+aW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBudW0uKiDigJQgUGFyc2luZyBlIEZvcm1hdGHDp8Oj
+byBOdW3DqXJpY2Eg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbW51bS5wYXJzZVwwMzNbMG0ocykgICAgICAgICAgICAgICAg4oaSIG51bWJlciB8IG5p
+bFxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIFRlbnRhIGNvbnZlcnRlciBzdHJpbmcgcGFy
+YSBuw7ptZXJvLCBzdXBvcnRhIHbDrXJndWxhIGRlY2ltYWxcMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzE7MzNtbnVtLmZvcm1hdFwwMzNbMG0obiBbLCBkZWMgWywgdGhvdSBbLCBkc2Vw
+XV1dKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIFBhZHLDo28gQlI6IHRob3U9Jy4nLCBk
+c2VwPScsJ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBudW0uZm9ybWF0KDEy
+MzQ1NjcsIDIpICAtLT4gJzEuMjM0LjU2NywwMCdcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtbnVtLmNsYW1wXDAzM1swbShuLCBsbywgaGkpICAgICAgICDihpIgbiBsaW1pdGFk
+byBlbnRyZSBsbyBlIGhpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW51bS5sZXJwXDAzM1sw
+bShhLCBiLCB0KSAgICAgICAgICAg4oaSIGludGVycG9sYcOnw6NvIGxpbmVhciAodCBlbnRyZSAw
+IGUgMSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbnVtLnJvdW5kXDAzM1swbShuIFssIGRl
+Y2ltYWlzXSkgICAg4oaSIGFycmVkb25kYW1lbnRvXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgbnVtLnJvdW5kKDMuNTY3LCAyKSAgLS0+IDMuNTdcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtbnVtLnNpZ25cMDMzWzBtKG4pICAgIOKGkiAtMSB8IDAgfCAxXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbW51bS5pc19pbnRcMDMzWzBtKG4pICDihpIgYm9vbFxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21udW0uaXNfbmFuXDAzM1swbShuKSAg4oaSIGJvb2xcbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtbnVtLmluX3JhbmdlXDAzM1swbShuLCBsbywgaGkpICDihpIg
+Ym9vbFxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgQ29udmVyc8OjbyBkZSBCYXNl
+IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M21udW0udG9fYmluXDAzM1swbShuKSAgICAgICAgICAgICAg4oaSIHN0cmluZyBiaW7DoXJpYVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM21udW0udG9faGV4XDAzM1swbShuIFssIHVwcGVyXSkg
+ICAg4oaSIHN0cmluZyBoZXhhZGVjaW1hbFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21udW0u
+dG9fb2N0XDAzM1swbShuKSAgICAgICAgICAgICAg4oaSIHN0cmluZyBvY3RhbFxuXG4iCiAgICBw
+cmludGYgIlwwMzNbMTszNm3ilIDilIAgRXN0YXTDrXN0aWNhIFNpbXBsZXMg4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW51bS5zdW1cMDMzWzBtKHQp
+ICAgXDAzM1sxOzMzbW51bS5hdmdcMDMzWzBtKHQpICAgXDAzM1sxOzMzbW51bS5taW5cMDMzWzBt
+KHQpICAgXDAzM1sxOzMzbW51bS5tYXhcMDMzWzBtKHQpXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgbnVtLmhlbHAoKSAg4oCUIGxpc3RhIHRvZGFzIGFzIGZ1bsOnw7Vlc1wwMzNbMG1cblxu
+IgogICAgfQogICAgX2RvY19wYXRoKCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQ
+IHBhdGguKiDigJQgTWFuaXB1bGHDp8OjbyBkZSBDYW1pbmhvcyDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtcGF0aC5qb2luXDAz
+M1swbSguLi4pICAgICAgICAgICAgICBqdW50YSBwYXJ0ZXMgZGUgY2FtaW5ob1xuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIHBhdGguam9pbignL2hvbWUnLCdlbGxpb3QnLCd4Lmx1YScpICAt
+LT4gJy9ob21lL2VsbGlvdC94Lmx1YSdcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtcGF0aC5iYXNlbmFtZVwwMzNbMG0ocCBbLCBleHRdKSAgICBub21lIGRvIGFycXVpdm8gKHNl
+bSBleHRlbnPDo28gc2UgZXh0IGluZm9ybWFkYSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+cGF0aC5kaXJuYW1lXDAzM1swbShwKSAgICAgICAgICAgICBkaXJldMOzcmlvIHBhaVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21wYXRoLmV4dFwwMzNbMG0ocCkgICAgICAgICAgICAgICAgIGV4
+dGVuc8OjbzogJy5sdWEnLCAnLmMnXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXBhdGguc3Rl
+bVwwMzNbMG0ocCkgICAgICAgICAgICAgICAgbm9tZSBzZW0gZXh0ZW5zw6NvXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXBhdGguc3BsaXRcMDMzWzBtKHApICAgICAgICAgICAgICAg4oaSIGRp
+ciwgYmFzZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21wYXRoLnBhcnRzXDAzM1swbShwKSAg
+ICAgICAgICAgICAgIOKGkiB0YWJlbGEgZGUgc2VnbWVudG9zXG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbXBhdGguYWJzXDAzM1swbShwKSAgICAgICAgICAgICAgICAgY2FtaW5obyBhYnNvbHV0
+b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21wYXRoLmV4cGFuZHVzZXJcMDMzWzBtKHApICAg
+ICAgICAgICd+JyDihpIgSE9NRVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21wYXRoLmV4aXN0
+c1wwMzNbMG0ocCkgICAgICAgICAgICAgIOKGkiBib29sXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgcGF0aC5oZWxwKCkgIOKAlCBsaXN0YSB0b2RhcyBhcyBmdW7Dp8O1ZXNcMDMzWzBtXG5c
+biIKICAgIH0KICAgIF9kb2NfY29sb3IoKSB7CiAgICBwcmludGYgIlwwMzNbMTszNW3ilZDilZDi
+lZAgY29sb3IuKiDigJQgRXNjYXBlIEFOU0kgY29tIE5vbWUg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgQ29y
+ZXMgZGUgVGV4dG8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbWNvbG9yLnJlZFwwMzNbMG0ocykgICBcMDMzWzE7MzNtY29s
+b3IuZ3JlZW5cMDMzWzBtKHMpICBcMDMzWzE7MzNtY29sb3IueWVsbG93XDAzM1swbShzKSAgXDAz
+M1sxOzMzbWNvbG9yLmJsdWVcMDMzWzBtKHMpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWNv
+bG9yLm1hZ2VudGFcMDMzWzBtKHMpICBcMDMzWzE7MzNtY29sb3IuY3lhblwwMzNbMG0ocykgIFww
+MzNbMTszM21jb2xvci53aGl0ZVwwMzNbMG0ocykgIFwwMzNbMTszM21jb2xvci5ibGFja1wwMzNb
+MG0ocylcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBWZXJzw7VlcyBicmlsaGFudGVzOiBj
+b2xvci5icmlnaHRfcmVkLCBicmlnaHRfZ3JlZW4sIGJyaWdodF9jeWFuLi4uXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRXN0aWxvcyDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtY29sb3IuYm9sZFwwMzNbMG0ocykgIFwwMzNbMTszM21jb2xvci5kaW1cMDMz
+WzBtKHMpICBcMDMzWzE7MzNtY29sb3IuaXRhbGljXDAzM1swbShzKSAgXDAzM1sxOzMzbWNvbG9y
+LnVuZGVybGluZVwwMzNbMG0ocylcblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEZ1
+bmRvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jb2xvci5iZ19yZWRcMDMz
+WzBtKHMpICBcMDMzWzE7MzNtY29sb3IuYmdfZ3JlZW5cMDMzWzBtKHMpICBcMDMzWzE7MzNtY29s
+b3IuYmdfYmx1ZVwwMzNbMG0ocykgIC4uLlxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDi
+lIAgVHJ1ZWNvbG9yICgyNC1iaXQpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21jb2xvci5yZ2JcMDMzWzBtKHIsIGcsIGIgWywgc10pICAgICAg
+Zm9yZWdyb3VuZCAyNC1iaXRcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtY29sb3IuYmdfcmdi
+XDAzM1swbShyLCBnLCBiIFssIHNdKSAgIGJhY2tncm91bmQgMjQtYml0XG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgY29sb3IucmdiKDI1NSwxMjgsMCwnYWxlcnRhJykgIC0tIGxhcmFuamFc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBVdGlsaXTDoXJpb3Mg4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbWNvbG9yLnN0cmlwXDAzM1swbShzKSAgICByZW1vdmUgdG9kb3Mgb3Mg
+ZXNjYXBlcyBBTlNJIGRhIHN0cmluZ1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jb2xvci5s
+ZW5cMDMzWzBtKHMpICAgICAgY29tcHJpbWVudG8gdmlzw612ZWwgKHNlbSBlc2NhcGVzKVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIFNlbSBhcmd1bWVudG8gcmV0b3JuYSBhcGVuYXMgbyBl
+c2NhcGU6IGNvbG9yLnJlZCgpIOKGkiAnXHgxYlszMW0nXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIGNvbG9yLmhlbHAoKSAg4oCUIGxpc3RhIHRvZGFzIGFzIGZ1bsOnw7Vlc1ww
+MzNbMG1cblxuIgogICAgfQogICAgX2RvY190ZXN0KCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt
+4pWQ4pWQ4pWQIHRlc3QuKiDigJQgQXNzZXJ0aW9ucyBwYXJhIFNjcmlwdHMgVGVzdMOhdmVpcyDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMz
+WzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBPcmdhbml6YcOnw6NvIOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM210ZXN0LnN1aXRlXDAzM1swbShuYW1lKSAgICAgaW5pY2lhIHVtYSBzdWl0
+ZSBub21lYWRhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRlc3QucmVwb3J0XDAzM1swbSgp
+ICAgICAgICDihpIgaW50IChuw7ptZXJvIGRlIGZhbGhhcyksIGltcHJpbWUgcmVzdW1vXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbXRlc3QucmVzZXRcMDMzWzBtKCkgICAgICAgICB6ZXJhIGNv
+bnRhZG9yZXNcblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEFzc2VydGlvbnMg4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXRlc3Qub2tcMDMzWzBtKHYsIG1zZykgICAgICAgICAgdiDDqSB0
+cnV0aHlcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGVzdC5lcVwwMzNbMG0oYSwgYiwgbXNn
+KSAgICAgICBhID09IGJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGVzdC5uZXFcMDMzWzBt
+KGEsIGIsIG1zZykgICAgICBhIH49IGJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGVzdC5n
+dFwwMzNbMG0oYSwgYiwgbXNnKSAgICAgICBhID4gYlxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M210ZXN0Lmx0XDAzM1swbShhLCBiLCBtc2cpICAgICAgIGEgPCBiXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXRlc3QuZ3RlXDAzM1swbShhLCBiLCBtc2cpICAgICAgYSA+PSBiXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXRlc3QubHRlXDAzM1swbShhLCBiLCBtc2cpICAgICAgYSA8PSBi
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRlc3QubmlsX1wwMzNbMG0odiwgbXNnKSAgICAg
+ICAgdiA9PSBuaWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGVzdC5ub3RfbmlsXDAzM1sw
+bSh2LCBtc2cpICAgICB2IH49IG5pbFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210ZXN0LnR5
+cGVfaXNcMDMzWzBtKHYsIHRwLCBtc2cpIHR5cGUodikgPT0gdHBcbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtdGVzdC5jb250YWluc1wwMzNbMG0ocywgc3ViLCBtc2cpXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXRlc3QubWF0Y2hcMDMzWzBtKHMsIHBhdCwgbXNnKSAgcGFkcsOjbyBMdWFc
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGVzdC5kZWVwX2VxXDAzM1swbShhLCBiLCBtc2cp
+ICBjb21wYXJhw6fDo28gcmVjdXJzaXZhIGRlIHRhYmVsYXNcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtdGVzdC5lcnJcMDMzWzBtKGZuLCBtc2cpICAgICAgICBmbiBkZXZlIGxhbsOnYXIgZXJy
+b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210ZXN0Lm5vX2VyclwwMzNbMG0oZm4sIG1zZykg
+ICAgIGZuIG7Do28gZGV2ZSBsYW7Dp2FyIGVycm9cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt
+4pSA4pSAIEV4ZW1wbG8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdGVzdC5zdWl0
+ZSgnbWF0aCcpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHRlc3QuZXEoMisy
+LCA0LCAnc29tYScpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHRlc3QuZGVl
+cF9lcSh7MSwyfSx7MSwyfSwgJ3RhYmVsYXMgaWd1YWlzJylcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgbG9jYWwgZmFsaGFzID0gdGVzdC5yZXBvcnQoKVwwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICB0ZXN0LmhlbHAoKSAg4oCUIGxpc3RhIHRvZGFzIGFzIGZ1
+bsOnw7Vlc1wwMzNbMG1cblxuIgogICAgfQogICAgX2RvY19xdWV1ZV9zdGFjaygpIHsKICAgIHBy
+aW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBRdWV1ZSAvIFN0YWNrIOKAlCBFc3RydXR1cmFzIGRl
+IERhZG9zIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7
+MzZt4pSA4pSAIFF1ZXVlIOKAlCBGaWxhIEZJRk8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1sw
+bVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvY2FsIHEgPSBRdWV1ZS5uZXcoKVwwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBxOnB1c2godikgICAgICBhZGljaW9uYSBh
+byBmaW5hbFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBxOnBvcCgpICAgICAg
+ICByZW1vdmUgZSByZXRvcm5hIG8gcHJpbWVpcm9cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgcTpwZWVrKCkgICAgICAgbMOqIG8gcHJpbWVpcm8gc2VtIHJlbW92ZXJcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcTpzaXplKCkgICAgICAgcXVhbnRpZGFkZSBk
+ZSBlbGVtZW50b3NcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcTppc19lbXB0
+eSgpICAg4oaSIGJvb2xcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcTp0b190
+YWJsZSgpICAg4oaSIGPDs3BpYSBjb21vIHRhYmVsYSBMdWFcMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiXDAzM1sxOzM2beKUgOKUgCBTdGFjayDigJQgUGlsaGEgTElGTyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbG9jYWwgcyA9IFN0YWNrLm5l
+dygpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHM6cHVzaCh2KSAgICAgIGVt
+cGlsaGEgbm8gdG9wb1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBzOnBvcCgp
+ICAgICAgICByZW1vdmUgZSByZXRvcm5hIG8gdG9wb1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzA7OTBtICBzOnBlZWsoKSAgICAgICBsw6ogbyB0b3BvIHNlbSByZW1vdmVyXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHM6c2l6ZSgpICAgICAgIHF1YW50aWRhZGUgZGUg
+ZWxlbWVudG9zXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHM6aXNfZW1wdHko
+KSAgIOKGkiBib29sXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHM6dG9fdGFi
+bGUoKSAgIOKGkiBjw7NwaWEgZW0gb3JkZW0gTElGTyAodG9wbyBwcmltZWlybylcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBFeGVtcGxvIOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIGxvY2FsIHEgPSBRdWV1ZS5uZXcoKVwwMzNbMG1cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBmb3IgXywgaG9zdCBpbiBpcGFpcnModGFyZ2V0cykgZG8gcTpwdXNo
+KGhvc3QpIGVuZFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB3aGlsZSBub3Qg
+cTppc19lbXB0eSgpIGRvXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgbG9j
+YWwgaCA9IHE6cG9wKClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBzY2Fu
+KGgpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGVuZFwwMzNbMG1cblxuIgog
+ICAgfQogICAgX2RvY190YWJsZV9leHRyYXMoKSB7CiAgICBwcmludGYgIlwwMzNbMTszNW3ilZDi
+lZDilZAgdGFibGUuKiBleHRyYXMg4oCUIEZ1bsOnw7VlcyBBZGljaW9uYWlzIOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIFRyYW5zZm9y
+bWHDp8OjbyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtdGFibGUubWFwXDAzM1swbSh0LCBmbikgICAgICAgICAg4oaS
+IG5vdmEgdGFiZWxhIGNvbSBmbiBhcGxpY2FkYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210
+YWJsZS5maWx0ZXJcMDMzWzBtKHQsIGZuKSAgICAgICDihpIgZWxlbWVudG9zIG9uZGUgZm4gcmV0
+b3JuYSB0cnVlXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLnJlZHVjZVwwMzNbMG0o
+dCwgZm4gWywgYWNjXSkgIOKGkiB2YWxvciBhY3VtdWxhZG9cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtdGFibGUuZmxhdFwwMzNbMG0odCBbLCBkZXB0aF0pICAg4oaSIGFjaGF0YSBhbmluaGFt
+ZW50b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210YWJsZS51bmlxdWVcMDMzWzBtKHQpICAg
+ICAgICAgICDihpIgcmVtb3ZlIGR1cGxpY2F0YXNcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+dGFibGUucmV2ZXJzZVwwMzNbMG0odCkgICAgICAgICAg4oaSIG9yZGVtIGludmVyc2FcbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtdGFibGUuc29ydGVkXDAzM1swbSh0IFssIGZuXSkgICAg4oaS
+IGPDs3BpYSBvcmRlbmFkYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210YWJsZS5zbGljZVww
+MzNbMG0odCwgYSwgYikgICAgICDihpIgc3VidGFiZWxhXG5cbiIKICAgIHByaW50ZiAiXDAzM1sx
+OzM2beKUgOKUgCBCdXNjYSBlIFByZWRpY2Fkb3Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmZpbmRcMDMzWzBtKHQsIGZuKSAgICAg
+ICAgIOKGkiB2LCBpIChwcmltZWlybyBxdWUgc2F0aXNmYXogZm4pXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXRhYmxlLmFueVwwMzNbMG0odCwgZm4pICAgICAgICAgIOKGkiBib29sXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmFsbFwwMzNbMG0odCwgZm4pICAgICAgICAgIOKG
+kiBib29sXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmNvdW50XDAzM1swbSh0IFss
+IGZuXSkgICAgIOKGkiBpbnRcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdGFibGUuaW5kZXhf
+b2ZcMDMzWzBtKHQsIHZhbCkgICAg4oaSIGludCB8IG5pbFxuXG4iCiAgICBwcmludGYgIlwwMzNb
+MTszNm3ilIDilIAgQ29tYmluYcOnw6NvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210YWJsZS5tZXJn
+ZVwwMzNbMG0oLi4uKSAgICAgICAgICDihpIgbWVzY2xhIHRhYmVsYXMgKMO6bHRpbW8gdmVuY2Up
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmNvbmNhdF9hbGxcMDMzWzBtKC4uLikg
+ICAgIOKGkiBjb25jYXRlbmEgYXJyYXlzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxl
+LnppcFwwMzNbMG0oLi4uKSAgICAgICAgICAgIOKGkiB0YWJlbGEgZGUgdHVwbGFzXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmdyb3VwX2J5XDAzM1swbSh0LCBmbikgICAgIOKGkiBh
+Z3J1cGEgcG9yIGNoYXZlXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRhYmxlLmtleXNcMDMz
+WzBtKHQpICBcMDMzWzE7MzNtdGFibGUudmFsdWVzXDAzM1swbSh0KSAgXDAzM1sxOzMzbXRhYmxl
+LnN1bVwwMzNbMG0odClcblxuIgogICAgfQogICAgX2RvY19yZSgpIHsKICAgIHByaW50ZiAiXDAz
+M1sxOzM1beKVkOKVkOKVkCByZS4qIOKAlCBFeHByZXNzw7VlcyBSZWd1bGFyZXMg4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXJlLm1hdGNoXDAzM1swbShzLCBwYXQpICAgICAgICAgIOKGkiBzdHJp
+bmcgfCBuaWwgKG1hdGNoIGNvbXBsZXRvKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21yZS5z
+ZWFyY2hcMDMzWzBtKHMsIHBhdCkgICAgICAgICDihpIgc3RyaW5nIHwgbmlsIChidXNjYSBlbSBx
+dWFscXVlciBwb3Npw6fDo28pXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXJlLmZpbmRhbGxc
+MDMzWzBtKHMsIHBhdCkgICAgICAgIOKGkiB0YWJlbGEgY29tIHRvZGFzIGFzIG9jb3Jyw6puY2lh
+c1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHJlLmZpbmRhbGwoJ2ExYjJjMycsICclZCcp
+ICAtLT4geycxJywnMicsJzMnfVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21y
+ZS5zdWJcMDMzWzBtKHMsIHBhdCwgcmVwbCkgICAgICDihpIgc3RyaW5nIGNvbSBzdWJzdGl0dWnD
+p8O1ZXNcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICByZS5zdWIoJ2ZvbyBiYXInLCAnZm9v
+JywgJ2JheicpICAtLT4gJ2JheiBiYXInXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbXJlLnNwbGl0XDAzM1swbShzLCBwYXQpICAgICAgICAgIOKGkiB0YWJlbGFcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzNtcmUuY29tcGlsZVwwMzNbMG0ocGF0KSAgICAgICAgICAg4oaSIHBh
+ZHLDo28gY29tcGlsYWRvIHJldXRpbGl6w6F2ZWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+cmUuZmluZGl0ZXJcMDMzWzBtKHMsIHBhdCkgICAgICAg4oaSIGl0ZXJhdG9yIGRlIG9jb3Jyw6pu
+Y2lhc1xuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRXh0cmFzIChFbGxpb3RPUykg
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXJlLm5hbWVkXDAzM1swbShzLCBwYXQsIG5hbWVzKSAgIOKGkiB0YWJlbGEgY29tIGdydXBvcyBu
+b21lYWRvc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHJlLm5hbWVkKCcyMDI2LTA5LTA2
+JywnKCVkKyktKCVkKyktKCVkKyknLHsneWVhcicsJ21vbnRoJywnZGF5J30pXDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIC0tPiB7eWVhcj0nMjAyNicsIG1vbnRoPScwOScsIGRh
+eT0nMDYnfVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21yZS5nbWF0Y2hcMDMz
+WzBtKHMsIHBhdCkgICAgICAgICDihpIgaXRlcmF0b3IgKGNvbXBhdMOtdmVsIGNvbSBzdHJpbmcu
+Z21hdGNoKVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUGFkcsO1ZXMgdXNhbSBzaW50
+YXhlIEx1YTogJSVkICUlYSAlJXMgJSV3ICUlcCBldGMuXDAzM1swbVxuXG4iCiAgICB9CiAgICBf
+ZG9jX3RyeSgpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCB0cnkuKiDigJQgVHJh
+dGFtZW50byBkZSBFcnJvcyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBTaW50YXhlIHRy
+aWYgKHByZXByb2Nlc3NhZGEg4oCUIGVzdGlsbyBpZi9lbHNlIGRvIEx1YSkg4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXRyaWZcMDMzWzBtIDxleHByPiB0aGVuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICAt
+LSBleGVjdXRhZG8gc2UgPGV4cHI+IG7Do28gZGV1IGVycm9cMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXRyeWVsc2VpZlwwMzNbMG0gXCJwYWRyw6NvXCIgdGhlblxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gICAgLS0gZXJybyBxdWUgY29udMOpbSBcInBhZHLDo29cIiAob3Bj
+aW9uYWwsIHJlcGV0w612ZWwpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210cnll
+bHNlXDAzM1swbSBbdmFyXSB0aGVuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICAtLSBx
+dWFscXVlciBvdXRybyBlcnJvOyB2YXIgcmVjZWJlIGEgbWVuc2FnZW0gKHBhZHLDo286IGVycilc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRyeWVuZFwwMzNbMG1cblxuIgogICAg
+cHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEV4ZW1wbG8gdHJpZiDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICB0cmlmIG5ldC5nZXQoXCJodHRwczovL2V4ZW1wbG8uY29tXCIpIHRoZW5cMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBwcmludChcImVudmlhZG9cIilcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdHJ5ZWxzZWlmIFwidGltZW91dFwiIHRoZW5cMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBwcmludChcInNlbSByZXNwb3N0YVwi
+KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB0cnllbHNlIGVyciB0aGVuXDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgcHJpbnQoXCJlcnJvOiBcIi4uZXJy
+KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB0cnllbmRcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBBUEkgdHJ5LiogKHByb2dyYW3DoXRpY2EpIOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210cnkuY2FsbFwwMzNbMG0o
+Zm4sIC4uLikgICAgICAgICDihpIgb2JqZXRvIGNvbSBtw6l0b2RvcyBlbmNhZGXDoXZlaXNcbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIDpjYXRjaChmdW5jdGlvbihlcnIpIHByaW50KGVy
+cikgZW5kKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIDpmaW5hbGx5KGZ1
+bmN0aW9uKCkgcHJpbnQoJ3NlbXByZScpIGVuZClcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtdHJ5LnBjYWxsXDAzM1swbShmbiwgLi4uKSAgICAgICAgIOKGkiBvaywgZXJyICAo
+YWxpYXMgZGlyZXRvIGRlIHBjYWxsKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210cnkueHBj
+YWxsXDAzM1swbShmbiwgbXNnaCwgLi4uKSAg4oaSIG9rLCBlcnIgIChhbGlhcyBkZSB4cGNhbGwp
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXRyeS5tdXN0XDAzM1swbShmbiwgLi4uKSAgICAg
+ICAgICDihpIgZXhlY3V0YSBvdSBwcm9wYWdhIGVycm9cblxuIgogICAgfQogICAgX2RvY19uZXQo
+KSB7CiAgICBwcmludGYgIlwwMzNbMTszNW3ilZDilZDilZAgbmV0Liog4oCUIE3Ds2R1bG8gZGUg
+UmVkZSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBIVFRQ
+IOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQuZ2V0XDAzM1sw
+bSh1cmwgWywgb3B0c10pXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUmV0b3JuYTogYm9k
+eShzdHJpbmcpLCBjb2RlKGludCkgICBvdSAgIG5pbCwgZXJybXNnXDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszMW0gIOKaoCByZXRvcm5hIERPSVMgdmFsb3JlcyBzZXBhcmFkb3MsIG7D
+o28gdW1hIHRhYmVsYSFcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwg
+Ym9keSwgY29kZSA9IG5ldC5nZXQoJ2h0dHBzOi8vYWx2by5jb20nKVwwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBib2R5LCBjb2RlID0gbmV0LmdldCh1cmwsIHt0aW1l
+b3V0PTEwLCBxdWlldD10cnVlfSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+bmV0LmdldCgnaHR0cHM6Ly9hbHZvLmNvbScsICdzYWlkYS5odG1sJykgICAtLSBzYWx2YSBlbSBh
+cnF1aXZvXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW5ldC5wb3N0XDAzM1sw
+bSh1cmwsIGJvZHkgWywgY29udGVudF90eXBlIFssIG9wdHNdXSlcbiIKICAgIHByaW50ZiAiICBc
+MDMzWzA7OTBtICBSZXRvcm5hOiBib2R5KHN0cmluZyksIGNvZGUoaW50KSAgIG91ICAgbmlsLCBl
+cnJtc2dcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgQ29udGVudC1UeXBlIHBh
+ZHLDo286IGFwcGxpY2F0aW9uL3gtd3d3LWZvcm0tdXJsZW5jb2RlZFwwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBiLCBjID0gbmV0LnBvc3QodXJsLFwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgICd1c2VyPWFkbWluJnBhc3M9MTIzJylcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgYiwgYyA9IG5ldC5wb3N0KHVybCwg
+anNvbl9zdHIsICdhcHBsaWNhdGlvbi9qc29uJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtbmV0LmZldGNoXDAzM1swbSh1cmwsIG9wdHMpXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgSW50ZXJmYWNlIG1vZGVybmEuIFJldG9ybmE6IGJvZHksIGNvZGUsIGhlYWRlcnNf
+cmVjZWJpZG9zXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG9wdHM6IHttZXRo
+b2QsIGJvZHksIHRpbWVvdXQsXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAg
+aGVhZGVycywgcXVpZXQsIGZvbGxvdywgdWEsIGZpbGV9XDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIGxvY2FsIGIsYyxoID0gbmV0LmZldGNoKHVybCwge21ldGhvZD0nUFVUJyxc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBib2R5PSd7fScsIHF1aWV0PXRy
+dWV9KVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQuZ2V0aFwwMzNbMG0o
+dXJsIFssIG9wdHNdKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIENvbW8gZ2V0ICsgcmV0
+b3JuYSBoZWFkZXJzLiBxdWlldCBwb3IgcGFkcmFvLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICJc
+MDMzWzE7MzZt4pSA4pSAIFRDUCAvIFNPQ0tFVFMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW5ldC50Y3BcMDMz
+WzBtKGhvc3QsIHBvcnQpICAtPiAgc29ja2V0IE9PICBvdSAgbmlsLCBlcnJtc2dcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBzID0gbmV0LnRjcCgnMTkyLjE2OC4xLjEnLCA4MClc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgczpzZW5kKCdkYWRvcycpICAgIC0t
+IGVudmlhIHN0cmluZ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBk
+YXRhID0gczpyZWN2KDQwOTYpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHM6
+Y2xvc2UoKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMW0gICEgcmVjdigpIHJl
+dG9ybmEgbmlsIHNlbSBkYWRvIC0tIG5hbyBlIGVycm8hXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gICAgcmVwZWF0IHN5cy5zbGVlcCgwLjEpXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gICAgZGF0YSA9IHM6cmVjdig0MDk2KSB1bnRpbCBkYXRhXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW5ldC5saXN0ZW5cMDMzWzBtKHBvcnQgWywgaG9z
+dF0pICAtPiAgc29ja2V0IHNlcnZpZG9yXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMxbSAgISBQ
+T1JUQSBlIG8gcHJpbWVpcm8gYXJndW1lbnRvIVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBsb2NhbCBzcnYgID0gbmV0Lmxpc3Rlbig0NDQ0KVwwMzNbMG1cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBjb25uID0gc3J2OmFjY2VwdCgpXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIGNvbm46c2VuZCgncmVzcG9zdGEnKVwwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBjb25uOmNsb3NlKCk7IHNydjpjbG9zZSgpXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW5ldC5zeW5cMDMzWzBtKGhvc3QsIHBvcnQgWywg
+dGltZW91dCBbLCBmYW1pbHldXSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBTWU4gcHJv
+YmUgZGVkaWNhZG8gc2VtIHJvb3QuIFJldG9ybmEgdGFiZWxhIHtzdGF0dXMsaG9zdCxwb3J0LG1z
+LG9wZW4sZmFtaWx5fS5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUG9zaWNp
+b25hbDogaW1wcmltZSByZXN1bHRhZG8gY29sb3JpZG8gYXV0b21hdGljYW1lbnRlLlwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBuZXQuc3luKCcxLjEuMS4xJywgODApXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG5ldC5zeW4oe2hvc3Q9J2Fsdm8uY29tJywg
+cG9ydD00NDMsIHZlcmJvc2U9ZmFsc2V9KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICBsb2NhbCByID0gbmV0LnN5bignYWx2by5jb20nLCAyMik7IGlmIHIub3BlbiB0aGVuIC4u
+LiBlbmRcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbmV0LnNvY2tldFwwMzNb
+MG0oZmFtaWx5LCB0eXBlLCBob3N0LCBwb3J0IFssIHRvIFssIHBheWxvYWRdXSlcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBGaXJlLWFuZC1mb3JnZXQ6IGNvbmVjdGEsIGVudmlhLCByZWNl
+YmUsIGZlY2hhLlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBuZXQuc29ja2V0
+KCdpcHY0Jywnc3RyZWFtJywnYWx2by5jb20nLDgwKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21uZXQudWRwXDAzM1swbShob3N0LCBwb3J0KSAgLT4gIHNvY2tldCBVRFBcblxu
+IgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEROUyAvIFBJTkcgLyBTQ0FOIOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQu
+ZG5zXDAzM1swbShob3N0IFssIHR5cGVdKSAg4oaSICB0YWJlbGEgZGUgSVBzICAgb3UgICBuaWws
+IGVycm1zZ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB0eXBlOiAnQScgKHBh
+ZHLDo28pLCAnQUFBQScsICdBTlknXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IGxvY2FsIGlwcyA9IG5ldC5kbnMoJ2dvb2dsZS5jb20nKVwwMzNbMG1cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICBmb3IgXywgaXAgaW4gaXBhaXJzKGlwcykgZG8gcHJpbnQoaXApIGVuZFww
+MzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQucGluZ1wwMzNbMG0oaG9zdCkg
+IOKGkiAgdHJ1ZSAvIGZhbHNlXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQu
+c2NhblwwMzNbMG0oaG9zdCwgcDEsIHAyIFssIHRocmVhZHNdKVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIC0+IHRhYmVsYSBkZSBwb3J0YXMgYWJlcnRhc1wwMzNbMG1cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBhYmVydGFzID0gbmV0LnNjYW4oJzE5Mi4xNjguMS4xJywg
+MSwgMTAyNClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZm9yIF8sIHAgaW4g
+aXBhaXJzKGFiZXJ0YXMpIGRvIHByaW50KHApIGVuZFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21uZXQub3NcMDMzWzBtKGhvc3QpICAgICAgICAgT1MgZmluZ2VycHJpbnRcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW5ldC5pcFwwMzNbMG0oW3N1Ym5ldF0pICAg
+ICBob3N0cyBhdGl2b3MgbmEgcmVkZSBsb2NhbFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBuZXQuaXAoJzE5Mi4xNjguMScpICAgLS0gc3VibmV0IGVzcGVjw61maWNhXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQuaW1wb3J0XDAzM1swbSh1cmwpICAgICAg
+YmFpeGEgZSBleGVjdXRhIEx1YSByZW1vdG9cMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfbW9k
+KCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIG1vZC4qIOKAlCBTY2FubmVycyBk
+ZSBQZW50ZXN0ICgyMykg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgSU5KRcOHw5VFUyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzE7MzNtbW9kLnhzc1wwMzNbMG0odXJsKSAgICAgICAgICAgWFNTIHJlZmxlY3Rl
+ZCwgc3RvcmVkIGUgRE9NXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2Quc3Fs
+aVwwMzNbMG0odXJsKSAgICAgICAgICBTUUxpOiBlcnJvciwgYm9vbGVhbiwgdGltZS1iYXNlZCwg
+VU5JT05cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW1vZC5ub3NxbFwwMzNbMG0o
+dXJsKSAgICAgICAgIE5vU1FMIEluamVjdGlvblwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtbW9kLmxmaVwwMzNbMG0odXJsKSAgICAgICAgICAgTEZJIGUgUGF0aCBUcmF2ZXJzYWxc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW1vZC5yY2VcMDMzWzBtKHVybCkgICAg
+ICAgICAgIFJlbW90ZSBDb2RlIEV4ZWN1dGlvblwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtbW9kLnNzdGlcMDMzWzBtKHVybCkgICAgICAgICAgU2VydmVyLVNpZGUgVGVtcGxhdGUg
+SW5qZWN0aW9uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2QueHhlXDAzM1sw
+bSh1cmwpICAgICAgICAgICBYTUwgRXh0ZXJuYWwgRW50aXR5XDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIFRvZG9zIHJldG9ybmFtOiB7dnVsbj1ib29sLCBwYXlsb2FkPXN0cmlu
+ZywgZGV0YWxoZXM9c3RyaW5nfSBvdSBuaWxcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sx
+OzM2beKUgOKUgCBJTkZSQUVTVFJVVFVSQSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbW9kLnNzcmZcMDMzWzBtKHVy
+bCkgICAgICAgICAgU1NSRlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbW9kLmNv
+cnNcMDMzWzBtKHVybCkgICAgICAgICAgQ09SUyBtaXNjb25maWd1cmF0aW9uXDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2QuY3NyZlwwMzNbMG0odXJsKSAgICAgICAgICBDU1JG
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2QucmVkaXJcMDMzWzBtKHVybCkg
+ICAgICAgICBPcGVuIFJlZGlyZWN0XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21t
+b2QuaWRvclwwMzNbMG0odXJsLCBwYXJhbSkgICBJRE9SXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21tb2Quand0XDAzM1swbSh0b2tlbikgICAgICAgICBKV1Q6IGFsZzpub25lLCB3
+ZWFrIHNlY3JldCwgUlMyNTbihpJIUzI1NlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtbW9kLmhlYWRlcnNcMDMzWzBtKHVybCkgICAgICAgYW5hbGlzYSBzZWN1cml0eSBoZWFkZXJz
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2Qud2FmXDAzM1swbSh1cmwpICAg
+ICAgICAgICBkZXRlY3RhIGUgZmluZ2VycHJpbnRhIFdBRlwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICJcMDMzWzE7MzZt4pSA4pSAIFJFQ09OSEVDSU1FTlRPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21tb2Quc3BpZGVy
+XDAzM1swbSh1cmwsIGxpbWl0KSBjcmF3bGVyIOKGkiB0YWJlbGEgZGUgVVJMc1wwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbW9kLmRpcnNcMDMzWzBtKHVybCkgICAgICAgICAgYnJ1
+dGVmb3JjZSBkZSBkaXJldMOzcmlvc1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+bW9kLnN1YmRvbWFpbnNcMDMzWzBtKGRvbWFpbikgZW51bWVyYcOnw6NvIGRlIHN1YmRvbcOtbmlv
+c1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbW9kLmJhY2t1cFwwMzNbMG0odXJs
+KSAgICAgICAgYXJxdWl2b3MgZGUgYmFja3VwIGV4cG9zdG9zXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21tb2Quc2VjcmV0c1wwMzNbMG0odXJsKSAgICAgICBzZWNyZXRzIGUgY2hh
+dmVzIHZhemFkYXNcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbW1vZC5wYXJhbXNc
+MDMzWzBtKHVybCkgICAgICAgIHBhcsOibWV0cm9zIG9jdWx0b3NcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbW1vZC5jaGFpblwwMzNbMG0odXJsKSAgICAgICAgIHBpcGVsaW5lIGF1
+dG9tw6F0aWNvIOKAlCByb2RhIHR1ZG9cMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2
+beKUgOKUgCBFWEVNUExPOiBTQ0FOIENPTSBSRUxBVMOTUklPIOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIGxvY2FsIGFsdm8gPSAnaHR0cDovL2Fsdm8uY29tJ1wwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBjaGVja3MgPSB7J3hzcycsJ3NxbGknLCdsZmkn
+LCdjb3JzJywnaGVhZGVycyd9XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGZv
+ciBfLCBub21lIGluIGlwYWlycyhjaGVja3MpIGRvXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gICAgbG9jYWwgb2ssIHIgPSBwY2FsbChtb2Rbbm9tZV0sIGFsdm8pXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgaWYgb2sgYW5kIHIgYW5kIHIudnVsbiB0aGVu
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgICBwcmludCgnWyFdICcuLm5v
+bWU6dXBwZXIoKS4uJzogJy4uci5wYXlsb2FkKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICAgICAgZnMuYXBwZW5kKCdyZWxhdG9yaW8udHh0Jywgbm9tZS4uJzogJy4uci5wYXls
+b2FkLi4nXG4nKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIGVuZFwwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBlbmRcMDMzWzBtXG5cbiIKICAgIH0KICAg
+IF9kb2NfY3J5cHRvKCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIGNyeXB0by4q
+IOKAlCBDcmlwdG9ncmFmaWEg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3i
+lIDilIAgSEFTSEVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8u
+bWQ1XDAzM1swbShzKSAgICAgICAgICAgICAg4oaSIHN0cmluZyBoZXggMzIgY2hhcnNcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWNyeXB0by5zaGExXDAzM1swbShzKSAgICAgICAg
+ICAgICDihpIgc3RyaW5nIGhleCA0MCBjaGFyc1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtY3J5cHRvLnNoYTI1NlwwMzNbMG0ocykgICAgICAgICAgIOKGkiBzdHJpbmcgaGV4IDY0
+IGNoYXJzXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8uc2hhNTEyXDAz
+M1swbShzKSAgICAgICAgICAg4oaSIHN0cmluZyBoZXggMTI4IGNoYXJzXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8uaG1hY1wwMzNbMG0oa2V5LCBkYXRhLCBhbGdvKSAg
+4oaSIGhleCAgKGFsZ286ICdzaGEyNTYnLCdzaGExJylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgcHJpbnQoY3J5cHRvLnNoYTI1Nignc2VuaGExMjMnKSlcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHJpbnQoY3J5cHRvLmhtYWMoJ2NoYXZlJywnZGFkbycs
+J3NoYTI1NicpKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEVOQ09E
+SU5HIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFww
+MzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8uYjY0ZVwwMzNbMG0ocykg
+ICAgICAgICAgICAg4oaSIHN0cmluZyBCYXNlNjRcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbWNyeXB0by5iNjRkXDAzM1swbShzKSAgICAgICAgICAgICDihpIgc3RyaW5nIGRlY29k
+aWZpY2FkYVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBlbmMgPSBj
+cnlwdG8uYjY0ZSgnb2xhIG11bmRvJykgICAtLT4gJ2IyeGhJRzExYm1SdidcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHJpbnQoY3J5cHRvLmI2NGQoZW5jKSkgICAgICAgICAg
+ICAgICAgLS0+ICdvbGEgbXVuZG8nXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3i
+lIDilIAgQUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21j
+cnlwdG8uYWVzX2VuY1wwMzNbMG0oa2V5LCBkYXRhKSAg4oaSIHN0cmluZyBjaWZyYWRhXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8uYWVzX2RlY1wwMzNbMG0oa2V5LCBk
+YXRhKSAg4oaSIHN0cmluZyBvcmlnaW5hbFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzFtICDimqAga2V5IGRldmUgdGVyIGV4YXRhbWVudGUgMzIgYnl0ZXMgKEFFUy0yNTYpXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIGsgICA9ICdjaGF2ZV9kZV8zMl9i
+eXRlc19leGF0YW1lbnRlX18nXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxv
+Y2FsIGVuYyA9IGNyeXB0by5hZXNfZW5jKGssICdzZWdyZWRvJylcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgZGVjID0gY3J5cHRvLmFlc19kZWMoaywgZW5jKSAgLS0+
+ICdzZWdyZWRvJ1wwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEpXVCDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtY3J5cHRvLmp3dFww
+MzNbMG0odG9rZW4pICAgICAgICAgIOKGkiB7aGVhZGVyPXt9LCBwYXlsb2FkPXt9LCByYXd9XDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMW0gIOKaoCBkZWNvZGlmaWNhIHNlbSB2ZXJp
+ZmljYXIgYXNzaW5hdHVyYSAow7p0aWwgZW0gcGVudGVzdClcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgbG9jYWwgdCA9IGNyeXB0by5qd3QoJ2V5SmhiR2MuLi4nKVwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludCh0LmhlYWRlci5hbGcpICAgIC0tICdI
+UzI1NicsICdSUzI1NicsICdub25lJy4uLlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICBwcmludCh0LnBheWxvYWQuc3ViKSAgIC0tIHN1YmplY3QvdXN1w6FyaW9cMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHJpbnQodC5wYXlsb2FkLmV4cCkgICAtLSBleHBp
+cmHDp8OjbyAoZXBvY2gpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAg
+T1VUUk9TIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jcnlwdG8ucmFuZFww
+MzNbMG0obikgICAgICAgICAgICAg4oaSIG4gYnl0ZXMgYWxlYXTDs3Jpb3MgKHN0cmluZyBiaW7D
+oXJpYSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgdG9rZW4gPSBj
+cnlwdG8uYjY0ZShjcnlwdG8ucmFuZCgxNikpICAtLSB0b2tlbiBVUkwtc2FmZVwwMzNbMG1cblxu
+IgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEVYRU1QTE86IENSQUNLIE1ENSDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2Nh
+bCBoYXNoICA9ICdkNDFkOGNkOThmMDBiMjA0ZTk4MDA5OThlY2Y4NDI3ZSdcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgd29yZHMgPSB7J2FkbWluJywnMTIzNDU2Jywn
+c2VuaGEnLCdyb290JywncGFzc3dvcmQnfVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICBmb3IgXywgdyBpbiBpcGFpcnMod29yZHMpIGRvXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gICAgaWYgY3J5cHRvLm1kNSh3KSA9PSBoYXNoIHRoZW5cMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgICAgIHByaW50KCdbK10gU2VuaGE6ICcuLncpOyBicmVh
+a1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIGVuZFwwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBlbmRcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2Nfc3lz
+KCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIHN5cy4qICsgc2guKiDigJQgU2lz
+dGVtYSwgVGhyZWFkcyBlIFNoZWxsIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJc
+MDMzWzE7MzZt4pSA4pSAIFNIRUxMIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MTszMW3imqAgIHN5cy5zaChjbWQpXDAzM1swbSDigJQgYXNzw61uY3Jvbm8sIHJldG9ybmEgUElE
+LiBOw4NPIGNhcHR1cmEgb3V0cHV0LlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+Mm3inJMgIHNoLnJlYWRcMDMzWzBtKGNtZCkgICAgICDihpIgc3RyaW5nIGNvbSBzdGRvdXQgIChi
+bG9xdWVhbnRlKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgICBsb2NhbCBv
+dXQgPSBzaC5yZWFkKCd3aG9hbWknKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+Mm3inJMgIHNoLmNhcHR1cmVcMDMzWzBtKGNtZCkgICDihpIgc3RyaW5nLCBleGl0X2NvZGUgIChi
+bG9xdWVhbnRlKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgICBsb2NhbCBv
+dXQsIGNvZGUgPSBzaC5jYXB0dXJlKCdscyAtbGEgMj4mMScpXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gICAgIGlmIGNvZGUgPT0gMCB0aGVuIHByaW50KG91dCkgZW5kXDAzM1sw
+bVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybeKckyAgc2guZXhlY1wwMzNbMG0oY21kKSAg
+ICAgIOKGkiBleGl0X2NvZGUgIChibG9xdWVhbnRlLCBzZW0gY2FwdHVyYSlcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgICAgc2guZXhlYygncGtnIGluc3RhbGwgbm1hcCAteScp
+XDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgVEhSRUFEUyDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLnRocmVhZFwwMzNbMG0oZm4pICAgICAgICDi
+hpIgdGlkXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zeXMuam9pblwwMzNbMG0o
+dGlkIFssIG1zXSkgIGFndWFyZGEgdGhyZWFkIHRlcm1pbmFyXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21zeXMua2lsbFwwMzNbMG0oaWQpICAgICAgICAgIGVuY2VycmEgdGFza1ww
+MzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLmxpc3RcMDMzWzBtKCkgICAgICAg
+ICAgICBsaXN0YSB0YXNrcyBhdGl2YXNcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXN5cy5tdXRleFwwMzNbMG0oKSAgICAgICAgICAgY3JpYSBtdXRleCBwYXJhIHNpbmNyb25pemHD
+p8Ojb1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLmNoYW5uZWxcMDMzWzBt
+KCkgICAgICAgICBjYW5hbCBlbnRyZSB0aHJlYWRzXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIGxvY2FsIHQgPSBzeXMudGhyZWFkKGZ1bmN0aW9uKClcMDMzWzBtXG4iCiAgICBw
+cmludGYgIiAgXDAzM1swOzkwbSAgICBuZXQuc2NhbignMTkyLjE2OC4xLjEnLDEsMTAyNClcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZW5kKVwwMzNbMG1cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBzeXMuam9pbih0KVwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMz
+WzE7MzZt4pSA4pSAIFNJU1RFTUEg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN5
+cy5pbmZvXDAzM1swbSgpICAgICAgICAgICAgaW5mbzogQ1BVLCBSQU0sIGFyY2gsIGRlcHNcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN5cy5zbGVlcFwwMzNbMG0ocykgICAgICAg
+ICAgcGF1c2EgKGFjZWl0YSBkZWNpbWFsOiBzeXMuc2xlZXAoMC4xKSlcMDMzWzBtXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXN5cy50aW1lXDAzM1swbSgpICAgICAgICAgICAgZXBvY2ggZW0g
+c2VndW5kb3MgKGZsb2F0KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLnRp
+bWVfbXNcMDMzWzBtKCkgICAgICAgICBlcG9jaCBlbSBtaWxpc3NlZ3VuZG9zIChpbnQpXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zeXMucGlkXDAzM1swbSgpICAgICAgICAgICAg
+IFBJRCBkbyBwcm9jZXNzbyBhdHVhbFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+c3lzLmVudlwwMzNbMG0odmFyKSAgICAgICAgICBsw6ogdmFyacOhdmVsIGRlIGFtYmllbnRlXDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zeXMuZW52XDAzM1swbSh2YXIsIHZhbCkg
+ICAgIHNldGEgdmFyacOhdmVsIGRlIGFtYmllbnRlXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM21zeXMuZXhpdFwwMzNbMG0obikgICAgICAgICAgIGVuY2VycmEgY29tIGPDs2RpZ28g
+blwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLnNwYXduXDAzM1swbShjbWQp
+ICAgICAgICBwcm9jZXNzbyBmaWxobyBlbSBiYWNrZ3JvdW5kXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21zeXMubmV0XDAzM1swbSgpICAgICAgICAgICAgIGludGVyZmFjZXMgZGUg
+cmVkZSBjb20gYnl0ZXMgVFgvUlhcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN5
+cy5zdG9yYWdlXDAzM1swbShbcGF0aF0pICAgZXNwYcOnbyBlbSBkaXNjbzogdG90YWwsIHVzYWRv
+LCBsaXZyZVwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIERBVEEgLyBS
+RUzDk0dJTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLmRhdGVcMDMzWzBtKFtmbXQgWywgZXBvY2hdXSkgICBm
+b3JtYXRhIGRhdGEvaG9yYVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBmbXQg
+dXNhIHN0cmZ0aW1lLiBQYWRyw6NvOiAnJSVZLSUlbS0lJWQgJSVIOiUlTTolJVMnXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGZtdD0nKnQnIHJldG9ybmEgdGFiZWxhIHt5ZWFy
+LG1vbnRoLGRheSxob3VyLG1pbixzZWMsLi4ufVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBzeXMuZGF0ZSgpICAgICAgICAgICAgICAtLT4gICcyMDI2LTA5LTA0IDE5OjQ1OjIw
+J1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBzeXMuZGF0ZSgnJSVkLyUlbS8l
+JVknKSAgICAtLT4gICcwNC8wOS8yMDI2J1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICBzeXMuZGF0ZSgnJSVIOiUlTScsIHQwKSAgIC0tPiAgaG9yYSBkZSB1bSBlcG9jaCBlc3Bl
+Y8OtZmljb1wwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zeXMudG9kYXlcMDMz
+WzBtKCkgICAgICAgICAgICAgICBkYXRhIGF0dWFsIG5vIGZvcm1hdG8gSVNPXDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHN5cy50b2RheSgpICAgICAgICAgICAgIC0tPiAgJzIw
+MjYtMDktMDQnXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN5cy5ub3dcMDMz
+WzBtKCkgICAgICAgICAgICAgICAgIGhvcmEgYXR1YWwgSEg6TU06U1NcMDMzWzBtXG4iCiAgICBw
+cmludGYgIiAgXDAzM1swOzkwbSAgc3lzLm5vdygpICAgICAgICAgICAgICAgLS0+ICAnMTk6NDU6
+MTMnXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN5cy5jbG9ja1wwMzNbMG0o
+KSAgICAgICAgICAgICAgIHRlbXBvIGRlIENQVSBkbyBwcm9jZXNzb1wwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB0MCA9IHN5cy5jbG9jaygpXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIC0tIGZheiBhbGdvIHBlc2FkbyAtLVwwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludChzeXMuY2xvY2soKS10MCwgJ3MgZGUgQ1BVJylc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3lzLnVwdGltZVwwMzNbMG0oKSAg
+ICAgICAgICAgICAgc2VndW5kb3MgZGVzZGUgbyBib290XDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIHByaW50KHN5cy5mbXRfZHVyKHN5cy51cHRpbWUoKSkpICAtLT4gICczaCA0
+Mm0gMTFzJ1wwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zeXMuZm10X2R1clww
+MzNbMG0oc2VndW5kb3MpICAgICBjb252ZXJ0ZSBkdXJhw6fDo28gZW0gc3RyaW5nIGxlZ8OtdmVs
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHN5cy5mbXRfZHVyKDM3MjUpICAg
+ICAgIC0tPiAgJzFoIDJtIDVzJ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBz
+eXMuZm10X2R1cig5MCkgICAgICAgICAtLT4gICcxbSAzMHMnXDAzM1swbVxuXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXN5cy50elwwMzNbMG0oKSAgICAgICAgICAgICAgICAgIGZ1c28gaG9y
+w6FyaW8gbG9jYWxcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgc3lzLnR6KCkg
+ICAgICAgICAgICAgICAgLS0+ICAnQW1lcmljYS9TYW9fUGF1bG8nIG91ICdVVEMtMDM6MDAnXDAz
+M1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRVhFTVBMTzogTUVESVIgVEVN
+UE8gREUgU0NSSVBUIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFww
+MzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvZy5pbmZvKCdpbmljaW86Jywg
+c3lzLm5vdygpKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB0MCA9
+IHN5cy50aW1lKClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbmV0LnN5bign
+MS4xLjEuMScsIDgwKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2cub2so
+J2NvbmNsdWlkbyBlbScsIHN5cy5mbXRfZHVyKHN5cy50aW1lKCktdDApKVwwMzNbMG1cblxuIgog
+ICAgfQogICAgX2RvY19mcygpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBmcy4q
+IOKAlCBGaWxlc3lzdGVtIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICJcMDMzWzE7MzZt4pSA4pSAIExFSVRVUkEgRSBFU0NSSVRBIOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21mcy5yZWFkXDAzM1sw
+bShwYXRoKSAgICAgICAgIOKGkiBzdHJpbmcgIG91ICBuaWwsIGVycm1zZ1wwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB0eHQgPSBmcy5yZWFkKCcvZXRjL2hvc3RzJylc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZm9yIGxpbmhhIGluIHR4dDpnbWF0
+Y2goJ1teXG5dKycpIGRvIHByaW50KGxpbmhhKSBlbmRcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtZnMud3JpdGVcMDMzWzBtKHBhdGgsIGRhdGEpICBjcmlhIG91IHNvYnJlc2Ny
+ZXZlIGFycXVpdm9cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWZzLmFwcGVuZFww
+MzNbMG0ocGF0aCwgZGF0YSkgYWRpY2lvbmEgYW8gZmluYWxcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgZnMud3JpdGUoJ2xvZy50eHQnLCAnWypdIGluaWNpb1xuJylcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZnMuYXBwZW5kKCdsb2cudHh0JywgJ1srXSBh
+Y2hvdSBYU1NcbicpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgSU5T
+UEXDh8ODTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZnMubGlzdFwwMzNbMG0oW2Rp
+cl0pICAgICAgICDihpIgdGFiZWxhIGRlIG5vbWVzIChwYWRyw6NvOiBkaXIgYXR1YWwpXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21mcy5zdGF0XDAzM1swbShwYXRoKSAgICAgICAg
+IOKGkiB7c2l6ZSwgbXRpbWUsIGN0aW1lLCBpc2RpciwgaXNmaWxlfVwwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzNtZnMuaXNmaWxlXDAzM1swbShwYXRoKSAgICAgICDihpIgdHJ1ZS9m
+YWxzZVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZnMuaXNkaXJcMDMzWzBtKHBh
+dGgpICAgICAgICDihpIgdHJ1ZS9mYWxzZVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtZnMuZ2xvYlwwMzNbMG0ocGF0dGVybikgICAgICDihpIgdGFiZWxhIGRlIHBhdGhzXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGZvciBfLCBmIGluIGlwYWlycyhmcy5nbG9i
+KCcvdG1wLyoudHh0JykpIGRvIHByaW50KGYpIGVuZFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJc
+MDMzWzE7MzZt4pSA4pSAIE9QRVJBw4fDlUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21m
+cy5ta2RpclwwMzNbMG0ocGF0aCkgICAgICAgIGNyaWEgZGlyZXTDs3JpbyAoZSBwYWlzKVwwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZnMucm1cMDMzWzBtKHBhdGgpICAgICAgICAg
+ICByZW1vdmUgYXJxdWl2b1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZnMubW92
+ZVwwMzNbMG0oc3JjLCBkc3QpICAgICBtb3ZlL3Jlbm9tZWlhXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21mcy5jb3B5XDAzM1swbShzcmMsIGRzdCkgICAgIGNvcGlhXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM21mcy5jaG1vZFwwMzNbMG0ocGF0aCwgbW9kZSkgIG11
+ZGEgcGVybWlzc8O1ZXMgKGV4OiAnNzU1JylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sx
+OzM2beKUgOKUgCBFWEVNUExPOiBMT0cgREUgU0NBTiDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBsb2cgPSAnL3RtcC9zY2FuXycuLm9z
+LmRhdGUoJyUlWSUlbSUlZCcpLi4nLnR4dCdcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgZnMud3JpdGUobG9nLCAnWypdICcuLm9zLmRhdGUoKS4uJ1xuJylcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgZm9yIF8sIHVybCBpbiBpcGFpcnMobW9kLnNwaWRlcign
+aHR0cDovL2Fsdm8uY29tJywgNTApKSBkb1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICAgIGxvY2FsIHIgPSBtb2QueHNzKHVybClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgICBpZiByIGFuZCByLnZ1bG4gdGhlbiBmcy5hcHBlbmQobG9nLCAnW1hTU10gJy4u
+dXJsLi4nXG4nKSBlbmRcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZW5kXDAz
+M1swbVxuXG4iCiAgICB9CiAgICBfZG9jX2FpKCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ
+4pWQ4pWQIGFpLiog4oCUIENZTiAoSW50ZWxpZ8OqbmNpYSBBcnRpZmljaWFsKSDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBDSEFU
+IEUgUEVSR1VOVEFTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21haS5hc2tcMDMzWzBtKCdwZXJndW50YScpICAgIOKGkiBzdHJp
+bmcgKHNlbSBoaXN0w7NyaWNvKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWku
+Y2hhdFwwMzNbMG0oJ21lbnNhZ2VtJykgICDihpIgc3RyaW5nIChtYW50w6ltIGhpc3TDs3JpY28p
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21haS5jbGVhclwwMzNbMG0oKSAgICAg
+ICAgICAgIGxpbXBhIGhpc3TDs3JpY29cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgcHJpbnQoYWkuYXNrKCdleHBsaXF1ZSBTU1JGIGVtIHVtYSBsaW5oYScpKVwwMzNbMG1cblxu
+IgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEdFUkHDh8ODTyBERSBDw5NESUdPIOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21h
+aS5jb2RlXDAzM1swbSgndGFyZWZhJykgICAgIOKGkiBzdHJpbmcgY29tIGPDs2RpZ28gTHVhIHBy
+b250b1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBjb2QgPSBhaS5j
+b2RlKCdwb3J0IHNjYW5uZXIgdXNhbmRvIG5ldC5zY2FuJylcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgbG9hZChjb2QpKCkgICAtLSBleGVjdXRhIGRpcmV0b1wwMzNbMG1cblxu
+IgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIFBST1ZJREVSUyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzNtYWkucHJvdmlkZXJcMDMzWzBtKCdza3knKSAgICAgICAgICAgICAgICBncmF0
+dWl0bywgc2VtIGtleSAocGFkcsOjbylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bWFpLnByb3ZpZGVyXDAzM1swbSgncG9sbGluYXRpb25zJykgICAgICAgZ3JhdHVpdG9cMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWFpLnByb3ZpZGVyXDAzM1swbSgnb2xsYW1hJykg
+ICAgICAgICAgICAgbG9jYWwgKHNlbSBpbnRlcm5ldClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbWFpLnByb3ZpZGVyXDAzM1swbSgnZ3JvcScsJ21vZGVsbycpICAgICAga2V5IGdy
+YXR1aXRhXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21haS5wcm92aWRlclwwMzNb
+MG0oJ29wZW5haScsJ2dwdC00bycpICAgIGtleSBwYWdhXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21haS5wcm92aWRlclwwMzNbMG0oJ2dlbWluaScpICAgICAgICAgICAgIGtleSBn
+cmF0dWl0YTogYWlzdHVkaW8uZ29vZ2xlLmNvbVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtYWkua2V5XDAzM1swbSgnU1VBX0tFWScpICAgICAgICAgICAgICAgIGNvbmZpZ3VyYSBj
+aGF2ZVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWkubW9kZWxcMDMzWzBtKCdt
+b2RlbG8nKSAgICAgICAgICAgICAgIHRyb2NhIG1vZGVsb1wwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICJcMDMzWzE7MzZt4pSA4pSAIEJVU0NBIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM21haS5zZWFyY2hcMDMzWzBtKCdxdWVyeScpICAgIOKGkiByZXN1bHRhZG9zIGRhIHdl
+YlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludChhaS5zZWFyY2goJ0NW
+RS0yMDI0IEFwYWNoZSBSQ0UnKSlcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKU
+gOKUgCBFWEVNUExPOiBQRU5URVNUIEFTU0lTVElETyBQT1IgSUEg4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9j
+YWwgaCA9IG1vZC5oZWFkZXJzKCdodHRwczovL2Fsdm8uY29tJylcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgYW5hbGlzZSA9IGFpLmFzayhcMDMzWzBtXG4iCiAgICBw
+cmludGYgIiAgXDAzM1swOzkwbSAgICAnQW5hbGlzZSBoZWFkZXJzOlxuJy4udG9zdHJpbmcoaCkp
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHByaW50KGFuYWxpc2UpXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIC0tIGdlcmEgZSBleGVjdXRhIGV4cGxvaXQ6
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvYWQoYWkuY29kZShcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICAnU1FMaSBlbSBodHRwOi8vYWx2by5jb20v
+P2lkPScpKSgpXDAzM1swbVxuXG4iCiAgICB9CiAgICBfZG9jX3N0cmluZygpIHsKICAgIHByaW50
+ZiAiXG5cMDMzWzE7MzVt4pWQ4pWQ4pWQIHN0cmluZy4qIOKAlCBFeHRlbnPDtWVzIGRlIFN0cmlu
+ZyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtRGlzcG9uw612ZWlzIGNvbW8gZnVuw6fDtWVzIGUgY29tbyBtw6l0
+b2Rvczogczp0cmltKCkgIHM6c3BsaXQoXCIsXCIpICBzOmlzbnVtZXJpYygpXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgTElNUEVaQSDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzE7MzNtc3RyaW5nLnRyaW1cMDMzWzBtKHMpICAgICAgICAgICAgICAgICDihpIg
+cmVtb3ZlIGVzcGHDp29zIGRhcyBkdWFzIHBvbnRhc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
+MG0gIHN0cmluZy50cmltKCcgIG9sw6EgICcpICAtLT4gICdvbMOhJ1wwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzE7MzNtc3RyaW5nLmx0cmltXDAzM1swbShzKSAgICAgICAgICAgICAgICDi
+hpIgcmVtb3ZlIGVzcGHDp29zIGRhIGVzcXVlcmRhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXN0cmluZy5ydHJpbVwwMzNbMG0ocykgICAgICAgICAgICAgICAg4oaSIHJlbW92ZSBlc3Bhw6dv
+cyBkYSBkaXJlaXRhXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBCVVNDQSBFIFZF
+UklGSUNBw4fDg08g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXN0cmluZy5zdGFydHN3aXRoXDAzM1swbShzLCBwcmVmaXgpICAgIOKGkiB0cnVl
+IHNlIHMgY29tZcOnYSBjb20gcHJlZml4XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmlu
+Zy5lbmRzd2l0aFwwMzNbMG0ocywgc3VmZml4KSAgICAgIOKGkiB0cnVlIHNlIHMgdGVybWluYSBj
+b20gc3VmZml4XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5jb250YWluc1wwMzNb
+MG0ocywgc3ViKSAgICAgICAgIOKGkiB0cnVlIHNlIHN1YiBlc3TDoSBlbSBzXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXN0cmluZy5jb3VudF9vY2NcMDMzWzBtKHMsIHN1YikgICAgICAgIOKG
+kiBuw7ptZXJvIGRlIG9jb3Jyw6puY2lhcyBkZSBzdWJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtc3RyaW5nLnJlbW92ZXByZWZpeFwwMzNbMG0ocywgcCkgICAgICAg4oaSIHJlbW92ZSBwcmVm
+aXhvIHNlIHByZXNlbnRlXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5yZW1vdmVz
+dWZmaXhcMDMzWzBtKHMsIHApICAgICAgIOKGkiByZW1vdmUgc3VmaXhvIHNlIHByZXNlbnRlXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgc3RyaW5nLnN0YXJ0c3dpdGgoJ0VsbGlvdE9TJywn
+RWxsaW90JykgIC0tPiAgdHJ1ZVwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA
+4pSAIERJVklTw4NPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcuc3Bs
+aXRcMDMzWzBtKHMsIHNlcCBbLCBwbGFpbl0pICDihpIgdGFiZWxhIGRlIHBhcnRlc1xuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIHN0cmluZy5zcGxpdCgnYSxiLGMnLCcsJykgIC0tPiAgeydh
+JywnYicsJ2MnfVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBzdHJpbmcuc3Bs
+aXQoJ3VtIGRvaXMnKSAgICAtLT4gIHsndW0nLCdkb2lzJ30gIChzZXAgcGFkcsOjbzogJSVzKylc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5saW5lc1wwMzNbMG0ocykg
+ICAgICAgICAgICAgICAgIOKGkiB0YWJlbGEgZGUgbGluaGFzIChDUkxGIG9rKVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM21zdHJpbmcud29yZHNcMDMzWzBtKHMpICAgICAgICAgICAgICAgICDi
+hpIgdGFiZWxhIGRlIHBhbGF2cmFzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5w
+YXJ0aXRpb25cMDMzWzBtKHMsIHNlcCkgICAgICAgIOKGkiBhbnRlcywgc2VwLCBkZXBvaXMgKDHC
+qiBvY29ycsOqbmNpYSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3RyaW5nLnJwYXJ0aXRp
+b25cMDMzWzBtKHMsIHNlcCkgICAgICAg4oaSIGFudGVzLCBzZXAsIGRlcG9pcyAow7psdGltYSlc
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBzdHJpbmcucGFydGl0aW9uKCd1c2VyQGhvc3Qn
+LCdAJykgIC0tPiAgJ3VzZXInLCdAJywnaG9zdCdcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAz
+M1sxOzM2beKUgOKUgCBGT1JNQVRBw4fDg08gRSBQQURESU5HIOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNb
+MG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcubHBhZFwwMzNbMG0ocywgbiBb
+LCBjaF0pICAgICAgICDihpIgYWxpbmhhIMOgIGRpcmVpdGFcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtc3RyaW5nLnJwYWRcMDMzWzBtKHMsIG4gWywgY2hdKSAgICAgICAg4oaSIGFsaW5oYSDD
+oCBlc3F1ZXJkYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcubGp1c3RcMDMzWzBt
+KHMsIG4gWywgY2hdKSAgICAgICDihpIgYWxpYXMgZGUgcnBhZFxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM21zdHJpbmcucmp1c3RcMDMzWzBtKHMsIG4gWywgY2hdKSAgICAgICDihpIgYWxpYXMg
+ZGUgbHBhZFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcuY2VudGVyXDAzM1swbShz
+LCBuIFssIGNoXSkgICAgICDihpIgY2VudHJhbGl6YSBjb20gY2hcbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtc3RyaW5nLnpmaWxsXDAzM1swbShzLCBuKSAgICAgICAgICAgICAg4oaSIHByZWVu
+Y2hlIGNvbSB6ZXJvcyDDoCBlc3F1ZXJkYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJp
+bmcudHJ1bmNhdGVcMDMzWzBtKHMsIG4gWywgc3VmXSkgICDihpIgY29ydGEgZW0gbiBjaGFycyAr
+IHN1Zml4b1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcucmVwZWF0X3N0clwwMzNb
+MG0ocywgbikgICAgICAgICDihpIgcmVwZXRlIHMgbiB2ZXplc1xuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM21zdHJpbmcuZXhwYW5kdGFic1wwMzNbMG0ocyBbLCBuXSkgICAgICDihpIgZXhwYW5k
+ZSBcdCBlbSBuIGVzcGHDp29zIChwYWRyw6NvIDgpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgc3RyaW5nLmxwYWQoJzQyJyw2LCcwJykgICAgLS0+ICAnMDAwMDQyJ1wwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICBzdHJpbmcuY2VudGVyKCdFT1MnLDksJy0nKSAtLT4gICct
+LS1FT1MtLS0nXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgVFJBTlNG
+T1JNQcOHw4NPIERFIENBU08g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXN0cmluZy5jYXBpdGFsaXplXDAzM1swbShzKSAgICAgICAgICAgIOKGkiBQcmlt
+ZWlyYSBsZXRyYSBtYWnDunNjdWxhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy50
+aXRsZVwwMzNbMG0ocykgICAgICAgICAgICAgICAgIOKGkiBDYWRhIFBhbGF2cmEgTWFpw7pzY3Vs
+YVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcuc3dhcGNhc2VcMDMzWzBtKHMpICAg
+ICAgICAgICAgICDihpIgaW52ZXJ0ZSBtYWnDunNjdWxhcy9taW7DunNjdWxhc1xuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM21zdHJpbmcuc2x1Z2lmeVwwMzNbMG0ocykgICAgICAgICAgICAgICDi
+hpIgT2zDoSBNdW5kbyDihpIgb2xhLW11bmRvXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+c3RyaW5nLnRpdGxlKCdvbMOhIG11bmRvJykgICAgLS0+ICAnT2zDoSBNdW5kbydcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgc3RyaW5nLnN3YXBjYXNlKCdFbGxpb3RPUycpICAt
+LT4gICdlTExJT1RvcydcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBI
+VE1MIEUgVVJMIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFww
+MzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcuZXNjYXBlX2h0bWxcMDMz
+WzBtKHMpICAgICAgICAgICDihpIgJiA8ID4gcGFyYSBlbnRpZGFkZXMgSFRNTFxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM21zdHJpbmcudW5lc2NhcGVfaHRtbFwwMzNbMG0ocykgICAgICAgICDi
+hpIgZW50aWRhZGVzIEhUTUwgcGFyYSBjaGFyc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21z
+dHJpbmcuZW5jb2RlX3VybFwwMzNbMG0ocykgICAgICAgICAgICDihpIgcGVyY2VudC1lbmNvZGlu
+ZyBwYXJhIFVSTHNcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtc3RyaW5nLmRlY29kZV91cmxc
+MDMzWzBtKHMpICAgICAgICAgICAg4oaSIGRlY29kaWZpY2EgcGVyY2VudC1lbmNvZGluZ1xuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM21zdHJpbmcuaW50ZXJwb2xhdGVcMDMzWzBtKHMsIHZhcnMp
+ICAgICDihpIgc3Vic3RpdHVpIHtjaGF2ZX0gcGVsYSB0YWJlbGEgdmFyc1xuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIHN0cmluZy5pbnRlcnBvbGF0ZSgne2hvc3R9Ontwb3J0fScse2hvc3Q9
+J2xvY2FsaG9zdCcscG9ydD04MDgwfSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgLS0+ICAnbG9jYWxob3N0OjgwODAnXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTsz
+Nm3ilIDilIAgVkFMSURBw4fDg08gKGlzKikg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5pc251bWVyaWNcMDMz
+WzBtKHMpICAgICAgICAgICAgIOKGkiB0cnVlIHNlIHMgcmVwcmVzZW50YSBuw7ptZXJvXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5pc2ludGVnZXJcMDMzWzBtKHMpICAgICAgICAg
+ICAgIOKGkiB0cnVlIHNlIHJlcHJlc2VudGEgaW50ZWlyb1xuIgogICAgcHJpbnRmICIgIFwwMzNb
+MTszM21zdHJpbmcuaXNhbHBoYVwwMzNbMG0ocykgICAgICAgICAgICAgICDihpIgdHJ1ZSBzZSBz
+w7MgbGV0cmFzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5pc2FsbnVtXDAzM1sw
+bShzKSAgICAgICAgICAgICAgIOKGkiB0cnVlIHNlIGxldHJhcyBlIGTDrWdpdG9zXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5pc3NwYWNlXDAzM1swbShzKSAgICAgICAgICAgICAg
+IOKGkiB0cnVlIHNlIHPDsyBlc3Bhw6dvcy90YWJzL25ld2xpbmVzXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXN0cmluZy5pc2xvd2VyXDAzM1swbShzKSAgICAgICAgICAgICAgIOKGkiB0cnVl
+IHNlIHRvZGFzIG1pbsO6c2N1bGFzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXN0cmluZy5p
+c3VwcGVyXDAzM1swbShzKSAgICAgICAgICAgICAgIOKGkiB0cnVlIHNlIHRvZGFzIG1hacO6c2N1
+bGFzXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgc3RyaW5nLmlzbnVtZXJpYygnMy4xNCcp
+ICAgLS0+ICB0cnVlXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHN0cmluZy5p
+c3VwcGVyKCdIRUxMTyAxJykgIC0tPiAgdHJ1ZSAgKGTDrWdpdG9zIG7Do28gY29udGFtKVwwMzNb
+MG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG1EaWNhOiBzdHJpbmcuaGVscCgpIG5vIFJF
+UEwgcGFyYSByZWZlcsOqbmNpYSByw6FwaWRhIGNvbG9yaWRhXDAzM1swbVxuXG4iCiAgICB9CiAg
+ICBfZG9jX3V0aWwoKSB7CiAgICBwcmludGYgIlxuXDAzM1sxOzM1beKVkOKVkOKVkCB1dGlsLiog
+4oCUIFN0ZGxpYiBGdW5jaW9uYWwg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbVVz
+ZTogbG9jYWwgbW9kID0gcmVxdWlyZShcIkBzdGQvbW9kXCIpXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG11dGlsLmhlbHAoKSAvIHV0aWwuaGVscCgnc3RhdHMnKSAvIHV0aWwuaGVs
+cCgnaXRlcicpIC8gdXRpbC5oZWxwKCdmbicpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNb
+MTszNm3ilIDilIAgVFJBTlNGT1JNQcOHw4NPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLm1hcFwwMzNb
+MG0odCwgZm4pICAgICAgICAgICDihpIgbm92YSB0YWJlbGEgY29tIGZuKHYsaSkgZW0gY2FkYSBp
+dGVtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdXRpbC5tYXAoezEsMiwzfSwgZnVuY3Rp
+b24oeCkgcmV0dXJuIHgqMiBlbmQpICAtLT4gIHsyLDQsNn1cMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXV0aWwuZmlsdGVyXDAzM1swbSh0LCBmbikgICAgICAgIOKGkiBpdGVucyBv
+bmRlIGZuKHYpIMOpIHZlcmRhZGVpcm9cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB1dGls
+LmZpbHRlcih7MSwyLDMsNH0sIGZ1bmN0aW9uKHgpIHJldHVybiB4JSUyPT0wIGVuZCkgIC0tPiAg
+ezIsNH1cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwucmVkdWNlXDAzM1sw
+bSh0LCBmbiwgYWNjKSAgIOKGkiBhY3VtdWxhIGNvbSBmbihhY2MsdilcbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICB1dGlsLnJlZHVjZSh7MSwyLDMsNCw1fSwgZnVuY3Rpb24oYSxiKSByZXR1
+cm4gYStiIGVuZCwgMCkgIC0tPiAgMTVcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXV0aWwuc29ydGVkXDAzM1swbSh0IFssIGZuXSkgICAgIOKGkiBjw7NwaWEgb3JkZW5hZGE7IGZu
+PWNvbXBhcmFkb3Igb3BjaW9uYWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC51bmlx
+dWVcMDMzWzBtKHQpICAgICAgICAgICAg4oaSIHJlbW92ZSBkdXBsaWNhdGFzLCBtYW50w6ltIG9y
+ZGVtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuZmxhdHRlblwwMzNbMG0odCBbLCBk
+ZXB0aF0pIOKGkiBhY2hhdGEgdGFiZWxhcyBhbmluaGFkYXNcblxuIgogICAgcHJpbnRmICJcMDMz
+WzE7MzZt4pSA4pSAIFBSRURJQ0FET1Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuYW55
+XDAzM1swbSh0LCBmbikgICAgICAgICAgIOKGkiB0cnVlIHNlIGFsZ3VtIHNhdGlzZmF6IGZuXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuYWxsXDAzM1swbSh0LCBmbikgICAgICAgICAg
+IOKGkiB0cnVlIHNlIHRvZG9zIHNhdGlzZmF6ZW0gZm5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtdXRpbC5jb3VudFwwMzNbMG0odCwgZm5fb3VfdmFsKSAg4oaSIHF1YW50b3Mgc2F0aXNmYXpl
+bSBmbiBvdSA9PSB2YWxcblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEdFUkHDh8OD
+TyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5yYW5nZVwwMzNbMG0oYSBb
+LGIgWyxzdGVwXV0pIOKGkiBzZXF1w6puY2lhIG51bcOpcmljYSBlc3RpbG8gUHl0aG9uXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgdXRpbC5yYW5nZSg1KSAgICAgICAtLT4gIHsxLDIsMyw0
+LDV9XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHV0aWwucmFuZ2UoMCwxMCwy
+KSAgLS0+ICB7MCwyLDQsNiw4LDEwfVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBt
+ICB1dGlsLnJhbmdlKDUsMSwtMSkgIC0tPiAgezUsNCwzLDIsMX1cMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXV0aWwuZW51bWVyYXRlXDAzM1swbSh0IFssIHN0YXJ0XSkg4oaSIHt7
+aSx2fSwuLi59XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuemlwXDAzM1swbSh0MSwg
+dDIsIC4uLikgICAgICDihpIge3thMSxiMX0se2EyLGIyfSwuLi59XG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXV0aWwuY2h1bmtcMDMzWzBtKHQsIG4pICAgICAgICAgICDihpIgZGl2aWRlIGVt
+IGJsb2NvcyBkZSBuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdXRpbC5jaHVuayh7MSwy
+LDMsNCw1LDYsN30sMykgIC0tPiAge3sxLDIsM30sezQsNSw2fSx7N319XDAzM1swbVxuXG4iCiAg
+ICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgQUdSRUdBw4fDg08g4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXV0aWwuc3VtXDAzM1swbSh0IFssIGZuXSkgICAgICAgICDihpIgc29tYVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLm1pblwwMzNbMG0odCBbLCBmbl0pICAgICAgICAg
+4oaSIG1lbm9yIHZhbG9yXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwubWF4XDAzM1sw
+bSh0IFssIGZuXSkgICAgICAgICDihpIgbWFpb3IgdmFsb3JcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtdXRpbC5ncm91cGJ5XDAzM1swbSh0LCBmbikgICAgICAgIOKGkiB7Y2hhdmUtPntpdGVu
+c319IGFncnVwYWRvcyBwb3IgZm5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB1dGlsLmdy
+b3VwYnkoezEsMiwzLDR9LCBmdW5jdGlvbih4KSByZXR1cm4geCUlMj09MCBhbmQgJ3Bhcicgb3Ig
+J2ltcGFyJyBlbmQpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgVEFC
+RUxBUyBFIERJQ1RTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmtleXNcMDMzWzBtKHQpICAgICAgICAgICAgICDi
+hpIgbGlzdGEgZGUgY2hhdmVzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwudmFsdWVz
+XDAzM1swbSh0KSAgICAgICAgICAgIOKGkiBsaXN0YSBkZSB2YWxvcmVzXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXV0aWwucGlja1wwMzNbMG0odCwga2V5cykgICAgICAgIOKGkiBzdWItdGFi
+ZWxhIGNvbSBhcyBjaGF2ZXNcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5vbWl0XDAz
+M1swbSh0LCBrZXlzKSAgICAgICAg4oaSIHN1Yi10YWJlbGEgc2VtIGFzIGNoYXZlc1xuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM211dGlsLm1lcmdlXDAzM1swbSh0MSwgdDIsIC4uLikgICDihpIg
+dW5lIHRhYmVsYXMgKGRpcmVpdGEgc29icmVzY3JldmUpXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbXV0aWwuZGVlcGNvcHlcMDMzWzBtKHQpICAgICAgICAgIOKGkiBjw7NwaWEgcHJvZnVuZGEg
+cmVjdXJzaXZhXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdXRpbC5tZXJnZSh7eD0xLHk9
+Mn0se3k9OTksej0zfSkgIC0tPiAge3g9MSx5PTk5LHo9M31cMDMzWzBtXG5cbiIKICAgIHByaW50
+ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMgREUgQUxUQSBPUkRFTSDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5wYXJ0aWFsXDAzM1swbShm
+biwgLi4uKSAgICAgIOKGkiBhcGxpY2HDp8OjbyBwYXJjaWFsIChjdXJyeWluZylcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBhZGQxMCA9IHV0aWwucGFydGlhbChmdW5jdGlvbihh
+LGIpIHJldHVybiBhK2IgZW5kLCAxMClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgYWRkMTAoNSkgIC0tPiAgMTVcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0
+aWwubWVtb2l6ZVwwMzNbMG0oZm4pICAgICAgICAgIOKGkiBjYWNoZWlhIHJlc3VsdGFkb3NcbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5vbmNlXDAzM1swbShmbikgICAgICAgICAgICAg
+4oaSIGV4ZWN1dGEgc8OzIG5hIHByaW1laXJhIGNoYW1hZGFcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtdXRpbC5yZXRyeVwwMzNbMG0oZm4sIG4gWywgbXNdKSAg4oaSIHRlbnRhIG4gdmV6ZXMg
+Y29tIGRlbGF5XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwucGlwZVwwMzNbMG0oZm4x
+LCBmbjIsIC4uLikgIOKGkiBjb21wb3Npw6fDo28gZXNx4oaSZGlyXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgdXRpbC5waXBlKHN0cmluZy50cmltLCBzdHJpbmcubG93ZXIpKCcgIE9Mw4Eg
+ICcpICAtLT4gICdvbMOhJ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5j
+b21wb3NlXDAzM1swbShmbjEsIGZuMiwgLi4uKSDihpIgY29tcG9zacOnw6NvIGRpcuKGkmVzcVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmZsaXBcMDMzWzBtKGZuKSAgICAgICAgICAg
+ICDihpIgaW52ZXJ0ZSBvcmRlbSBkb3MgMiBwcmltZWlyb3MgYXJnc1xuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM211dGlsLnRhcFwwMzNbMG0odiwgZm4pICAgICAgICAgICDihpIgY2hhbWEgZm4o
+dikgZSByZXRvcm5hIHZcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5pZGVudGl0eVww
+MzNbMG0odikgICAgICAgICAg4oaSIHJldG9ybmEgdlxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M211dGlsLmFsd2F5c1wwMzNbMG0odikgICAgICAgICAgICDihpIgZnVuw6fDo28gcXVlIHNlbXBy
+ZSByZXRvcm5hIHZcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5kZWZhdWx0XDAzM1sw
+bSh2LCBkKSAgICAgICAg4oaSIHYgc2UgbsOjbyBuaWwsIHNlbsOjbyBkXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXV0aWwudHJ1dGh5XDAzM1swbSh2KSAgICAgICAgICAgIOKGkiB2IG7Do28g
+w6kgbmlsIG5lbSBmYWxzZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmZhbHN5XDAz
+M1swbSh2KSAgICAgICAgICAgICDihpIgdiDDqSBuaWwgb3UgZmFsc2VcblxuIgogICAgcHJpbnRm
+ICJcMDMzWzE7MzZt4pSA4pSAIElPIEUgREVCVUcg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0
+aWwucHJpbnRmXDAzM1swbShmbXQsIC4uLikgICAgIOKGkiBpby53cml0ZSBjb20gc3RyaW5nLmZv
+cm1hdFxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLnBwXDAzM1swbSh2KSAgICAgICAg
+ICAgICAgICDihpIgcHJldHR5LXByaW50IGRlIHF1YWxxdWVyIHZhbG9yXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXV0aWwud2l0aF9maWxlXDAzM1swbShwLCBtLCBmbikgIOKGkiBhYnJlIGFy
+cXVpdm8sIGNoYW1hIGZuKGYpLCBmZWNoYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHV0
+aWwud2l0aF9maWxlKCdzYWlkYS50eHQnLCd3JywgZnVuY3Rpb24oZikgZjp3cml0ZSgnbGluaGFc
+bicpIGVuZClcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5mdW5jXDAz
+M1swbShtb2QpICAgICAgICAgICAgIOKGkiBsaXN0YSBmdW5ceGMzXHhhN1x4YzNceGI1ZXMgZGUg
+cXVhbHF1ZXIgbVx4YzNceGIzZHVsbyBvdSB0YWJlbGFcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICB1dGlsLmZ1bmMobWF0aCkgICAgIC0tIGxpc3RhIHRvZGFzIGFzIGZ1blx4YzNceGE3XHhj
+M1x4YjVlcyBkbyBtYXRoLipcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgdXRp
+bC5mdW5jKCdzb2NrZXQnKSAgLS0gY2FycmVnYSBlIGluc3BlY2lvbmEgbVx4YzNceGIzZHVsbyBs
+dWFyb2Nrc1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB1dGlsLmZ1bmMobmV0
+KSAgICAgICAtLSBpbnNwZWNpb25hIG1ceGMzXHhiM2R1bG9zIGRvIEVsbGlvdE9TXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRVNUQVTDjVNUSUNBUyAodXRpbC5oZWxw
+KCdzdGF0cycpKSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5tZWFuXDAzM1swbSh0KSAgICAgICAgICAgICAg
+4oaSIG3DqWRpYSBhcml0bcOpdGljYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLm1l
+ZGlhblwwMzNbMG0odCkgICAgICAgICAgICDihpIgbWVkaWFuYVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM211dGlsLm1vZGVcMDMzWzBtKHQpICAgICAgICAgICAgICDihpIgdmFsb3IgbWFpcyBm
+cmVxdWVudGVcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC52YXJpYW5jZVwwMzNbMG0o
+dCkgICAgICAgICAg4oaSIHZhcmnDom5jaWEgcG9wdWxhY2lvbmFsXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXV0aWwuc3RkZXZcMDMzWzBtKHQpICAgICAgICAgICAgIOKGkiBkZXN2aW8gcGFk
+csOjbyBwb3B1bGFjaW9uYWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5zdGRldl9z
+YW1wbGVcMDMzWzBtKHQpICAgICAg4oaSIGRlc3ZpbyBwYWRyw6NvIGFtb3N0cmFsIChuLTEpXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwucGVyY2VudGlsZVwwMzNbMG0odCwgcCkgICAg
+IOKGkiBwZXJjZW50aWwgcCAoMC0xMDApXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwu
+bm9ybWFsaXplXDAzM1swbSh0KSAgICAgICAgIOKGkiBub3JtYWxpemEgZW50cmUgMCBlIDFcbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5jbGFtcFwwMzNbMG0odiwgbG8sIGhpKSAgICAg
+4oaSIGxpbWl0YSB2IGFvIGludGVydmFsbyBbbG8saGldXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbXV0aWwucm91bmRcMDMzWzBtKG4gWywgZGVjaW1hbHNdKSDihpIgYXJyZWRvbmRhIHBhcmEg
+TiBjYXNhcyBkZWNpbWFpc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHV0aWwucm91bmQo
+My4xNDE1OSwgMikgIC0tPiAgMy4xNFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt
+4pSA4pSAIElURVJBw4fDg08gRSBHRU5FUkFUT1JTICh1dGlsLmhlbHAoJ2l0ZXInKSkg4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuaXRlclwwMzNbMG0o
+dCkgICAgICAgICAgICAgIOKGkiBpdGVyYWRvciBsYXp5IHNvYnJlIHRhYmVsYVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM211dGlsLmdlbmVyYXRvclwwMzNbMG0oZm4pICAgICAgICDihpIgZ2Vy
+YWRvciB2aWEgY29yb3V0aW5lICh5aWVsZClcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRp
+bC50YWtlXDAzM1swbShzcmMsIG4pICAgICAgICAg4oaSIHByaW1laXJvcyBuIHZhbG9yZXNcbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5kcm9wXDAzM1swbSh0LCBuKSAgICAgICAgICAg
+4oaSIHNlbSBvcyBwcmltZWlyb3MgblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLnN0
+ZXBcMDMzWzBtKHQsIG4pICAgICAgICAgICDihpIgdW0gYSBjYWRhIG4gZWxlbWVudG9zXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwudGFsbHlcMDMzWzBtKHQpICAgICAgICAgICAgIOKG
+kiB7dmFsb3ItPmNvbnRhZ2VtfVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmZsYXRf
+bWFwXDAzM1swbSh0LCBmbikgICAgICDihpIgbWFwICsgZmxhdHRlbiBkZSBuw612ZWwgMVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmludGVybGVhdmVcMDMzWzBtKGEsIGIpICAgICDi
+hpIgbWVzY2xhIGFsdGVybmFuZG8gZWxlbWVudG9zXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXV0aWwuZmlyc3RcMDMzWzBtKHQgWywgZm5dKSAgICAgIOKGkiBwcmltZWlybyAocXVlIHNhdGlz
+ZmF6IGZuKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLmxhc3RcMDMzWzBtKHQgWywg
+Zm5dKSAgICAgICDihpIgw7psdGltbyAocXVlIHNhdGlzZmF6IGZuKVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM211dGlsLmluZGV4X29mXDAzM1swbSh0LCB2YWwpICAgICDihpIgcG9zacOnw6Nv
+IGRvIHZhbG9yIChvdSBuaWwpXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwud2l0aG91
+dFwwMzNbMG0odCwgLi4uKSAgICAgIOKGkiB0YWJlbGEgc2VtIG9zIHZhbG9yZXMgbGlzdGFkb3Nc
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdXRpbC5kaWZmZXJlbmNlXDAzM1swbShhLCBiKSAg
+ICAg4oaSIGVsZW1lbnRvcyBkZSBhIHF1ZSBuw6NvIGVzdMOjbyBlbSBiXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbXV0aWwuaW50ZXJzZWN0aW9uXDAzM1swbShhLCBiKSAgIOKGkiBlbGVtZW50
+b3MgcHJlc2VudGVzIGVtIGFtYm9zXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwudW5p
+b25cMDMzWzBtKGEsIGIpICAgICAgICAgIOKGkiB0b2RvcyBvcyBlbGVtZW50b3Mgw7puaWNvcyBk
+ZSBhIGUgYlxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211dGlsLnJvdGF0ZVwwMzNbMG0odCwg
+bikgICAgICAgICDihpIgcm90YWNpb25hIG4gcG9zacOnw7Vlc1xuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM211dGlsLnRyYW5zcG9zZVwwMzNbMG0obSkgICAgICAgICDihpIgdHJhbnNww7VlIG1h
+dHJpeCBkZSB0YWJlbGFzXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwuY29tYmluYXRp
+b25zXDAzM1swbSh0LCByKSAgIOKGkiB0b2RhcyBhcyBjb21iaW5hw6fDtWVzIGRlIHIgZWxlbWVu
+dG9zXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXV0aWwucGVybXV0YXRpb25zXDAzM1swbSh0
+KSAgICAgIOKGkiB0b2RhcyBhcyBwZXJtdXRhw6fDtWVzXG5cbiIKICAgIHByaW50ZiAiXDAzM1sx
+OzM2beKUgOKUgCBQSVBFTElORSBFTkNBREXDgVZFTCAodXRpbC5jaGFpbikg4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbXV0aWwuY2hhaW5cMDMzWzBtKHQpICAgICAgICAgICAgIOKGkiBvYmpldG8gY29tIG3DqXRv
+ZG9zIGVuY2FkZcOhdmVpc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIE3DqXRvZG9zOiA6
+bWFwIDpmaWx0ZXIgOnNvcnRlZCA6dW5pcXVlIDpmbGF0dGVuIDp0YWtlIDpkcm9wXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgICAgICAgIDpyZXZlcnNlIDplYWNoIDp2YWx1
+ZSA6Y291bnQgOnN1bSA6bWluIDptYXggOm1lYW4gOmZpcnN0IDpsYXN0XDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIHV0aWwuY2hhaW4oezUsMyw4LDEsOSwyfSlcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICA6ZmlsdGVyKGZ1bmN0aW9uKHgpIHJldHVybiB4
+ID4gMyBlbmQpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgOnNvcnRlZCgp
+Om1hcChmdW5jdGlvbih4KSByZXR1cm4geCoxMCBlbmQpXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gICAgOnZhbHVlKCkgICAtLT4gIHs1MCw4MCw5MH1cMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtRGljYTogdXRpbC5oZWxwKCkgbm8gUkVQTCBwYXJhIHJlZmVy
+w6puY2lhIHLDoXBpZGEgY29sb3JpZGFcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfanNvbigp
+IHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBqc29uLiog4oCUIEpTT04gZW5jb2Rl
+L2RlY29kZSDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWpzb24uZW5jb2RlXDAzM1swbSh2YWx1ZSkgICDi
+hpIgc3RyaW5nIEpTT04gIG91ICBuaWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBDb252
+ZXJ0ZSBxdWFscXVlciB2YWxvciBMdWEgZW0gc3RyaW5nIEpTT04uXDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIG5pbCDihpIgJ251bGwnICAgdHJ1ZS9mYWxzZSDihpIgJ3RydWUn
+LydmYWxzZSdcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbnVtYmVyIOKGkiBu
+w7ptZXJvICAgc3RyaW5nIOKGkiBzdHJpbmcgY29tIGVzY2FwZXNcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgdGFibGUgKGFycmF5KSDihpIgWy4uLl0gICB0YWJsZSAoZGljdCkg
+4oaSIHsuLi59XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAganNvbi5lbmNv
+ZGUobmlsKSAgICAgICAgICAgLS0+ICdudWxsJ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBqc29uLmVuY29kZSh0cnVlKSAgICAgICAgICAtLT4gJ3RydWUnXDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGpzb24uZW5jb2RlKDQyKSAgICAgICAgICAgIC0tPiAn
+NDInXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGpzb24uZW5jb2RlKCdvaScp
+ICAgICAgICAgIC0tPiAnXCJvaVwiJ1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBt
+ICBqc29uLmVuY29kZSh7MSwyLDN9KSAgICAgICAtLT4gJ1sxLDIsM10nXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIGpzb24uZW5jb2RlKHt4PTEseT0yfSkgICAgIC0tPiAne1wi
+eFwiOjEsXCJ5XCI6Mn0nXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWpzb24u
+ZGVjb2RlXDAzM1swbShzdHIpICAgICDihpIgdmFsdWUgTHVhICBvdSAgbmlsXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgQ29udmVydGUgc3RyaW5nIEpTT04gZW0gdmFsb3IgTHVhLlwwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAnbnVsbCcg4oaSIG5pbCAgICd0cnVlJy8n
+ZmFsc2UnIOKGkiBib29sZWFuXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG7D
+um1lcm8g4oaSIG51bWJlciAgIHN0cmluZyDihpIgc3RyaW5nXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIFsuLi5dIOKGkiB0YWJsZSBhcnJheSAgIHsuLi59IOKGkiB0YWJsZSBk
+aWN0XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAganNvbi5kZWNvZGUoJ251
+bGwnKSAgICAgICAgLS0+IG5pbFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBq
+c29uLmRlY29kZSgnNDInKSAgICAgICAgICAtLT4gNDJcMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAganNvbi5kZWNvZGUoJ1sxLDIsM10nKSAgICAgLS0+IHsxLDIsM31cMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgbyA9IGpzb24uZGVjb2RlKCd7XCJh
+XCI6MSxcImJcIjp7XCJjXCI6OTl9fScpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
+MG0gIHByaW50KG8uYSwgby5iLmMpICAgICAgICAgIC0tPiAxICAgOTlcMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBFWEVNUExPUyBSRUFJUyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAt
+LSBjb25zdW1pciBBUEkgUkVTVDpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+bG9jYWwgYm9keSwgY29kZSA9IG5ldC5nZXQoJ2h0dHBzOi8vYXBpLmdpdGh1Yi5jb20vdXNlcnMv
+dG9ydmFsZHMnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB1ID0g
+anNvbi5kZWNvZGUoYm9keSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHJp
+bnQodS5uYW1lLCB1LnB1YmxpY19yZXBvcylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICAtLSBQT1NUIGNvbSBKU09OOlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICBsb2NhbCBwYXlsb2FkID0ganNvbi5lbmNvZGUoe3VzZXI9J2FkbWluJywgcGFzcz0nMTIz
+J30pXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIGIsIGMgPSBuZXQu
+cG9zdCh1cmwsIHBheWxvYWQsICdhcHBsaWNhdGlvbi9qc29uJylcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgcmVzcCA9IGpzb24uZGVjb2RlKGIpXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgLS0gcGF5bG9hZCBOb1NRTCBJbmplY3Rpb246XDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIG5vc3FsID0ganNvbi5lbmNv
+ZGUoe3VzZXJuYW1lPXtbJ1wkbmUnXT0nJ30sXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhc3N3b3JkPXtbJ1wkbmUnXT0+Jyd9
+fSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbmV0LnBvc3QodXJsLCBub3Nx
+bCwgJ2FwcGxpY2F0aW9uL2pzb24nKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
+MG0gIC0tIHNhbHZhciBzY2FuIGVtIEpTT046XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIGxvY2FsIHJlc3VsdGFkbyA9IHtob3N0PSdhbHZvLmNvbScsIHZ1bG5zPXsneHNzJywn
+c3FsaSd9fVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBmcy53cml0ZSgnc2Nh
+bi5qc29uJywganNvbi5lbmNvZGUocmVzdWx0YWRvKSlcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICAtLSByb3VuZHRyaXAgZW5jb2RlIC0+IGRlY29kZTpcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgb3JpZyA9IHtob3N0cz17JzEyNy4wLjAuMScs
+JzE5Mi4xNjguMS4xJ30sIHBvcnQ9ODA4MH1cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgbG9jYWwgYmFjayA9IGpzb24uZGVjb2RlKGpzb24uZW5jb2RlKG9yaWcpKVwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludChiYWNrLnBvcnQsIGJhY2suaG9zdHNb
+MV0pICAtLT4gODA4MCAgMTI3LjAuMC4xXDAzM1swbVxuXG4iCiAgICB9CiAgICBfZG9jX2xvZygp
+IHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBsb2cuKiDigJQgTG9nZ2luZyBFc3Ry
+dXR1cmFkbyDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBNw7NkdWxvIGRlIGxvZyBjb20gbsOtdmVpcywgY29y
+ZXMgZSB0aW1lc3RhbXAuIE5hdGl2byBubyBFbGxpb3RPUy5cbiIKICAgIHByaW50ZiAiICBOw6Nv
+IHByZWNpc2EgZGUgcmVxdWlyZSgpIOKAlCBkaXNwb27DrXZlbCBlbSBxdWFscXVlciBzY3JpcHQg
+b3UgUkVQTC5cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIE7DjVZFSVMgKGRvIG1l
+bm9yIGFvIG1haW9yKSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtVFJBQ0U9
+MCAgREVCVUc9MSAgSU5GTz0yICBPSz0zICBXQVJOPTQgIEVSUj01XDAzM1swbVxuXG4iCiAgICBw
+cmludGYgIlwwMzNbMTszNm3ilIDilIAgRlVOw4fDlUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21sb2cudHJhY2VcMDMzWzBtKC4uLikgICBcMDMzWzA7OTBtW1RSQUNFXSBI
+SDpNTTpTUyBtZW5zYWdlbVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbG9nLmRl
+YnVnXDAzM1swbSguLi4pICAgXDAzM1swOzM2bVtERUJVR10gSEg6TU06U1MgbWVuc2FnZW1cMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvZy5pbmZvXDAzM1swbSguLi4pICAgIFww
+MzNbMTszN21bSU5GTyBdIEhIOk1NOlNTIG1lbnNhZ2VtXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21sb2cub2tcMDMzWzBtKC4uLikgICAgICBcMDMzWzE7MzJtW09LICAgXSBISDpN
+TTpTUyBtZW5zYWdlbVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbG9nLndhcm5c
+MDMzWzBtKC4uLikgICAgXDAzM1sxOzMzbVtXQVJOIF0gSEg6TU06U1MgbWVuc2FnZW1cMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvZy5lcnJcMDMzWzBtKC4uLikgICAgIFwwMzNb
+MTszMW1bRVJSICBdIEhIOk1NOlNTIG1lbnNhZ2VtXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+QWNlaXRhIG3Dumx0aXBsb3MgYXJndW1lbnRvcyDigJQgc8OjbyBjb25jYXRlbmFkb3MgY29tIGVz
+cGHDp286XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9nLmluZm8oJ2hvc3Q6JywgaG9z
+dCwgJ3BvcnRhOicsIHBvcnQpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDi
+lIAgQ09ORklHVVJBw4fDg08g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvZy5zZXRfbGV2ZWxcMDMz
+WzBtKGx2bClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBGaWx0cmEgbWVuc2FnZW5zIGFi
+YWl4byBkbyBuw612ZWwuIEFjZWl0YSBub21lIG91IG7Dum1lcm8uXDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIGxvZy5zZXRfbGV2ZWwoJ1dBUk4nKSAgIC0tIHPDsyBXQVJOIGUg
+RVJSIGFwYXJlY2VtXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvZy5zZXRf
+bGV2ZWwoMCkgICAgICAgIC0tIHR1ZG8gYXBhcmVjZSAocGFkcsOjbylcMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtbG9nLnRvX2ZpbGVcMDMzWzBtKHBhdGgpXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgRHVwbGljYSBzYcOtZGEgcGFyYSBhcnF1aXZvIChzZW0gY29yZXMp
+LiBBcHBlbmQgYXV0b23DoXRpY28uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IGxvZy50b19maWxlKCdzY2FuLmxvZycpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbWxvZy5zZXRfb3V0cHV0XDAzM1swbShmbilcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBt
+ICBSZWRpcmVjaW9uYSBzYcOtZGEgcGFyYSBmdW7Dp8OjbyBjdXN0b21pemFkYS5cMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9nLnNldF9vdXRwdXQoZnVuY3Rpb24ocykgdWku
+Ym94KHMpIGVuZClcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbG9nLnNpbGVu
+dFwwMzNbMG0oKSAgICDigJQgZGVzYXRpdmEgdG9kYSBzYcOtZGEgdGVtcG9yYXJpYW1lbnRlXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvZy5yZXN1bWVcMDMzWzBtKCkgICAg4oCUIHJlYXRp
+dmEgc2HDrWRhXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBVVElMSVTDgVJJT1Mg
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxvZy50aW1lZFwwMzNbMG0obGFiZWwsIGZuKVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIEV4ZWN1dGEgZm4oKSwgbWVkZSB0ZW1wbyBlIGxvZ2Eg
+T0svRVJSIGNvbSBkdXJhw6fDo28uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IGxvZy50aW1lZCgnZG93bmxvYWQnLCBmdW5jdGlvbigpIG5ldC5nZXQodXJsKSBlbmQpXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIC0tIFtPSyAgIF0gMjM6NDE6MDEgZG93bmxv
+YWQgKDAuMzEycylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBFWEVN
+UExPIENPTVBMRVRPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvZy50b19maWxlKCdhcHAubG9nJylcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9nLnNldF9sZXZlbCgnSU5GTycpXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvZy5pbmZvKCdpbmljaWFuZG8gc2NhbiBlbScs
+IGhvc3QpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIG9rLCBlcnIg
+PSBwY2FsbChmdW5jdGlvbigpIG5ldC5zeW4oaG9zdCwgODApIGVuZClcMDMzWzBtXG4iCiAgICBw
+cmludGYgIiAgXDAzM1swOzkwbSAgaWYgb2sgdGhlbiBsb2cub2soJ3BvcnRhIDgwIGFiZXJ0YScp
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGVsc2UgICAgICBsb2cuZXJyKCdm
+YWxob3U6JywgZXJyKSBlbmRcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfY3N2KCkgewogICAg
+cHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIGNzdi4qIOKAlCBQYXJzZSBlIEVzY3JpdGEgZGUg
+Q1NWIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFBhcnNlciBDU1YgY29tcGxldG86IHN1cG9ydGEgY2FtcG9zIGNvbSBhc3Bh
+cywgQ1JMRiwgc2VwYXJhZG9yIGN1c3RvbS5cbiIKICAgIHByaW50ZiAiICBOYXRpdm8gbm8gRWxs
+aW90T1Mg4oCUIHNlbSByZXF1aXJlKCkuXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKU
+gCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWNzdi5kZWNv
+ZGVcMDMzWzBtKHN0ciBbLCBvcHRzXSkgIOKGkiAgdGFiZWxhIGRlIGxpbmhhc1xuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIFBhcnNlIGRlIHN0cmluZyBDU1YuIENvbSBoZWFkZXI9dHJ1ZSAo
+cGFkcsOjbyksIGNhZGEgbGluaGFcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+w6kgdW1hIHRhYmVsYSBjb20gY2hhdmVzIHBlbG9zIG5vbWVzIGRhcyBjb2x1bmFzLlwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB0ID0gY3N2LmRlY29kZSgnbm9tZSxp
+ZGFkZVxuTWlrZSwyMFxuQW5hLDI1JylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgcHJpbnQodFsxXS5ub21lLCB0WzFdLmlkYWRlKSAgIC0tPiBNaWtlICAyMFwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludCh0WzJdLm5vbWUpICAgICAgICAgICAgICAg
+LS0+IEFuYVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21jc3YuZW5jb2RlXDAz
+M1swbSh0IFssIG9wdHNdKSAg4oaSICBzdHJpbmcgQ1NWXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgQ29udmVydGUgdGFiZWxhIGRlIHRhYmVsYXMgZW0gc3RyaW5nIENTVi5cMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgQWRpY2lvbmEgYXNwYXMgYXV0b21hdGljYW1lbnRl
+IHF1YW5kbyBuZWNlc3PDoXJpby5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+bG9jYWwgcyA9IGNzdi5lbmNvZGUodClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgbG9jYWwgcyA9IGNzdi5lbmNvZGUodCwge3NlcD0nOyd9KVwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM21jc3YucmVhZFwwMzNbMG0ocGF0aCBbLCBvcHRzXSkgIOKGkiAgdGFi
+ZWxhXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgTMOqIGFycXVpdm8gQ1NWIGRvIGRpc2Nv
+LiBFcXVpdmFsZSBhIGRlY29kZShmcy5yZWFkKHBhdGgpKS5cMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgbG9jYWwgdCA9IGNzdi5yZWFkKCdkYWRvcy5jc3YnKVwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCB0ID0gY3N2LnJlYWQoJ2RhZG9zLmNzdics
+IHtzZXA9JzsnLCBoZWFkZXI9ZmFsc2V9KVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MTszM21jc3Yud3JpdGVcMDMzWzBtKHBhdGgsIHQgWywgb3B0c10pXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgR3JhdmEgdGFiZWxhIGNvbW8gYXJxdWl2byBDU1YuXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIGNzdi53cml0ZSgnc2FpZGEuY3N2JywgdClcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgY3N2LndyaXRlKCdzYWlkYS5jc3YnLCB0LCB7c2Vw
+PSc7J30pXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgT1DDh8OVRVMg
+KG9wdHMpIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zZXBcMDMzWzBtICAgIHNlcGFyYWRvciBkZSBjYW1w
+byAgKHBhZHLDo286ICcsJylcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtcXVvdGVcMDMzWzBt
+ICBjYXJhY3RlcmUgZGUgYXNwYXMgIChwYWRyw6NvOiAnXCInKVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMTszM21oZWFkZXJcMDMzWzBtIHRydWUgPSBwcmltZWlyYSBsaW5oYSBzw6NvIGNhYmXDp2Fs
+aG9zIChwYWRyw6NvOiB0cnVlKVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRVhF
+TVBMTyBDT01QTEVUTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAtLSBsZXIsIGZpbHRyYXIgZSByZWVzY3JldmVyXDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIHQgPSBjc3YucmVhZCgndXN1
+YXJpb3MuY3N2JylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgYXRp
+dm9zID0gdXRpbC5maWx0ZXIodCwgZnVuY3Rpb24ocilcMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgICByZXR1cm4gci5zdGF0dXMgPT0gJ2F0aXZvJ1wwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBlbmQpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
+MG0gIGNzdi53cml0ZSgnYXRpdm9zLmNzdicsIGF0aXZvcylcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgbG9nLm9rKCdmaWx0cmFkb3M6JywgI2F0aXZvcywgJ3VzdWFyaW9zIGF0
+aXZvcycpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgLS0gcG9udG8tZS12
+w61yZ3VsYSAocGFkcsOjbyBCUiBkZSBwbGFuaWxoYXMpXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIGxvY2FsIHQyID0gY3N2LnJlYWQoJ3JlbGF0b3Jpby5jc3YnLCB7c2VwPSc7
+J30pXDAzM1swbVxuXG4iCiAgICB9CiAgICBfZG9jX2RvdygpIHsKICAgIHByaW50ZiAiXDAzM1sx
+OzM1beKVkOKVkOKVkCBkb3cuKiDigJQgRG93bmxvYWQgZGUgTcOtZGlhIOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIE1vdG9yIGjDrWJyaWRvOiBZb3VUdWJlIHVzYSB5dC1kbHA7IG91dHJvcyBzaXRlcyB1
+c2FtIENvYmFsdCBBUEkgKyB3Z2V0LlxuIgogICAgcHJpbnRmICIgIFRvZG9zIG9zIGFycXVpdm9z
+IHPDo28gc2Fsdm9zIGVtIH4vRG93bmxvYWRzL1xuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3i
+lIDilIAgRlVOw4fDlUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21kb3cudmlk
+ZW9cMDMzWzBtKHVybClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBCYWl4YSB2w61kZW8u
+IFlvdVR1YmUg4oaSIHl0LWRscC4gT3V0cm9zIHNpdGVzIOKGkiBDb2JhbHQgQVBJLlwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBkb3cudmlkZW8oJ2h0dHBzOi8veW91dHViZS5j
+b20vd2F0Y2g/dj0uLi4nKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21kb3cu
+YXVkaW9cMDMzWzBtKHVybClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBFeHRyYWkgYXBl
+bmFzIG8gw6F1ZGlvIGRvIHbDrWRlby5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgZG93LmF1ZGlvKCdodHRwczovL3lvdXR1YmUuY29tL3dhdGNoP3Y9Li4uJylcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZG93LmltYWdlblwwMzNbMG0odXJsKVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIEJhaXhhIGltYWdlbSB2aWEgVVJMIGRpcmV0YS5cMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZG93LmltYWdlbignaHR0cHM6Ly9zaXRlLmNv
+bS9mb3RvLmpwZycpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWRvdy5wbGF5
+bGlzdFwwMzNbMG0odXJsKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIEJhaXhhIHBsYXls
+aXN0IGNvbXBsZXRhIGRvIFlvdVR1YmUgdmlhIHl0LWRscC5cMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgZG93LnBsYXlsaXN0KCdodHRwczovL3lvdXR1YmUuY29tL3BsYXlsaXN0
+P2xpc3Q9Li4uJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZG93LmluZm9c
+MDMzWzBtKHVybClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBNb3N0cmEgc3RhdHVzIGRh
+cyBmZXJyYW1lbnRhcyBlIGluc3TDom5jaWEgQ29iYWx0IGVtIHVzby5cMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtZG93LnJlc2V0XDAzM1swbSgpXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgVHJvY2EgaW5zdMOibmNpYSBDb2JhbHQgZW0gY2FjaGUgKMO6dGlsIHNlIGEg
+YXR1YWwgZmFsaGFyKS5cMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZG93Lmhl
+bHBcMDMzWzBtKClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBFeGliZSBhanVkYSBjb21w
+bGV0YSBkbyBtw7NkdWxvLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSA
+IFJFUVVJU0lUT1Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMxbSAg4pqgIFlvdVR1YmUgcmVxdWVy
+IHl0LWRscDpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcGtnIGluc3RhbGwg
+cHl0aG9uLXl0LWRscFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEVY
+RU1QTE9TIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGRvdy52aWRlbygnaHR0cHM6
+Ly95b3V0dWJlLmNvbS93YXRjaD92PWRRdzR3OVdnWGNRJylcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgZG93LmF1ZGlvKCdodHRwczovL3lvdXR1YmUuY29tL3dhdGNoP3Y9ZFF3
+NHc5V2dYY1EnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBkb3cucGxheWxp
+c3QoJ2h0dHBzOi8veW91dHViZS5jb20vcGxheWxpc3Q/bGlzdD1QTHh5eicpXDAzM1swbVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGRvdy5pbWFnZW4oJ2h0dHBzOi8vc2l0ZS5jb20vaW1h
+Z2VtLnBuZycpXDAzM1swbVxuXG4iCiAgICB9CiAgICBfZG9jX3dlYigpIHsKICAgIHByaW50ZiAi
+XDAzM1sxOzM1beKVkOKVkOKVkCB3ZWIuKiDigJQgUGFyc2luZyBIVE1MIGUgU2Vydmlkb3IgV2Vi
+IOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt
+4pSA4pSAIEZVTsOHw5VFUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtd2ViLmdl
+dFwwMzNbMG0odXJsIFssIG9wdHNdKSAg4oaSICBodG1sLCBjb2RlICBvdSAgbmlsLCBlcnJtc2dc
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBCYWl4YSBIVE1ML0NTUy9KUywgc2VndWUgcmVk
+aXJlY3RzLCBVc2VyLUFnZW50IGRlIGJyb3dzZXIuXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIG9wdHM6IHt0aW1lb3V0LCB1YSwgcXVpZXQsIGhlYWRlcnMsIGZpbGV9XDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIGh0bWwsIGNvZGUgPSB3ZWIuZ2V0
+KCdodHRwczovL2Fsdm8uY29tJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+d2ViLmxpbmtzXDAzM1swbShodG1sKSAg4oaSICB0YWJlbGEgZGUgVVJMc1xuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIEV4dHJhaSBocmVmIGRlIDxhPi88bGluaz4gZSBzcmMgZGUgPGltZz4v
+PHNjcmlwdD4uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIGxpbmtz
+ID0gd2ViLmxpbmtzKGh0bWwpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGZv
+ciBfLCBsIGluIGlwYWlycyhsaW5rcykgZG8gcHJpbnQobCkgZW5kXDAzM1swbVxuXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbXdlYi5mb3Jtc1wwMzNbMG0oaHRtbCkgIOKGkiAgdGFiZWxhIGRl
+IGZvcm11bMOhcmlvc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIEV4dHJhaSA8Zm9ybT4g
+Y29tIGlucHV0cywgc2VsZWN0cyBlIHRleHRhcmVhcy5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgbG9jYWwgZm9ybXMgPSB3ZWIuZm9ybXMoaHRtbClcMDMzWzBtXG5cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzE7MzNtd2ViLnNjcmlwdHNcMDMzWzBtKGh0bWwpICDihpIgIHRhYmVs
+YSBkZSBzY3JpcHRzXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgRXh0cmFpIDxzY3JpcHQ+
+IGV4dGVybm9zIGUgaW5saW5lLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM213
+ZWIuc2VydmVcMDMzWzBtKHBhdGgsIHBvcnQgWywgb3B0c10pXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgU29iZSBzZXJ2aWRvciBIVFRQIGVzdMOhdGljbyBlbSBiYWNrZ3JvdW5kLlwwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB3ZWIuc2VydmUoJy9zZGNhcmQvbWV1c2l0
+ZScsIDgwODApXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXdlYi5zdG9wXDAz
+M1swbSgpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUGFyYSBvIHNlcnZpZG9yIGluaWNp
+YWRvIHBvciB3ZWIuc2VydmUoKS5cMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKU
+gOKUgCBFWEVNUExPUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBodG1s
+LCBjb2RlID0gd2ViLmdldCgnaHR0cHM6Ly9hbHZvLmNvbScpXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIHByaW50KCdzdGF0dXM6JywgY29kZSlcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgbGlua3MgPSB3ZWIubGlua3MoaHRtbClcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZm9yIF8sIGwgaW4gaXBhaXJzKGxpbmtzKSBkbyBw
+cmludChsKSBlbmRcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAtLSBhdWRp
+dGFyIGZvcm11bMOhcmlvcyBkZSBsb2dpbjpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgbG9jYWwgZm9ybXMgPSB3ZWIuZm9ybXMoaHRtbClcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgZm9yIF8sIGYgaW4gaXBhaXJzKGZvcm1zKSBkb1wwMzNbMG1cbiIKICAg
+IHByaW50ZiAiICBcMDMzWzA7OTBtICAgIHByaW50KGYuYWN0aW9uLCBmLm1ldGhvZClcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZW5kXDAzM1swbVxuXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgLS0gc2VydmlyIHByb2pldG8gbG9jYWw6XDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIHdlYi5zZXJ2ZSgnLi9tZXVzaXRlJywgODA4MClcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgLS0gYWNlc3NhciBubyBicm93c2VyOiBodHRwOi8v
+bG9jYWxob3N0OjgwODBcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfbG1vZCgpIHsKICAgIHBy
+aW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBsbW9kLiog4oCUIENyaWFkb3IgZGUgTcOzZHVsb3Mg
+THVhIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIENyaWEgZSBnZXJlbmNpYSBtw7NkdWxvcyBMdWEgZW0gfi8ubHVhLW1vZHVsZXMvXG4i
+CiAgICBwcmludGYgIiAgTcOzZHVsb3MgY3JpYWRvcyBjb20gbG1vZCBzw6NvIGNhcnJlZ2Fkb3Mg
+dmlhIHJlcXVpcmUoJ25vbWUnKS5cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEZV
+TsOHw5VFUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtbG1vZC5uZXdcMDMzWzBt
+KCdub21lJyBbLCB0aXBvXSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBDcmlhIG3Ds2R1
+bG8gZW0gfi8ubHVhLW1vZHVsZXMvbm9tZS5sdWFcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgdGlwb3M6IHNjYW5uZXIgfCByZWNvbiB8IHV0aWwgfCBnZW5lcmljIChwYWRyw6Nv
+KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsbW9kLm5ldygnbXlzY2FubmVy
+JywgJ3NjYW5uZXInKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21sbW9kLm1v
+ZFwwMzNbMG0oJ2FycXVpdm8ubHVhJylcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBDb3Bp
+YS9yZWdpc3RyYSBhcnF1aXZvIEx1YSBleGlzdGVudGUgY29tbyBtw7NkdWxvLlwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsbW9kLm1vZCgnbWV1dG9vbC5sdWEnKVwwMzNbMG1c
+blxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21sbW9kLmxpc3RcMDMzWzBtKClcbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBMaXN0YSBtw7NkdWxvcyBpbnN0YWxhZG9zIGVtIH4vLmx1YS1t
+b2R1bGVzXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxtb2QucmVtb3ZlXDAz
+M1swbSgnbm9tZScpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUmVtb3ZlIG3Ds2R1bG8g
+cGVsbyBub21lLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21sbW9kLnBhdGhc
+MDMzWzBtKClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBNb3N0cmEgbyBkaXJldMOzcmlv
+IGRlIG3Ds2R1bG9zLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21sbW9kLmhl
+bHBcMDMzWzBtKClcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBBanVkYSBjb20gZXhlbXBs
+b3MuXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWxtb2QuZXh0cmFjdFwwMzNb
+MG0oJ25vbWUnIFssIG9wdHNdKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIEV4dHJhaSBh
+IGludGVyZmFjZSBkZSBxdWFscXVlciBtw7NkdWxvIG5hdGl2byBkbyBFbGxpb3RPUyBwYXJhIHVt
+XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGFycXVpdm8gLmx1YSBlbSB+Ly5s
+dWEtbW9kdWxlcy88bm9tZT5fZXh0cmFjdC5sdWFcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgw5p0aWwgcGFyYSBlc3R1ZGFyIGZ1bsOnw7Vlcywgb3JpZ2VucyAoQyB2cyBMdWEp
+IGUgY3JpYXIgbcOzZHVsb3NcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHLD
+s3ByaW9zIGJhc2VhZG9zIG5vcyBuYXRpdm9zLlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICBvcHRzOiB7IGZpbGU9J2NhbWluaG8ubHVhJywgdmVyYm9zZT10cnVlL2ZhbHNlIH1c
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAtLSBleGVtcGxvczpcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG1vZC5leHRyYWN0KCduZXQnKSAgICAgICAg
+ICAgICAgLS0gZXh0cmFpIGludGVyZmFjZSBkZSBuZXQuKlwwMzNbMG1cbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICBsbW9kLmV4dHJhY3QoJ2ZzJykgICAgICAgICAgICAgICAtLSBleHRyYWkg
+aW50ZXJmYWNlIGRlIGZzLipcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG1v
+ZC5leHRyYWN0KCdsb2cnKSAgICAgICAgICAgICAgLS0gZXh0cmFpIG3Ds2R1bG8gbG9nLiogKEx1
+YSlcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG1vZC5leHRyYWN0KCdjc3Yn
+LCB7dmVyYm9zZT1mYWxzZX0pICAtLSBzaWxlbmNpb3NvXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gIGxtb2QuZXh0cmFjdCgnbmV0Jywge2ZpbGU9Jy9zZGNhcmQvbmV0X3JlZi5s
+dWEnfSlcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGTFVYTyBUw41Q
+SUNPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxtb2QubmV3KCdhdXRoYnlwYXNzJywgJ3NjYW5uZXIn
+KSAtLSBjcmlhIG8gdGVtcGxhdGVcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+bXMgLWUgfi8ubHVhLW1vZHVsZXMvYXV0aGJ5cGFzcy5sdWEgLS0gZWRpdGFcMDMzWzBtXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgLS0gbm8gUkVQTCBvdSBlbSBzY3JpcHRzOlwwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBhYiA9IHJlcXVpcmUoJ2F1dGhieXBh
+c3MnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBhYi5zY2FuKCdodHRwczov
+L2Fsdm8uY29tL2xvZ2luJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKU
+gCBUSVBPUyBERSBURU1QTEFURSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMHNcMDMzWzBtICVzXG4iICJzY2FubmVyIiAidGVt
+cGxhdGUgY29tIHNjYW4odXJsKSArIGRldGVjw6fDo28gZGUgdnVsbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtJS0xMHNcMDMzWzBtICVzXG4iICJyZWNvbiIgICAidGVtcGxhdGUgY29tIHJ1biho
+b3N0KSBwYXJhIHJlY29uaGVjaW1lbnRvIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEwc1ww
+MzNbMG0gJXNcbiIgInV0aWwiICAgICJ0ZW1wbGF0ZSB1dGlsaXTDoXJpbyBnZW7DqXJpY28gY29t
+IGhlbHBlcnMiCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbSUtMTBzXDAzM1swbSAlc1xuIiAiZ2Vu
+ZXJpYyIgIm3Ds2R1bG8gdmF6aW8sIGVzdHJ1dHVyYSBtw61uaW1hIgogICAgcHJpbnRmICJcbiIK
+ICAgIH0KICAgIF9kb2NfbHgoKSB7CiAgICBsb2NhbCBCPSdcMDMzWzE7MzZtJyBHPSdcMDMzWzE7
+MzJtJyBZPSdcMDMzWzE7MzNtJyBNPSdcMDMzWzE7MzVtJyBSPSdcMDMzWzBtJyBEPSdcMDMzWzA7
+OTBtJwogICAgcHJpbnRmICJcbiR7Qn3ilZDilZDilZAgbHgg4oCUIEludGVyZmFjZSBHcsOhZmlj
+YSBkZSBBbHRvIE7DrXZlbCDilZDilZDilZAke1J9XG5cbiIKICAgIHByaW50ZiAiICAke0R9SW5z
+dGFsYcOnw6NvIDogbHBtIGluc3RhbGwgbHgke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfVVzbyAg
+ICAgICAgOiBsb2NhbCBseCA9IHJlcXVpcmUoXCJseFwiKSR7Un1cblxuIgogICAgcHJpbnRmICIk
+e0194pSA4pSAIEpBTkVMQSBFIFRFTEFTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Un1cblxuIgog
+ICAgcHJpbnRmICIgICR7R31seC5hcHAodGl0dWxvLCBbdGFtYW5ob10sIFt0ZW1hXSwgbGF5b3V0
+KSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBDcmlhIGUgZXhpYmUgdW1hIGphbmVsYSBjb21w
+bGV0YS4ke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgdGFtYW5obzogXCI2MDB4NDAwXCIgICB0
+ZW1hOiBcImRhcmtcIiBvdSBcImxpZ2h0XCIke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgUG9k
+ZSBjb21iaW5hcjogXCI1MDB4NDAwIGRhcmtcIiR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBs
+YXlvdXQ6IGxpc3RhIGRlIHdpZGdldHMg4oCUIGx4LmZpZWxkLCBseC5vdXRwdXQsIGx4LmJ1dHRv
+bi4uLiR7Un1cblxuIgogICAgcHJpbnRmICIgICR7R31seC5zY3JlZW4oaWQsIGxheW91dCwgW29w
+dHNdKSR7Un0gIHRlbGEgcGFyYSBhcHBzIG11bHRpcMOhZ2luYVxuIgogICAgcHJpbnRmICIgICR7
+RH0gIG9wdHM6IHsgdGl0bGU9XCJUw610dWxvXCIgfSAgIHYuZ28oaWQpIG5hdmVnYSBlbnRyZSB0
+ZWxhcyR7Un1cblxuIgogICAgcHJpbnRmICIgICR7R31seC5tZW51KGl0ZW1zKSR7Un1cbiIKICAg
+IHByaW50ZiAiICAke0R9ICBpdGVtczogeyB7XCJBcnF1aXZvXCIsIHtcIkFicmlyXCIsIGZufSwg
+e3NlcD10cnVlfSwge1wiU2FpclwiLCBseC5xdWl0fSB9LCAuLi4gfSR7Un1cblxuIgogICAgcHJp
+bnRmICIgICR7R31seC5iZyhjb3Jfb3VfcGF0aCkke1J9ICAgICAgICAgZnVuZG86IG5vbWUvaGV4
+L3JnYiBvdSBjYW1pbmhvIGRlIGltYWdlbVxuIgogICAgcHJpbnRmICIgICR7R31seC5pY29uKHBh
+dGgpJHtSfSAgICAgICAgICAgICAgw61jb25lIGRhIGphbmVsYSAoLnBuZy8uc3ZnKVxuIgogICAg
+cHJpbnRmICIgICR7R31seC5jc3MoLi4uKSR7Un0gICAgICAgICAgICAgICAgQ1NTIEdUSyBnbG9i
+YWxcbiIKICAgIHByaW50ZiAiICAke0R9ICBwcmVzZXRzOiBcInJvdW5kZWRcIiBcInJvdW5kZWRf
+bGdcIiBcImZsYXRcIiBcInNoYWRvd1wiIFwiYm9yZGVyZWRcIiBcImNvbXBhY3RcIiBcImNvbWZv
+cnRhYmxlXCIke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgbHguY3NzKFwicm91bmRlZFwiLCBc
+InNoYWRvd1wiKSAgIGx4LmNzcyhcImJ1dHRvbiB7IGNvbG9yOiByZWQ7IH1cIikke1J9XG5cbiIK
+ICAgIHByaW50ZiAiJHtNfeKUgOKUgCBURVhUTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIAke1J9XG5cbiIKICAgIHByaW50ZiAiICAke0d9bHgudGV4dChz
+dHIsIFtvcHRzXSkke1J9ICAgICAgIHRleHRvL3LDs3R1bG9cbiIKICAgIHByaW50ZiAiICAke0R9
+ICBvcHRzOiB7IGJvbGQ9dHJ1ZSwgY29sb3I9XCJyZWRcIiwgc2l6ZT1cImxhcmdlXCIsIGFsaWdu
+PS4uLiB9JHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gIGF0YWxobyBjb3I6ICAgbHgudGV4dChc
+Im1zZ1wiLCBcImJsdWVfYm9sZFwiKSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBhdGFsaG8g
+Ym9sZDogIGx4LnRleHQoXCJtc2dcIiwgXCJib2xkXCIpJHtSfVxuIgogICAgcHJpbnRmICIgICR7
+R31seC5oMSh0ZXh0bywgW2Nvcl0pJHtSfSAgICAgICAgdMOtdHVsbyBncmFuZGUgIChib2xkICsg
+eC1sYXJnZSlcbiIKICAgIHByaW50ZiAiICAke0d9bHguaDIodGV4dG8sIFtjb3JdKSR7Un0gICAg
+ICAgIHTDrXR1bG8gbcOpZGlvICAgKGJvbGQgKyBsYXJnZSlcblxuIgogICAgcHJpbnRmICIke019
+4pSA4pSAIEVOVFJBREFTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7
+Un1cblxuIgogICAgcHJpbnRmICIgICR7R31seC5maWVsZChpZCwgaGludCwgW2Z0eXBlXSkke1J9
+ICBjYW1wbyB0ZXh0byDigJQgZnR5cGU6IFwidGV4dFwifFwicGFzc3dvcmRcIlxuIgogICAgcHJp
+bnRmICIgICR7R31seC5wYXNzd29yZChpZCwgaGludCkke1J9ICAgICAgICAgY2FtcG8gZGUgc2Vu
+aGEgKGF0YWxobyBkZSBmaWVsZClcbiIKICAgIHByaW50ZiAiICAke0d9bHguY2hlY2soaWQsIGxh
+YmVsLCBbZGVmYXVsdF0pJHtSfSAgY2hlY2tib3gg4oCUIHYuaWQg4oaSIHRydWUvZmFsc2VcbiIK
+ICAgIHByaW50ZiAiICAke0d9bHguc2VsZWN0KGlkLCBsYmwsIG9wdHMsIFtkZWZdKSR7Un0gZHJv
+cGRvd24g4oCUIHYuaWQg4oaSIG9ww6fDo28gc2VsZWNpb25hZGFcbiIKICAgIHByaW50ZiAiICAk
+e0R9ICBvcHRzOiB7XCJPcMOnw6NvMVwiLFwiT3DDp8OjbzJcIiwuLi59ICAgZGVmOiDDrW5kaWNl
+IGluaWNpYWwgKDEtYmFzZWQpJHtSfVxuIgogICAgcHJpbnRmICIgICR7R31seC5zbGlkZXIoaWQs
+IGxibCwgbWluLCBtYXgsIHN0ZXAsIGRlZikke1J9ICBzbGlkZXIg4oCUIHYuaWQg4oaSIG7Dum1l
+cm9cbiIKICAgIHByaW50ZiAiICAke0d9bHguc3BpbihpZCwgbGJsLCBtaW4sIG1heCwgW3N0ZXAs
+IGRlZl0pJHtSfSAgaW5wdXQgbnVtw6lyaWNvIOKAlCB2LmlkIOKGkiBuw7ptZXJvXG4iCiAgICBw
+cmludGYgIiAgJHtHfWx4LnRvZ2dsZShpZCwgbGFiZWwsIFtkZWZhdWx0XSkke1J9ICBzd2l0Y2gg
+b24vb2ZmIOKAlCB2LmlkIOKGkiB0cnVlL2ZhbHNlXG4iCiAgICBwcmludGYgIiAgJHtHfWx4LmNv
+bG9yKGlkLCBsYWJlbCwgW2RlZmF1bHRdKSR7Un0gICBjb2xvciBwaWNrZXIg4oCUIHYuaWQg4oaS
+IFwiI3JyZ2diYlwiXG4iCiAgICBwcmludGYgIiAgJHtEfSAgZGVmYXVsdDogbm9tZSBkZSBjb3Ig
+KFwicmVkXCIsXCJibHVlX2JvbGRcIi4uLikgb3UgaGV4IFwiI3JyZ2diYlwiJHtSfVxuXG4iCiAg
+ICBwcmludGYgIiR7TX3ilIDilIAgU0HDjURBUyBFIExBWU9VVCDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAk
+e1J9XG5cbiIKICAgIHByaW50ZiAiICAke0d9bHgub3V0cHV0KGlkLCBbb3B0c10pJHtSfSAgICAg
+ICDDoXJlYSBkZSB0ZXh0byDigJQgdi5pZCA9IHRleHRvIG91IHRhYmVsYVxuIgogICAgcHJpbnRm
+ICIgICR7RH0gIG9wdHM6IHsgbW9ubz10cnVlLCBoZWlnaHQ9MjAwIH0ke1J9XG4iCiAgICBwcmlu
+dGYgIiAgJHtHfWx4LnRhYmxlKGlkLCB7Y29sdW5hc30sIFtvcHRzXSkke1J9ICB0YWJlbGEgY29t
+IGNvbHVuYXMg4oCUIHYuaWQgPSByb3dzXG4iCiAgICBwcmludGYgIiAgJHtHfWx4LnByb2dyZXNz
+KGlkLCBbb3B0c10pJHtSfSAgICAgYmFycmEgZGUgcHJvZ3Jlc3NvIOKAlCB2LmlkID0gMC41ICg1
+MCUlKVxuIgogICAgcHJpbnRmICIgICR7R31seC5zdGF0dXNiYXIoaWQpJHtSfSAgICAgICAgICAg
+IGJhcnJhIGRlIHN0YXR1cyBubyByb2RhcMOpIOKAlCB2LmlkID0gXCJ0ZXh0b1wiXG4iCiAgICBw
+cmludGYgIiAgJHtHfWx4LmltYWdlKHBhdGgsIFt3aWR0aCwgaGVpZ2h0XSkke1J9ICBpbWFnZW0g
+ZGUgYXJxdWl2byBvdSDDrWNvbmUgR1RLXG4iCiAgICBwcmludGYgIiAgJHtEfSAgcGF0aCBzZW0g
+Jy8nIG91ICcuJyDihpIgdHJhdGFkbyBjb21vIG5vbWUgZGUgw61jb25lIEdUSyR7Un1cbiIKICAg
+IHByaW50ZiAiICAke0d9bHgucm93KHt3aWRnZXRzfSwgW29wdHNdKSR7Un0gICBsYXlvdXQgaG9y
+aXpvbnRhbFxuIgogICAgcHJpbnRmICIgICR7R31seC5idXR0b24obGFiZWwsIGZuLCBbb3B0c10p
+JHtSfSAgYm90w6NvIOKAlCBmbih2KSByZWNlYmUgY2FtcG9zIGUgc2HDrWRhc1xuIgogICAgcHJp
+bnRmICIgICR7RH0gIG9wdHM6IHsgc3VnZ2VzdGVkPXRydWUsIGRlc3RydWN0aXZlPXRydWUsIGlj
+b249XCJub21lXCIgfSR7Un1cbiIKICAgIHByaW50ZiAiICAke0d9bHgub2sobGFiZWwsIGZuKSR7
+Un0gICAgICAgICAgICBib3TDo28gc3VnZXJpZG8gKGF6dWwvYcOnw6NvKVxuIgogICAgcHJpbnRm
+ICIgICR7R31seC5kYW5nZXIobGFiZWwsIGZuKSR7Un0gICAgICAgIGJvdMOjbyBkZXN0cnV0aXZv
+ICh2ZXJtZWxobylcbiIKICAgIHByaW50ZiAiICAke0d9bHguc3BhY2VyKCkke1J9ICAgICAgICAg
+ICAgICAgICBlc3Bhw6dvIGZsZXjDrXZlbFxuIgogICAgcHJpbnRmICIgICR7R31seC5zZXAoKSR7
+Un0gICAgICAgICAgICAgICAgICAgIHNlcGFyYWRvciBob3Jpem9udGFsXG5cbiIKICAgIHByaW50
+ZiAiJHtNfeKUgOKUgCBDT1JFUyBOT01FQURBUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAke1J9XG5c
+biIKICAgIHByaW50ZiAiICAke0R9ZGFyayBkYXJrZXIgZGFya2VzdCBibGFjayB3aGl0ZSBsaWdo
+dCBsaWdodGVyJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH1yZWQgcmVkX2JvbGQgY3JpbXNvbiAg
+Ymx1ZSBibHVlX2JvbGQgbmF2eSAgZ3JlZW4gZ3JlZW5fYm9sZCBsaW1lIHRlYWwke1J9XG4iCiAg
+ICBwcmludGYgIiAgJHtEfXllbGxvdyBvcmFuZ2UgcHVycGxlIHBpbmsgY3lhbiBhcXVhIGdyZXkg
+c2lsdmVyIHRlcm1pbmFsIHRlcm1pbmFsX2dyZWVuJHtSfVxuXG4iCiAgICBwcmludGYgIiR7TX3i
+lIDilIAgT0JKRVRPIHYgTk8gQk9Uw4NPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Un1cblxuIgogICAgcHJpbnRm
+ICIgICR7RH12LmNhbXBvICAgICAgICAgICAgICDihpIgbMOqIHZhbG9yIGRlIGx4LmZpZWxkKFwi
+Y2FtcG9cIikke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfXYuc2FpZGEgPSB0ZXh0byAgICAgIOKG
+kiBzdWJzdGl0dWkgY29udGXDumRvIGRlIGx4Lm91dHB1dChcInNhaWRhXCIpJHtSfVxuIgogICAg
+cHJpbnRmICIgICR7RH12LnNhaWRhID0ge3Jvd3N9ICAgICDihpIgZXhpYmUgdGFiZWxhIGNvbSBj
+YWJlw6dhbGhvIGVtIGx4Lm91dHB1dCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9di5zYWlkYTph
+cHBlbmQodHh0KSAg4oaSIGFkaWNpb25hIHRleHRvIHNlbSBhcGFnYXIke1J9XG4iCiAgICBwcmlu
+dGYgIiAgJHtEfXYuc2FpZGE6Y2xlYXIoKSAgICAgIOKGkiBsaW1wYSBvIG91dHB1dCR7Un1cbiIK
+ICAgIHByaW50ZiAiICAke0R9di5zYWlkYTpnZXQoKSAgICAgICAg4oaSIHJldG9ybmEgY29udGXD
+umRvIGF0dWFsIGRvIG91dHB1dCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9di50YWJlbGEgPSB7
+cm93c30gICAg4oaSIHByZWVuY2hlIGx4LnRhYmxlKFwidGFiZWxhXCIpJHtSfVxuIgogICAgcHJp
+bnRmICIgICR7RH12LnRhYmVsYTpjbGVhcigpICAgICDihpIgbGltcGEgYSB0YWJlbGEke1J9XG4i
+CiAgICBwcmludGYgIiAgJHtEfXYucHJvZyA9IDAuNzUgICAgICAgIOKGkiBwcm9ncmVzc28gNzUl
+JSBlbSBseC5wcm9ncmVzcyhcInByb2dcIikke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfXYucHJv
+ZyA9IFwiQWd1YXJkZVwiICAg4oaSIHRleHRvIHB1bHNhbnRlIG5hIGJhcnJhJHtSfVxuIgogICAg
+cHJpbnRmICIgICR7RH12LnByb2c6cHVsc2UoKSAgICAgICDihpIgYW5pbWEgYSBiYXJyYSBtYW51
+YWxtZW50ZSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9di5wcm9nOnJlc2V0KCkgICAgICAg4oaS
+IHJlc2V0YSBhIGJhcnJhIHBhcmEgdmF6aW8ke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfXYuc3Rh
+dHVzID0gXCJ0ZXh0b1wiICAg4oaSIGF0dWFsaXphIGx4LnN0YXR1c2JhcihcInN0YXR1c1wiKSR7
+Un1cbiIKICAgIHByaW50ZiAiICAke0R9di5nbyhcInRlbGFcIikgICAgICAgICDihpIgbmF2ZWdh
+IHBhcmEgb3V0cmEgdGVsYSAobXVsdGlww6FnaW5hKSR7Un1cblxuIgogICAgcHJpbnRmICIke019
+4pSA4pSAIERJw4FMT0dPUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAk
+e1J9XG5cbiIKICAgIHByaW50ZiAiICAke0d9bHguYWxlcnQobXNnLCBbdGl0dWxvXSkke1J9ICAg
+ICAgICAgICAgIGRpw6Fsb2dvIGRlIGF2aXNvIGNvbSBPS1xuIgogICAgcHJpbnRmICIgICR7R31s
+eC5jb25maXJtKG1zZywgZm5fc2ltLCBbZm5fbmFvXSkke1J9ICAgc2ltL27Do28g4oCUIGZucyBj
+aGFtYWRhcyBjb25mb3JtZSByZXNwb3N0YVxuIgogICAgcHJpbnRmICIgICR7R31seC5wcm9tcHQo
+bXNnLCBmbikke1J9ICAgICAgICAgICAgICAgICAgcGVkZSB0ZXh0byDigJQgZm4odGV4dG8pXG4i
+CiAgICBwcmludGYgIiAgJHtHfWx4Lm5vdGlmeSh0aXR1bG8sIG1zZykke1J9ICAgICAgICAgICAg
+ICBub3RpZmljYcOnw6NvIGRvIHNpc3RlbWEgKG5vdGlmeS1zZW5kKVxuIgogICAgcHJpbnRmICIg
+ICR7R31seC5maWxlcGljayhmbikke1J9ICAgICAgICAgICAgICAgICAgICAgZXNjb2xoZSBhcnF1
+aXZvIOKAlCBmbihjYW1pbmhvKVxuIgogICAgcHJpbnRmICIgICR7R31seC5kaXJwaWNrKGZuKSR7
+Un0gICAgICAgICAgICAgICAgICAgICAgZXNjb2xoZSBwYXN0YSAg4oCUIGZuKGNhbWluaG8pXG5c
+biIKICAgIHByaW50ZiAiJHtNfeKUgOKUgCBTQcONREEgLyBUUkFZIC8gTE9PUCBFIFRJTUVSIOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7Un1cblxuIgogICAgcHJpbnRm
+ICIgICR7R31seC5wcmludCguLi4pJHtSfSAgICAgICAgICAgICAgY29tbyBwcmludCgpIG1hcyDi
+hpIgd2lkZ2V0cyBkZSBvdXRwdXQgZG8gYXBwXG4iCiAgICBwcmludGYgIiAgJHtEfSAgeWllbGQg
+YXV0b23DoXRpY28g4oCUIGEgVUkgYXR1YWxpemEgZHVyYW50ZSBsb29wcyBsb25nb3Mke1J9XG4i
+CiAgICBwcmludGYgIiAgJHtHfWx4LnRyYXkoaWNvbiwgbWVudV9pdGVtcykke1J9ICDDrWNvbmUg
+bmEgYmFuZGVqYSBkbyBzaXN0ZW1hXG4iCiAgICBwcmludGYgIiAgJHtEfSAgaWNvbjogcGF0aCBk
+ZSBhcnF1aXZvICgucG5nLy5zdmcpIG91IG5vbWUgZGUgw61jb25lIEdUSyR7Un1cbiIKICAgIHBy
+aW50ZiAiICAke0d9bHgucnVuKFtmbl0pJHtSfSAgICAgICAgICAgICAgIGluaWNpYSBvIGxvb3Ag
+4oCUIGZuIG9wY2lvbmFsIGV4ZWN1dGFkYSBhbnRlc1xuIgogICAgcHJpbnRmICIgICR7R31seC5x
+dWl0KCkke1J9ICAgICAgICAgICAgICAgICAgZmVjaGEgbyBhcHBcbiIKICAgIHByaW50ZiAiICAk
+e0d9bHguYWZ0ZXIobXMsIGZuKSR7Un0gICAgICAgICAgIGV4ZWN1dGEgZm4gdW1hIHZleiBhcMOz
+cyBOIG1zXG4iCiAgICBwcmludGYgIiAgJHtHfWx4LmV2ZXJ5KG1zLCBmbikg4oaSIGlkJHtSfSAg
+ICAgIGV4ZWN1dGEgZm4gYSBjYWRhIE4gbXNcbiIKICAgIHByaW50ZiAiICAke0d9bHguY2FuY2Vs
+KGlkKSR7Un0gICAgICAgICAgICAgIGNhbmNlbGEgdGltZXJcblxuIgogICAgcHJpbnRmICIke019
+4pSA4pSAIEVYRU1QTE9TIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgCR7
+Un1cblxuIgogICAgcHJpbnRmICIgICR7WX0tLSBDYWxjdWxhZG9yYSBjb20gc2VsZWN0IGUgaGlz
+dFx4YzNceGIzcmljbyR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9bG9jYWwgbHggPSByZXF1aXJl
+KFwibHhcIikke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfWxvY2FsIGhpc3QgPSB7fSR7Un1cbiIK
+ICAgIHByaW50ZiAiICAke0R9bHguYXBwKFwiQ2FsY3VsYWRvcmFcIiwgXCI0MjB4NDAwXCIsIFwi
+ZGFya1wiLCB7JHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gIGx4LmgxKFwiQ2FsY3VsYWRvcmFc
+IiksJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gIGx4LnJvdyh7IGx4LmZpZWxkKFwiYVwiLCBc
+Ik51bWVybyBBXCIpLCBseC5maWVsZChcImJcIiwgXCJOdW1lcm8gQlwiKSB9KSwke1J9XG4iCiAg
+ICBwcmludGYgIiAgJHtEfSAgbHguc2VsZWN0KFwib3BcIiwgXCJPcGVyYWNhb1wiLCB7XCIrXCIs
+IFwiLVwiLCBcIipcIiwgXCIvXCJ9LCAxKSwke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgbHgu
+dGFibGUoXCJoaXN0b3JpY29cIiwge1wiQVwiLCBcIk9wXCIsIFwiQlwiLCBcIlJlc3VsdGFkb1wi
+fSksJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gIGx4LnN0YXR1c2JhcihcInN0YXR1c1wiKSwk
+e1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgbHgub2soXCJDYWxjdWxhclwiLCBmdW5jdGlvbih2
+KSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgIGxvY2FsIGEsIGIgPSB0b251bWJlcih2LmEp
+LCB0b251bWJlcih2LmIpJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gICAgaWYgbm90IGEgb3Ig
+bm90IGIgdGhlbiB2LnN0YXR1cyA9IFwiTnVtZXJvIGludmFsaWRvXCIgcmV0dXJuIGVuZCR7Un1c
+biIKICAgIHByaW50ZiAiICAke0R9ICAgIGxvY2FsIHIke1J9XG4iCiAgICBwcmludGYgIiAgJHtE
+fSAgICBpZiB2Lm9wID09IFwiK1wiIHRoZW4gciA9IGErYiR7Un1cbiIKICAgIHByaW50ZiAiICAk
+e0R9ICAgIGVsc2VpZiB2Lm9wID09IFwiLVwiIHRoZW4gciA9IGEtYiR7Un1cbiIKICAgIHByaW50
+ZiAiICAke0R9ICAgIGVsc2VpZiB2Lm9wID09IFwiKlwiIHRoZW4gciA9IGEqYiR7Un1cbiIKICAg
+IHByaW50ZiAiICAke0R9ICAgIGVsc2VpZiB2Lm9wID09IFwiL1wiIHRoZW4ke1J9XG4iCiAgICBw
+cmludGYgIiAgJHtEfSAgICAgIGlmIGIgPT0gMCB0aGVuIHYuc3RhdHVzID0gXCJEaXZpc2FvIHBv
+ciB6ZXJvXCIgcmV0dXJuIGVuZCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgICAgciA9IGEv
+YiR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgIGVuZCR7Un1cbiIKICAgIHByaW50ZiAiICAk
+e0R9ICAgIGhpc3RbI2hpc3QrMV0gPSB7IGE9di5hLCBvcD12Lm9wLCBiPXYuYiwgcmVzdWx0YWRv
+PXIgfSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgIHYuaGlzdG9yaWNvID0gaGlzdCR7Un1c
+biIKICAgIHByaW50ZiAiICAke0R9ICAgIHYuc3RhdHVzID0gdi5hLi4nICcuLnYub3AuLicgJy4u
+di5iLi4nID0gJy4uciR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBlbmQpLCR7Un1cbiIKICAg
+IHByaW50ZiAiICAke0R9fSkke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfWx4LnJ1bigpJHtSfVxu
+XG4iCiAgICBwcmludGYgIiAgJHtZfS0tIEFwcCBtdWx0aXDDoWdpbmEgY29tIG1lbnUgZSBjb250
+cm9scyR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9bG9jYWwgbHggPSByZXF1aXJlKFwibHhcIikk
+e1J9XG4iCiAgICBwcmludGYgIiAgJHtEfWx4LmFwcChcIkFwcFwiLCBcIjQ1MHgzNTBcIiwgeyR7
+Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBseC5tZW51KHsge1wiQXJxdWl2b1wiLCB7XCJTYWly
+XCIsIGx4LnF1aXR9fSB9KSwke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgbHguc2NyZWVuKFwi
+aG9tZVwiLCB7JHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gICAgbHguaDEoXCJJbsOtY2lvXCIp
+LCBseC5zcGFjZXIoKSwke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgICBseC5vayhcIkNvbmZp
+Z3VyYcOnw7Vlc1wiLCBmdW5jdGlvbih2KSB2LmdvKFwiY2ZnXCIpIGVuZCksJHtSfVxuIgogICAg
+cHJpbnRmICIgICR7RH0gIH0pLCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBseC5zY3JlZW4o
+XCJjZmdcIiwgeyR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgIGx4LmgyKFwiQ29uZmlndXJh
+w6fDtWVzXCIpLCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgIGx4LnRvZ2dsZShcImVzY3Vy
+b1wiLCBcIk1vZG8gZXNjdXJvXCIsIHRydWUpLCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAg
+IGx4LnNsaWRlcihcInZvbFwiLCBcIlZvbHVtZVwiLCAwLCAxMDAsIDEsIDUwKSwke1J9XG4iCiAg
+ICBwcmludGYgIiAgJHtEfSAgICBseC5zZWxlY3QoXCJpZGlvbWFcIiwgXCJJZGlvbWFcIiwge1wi
+UFRcIixcIkVOXCIsXCJFU1wifSksJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gICAgbHguZGFu
+Z2VyKFwiVm9sdGFyXCIsIGZ1bmN0aW9uKHYpIHYuZ28oXCJob21lXCIpIGVuZCksJHtSfVxuIgog
+ICAgcHJpbnRmICIgICR7RH0gIH0pLCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9fSkke1J9XG4i
+CiAgICBwcmludGYgIiAgJHtEfWx4LnJ1bigpJHtSfVxuXG4iCiAgICBwcmludGYgIiAgJHtZfS0t
+IENvbSBseC5wcmludCBlIHByb2dyZXNzIGVtIGxvb3Ake1J9XG4iCiAgICBwcmludGYgIiAgJHtE
+fWxvY2FsIGx4ID0gcmVxdWlyZShcImx4XCIpJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH1seC5h
+cHAoXCJXb3JrZXJcIiwgXCI1MDB4MzUwXCIsIFwiZGFya1wiLCB7JHtSfVxuIgogICAgcHJpbnRm
+ICIgICR7RH0gIGx4Lm91dHB1dChcImxvZ1wiKSwke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAg
+bHgucHJvZ3Jlc3MoXCJwcm9nXCIpLCR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICBseC5vayhc
+IkluaWNpYXJcIiwgZnVuY3Rpb24odikke1J9XG4iCiAgICBwcmludGYgIiAgJHtEfSAgICBmb3Ig
+aSA9IDEsIDEwIGRvJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gICAgICBseC5wcmludChcIlBh
+c3NvIFwiLi5pLi5cIiBkZSAxMFwiKSR7Un1cbiIKICAgIHByaW50ZiAiICAke0R9ICAgICAgdi5w
+cm9nID0gaSAvIDEwJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH0gICAgZW5kJHtSfVxuIgogICAg
+cHJpbnRmICIgICR7RH0gICAgdi5wcm9nID0gXCJDb25jbHXDrWRvIVwiJHtSfVxuIgogICAgcHJp
+bnRmICIgICR7RH0gIGVuZCksJHtSfVxuIgogICAgcHJpbnRmICIgICR7RH19KSR7Un1cbiIKICAg
+IHByaW50ZiAiICAke0R9bHgucnVuKCkke1J9XG5cbiIKICAgIH0KCiAgICBfZG9jX2FkYigpIHsK
+ICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBhZGIuKiDigJQgQW5kcm9pZCBEZWJ1ZyBC
+cmlkZ2UgdmlhIFdpLUZpIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFVz
+YSBvIGJpbsOhcmlvIGFkYiBkbyBUZXJtdXguIEZ1bmNpb25hIHNlbSByb290IHZpYSBBREIgb3Zl
+ciBUQ1AuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMxbSAg4pqgIFJlcXVlcjogcGtnIGluc3Rh
+bGwgYW5kcm9pZC10b29sc1wwMzNbMG1cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSA
+IENPTkVYw4NPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIucGFpclwwMzNb
+MG0oJ2lwOnBvcnRhJywgJ2NvZGlnbycpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgUGFy
+ZWlhIHZpYSBXaS1GaSAoQW5kcm9pZCAxMSspLiBDw7NkaWdvIGFwYXJlY2UgZW06XDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIENvbmZpZ3VyYcOnw7VlcyDihpIgRGVzZW52b2x2
+ZWRvciDihpIgUGFyZWFtZW50byBwb3IgY8OzZGlnb1wwMzNbMG1cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzA7OTBtICBhZGIucGFpcignMTkyLjE2OC4xLjU6MzcxMjMnLCAnMTIzNDU2JylcMDMzWzBt
+XG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWRiLmNvbm5lY3RcMDMzWzBtKCdpcDpwb3J0
+YScpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgQ29uZWN0YSBhbyBkaXNwb3NpdGl2byBh
+cMOzcyBvIHBhcmVhbWVudG8uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGFk
+Yi5jb25uZWN0KCcxOTIuMTY4LjEuNTo1NTU1JylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtYWRiLmRpc2Nvbm5lY3RcMDMzWzBtKCkgICAgICAgRGVzY29uZWN0YVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM21hZGIuZGV2aWNlc1wwMzNbMG0oKSAgICAgICAgICBMaXN0YSBk
+aXNwb3NpdGl2b3MgY29uZWN0YWRvc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIuc3Rh
+dHVzXDAzM1swbSgpICAgICAgICAgICBTdGF0dXMgZGEgY29uZXjDo28gQURCXG5cbiIKICAgIHBy
+aW50ZiAiXDAzM1sxOzM2beKUgOKUgCBTSEVMTCBFIEFSUVVJVk9TIOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIuc2hlbGxc
+MDMzWzBtKCdjbWQnKSAgICAgICAgRXhlY3V0YSBjb21hbmRvIGNvbW8gQURCIHNoZWxsXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgYWRiLnNoZWxsKCdwbSBsaXN0IHBhY2thZ2VzJylcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgYWRiLnNoZWxsKCdkdW1wc3lzIGJhdHRl
+cnknKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIucmVwbFwwMzNbMG0o
+KSAgICAgICAgICAgICBTaGVsbCBBREIgaW50ZXJhdGl2b1xuXG4iCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbWFkYi5wdXNoXDAzM1swbSgnbG9jYWwnLCAncmVtb3RvJylcbiIKICAgIHByaW50ZiAi
+ICBcMDMzWzA7OTBtICBDb3BpYSBhcnF1aXZvIHBhcmEgbyBkZXZpY2UuXDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIGFkYi5wdXNoKCcvc2RjYXJkL2FycS5hcGsnLCAnL3NkY2Fy
+ZC9Eb3dubG9hZC9hcnEuYXBrJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+YWRiLnB1bGxcMDMzWzBtKCdyZW1vdG8nLCAnbG9jYWwnKVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIENvcGlhIGFycXVpdm8gZG8gZGV2aWNlLlwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21hZGIuaW5zdGFsbFwwMzNbMG0oJ2FwcC5hcGsnKSAgSW5zdGFsYSBBUEsgbm8g
+ZGV2aWNlXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBDT05UUk9MRSBETyBERVZJ
+Q0Ug4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sx
+OzMzbWFkYi50YXBcMDMzWzBtKHgsIHkpICAgICAgICAgICAgIFNpbXVsYSB0b3F1ZSBuYSB0ZWxh
+XG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWFkYi5zd2lwZVwwMzNbMG0oeDEseTEseDIseTIp
+ICAgIFNpbXVsYSBnZXN0byBkZSBzd2lwZVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIu
+a2V5ZXZlbnRcMDMzWzBtKGNvZGUpICAgICAgICAgRW52aWEgZXZlbnRvIGRlIHRlY2xhXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1sxOzMzbWFkYi50ZXh0XDAzM1swbSgndGV4dG8nKSAgICAgICAgICBE
+aWdpdGEgdGV4dG9cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWRiLnNjcmVlbnNob3RcMDMz
+WzBtKCkgICAgICAgICAgIENhcHR1cmEgdGVsYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21h
+ZGIucmVib290XDAzM1swbSgncmVjb3ZlcnknKSAgICAgUmVpbmljaWEgZW0gcmVjb3Zlcnkgb3Ug
+ZmFzdGJvb3RcblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIElORk9STUHDh8OVRVMg
+RE8gU0lTVEVNQSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNt
+YWRiLnByb3BcMDMzWzBtKCkgICAgICAgICAgICAgICBMaXN0YSBwcm9wcmllZGFkZXMgZG8gc2lz
+dGVtYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIud2lmaVwwMzNbMG0oKSAgICAgICAg
+ICAgICAgIEluZm8gZGUgV2ktRmlcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWRiLnNjcmVl
+bl9zaXplXDAzM1swbSgpICAgICAgICAgUmVzb2x1w6fDo28gZGEgdGVsYVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21hZGIuc2NyZWVuX2RlbnNpdHlcMDMzWzBtKCkgICAgICBEZW5zaWRhZGUg
+ZGEgdGVsYVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZGIuZm9yd2FyZFwwMzNbMG0obHBv
+cnQsIHJwb3J0KSBQb3J0IGZvcndhcmRpbmdcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWRi
+LmdhbWVfbW9kZVwwMzNbMG0oYm9vbCkgICAgICAgQXRpdmEvZGVzYXRpdmEgbW9kbyBnYW1lXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWFkYi5zZXR1cFwwMzNbMG0oKSAgICAgICAgICAgICAg
+Q29uZmlndXJhIGFtYmllbnRlIEFEQlxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAg
+RkxVWE8gVMONUElDTyAoQW5kcm9pZCAxMSspIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIC0tIDEuIEF0aXZhciBtb2RvIGRlc2Vudm9sdmVkb3IgKyBQYXJlYW1lbnRvIHBvciBj
+w7NkaWdvXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGFkYi5wYWlyKCcxOTIu
+MTY4LjEuNTozNzEyMycsICc2NTQzMjEnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7
+OTBtICAtLSAyLiBDb25lY3RhclwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBh
+ZGIuY29ubmVjdCgnMTkyLjE2OC4xLjU6NTU1NScpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIC0tIDMuIFVzYXJcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+YWRiLnNoZWxsKCdpZCcpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGFkYi5z
+Y3JlZW5zaG90KClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgYWRiLnRhcCg1
+NDAsIDk2MClcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfZGIoKSB7CiAgICBwcmludGYgIlww
+MzNbMTszNW3ilZDilZDilZAgZGIuKiDigJQgU1FMaXRlMyBFbWJ1dGlkbyDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbWRiLm9wZW5cMDMzWzBtKHBhdGgpICAgICAgQWJyZS9jcmlhIGJh
+bmNvIFNRTGl0ZTNcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZGIuY2xvc2VcMDMzWzBtKCkg
+ICAgICAgICBGZWNoYSBvIGJhbmNvXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWRiLmV4ZWNc
+MDMzWzBtKHNxbCkgICAgICAgRXhlY3V0YSBzZW0gcmV0b3JubyAoQ1JFQVRFLCBJTlNFUlQsIFVQ
+REFURSwgREVMRVRFKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21kYi5xdWVyeVwwMzNbMG0o
+c3FsKSAgICAgIFNFTEVDVCDihpIgdGFiZWxhIEx1YSBbe2NvbD12YWwsLi4ufSwgLi4uXVxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM21kYi50YWJsZXNcMDMzWzBtKCkgICAgICAgIExpc3RhIHRh
+YmVsYXMgZG8gYmFuY29cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZGIuaGVscFwwMzNbMG0o
+KSAgICAgICAgICBBanVkYSBkbyBtw7NkdWxvXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKU
+gOKUgCBFWEVNUExPUyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBkYi5vcGVuKCdz
+Y2FuLmRiJylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZGIuZXhlYygnQ1JF
+QVRFIFRBQkxFIElGIE5PVCBFWElTVFMgdnVsbnMgKGhvc3QgVEVYVCwgdGlwbyBURVhULCB1cmwg
+VEVYVCknKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBkYi5leGVjKFwiSU5T
+RVJUIElOVE8gdnVsbnMgVkFMVUVTICgnYWx2by5jb20nLCd4c3MnLCcvc2VhcmNoJylcIilcMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgcm93cyA9IGRiLnF1ZXJ5KCdT
+RUxFQ1QgKiBGUk9NIHZ1bG5zJylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+Zm9yIF8sIHIgaW4gaXBhaXJzKHJvd3MpIGRvXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gICAgcHJpbnQoci5ob3N0LCByLnRpcG8sIHIudXJsKVwwMzNbMG1cbiIKICAgIHByaW50
+ZiAiICBcMDMzWzA7OTBtICBlbmRcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+ZGIuY2xvc2UoKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMW0gIOKaoCBTZW1w
+cmUgZmVjaGUgbyBiYW5jbyBjb20gZGIuY2xvc2UoKSBhbyB0ZXJtaW5hciFcMDMzWzBtXG5cbiIK
+ICAgIH0KICAgIF9kb2NfcGVudCgpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCBw
+ZW50Liog4oCUIExhYiBMb2NhbCBWdWxuZXLDoXZlbCDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBTb2JlIHVtIHNlcnZpZG9y
+IEhUVFAgdnVsbmVyw6F2ZWwgbG9jYWxtZW50ZSBwYXJhIHByYXRpY2FyIHBlbnRlc3QuXG5cbiIK
+ICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbXBlbnQuc3RhcnRcMDMzWzBtKGxldmVsLCBwb3J0KVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIFNvYmUgbGFiLiBsZXZlbDogJ2Vhc3knLCAnbWVkJyBvdSAnaGFy
+ZCdcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcGVudC5zdGFydCgnZWFzeScs
+IDgwODEpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXBlbnQuc3RvcFwwMzNb
+MG0oKSAgICAgICAgICBQYXJhIHRvZG9zIG9zIGxhYnNcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7
+MzNtcGVudC5zdGF0dXNcMDMzWzBtKCkgICAgICAgIFN0YXR1cyBkb3MgbGFicyByb2RhbmRvXG5c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBQT1JUQVMgUEFEUsODTyDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtJS04c1wwMzNbMG0gIHBvcnRhIDgwODFcbiIgImVhc3kiCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbSUtOHNcMDMzWzBtICBwb3J0YSA4MDgyXG4iICJtZWQiCiAgICBwcmludGYgIiAgXDAz
+M1sxOzMzbSUtOHNcMDMzWzBtICBwb3J0YSA4MDgzXG4iICJoYXJkIgogICAgcHJpbnRmICJcbiIK
+ICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBFTkRQT0lOVFMgRElTUE9Ow41WRUlTIOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIC9zZWFyY2ggIC9s
+b2dpbiAgL3hzcyAgL2NvbW1lbnQgIC9kb20gIC9leGVjICAvZmlsZSAgL3BhdGhcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgL25vdGUgIC90cGwgIC91cGxvYWQgIC9hcGkvdXNl
+cnMgIC9hcGkvbWUgIC9hcGkvcHJvZHVjdHNcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgL3JlZGlyZWN0ICAvY29ycyAgL2NzcmYgIC9qd3QgIC94eGUgIC9hZG1pbiAgL3JlZ2lz
+dGVyXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIC9yZXNldCAgL2RlYnVnICAv
+YmFja3VwICAvc3NyZiAgL3JhdGUgIC9oZWFkZXJzXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlww
+MzNbMTszNm3ilIDilIAgRkxBR1MgRVhFTVBMTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBGTEFHe2Vhc3lf
+c3FsaV93aW59ICAgIEZMQUd7bm9zcWxfYXV0aF9ieXBhc3N9XDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIEZMQUd7and0X25vbmVfYXR0YWNrfSAgRkxBR3tsZmlfZm91bmRfeW91
+fVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBGTEFHe3NzcmZfaW50ZXJuYWxf
+ZmV0Y2h9XDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRkxVWE8gVMON
+UElDTyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwZW50LnN0YXJ0KCdlYXN5JywgODA4MSlcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbW9kLnNxbGkoJ2h0dHA6Ly9sb2NhbGhvc3Q6
+ODA4MS9sb2dpbicpICAtLSB0ZXN0YSBzcWxpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIG1vZC54c3MoJ2h0dHA6Ly9sb2NhbGhvc3Q6ODA4MS9zZWFyY2gnKSAgLS0gdGVzdGEg
+eHNzXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHBlbnQuc3RvcCgpXDAzM1sw
+bVxuXG4iCiAgICB9CiAgICBfZG9jX3NoKCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ
+4pWQIHNoLiog4oCUIFNoZWxsIERpcmV0byDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHBy
+aW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbXNoLmV4ZWNcMDMzWzBtKGNtZCkgICBFeGVjdXRhIGNvbWFuZG8gZSByZXRvcm5h
+IHNhw61kYSBjb21vIHN0cmluZ1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21zaC5yZWFkXDAz
+M1swbShjbWQpICAgQWxpYXMgZGUgc2guZXhlY1xuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3i
+lIDilIAgRVhFTVBMT1Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwgb3V0
+ID0gc2guZXhlYygndW5hbWUgLWEnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBt
+ICBwcmludChvdXQpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbG9jYWwg
+ZmlsZXMgPSBzaC5leGVjKCdscyAtbGEgficpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gIHByaW50KGZpbGVzKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IC0tIGNvbWJpbmFyIGNvbSBuZXQgZSBmczpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sw
+OzkwbSAgbG9jYWwgaXAgPSBzaC5leGVjKCdpcCBhZGRyIHNob3cgd2xhbjAgfCBncmVwIGluZXQn
+KVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBmcy53cml0ZSgnaXAudHh0Jywg
+aXApXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMxbSAg4pqgIHNoLmV4ZWMoKSBj
+YXB0dXJhIHN0ZG91dC4gUGFyYSBzdGRlcnIgdXNlIDI+JjE6XDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMDs5MG0gIHNoLmV4ZWMoJ2NvbWFuZG8gMj4mMScpXDAzM1swbVxuXG4iCiAgICB9
+CiAgICBfZG9jX2NjKCkgewogICAgcHJpbnRmICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIGNjLiog4oCU
+IENvbXBpbGFkb3IgQyBJbmxpbmUgZSBUcmFuc3BpbGFkb3IgTHVh4oaSQyDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiXDAz
+M1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bWNjLnJ1blwwMzNbMG0oY29kaWdvX2MpXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgQ29t
+cGlsYSBlIGV4ZWN1dGEgY8OzZGlnbyBDIGRpcmV0byBkbyBSRVBMLlwwMzNbMG1cbiIKICAgIHBy
+aW50ZiAiICBcMDMzWzA7OTBtICBjYy5ydW4oW1tcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgICAjaW5jbHVkZSA8c3RkaW8uaD5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgICBpbnQgbWFpbigpIHsgcHJpbnRmKFwib2xhIGRvIEMhXG5cIik7IHJldHVybiAw
+OyB9XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIF1dKVwwMzNbMG1cblxuIgog
+ICAgcHJpbnRmICIgIFwwMzNbMTszM21jYy5sdWEyY1wwMzNbMG0oYXJxdWl2b19sdWEpXG4iCiAg
+ICBwcmludGYgIiAgXDAzM1swOzkwbSAgVHJhbnNwaWxhIGFycXVpdm8gTHVhIHBhcmEgQyAoZ2Vy
+YSBhcnF1aXZvLmMpLlwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBDb2JyZTog
+ZnVuw6fDtWVzLCB0YWJlbGFzLCByZXRvcm5vIG3Dumx0aXBsbywgaW5mZXLDqm5jaWEgZGUgdGlw
+by5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgY2MubHVhMmMoJ21ldV9zY3Jp
+cHQubHVhJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtY2MuaGVscFwwMzNb
+MG0oKSAgIEFqdWRhIGRvIG3Ds2R1bG9cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSA
+IFZJQSBMSU5IQSBERSBDT01BTkRPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIG1zIC1sdWEyYyBhcnF1aXZvLmx1YSAgICAgICAjIHRyYW5zcGls
+YSDihpIgYXJxdWl2by5jXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG1zIC1s
+dWEyYyAtciBhcnF1aXZvLmx1YSAgICAjIHRyYW5zcGlsYSBlIGNvbXBpbGEgY29tIGN4eFwwMzNb
+MG1cblxuIgogICAgfQogICAgX2RvY191aSgpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKV
+kOKVkCB1aS4qIOKAlCBJbnRlcmZhY2UgZGUgVGVybWluYWwg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTsz
+Nm3ilIDilIAgRlVOw4fDlUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211aS5j
+b2xvclwwMzNbMG0oY29kZSwgdGV4dG8pICBUZXh0byBjb2xvcmlkbyAoY8OzZGlnb3MgQU5TSSlc
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB1aS5jb2xvcignMTszMicsICd0ZXh0byB2ZXJk
+ZSBib2xkJylcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdWkuYm94XDAzM1sw
+bSh0ZXh0bykgICAgICAgICAgRGVzZW5oYSBjYWl4YSBhbyByZWRvciBkbyB0ZXh0b1xuIgogICAg
+cHJpbnRmICIgIFwwMzNbMDs5MG0gIHVpLmJveCgnRWxsaW90T1MnKVwwMzNbMG1cblxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszM211aS5jbGVhclwwMzNbMG0oKSAgICAgICAgICAgICBMaW1wYSBh
+IHRlbGFcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdWkuc2xlZXBcMDMzWzBtKHMpICAgICAg
+ICAgICAgUGF1c2EgZW0gc2VndW5kb3NcblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM211aS5m
+aWdcMDMzWzBtKHRleHRvKSAgICAgICAgICBBU0NJSSBhcnQgdmlhIGZpZ2xldFxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIHVpLmZpZygnRWxsaW90T1MnKVwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMTszM211aS5pbnB1dFwwMzNbMG0oW3Byb21wdF0pICAgICBMw6ogbGluaGEg
+ZG8gdXN1w6FyaW9cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBsb2NhbCBub21lID0gdWku
+aW5wdXQoJ1NldSBub21lOiAnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBw
+cmludCgnT2xhLCAnIC4uIG5vbWUpXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bXVpLmhlbHBcMDMzWzBtKCkgICAgICAgICAgICAgIEFqdWRhIGRvIG3Ds2R1bG9cblxuIgogICAg
+cHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEPDk0RJR09TIERFIENPUiDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0x
+MHNcMDMzWzBtICBcMDMzWzE7MzJtVmVyZGUgYm9sZFwwMzNbMG1cbiIgICAgIjE7MzIiCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbSUtMTBzXDAzM1swbSAgXDAzM1sxOzMxbVZlcm1lbGhvIGJvbGRc
+MDMzWzBtXG4iICIxOzMxIgogICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTEwc1wwMzNbMG0gIFww
+MzNbMTszM21BbWFyZWxvIGJvbGRcMDMzWzBtXG4iICAiMTszMyIKICAgIHByaW50ZiAiICBcMDMz
+WzE7MzNtJS0xMHNcMDMzWzBtICBcMDMzWzE7MzZtQ2lhbm8gYm9sZFwwMzNbMG1cbiIgICAiMTsz
+NiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtJS0xMHNcMDMzWzBtICBcMDMzWzA7OTBtQ2luemEg
+ZGltXDAzM1swbVxuIiAgICAiMDs5MCIKICAgIHByaW50ZiAiXG4iCiAgICB9CiAgICBfZG9jX3R1
+aSgpIHsKICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkOKVkOKVkCB0dWkuKiDigJQgRnJhbWV3b3Jr
+IGRlIFVJIEludGVyYXRpdm8g4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAg
+ICBwcmludGYgIiAgRnJhbWV3b3JrIHBhcmEgY3JpYXIgaW50ZXJmYWNlcyBpbnRlcmF0aXZhcyBu
+byB0ZXJtaW5hbDpcbiIKICAgIHByaW50ZiAiICBtZW51cywgZm9ybXVsw6FyaW9zLCBjYWxsYmFj
+a3MgZGUgdGVjbGFkby5cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEZVTsOHw5VF
+UyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBc
+MDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdHVpLm1haW5cMDMzWzBtKCkgICAg
+ICAgIEluaWNpYSBsb29wIHByaW5jaXBhbCBkZSBVSVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M210dWkuZnVuY1wwMzNbMG0oZm4pICAgICAgUmVnaXN0cmEgZnVuw6fDo28gZGUgY2FsbGJhY2tc
+biIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtdHVpLmNsb3NlXDAzM1swbSgpICAgICAgIEVuY2Vy
+cmEgYSBVSVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM210dWkucmVhZFwwMzNbMG0oKSAgICAg
+ICAgTMOqIGV2ZW50byBkZSB0ZWNsYWRvXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbXR1aS5o
+ZWxwXDAzM1swbSgpICAgICAgICBBanVkYSBkbyBtw7NkdWxvXG5cbiIKICAgIHByaW50ZiAiXDAz
+M1sxOzM2beKUgOKUgCBFWEVNUExPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IHR1aS5mdW5jKGZ1bmN0aW9uKClcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+ICB1aS5jbGVhcigpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgdWkuZmln
+KCdNZW51JylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBsb2NhbCBvcCA9
+IHVpLmlucHV0KCdFc2NvbGhhIFsxLTNdOiAnKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICAgIGlmIG9wID09ICcxJyB0aGVuXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNb
+MDs5MG0gICAgICBwcmludChuZXQuZ2V0KCdodHRwczovL2lmY29uZmlnLm1lJykpXDAzM1swbVxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgZWxzZWlmIG9wID09ICdxJyB0aGVuXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgICB0dWkuY2xvc2UoKVwwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIGVuZFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzA7OTBtICBlbmQpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHR1aS5t
+YWluKClcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfZXhwbG9pdCgpIHsKICAgIHByaW50ZiAi
+XDAzM1sxOzM1beKVkOKVkOKVkCBleHBsb2l0Liog4oCUIFJFUExzIGRlIFDDs3MtRXhwbG9yYcOn
+w6NvIEludGVyYXRpdmEg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgUkVQTHMgaW50ZXJhdGl2b3MgcGFyYSBl
+eHBsb3Jhw6fDo28gcGFzc28gYSBwYXNzbyBkZSB2dWxuZXJhYmlsaWRhZGVzLlxuIgogICAgcHJp
+bnRmICIgIENhZGEgUkVQTCBhY2VpdGEgcGF5bG9hZHMgZW0gbG9vcCBhdMOpIHZvY8OqIHNhaXIg
+KEN0cmwrQyBvdSAncScpLlxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRlVOw4fD
+lUVTIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21leHBsb2l0LnNxbGlcMDMzWzBt
+KHVybCkgICBSRVBMIGRlIFNRTCBJbmplY3Rpb24g4oCUIGV4dHJhaSBkYWRvcyBsaW5oYSBhIGxp
+bmhhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWV4cGxvaXQueHNzXDAzM1swbSh1cmwpICAg
+IFJFUEwgZGUgWFNTIOKAlCBpbmpldGEgZSB2ZXJpZmljYSByZWZsZXjDo28gZGUgcGF5bG9hZFxu
+IgogICAgcHJpbnRmICIgIFwwMzNbMTszM21leHBsb2l0LmxmaVwwMzNbMG0odXJsKSAgICBSRVBM
+IGRlIExGSSDigJQgbMOqIGFycXVpdm9zIHZpYSBwYXRoIHRyYXZlcnNhbFxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszM21leHBsb2l0LnJjZVwwMzNbMG0odXJsKSAgICBSRVBMIGRlIFJDRSDigJQg
+c2hlbGwgaW50ZXJhdGl2byB2aWEgZXhlY3XDp8OjbyByZW1vdGFcbiIKICAgIHByaW50ZiAiICBc
+MDMzWzE7MzNtZXhwbG9pdC5zc3RpXDAzM1swbSh1cmwpICAgUkVQTCBkZSBTU1RJIOKAlCBpbmpl
+dGEgdGVtcGxhdGVzIChKaW5qYTIsIFR3aWcuLi4pXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bWV4cGxvaXQuaWRvclwwMzNbMG0odXJsKSAgIFJFUEwgZGUgSURPUiDigJQgZnV6emluZyBkZSBJ
+RHMgcGFyYSBhY2Vzc28gbsOjbyBhdXRvcml6YWRvXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMz
+bWV4cGxvaXQuaGVscFwwMzNbMG0oKSAgICAgIEV4aWJlIGVzdGEgYWp1ZGFcblxuIgogICAgcHJp
+bnRmICJcMDMzWzE7MzZt4pSA4pSAIEVYRU1QTE8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAz
+M1swOzkwbSAgZXhwbG9pdC5zcWxpKCdodHRwOi8vYWx2by5jb20vcGFnZT9pZD0xJylcMDMzWzBt
+XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZXhwbG9pdC5yY2UoJ2h0dHA6Ly9hbHZvLmNv
+bS9jbWQ/ZXhlYz0nKVwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBleHBsb2l0
+LmxmaSgnaHR0cDovL2Fsdm8uY29tL3ZpZXc/ZmlsZT0nKVwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszMW0gIOKaoCBVc2UgYXBlbmFzIGVtIGFtYmllbnRlcyBhdXRvcml6YWRvcyAo
+bGFiIC8gQ1RGKS5cMDMzWzBtXG5cbiIKICAgIH0KICAgIF9kb2NfZWxsKCkgewogICAgcHJpbnRm
+ICJcMDMzWzE7MzVt4pWQ4pWQ4pWQIGVsbC4qIOKAlCBFbmNvZGVyL0RlY29kZXIgZGUgU2NyaXB0
+cyAoLmVsbCkg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgQ29udmVydGUgc2NyaXB0cyBM
+dWEvUHl0aG9uL0Jhc2ggZW0gZm9ybWF0byAuZWxsIChvZnVzY2FkbykgZSB2aWNlLXZlcnNhLlxu
+IgogICAgcHJpbnRmICIgIMOadGlsIHBhcmEgZGlzdHJpYnVpciBzY3JpcHRzIHNlbSBleHBvciBv
+IGPDs2RpZ28tZm9udGUuXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OV
+RVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+XDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWVsbC5lbmNvZGVcMDMzWzBtKHBh
+dGggWywgbGFuZyBbLCBvdXRdXSlcbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIENvZGlm
+aWNhIGFycXVpdm8gcGFyYSAuZWxsLiBsYW5nIGRldGVjdGFkbyBwZWxhIGV4dGVuc8Ojby5cMDMz
+WzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgICBlbGwuZW5jb2RlKCdzY3JpcHQubHVh
+JykgICAgICAgICAgICDihpIgZ2VyYSBzY3JpcHQuZWxsXDAzM1swbVxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMDs5MG0gICAgZWxsLmVuY29kZSgnc2NyaXB0LnB5JywgJ3B5dGhvbicpICAg4oaSIGZv
+csOnYSBsaW5ndWFnZW1cMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtZWxsLmRl
+Y29kZVwwMzNbMG0ocGF0aCBbLCBvdXRdKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAg
+UmVzdGF1cmEgLmVsbCBwYXJhIG8gY8OzZGlnbyBvcmlnaW5hbC5cMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1swOzkwbSAgICBlbGwuZGVjb2RlKCdzY3JpcHQuZWxsJykgICAgICAgICAgICDi
+hpIgcmVzdGF1cmEgc2NyaXB0Lmx1YVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTsz
+M21lbGwuZW5jb2RlX3N0clwwMzNbMG0oY29kZSwgbGFuZylcbiIKICAgIHByaW50ZiAiICBcMDMz
+WzA7OTBtICAgIENvZGlmaWNhIHN0cmluZyBkZSBjw7NkaWdvIOKGkiByZXRvcm5hIHN0cmluZyAu
+ZWxsXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWVsbC5kZWNvZGVfc3RyXDAz
+M1swbShkYXRhKVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgRGVjb2RpZmljYSBzdHJp
+bmcgLmVsbCDihpIgcmV0b3JuYSBjw7NkaWdvIG9yaWdpbmFsXDAzM1swbVxuXG4iCiAgICBwcmlu
+dGYgIiAgXDAzM1sxOzMzbWVsbC5oZWxwXDAzM1swbSgpICAgICAgICAgICAgRXhpYmUgZXN0YSBh
+anVkYVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRVhFTVBMTyDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBtXG5cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBlbGwuZW5jb2RlKCdtZXVfc2Nhbm5lci5sdWEnKSAg
+ICAgICAgIC0tIGdlcmEgbWV1X3NjYW5uZXIuZWxsXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIGVsbC5kZWNvZGUoJ21ldV9zY2FubmVyLmVsbCcpICAgICAgICAgLS0gcmVzdGF1
+cmEgbyAubHVhXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGxvY2FsIHMgPSBl
+bGwuZW5jb2RlX3N0cihjb2RlLCAnbHVhJykgLS0gY29kaWZpY2EgZW0gbWVtw7NyaWFcMDMzWzBt
+XG5cbiIKICAgIH0KICAgIF9kb2NfYWdlbnQoKSB7CiAgICBwcmludGYgIlwwMzNbMTszNW3ilZDi
+lZDilZAgYWdlbnQuKiDigJQgQWdlbnRlIEF1dMO0bm9tbyBjb20gVG9vbHMg4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgQWdlbnRlIGRlIElBIHF1ZSBleGVj
+dXRhIHRhcmVmYXMgZW0gbG9vcDogZ2VyYSBjw7NkaWdvLFxuIgogICAgcHJpbnRmICIgIGV4ZWN1
+dGEsIGFuYWxpc2EgbyByZXN1bHRhZG8gZSBpdGVyYSBhdXRvbWF0aWNhbWVudGUuXG5cbiIKICAg
+IHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbWFnZW50LnJ1blwwMzNbMG0oJ3RhcmVmYScgWywgb3B0c10pXG4iCiAgICBw
+cmludGYgIiAgXDAzM1swOzkwbSAgICBFeGVjdXRhIHRhcmVmYSBjb20gY29uZmlybWHDp8OjbyBh
+IGNhZGEgYmxvY28gZGUgY8OzZGlnby5cMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkw
+bSAgICBvcHRzOiB7IGF1dG89dHJ1ZSwgbGFuZz0nbHVhJ3wnYyd8J2Jhc2gnLCBtYXg9TiB9XDAz
+M1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgYWdlbnQucnVuKCdjcmllIHVtIHBv
+cnQgc2Nhbm5lcicpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgYWdlbnQu
+cnVuKCdjb21waWxlIGhlbGxvIHdvcmxkJywge2F1dG89dHJ1ZSwgbGFuZz0nYyd9KVwwMzNbMG1c
+blxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21hZ2VudC5jaGF0XDAzM1swbSgnbXNnJylcbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIENvbnZlcnNhIGxpdnJlIHNlbSBleGVjdcOnw6Nv
+IGRlIGPDs2RpZ28uXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgYWdlbnQu
+Y2hhdCgnZXhwbGljYSBidWZmZXIgb3ZlcmZsb3cnKVwwMzNbMG1cblxuIgogICAgcHJpbnRmICIg
+IFwwMzNbMTszM21hZ2VudC5yZXNldFwwMzNbMG0oKSAgICAgICAgIExpbXBhIG8gY29udGV4dG8v
+aGlzdMOzcmljbyBkbyBhZ2VudGVcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtYWdlbnQuaGVs
+cFwwMzNbMG0oKSAgICAgICAgICBFeGliZSBlc3RhIGFqdWRhXG5cbiIKICAgIHByaW50ZiAiXDAz
+M1sxOzM2beKUgOKUgCBFWEVNUExPIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0g
+IGFnZW50LnJ1bignZmHDp2EgdW0gc2Vydmlkb3IgSFRUUCBlbSBMdWEnLCB7YXV0bz10cnVlfSlc
+MDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgYWdlbnQucnVuKCdjcmllIHVtIHBv
+cnQgc2Nhbm5lciBlbSBiYXNoJylcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+YWdlbnQuY2hhdCgnY29tbyBmdW5jaW9uYSBoZWFwIHNwcmF5PycpXDAzM1swbVxuXG4iCiAgICB9
+CiAgICBfZG9jX2l2YXIoKSB7CiAgICBwcmludGYgIlwwMzNbMTszNW3ilZDilZDilZAgaXZhciB2
+Mi4wIOKAlCBWYXJpw6F2ZWlzIEluZGV4YWRhcyDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZBcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBBdGl2YWRvIHBvciBwYWRyw6NvLiBUb2RhIHZh
+cmnDoXZlbCBkZWNsYXJhZGEgcmVjZWJlIHVtIMOtbmRpY2UgIU4sXG4iCiAgICBwcmludGYgIiAg
+cGVybWl0aW5kbyByZWZlcmVuY2nDoS1sYSBwZWxvIG7Dum1lcm8gZW0gdmV6IGRvIG5vbWUgY29t
+cGxldG8uXG4iCiAgICBwcmludGYgIiAgSWRlYWwgcGFyYSBub21lcyBsb25nb3MgZW0gcHJvamV0
+b3Mgc8OpcmlvcywgVUlzIGUgam9nb3MuXG5cbiIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKU
+gCBGVU7Dh8OVRVMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWl2YXIuZW5hYmxl
+XDAzM1swbSgpICAgICAgICAgICBBdGl2YSBvIGl2YXIgKHBhZHLDo28pXG4iCiAgICBwcmludGYg
+IiAgXDAzM1sxOzMzbWl2YXIuZGlzYWJsZVwwMzNbMG0oKSAgICAgICAgICBEZXNhdGl2YSBvIGl2
+YXJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtaXZhci5zdGF0dXNcMDMzWzBtKCkgICAgICAg
+ICAgIFN0YXR1cyArIGNvbnRhZ2VtIGRlIHZhcnMsIGVzY29wb3MgZSBhbGlhc2VzXG4iCiAgICBw
+cmludGYgIiAgXDAzM1sxOzMzbWl2YXIubGlzdFwwMzNbMG0oKSAgICAgICAgICAgICBNYXBhICFO
+IOKGkiBub21lID0gdmFsb3JfYXR1YWxcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtaXZhci5h
+bGlhc1wwMzNbMG0oaywgdikgICAgICAgIFJlZ2lzdHJhICFrIOKGkiB2YXJpw6F2ZWwgdiB2aWEg
+THVhXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWl2YXIuYWxpYXNcMDMzWzBtKCkgICAgICAg
+ICAgICBMaXN0YSB0b2RvcyBvcyBhbGlhc2VzIHJlZ2lzdHJhZG9zXG4iCiAgICBwcmludGYgIiAg
+XDAzM1sxOzMzbWl2YXIuZGVidWdcMDMzWzBtKGJvb2wpICAgICAgICBBdmlzYSBlbSBzdGRlcnIg
+YW8gcmVnaXN0cmFyIGNhZGEgdmFyacOhdmVsXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMzbWl2
+YXIucmVzZXRcMDMzWzBtKCkgICAgICAgICAgICBMaW1wYSDDrW5kaWNlcywgYWxpYXNlcyBlIHBp
+bGhhIGRlIGVzY29wb3NcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzNtaXZhci5wcmVwcm9jZXNz
+XDAzM1swbShjb2RlKSAgIFByw6ktcHJvY2Vzc2Egc3RyaW5nIHN1YnN0aXR1aW5kbyAhTiBlICFh
+bGlhc1xuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21pdmFyLmhlbHBcMDMzWzBtKCkgICAgICAg
+ICAgICAgQWp1ZGEgcsOhcGlkYVxuXG4iCiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgw41O
+RElDRVMgTlVNw4lSSUNPUyAoIU4g4oCUIGVzY29wbyBhdHVhbCkg4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbm9tZV9sb25nb19hcXVp
+ID0gNDIgICAgIC0tICExIOKGkiBub21lX2xvbmdvX2FxdWlcMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgb3V0cm9fbm9tZSA9IFwiTWlrZVwiICAgICAgLS0gITIg4oaSIG91dHJv
+X25vbWVcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgcHJpbnQoITEsICEyKSAg
+ICAgICAgICAgIC0tIHByaW50KG5vbWVfbG9uZ29fYXF1aSwgb3V0cm9fbm9tZSlcMDMzWzBtXG5c
+biIKICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCAhIU4g4oCUIEFDRVNTTyBBTyBFU0NPUE8g
+RVhURVJOTyAocGFpL2dsb2JhbCkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgRGVudHJv
+IGRlIHVtYSBmdW7Dp8OjbywgXDAzM1sxOzMybSFOXDAzM1swbSByZWluaWNpYSBkbyAxIChlc2Nv
+cG8gbG9jYWwpLlxuIgogICAgcHJpbnRmICIgIFVzZSBcMDMzWzE7MzJtISFOXDAzM1swbSBwYXJh
+IGFjZXNzYXIgdmFyacOhdmVpcyBkbyBlc2NvcG8gZGUgZm9yYSAoZ2xvYmFsIG91IHBhaSkuXG5c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBkYW5vX2dsb2JhbCA9IDUwICAgICAgICAtLSAh
+MSBnbG9iYWwgLyB2aXJhICEhMSBkZW50cm8gZGUgZnVuw6fDtWVzXDAzM1swbVxuIgogICAgcHJp
+bnRmICIgIFwwMzNbMDs5MG0gIG11bHRpcGxpY2Fkb3IgPSAzICAgICAgIC0tICEyIGdsb2JhbCAv
+IHZpcmEgISEyIGRlbnRybyBkZSBmdW7Dp8O1ZXNcMDMzWzBtXG5cbiIKICAgIHByaW50ZiAiICBc
+MDMzWzA7OTBtICBmdW5jdGlvbiBjYWxjdWxhcigpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gICAgYm9udXMgPSAxMCAgICAgICAgICAgIC0tICExIG5lc3RlIGVzY29wbyAobG9j
+YWwpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgcmV0dXJuICEhMSAqICEh
+MiArICExIC0tIChkYW5vX2dsb2JhbCAqIG11bHRpcGxpY2Fkb3IpICsgYm9udXNcMDMzWzBtXG4i
+CiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgZW5kXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFww
+MzNbMDs5MG0gIHByaW50KGNhbGN1bGFyKCkpICAgICAgIC0tIDUwICogMyArIDEwID0gMTYwXDAz
+M1swbVxuXG4iCiAgICBwcmludGYgIiAgUmVncmE6IFwwMzNbMTszM20hTlwwMzNbMG0gPSBlc2Nv
+cG8gYXR1YWwuICBcMDMzWzE7MzNtISFOXDAzM1swbSA9IGVzY29wbyBwYWkgKGdsb2JhbCBvdSBm
+dW7Dp8OjbyBlbnZvbHZlbnRlKS5cblxuIgogICAgcHJpbnRmICJcMDMzWzE7MzZt4pSA4pSAIEFM
+SUFTRVMgTk9NRUFET1Mg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAg
+ICBwcmludGYgIiAgTGluaGEgXDAzM1sxOzMybSFhbGlhcyA9IHZhcm5hbWVcMDMzWzBtIG5vIHNj
+cmlwdCDDqSBpbnRlcmNlcHRhZGEgcGVsbyBwcsOpLXByb2Nlc3NhZG9yLFxuIgogICAgcHJpbnRm
+ICIgIHJlZ2lzdHJhIG8gYWxpYXMgZSBzb21lIGRvIGPDs2RpZ28gTHVhIChuw6NvIGdlcmEgZXJy
+byBkZSBzaW50YXhlKS5cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIHBsYXllcl9oZWFs
+dGhfcGVyY2VudGFnZSA9IDEwMFwwMzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAh
+aHAgPSBwbGF5ZXJfaGVhbHRoX3BlcmNlbnRhZ2UgICAtLSByZWdpc3RyYSBhbGlhc1wwMzNbMG1c
+biIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICBwcmludCghaHApICAgICAgICAgICAgICAgICAg
+ICAgICAtLSBleHBhbmRlIHBhcmEgcGxheWVyX2hlYWx0aF9wZXJjZW50YWdlXDAzM1swbVxuXG4i
+CiAgICBwcmludGYgIiAgVGFtYsOpbSB2aWEgTHVhOiBcMDMzWzE7MzJtaXZhci5hbGlhcyhcImhw
+XCIsIFwicGxheWVyX2hlYWx0aF9wZXJjZW50YWdlXCIpXDAzM1swbVxuXG4iCiAgICBwcmludGYg
+IlwwMzNbMTszNm3ilIDilIAgRVNDT1BPIFBPUiBGVU7Dh8ODTyAoYXV0b23DoXRpY28pIOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cblxuIgogICAgcHJp
+bnRmICIgIERlbnRybyBkZSBjYWRhIFwwMzNbMTszMm1mdW5jdGlvblwwMzNbMG0sICExIHJlaW5p
+Y2lhIGRvIHplcm8g4oCUIG7Do28gY29uZmxpdGFcbiIKICAgIHByaW50ZiAiICBjb20gdmFyacOh
+dmVpcyBkbyBlc2NvcG8gZXh0ZXJuby5cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGZ1
+bmN0aW9uIGF0YXF1ZSgpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gICAgZGFu
+b19iYXNlICAgID0gMTAgICAtLSAhMSBuZXN0ZSBlc2NvcG9cMDMzWzBtXG4iCiAgICBwcmludGYg
+IiAgXDAzM1swOzkwbSAgICBtdWx0aXBsaWNhZG9yID0gMiAgIC0tICEyIG5lc3RlIGVzY29wb1ww
+MzNbMG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICAgIHJldHVybiAhMSAqICEyXDAzM1sw
+bVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIGVuZFwwMzNbMG1cblxuIgogICAgcHJpbnRm
+ICJcMDMzWzE7MzZt4pSA4pSAIE1PRE8gREVCVUcg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSAXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAg
+aXZhci5kZWJ1Zyh0cnVlKSAgICAgICAgIC0tIGF0aXZhIGF2aXNvcyBkZSByZWdpc3Ryb1wwMzNb
+MG1cbiIKICAgIHByaW50ZiAiICBcMDMzWzA7OTBtICB4ID0gMTAgICAgICAgICAgICAgICAgICAg
+LS0gc3RkZXJyOiBbaXZhcjpkZWJ1Z10gITEg4oaSIHhcMDMzWzBtXG4iCiAgICBwcmludGYgIiAg
+XDAzM1swOzkwbSAgaXZhci5kZWJ1ZyhmYWxzZSkgICAgICAgIC0tIGRlc2F0aXZhXDAzM1swbVxu
+XG4iCiAgICBwcmludGYgIiAgUGVyc2lzdMOqbmNpYTogZXN0YWRvIHNhbHZvIGVtIFwwMzNbMDs5
+MG1+Ly5lbGxpb3RfaXZhci5jZmdcMDMzWzBtXG5cbiIKICAgIH0KICAgIF9ET0NfU1VCPSIkezI6
+LX0iCiAgICBjYXNlICIkX0RPQ19TVUIiIGluCiAgICAgIG5ldHxyZWRlKQogICAgICAgIGlmIFsg
+LW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfbmV0IHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBl
+bHNlIF9kb2NfbmV0OyBmaSA7OwogICAgICBtb2R8cGVudGVzdHxzY2FubmVycykKICAgICAgICBp
+ZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX21vZCB8IGV2YWwgIiRfRE9DX1BBR0VS
+IjsgZWxzZSBfZG9jX21vZDsgZmkgOzsKICAgICAgY3J5cHRvfGNyeXB0KQogICAgICAgIGlmIFsg
+LW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfY3J5cHRvIHwgZXZhbCAiJF9ET0NfUEFHRVIi
+OyBlbHNlIF9kb2NfY3J5cHRvOyBmaSA7OwogICAgICBzeXN8c2lzdGVtYSkKICAgICAgICBpZiBb
+IC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX3N5cyB8IGV2YWwgIiRfRE9DX1BBR0VSIjsg
+ZWxzZSBfZG9jX3N5czsgZmkgOzsKICAgICAgZnN8ZmlsZXN5c3RlbXxhcnF1aXZvcykKICAgICAg
+ICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2ZzIHwgZXZhbCAiJF9ET0NfUEFH
+RVIiOyBlbHNlIF9kb2NfZnM7IGZpIDs7CiAgICAgIGFpfGN5bnxpYSkKICAgICAgICBpZiBbIC1u
+ICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2FpIHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNl
+IF9kb2NfYWk7IGZpIDs7CiAgICAgIHN0cmluZ3xzdHIpCiAgICAgICAgaWYgWyAtbiAiJF9ET0Nf
+UEFHRVIiIF07IHRoZW4gX2RvY19zdHJpbmcgfCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2Rv
+Y19zdHJpbmc7IGZpIDs7CiAgICAgIHV0aWwpCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIi
+IF07IHRoZW4gX2RvY191dGlsIHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfdXRpbDsg
+ZmkgOzsKICAgICAganNvbikKICAgICAgICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBf
+ZG9jX2pzb24gfCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2RvY19qc29uOyBmaSA7OwogICAg
+ICBsb2cpCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19sb2cgfCBl
+dmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2RvY19sb2c7IGZpIDs7CiAgICAgIGNzdikKICAgICAg
+ICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2NzdiB8IGV2YWwgIiRfRE9DX1BB
+R0VSIjsgZWxzZSBfZG9jX2NzdjsgZmkgOzsKICAgICAgbW9kdWxvc3xtb2R1bGVzfGFwaSkKICAg
+ICAgICBfYWxsX21vZHMoKSB7IF9kb2NfbmV0OyBfZG9jX21vZDsgX2RvY19jcnlwdG87IF9kb2Nf
+c3lzOyBfZG9jX2ZzOyBfZG9jX2FpOyBfZG9jX2RiOyBfZG9jX3dlYjsgX2RvY19kb3c7IF9kb2Nf
+bG1vZDsgX2RvY19hZGI7IF9kb2NfcGVudDsgX2RvY19zaDsgX2RvY19jYzsgX2RvY191aTsgX2Rv
+Y190dWk7IF9kb2NfZXhwbG9pdDsgX2RvY19lbGw7IF9kb2NfYWdlbnQ7IF9kb2NfaXZhcjsgX2Rv
+Y19zdHJpbmc7IF9kb2NfdXRpbDsgX2RvY19qc29uOyBfZG9jX2xvZzsgX2RvY19jc3Y7IF9kb2Nf
+bnVtOyBfZG9jX3BhdGg7IF9kb2NfY29sb3I7IF9kb2NfdGVzdDsgX2RvY19xdWV1ZV9zdGFjazsg
+X2RvY19yZTsgX2RvY190cnk7IF9kb2NfdGFibGVfZXh0cmFzOyBfZG9jX2x4OyB9CiAgICAgICAg
+aWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2FsbF9tb2RzIHwgZXZhbCAiJF9ET0NfUEFH
+RVIiOyBlbHNlIF9hbGxfbW9kczsgZmkgOzsKICAgICAgZG93fGRvd25sb2FkfG1pZGlhKQogICAg
+ICAgIGlmIFsgLW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfZG93IHwgZXZhbCAiJF9ET0Nf
+UEFHRVIiOyBlbHNlIF9kb2NfZG93OyBmaSA7OwogICAgICB3ZWIpCiAgICAgICAgaWYgWyAtbiAi
+JF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY193ZWIgfCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2Ug
+X2RvY193ZWI7IGZpIDs7CiAgICAgIGxtb2QpCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIi
+IF07IHRoZW4gX2RvY19sbW9kIHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfbG1vZDsg
+ZmkgOzsKICAgICAgbHh8Z3VpfGludGVyZmFjZSkKICAgICAgICBpZiBbIC1uICIkX0RPQ19QQUdF
+UiIgXTsgdGhlbiBfZG9jX2x4IHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfbHg7IGZp
+IDs7CiAgICAgIGFkYikKICAgICAgICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9j
+X2FkYiB8IGV2YWwgIiRfRE9DX1BBR0VSIjsgZWxzZSBfZG9jX2FkYjsgZmkgOzsKICAgICAgZGJ8
+c3FsaXRlKQogICAgICAgIGlmIFsgLW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfZGIgfCBl
+dmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2RvY19kYjsgZmkgOzsKICAgICAgcGVudHxsYWIpCiAg
+ICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19wZW50IHwgZXZhbCAiJF9E
+T0NfUEFHRVIiOyBlbHNlIF9kb2NfcGVudDsgZmkgOzsKICAgICAgc2h8c2hlbGwpCiAgICAgICAg
+aWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19zaCB8IGV2YWwgIiRfRE9DX1BBR0VS
+IjsgZWxzZSBfZG9jX3NoOyBmaSA7OwogICAgICBjY3xjb21waWxlcikKICAgICAgICBpZiBbIC1u
+ICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2NjIHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNl
+IF9kb2NfY2M7IGZpIDs7CiAgICAgIHVpKQogICAgICAgIGlmIFsgLW4gIiRfRE9DX1BBR0VSIiBd
+OyB0aGVuIF9kb2NfdWkgfCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2RvY191aTsgZmkgOzsK
+ICAgICAgdHVpKQogICAgICAgIGlmIFsgLW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfdHVp
+IHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfdHVpOyBmaSA7OwogICAgICBleHBsb2l0
+fHBvc3QpCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19leHBsb2l0
+IHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfZXhwbG9pdDsgZmkgOzsKICAgICAgZWxs
+fGVuY29kZXIpCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19lbGwg
+fCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2UgX2RvY19lbGw7IGZpIDs7CiAgICAgIGFnZW50fGFn
+ZW50ZSkKICAgICAgICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2FnZW50IHwg
+ZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfYWdlbnQ7IGZpIDs7CiAgICAgIGl2YXIpCiAg
+ICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19pdmFyIHwgZXZhbCAiJF9E
+T0NfUEFHRVIiOyBlbHNlIF9kb2NfaXZhcjsgZmkgOzsKICAgICAgbnVtfG51bWJlcikKICAgICAg
+ICBpZiBbIC1uICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX251bSB8IGV2YWwgIiRfRE9DX1BB
+R0VSIjsgZWxzZSBfZG9jX251bTsgZmkgOzsKICAgICAgcGF0aCkKICAgICAgICBpZiBbIC1uICIk
+X0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX3BhdGggfCBldmFsICIkX0RPQ19QQUdFUiI7IGVsc2Ug
+X2RvY19wYXRoOyBmaSA7OwogICAgICBjb2xvcnxjb2xvdXJ8YW5zaSkKICAgICAgICBpZiBbIC1u
+ICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2NvbG9yIHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBl
+bHNlIF9kb2NfY29sb3I7IGZpIDs7CiAgICAgIHRlc3R8YXNzZXJ0KQogICAgICAgIGlmIFsgLW4g
+IiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfdGVzdCB8IGV2YWwgIiRfRE9DX1BBR0VSIjsgZWxz
+ZSBfZG9jX3Rlc3Q7IGZpIDs7CiAgICAgIHF1ZXVlfHN0YWNrfHN0cnVjdHxlc3RydXR1cmEpCiAg
+ICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19xdWV1ZV9zdGFjayB8IGV2
+YWwgIiRfRE9DX1BBR0VSIjsgZWxzZSBfZG9jX3F1ZXVlX3N0YWNrOyBmaSA7OwogICAgICByZXxy
+ZWdleHxyZWdleHApCiAgICAgICAgaWYgWyAtbiAiJF9ET0NfUEFHRVIiIF07IHRoZW4gX2RvY19y
+ZSB8IGV2YWwgIiRfRE9DX1BBR0VSIjsgZWxzZSBfZG9jX3JlOyBmaSA7OwogICAgICB0cnl8dHJ5
+Y2F0Y2h8dHJ5LWNhdGNoKQogICAgICAgIGlmIFsgLW4gIiRfRE9DX1BBR0VSIiBdOyB0aGVuIF9k
+b2NfdHJ5IHwgZXZhbCAiJF9ET0NfUEFHRVIiOyBlbHNlIF9kb2NfdHJ5OyBmaSA7OwogICAgICB0
+YWJsZV9leHRyYXN8dGFibGUtZXh0cmFzfHRhYmxlZXh0cmFzKQogICAgICAgIGlmIFsgLW4gIiRf
+RE9DX1BBR0VSIiBdOyB0aGVuIF9kb2NfdGFibGVfZXh0cmFzIHwgZXZhbCAiJF9ET0NfUEFHRVIi
+OyBlbHNlIF9kb2NfdGFibGVfZXh0cmFzOyBmaSA7OwogICAgICAiIikKICAgICAgICBpZiBbIC1u
+ICIkX0RPQ19QQUdFUiIgXTsgdGhlbiBfZG9jX2JvZHkgfCBldmFsICIkX0RPQ19QQUdFUiI7IGVs
+c2UgX2RvY19ib2R5OyBmaSA7OwogICAgICAqKQogICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVN1
+YmNvbWFuZG8gZGVzY29uaGVjaWRvOiAlc1wwMzNbMG1cbiIgIiRfRE9DX1NVQiIKICAgICAgICBw
+cmludGYgIiAgVXNlOiBcMDMzWzE7MzJtbXMgLS1kb2NcMDMzWzBtICAgICAgICAgICAjIGdlcmFs
+XG4iCiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIG1vZHVsb3NcMDMz
+WzBtICAgIyB0b2RvcyBvcyBtb2R1bG9zXG4iCiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sx
+OzMybW1zIC0tZG9jIG5ldFwwMzNbMG0gICAgICAgIyBuZXQuKlxuIgogICAgICAgIHByaW50ZiAi
+ICAgICAgIFwwMzNbMTszMm1tcyAtLWRvYyBtb2RcMDMzWzBtICAgICAgICMgbW9kLipcbiIKICAg
+ICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2MgY3J5cHRvXDAzM1swbSAgICAj
+IGNyeXB0by4qXG4iCiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIHN5
+c1wwMzNbMG0gICAgICAgIyBzeXMuKiAoaW5jbHVpIGRhdGEvcmVsb2dpbylcbiIKICAgICAgICBw
+cmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2MgZnNcMDMzWzBtICAgICAgICAjIGZzLipc
+biIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2MgYWlcMDMzWzBtICAg
+ICAgICAjIGFpLipcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2Mg
+ZGJcMDMzWzBtICAgICAgICAjIGRiLiogKFNRTGl0ZSlcbiIKICAgICAgICBwcmludGYgIiAgICAg
+ICBcMDMzWzE7MzJtbXMgLS1kb2Mgd2ViXDAzM1swbSAgICAgICAjIHdlYi4qXG4iCiAgICAgICAg
+cHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIGRvd1wwMzNbMG0gICAgICAgIyBkb3cu
+KiAoZG93bmxvYWRzKVxuIgogICAgICAgIHByaW50ZiAiICAgICAgIFwwMzNbMTszMm1tcyAtLWRv
+YyBsbW9kXDAzM1swbSAgICAgICMgbG1vZC4qIChtb2R1bG9zIGN1c3RvbSlcbiIKICAgICAgICBw
+cmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2MgYWRiXDAzM1swbSAgICAgICAjIGFkYi4q
+IChBbmRyb2lkIERlYnVnIEJyaWRnZSlcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7
+MzJtbXMgLS1kb2MgbHhcMDMzWzBtICAgICAgICAjIGx4LiogKGludGVyZmFjZSBncmFmaWNhIEdU
+SylcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2MgcGVudFwwMzNb
+MG0gICAgICAjIHBlbnQuKiAobGFiIHZ1bG5lcmF2ZWwpXG4iCiAgICAgICAgcHJpbnRmICIgICAg
+ICAgXDAzM1sxOzMybW1zIC0tZG9jIHNoXDAzM1swbSAgICAgICAgIyBzaC4qIChzaGVsbCBkaXJl
+dG8pXG4iCiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIGNjXDAzM1sw
+bSAgICAgICAgIyBjYy4qIChjb21waWxhZG9yIEMpXG4iCiAgICAgICAgcHJpbnRmICIgICAgICAg
+XDAzM1sxOzMybW1zIC0tZG9jIHVpXDAzM1swbSAgICAgICAgIyB1aS4qIChpbnRlcmZhY2UpXG4i
+CiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIHR1aVwwMzNbMG0gICAg
+ICAgIyB0dWkuKiAoVUkgaW50ZXJhdGl2bylcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMz
+WzE7MzJtbXMgLS1kb2MgZXhwbG9pdFwwMzNbMG0gICAjIGV4cGxvaXQuKiAocMOzcy1leHBsb3Jh
+w6fDo28pXG4iCiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIGVsbFww
+MzNbMG0gICAgICAgIyBlbGwuKiAoZW5jb2RlciBkZSBzY3JpcHRzKVxuIgogICAgICAgIHByaW50
+ZiAiICAgICAgIFwwMzNbMTszMm1tcyAtLWRvYyBhZ2VudFwwMzNbMG0gICAgICMgYWdlbnQuKiAo
+YWdlbnRlIGF1dMO0bm9tbylcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMg
+LS1kb2MgaXZhclwwMzNbMG0gICAgICAjIGl2YXIuKiAodmFyacOhdmVpcyBpbmRleGFkYXMpXG4i
+CiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIHN0cmluZ1wwMzNbMG0g
+ICAgIyBleHRlbnNvZXMgc3RyaW5nLipcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7
+MzJtbXMgLS1kb2MgdXRpbFwwMzNbMG0gICAgICAjIHN0ZGxpYiBmdW5jaW9uYWwgdXRpbC4qXG4i
+CiAgICAgICAgcHJpbnRmICIgICAgICAgXDAzM1sxOzMybW1zIC0tZG9jIGpzb25cMDMzWzBtICAg
+ICAgIyBqc29uLipcbiIKICAgICAgICBwcmludGYgIiAgICAgICBcMDMzWzE7MzJtbXMgLS1kb2Mg
+bG9nXDAzM1swbSAgICAgICAjIGxvZy4qIChsb2dnaW5nIGVzdHJ1dHVyYWRvKVxuIgogICAgICAg
+IHByaW50ZiAiICAgICAgIFwwMzNbMTszMm1tcyAtLWRvYyBjc3ZcMDMzWzBtICAgICAgICMgY3N2
+LiogKHBhcnNlIGUgZXNjcml0YSBDU1YpXG4iCiAgICAgICAgOzsKICAgIGVzYWMKICAgIDs7CiAg
+LS1zY3JpcHQpCiAgICBzaGlmdAogICAgX0VYX0xVQT0iJHtQUkVGSVg6LS9kYXRhL2RhdGEvY29t
+LnRlcm11eC9maWxlcy91c3J9L3NoYXJlL2x1YS1zY3JpcHRzIgogICAgX0VYX0M9IiR7UFJFRklY
+Oi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNyfS9zaGFyZS9jLXNjcmlwdHMiCiAgICBf
+U0M9IiQxIgogICAgaWYgWyAteiAiJF9TQyIgXTsgdGhlbgogICAgICAgIF9oYXNfbHVhPTAKICAg
+ICAgICBmb3IgZiBpbiAiJF9FWF9MVUEiLyoubHVhOyBkbyBbIC1mICIkZiIgXSAmJiBfaGFzX2x1
+YT0xICYmIGJyZWFrOyBkb25lCiAgICAgICAgaWYgWyAiJF9oYXNfbHVhIiA9ICIxIiBdOyB0aGVu
+CiAgICAgICAgICAgIHByaW50ZiAiXDAzM1sxOzM2beKUgOKUgCBTY3JpcHRzIEx1YSDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIBcMDMzWzBt
+XG4iCiAgICAgICAgICAgIGZvciBmIGluICIkX0VYX0xVQSIvKi5sdWE7IGRvCiAgICAgICAgICAg
+ICAgICBbIC1mICIkZiIgXSB8fCBjb250aW51ZQogICAgICAgICAgICAgICAgX25hbWU9JChiYXNl
+bmFtZSAiJGYiKQogICAgICAgICAgICAgICAgX2Rlc2M9JChoZWFkIC0zICIkZiIgfCBncmVwICJe
+LS0iIHwgdGFpbCAtMSB8IHNlZCAncy9eLS0gKi8vJykKICAgICAgICAgICAgICAgIHByaW50ZiAi
+ICBcMDMzWzE7MzJtJS0yMHNcMDMzWzBtIFwwMzNbMDs5MG0lc1wwMzNbMG1cbiIgIiRfbmFtZSIg
+IiRfZGVzYyIKICAgICAgICAgICAgZG9uZQogICAgICAgIGZpCiAgICAgICAgX2hhc19jPTAKICAg
+ICAgICBmb3IgZiBpbiAiJF9FWF9DIi8qOyBkbyBbIC1mICIkZiIgXSAmJiBfaGFzX2M9MSAmJiBi
+cmVhazsgZG9uZQogICAgICAgIGlmIFsgIiRfaGFzX2MiID0gIjEiIF07IHRoZW4KICAgICAgICAg
+ICAgcHJpbnRmICJcblwwMzNbMTszM23ilIDilIAgU2NyaXB0cyBDIOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIK
+ICAgICAgICAgICAgZm9yIGYgaW4gIiRfRVhfQyIvKjsgZG8KICAgICAgICAgICAgICAgIFsgLWYg
+IiRmIiBdIHx8IGNvbnRpbnVlCiAgICAgICAgICAgICAgICBfbmFtZT0kKGJhc2VuYW1lICIkZiIp
+CiAgICAgICAgICAgICAgICBfZGVzYz0kKGhlYWQgLTMgIiRmIiB8IGdyZXAgLW0xICJeLy8iIHwg
+c2VkICdzfF4vLyAqfHwnKQogICAgICAgICAgICAgICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTIw
+c1wwMzNbMG0gXDAzM1swOzkwbSVzXDAzM1swbVxuIiAiJF9uYW1lIiAiJF9kZXNjIgogICAgICAg
+ICAgICBkb25lCiAgICAgICAgZWxzZQogICAgICAgICAgICBwcmludGYgIlxuXDAzM1swOzkwbSAg
+KG5lbmh1bSBzY3JpcHQgQyBlbSAkX0VYX0MpXDAzM1swbVxuIgogICAgICAgIGZpCiAgICAgICAg
+cHJpbnRmICJcblwwMzNbMDs5MG0gIFVzbzogbXMgLS1zY3JpcHQgPG5vbWU+IC0tIFthcmdzXVww
+MzNbMG1cbiIKICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gIEM6IC5jIGNvbXBpbGEgdmlhIGN4
+eCB8IGJpbmFyaW8gZXhlY3V0YSBkaXJldG9cMDMzWzBtXG4iCiAgICAgICAgZXhpdCAwCiAgICBm
+aQogICAgc2hpZnQKICAgIF9GVUxMPSIiCiAgICBfU0NSSVBUX1RZUEU9IiIKICAgIGNhc2UgIiRf
+U0MiIGluCiAgICAgICAgKi5jKQogICAgICAgICAgICBbIC1mICIkX0VYX0MvJF9TQyIgXSAmJiBf
+RlVMTD0iJF9FWF9DLyRfU0MiICYmIF9TQ1JJUFRfVFlQRT0iY19zcmMiCiAgICAgICAgICAgIDs7
+CiAgICAgICAgKikKICAgICAgICAgICAgX1NDX0xVQT0iJF9TQyIKICAgICAgICAgICAgY2FzZSAi
+JF9TQ19MVUEiIGluICoubHVhKSA7OyAqKSBfU0NfTFVBPSIke19TQ19MVUF9Lmx1YSIgOzsgZXNh
+YwogICAgICAgICAgICBpZiBbIC1mICIkX0VYX0xVQS8kX1NDX0xVQSIgXTsgdGhlbgogICAgICAg
+ICAgICAgICAgX0ZVTEw9IiRfRVhfTFVBLyRfU0NfTFVBIjsgX1NDUklQVF9UWVBFPSJsdWEiCiAg
+ICAgICAgICAgIGVsaWYgWyAtZiAiJF9FWF9DLyRfU0MiIF0gJiYgWyAteCAiJF9FWF9DLyRfU0Mi
+IF07IHRoZW4KICAgICAgICAgICAgICAgIF9GVUxMPSIkX0VYX0MvJF9TQyI7IF9TQ1JJUFRfVFlQ
+RT0iY19iaW4iCiAgICAgICAgICAgIGVsaWYgWyAtZiAiJF9FWF9DLyR7X1NDfS5jIiBdOyB0aGVu
+CiAgICAgICAgICAgICAgICBfRlVMTD0iJF9FWF9DLyR7X1NDfS5jIjsgX1NDUklQVF9UWVBFPSJj
+X3NyYyIKICAgICAgICAgICAgZmkKICAgICAgICAgICAgOzsKICAgIGVzYWMKICAgIGlmIFsgLXog
+IiRfRlVMTCIgXTsgdGhlbgogICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbUVycm86ICckX1NDJyBu
+YW8gZW5jb250cmFkbyBlbSBsdWEtc2NyaXB0cyBuZW0gYy1zY3JpcHRzXDAzM1swbVxuIgogICAg
+ICAgIHByaW50ZiAiXDAzM1swOzkwbUx1YTpcMDMzWzBtXG4iCiAgICAgICAgZm9yIGYgaW4gIiRf
+RVhfTFVBIi8qLmx1YTsgZG8KICAgICAgICAgICAgWyAtZiAiJGYiIF0gJiYgcHJpbnRmICIgIFww
+MzNbMTszMm0lc1wwMzNbMG1cbiIgIiQoYmFzZW5hbWUgJGYpIgogICAgICAgIGRvbmUKICAgICAg
+ICBwcmludGYgIlwwMzNbMDs5MG1DOlwwMzNbMG1cbiIKICAgICAgICBmb3IgZiBpbiAiJF9FWF9D
+Ii8qOyBkbwogICAgICAgICAgICBbIC1mICIkZiIgXSAmJiBwcmludGYgIiAgXDAzM1sxOzMzbSVz
+XDAzM1swbVxuIiAiJChiYXNlbmFtZSAkZikiCiAgICAgICAgZG9uZQogICAgICAgIGV4aXQgMQog
+ICAgZmkKICAgIFsgIiQxIiA9ICItLSIgXSAmJiBzaGlmdAogICAgY2FzZSAiJF9TQ1JJUFRfVFlQ
+RSIgaW4KICAgICAgICBsdWEpCiAgICAgICAgICAgIGlmIF9pdmFyX25lZWRzX3ByZXByb2Nlc3Mg
+IiRfRlVMTCI7IHRoZW4KICAgICAgICAgICAgICAgIF9pdmFyX3J1bl9maWxlICIkX0ZVTEwiICIk
+QCIKICAgICAgICAgICAgZWxzZQogICAgICAgICAgICAgICAgX2x1YV9ydW4gIiRfQiIgLWUgInJl
+cXVpcmUoJ0BzdGQnKSIgIiRfRlVMTCIgIiRAIgogICAgICAgICAgICBmaQogICAgICAgICAgICA7
+OwogICAgICAgIGNfc3JjKQogICAgICAgICAgICBta2RpciAtcCAiJHtUTVBESVI6LSRIT01FLy5j
+YWNoZS9lbGxpb3R9IiAyPi9kZXYvbnVsbCB8fCB0cnVlCiAgICAgICAgICAgIF9DQklOPSIkKG1r
+dGVtcCAiJHtUTVBESVI6LSRIT01FLy5jYWNoZS9lbGxpb3R9L2VsbGlvdF9jc2NyaXB0X1hYWFhY
+WCIpIgogICAgICAgICAgICBjeHggIiRfRlVMTCIgLW8gIiRfQ0JJTiIgMj4mMSAmJiBjaG1vZCAr
+eCAiJF9DQklOIiAmJiAiJF9DQklOIiAiJEAiCiAgICAgICAgICAgIHJtIC1mICIkX0NCSU4iCiAg
+ICAgICAgICAgIDs7CiAgICAgICAgY19iaW4pCiAgICAgICAgICAgICIkX0ZVTEwiICIkQCIKICAg
+ICAgICAgICAgOzsKICAgIGVzYWMKICAgIDs7CiAgLS1jc2NyaXB0KQogICAgc2hpZnQKICAgIF9F
+WF9DPSIke1BSRUZJWDotL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzcn0vc2hhcmUvYy1z
+Y3JpcHRzIgogICAgX1NDPSIkMSIKICAgIGlmIFsgLXogIiRfU0MiIF07IHRoZW4KICAgICAgICBw
+cmludGYgIlwwMzNbMTszM23ilIDilIAgU2NyaXB0cyBDIGRpc3Bvbml2ZWlzIOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIKICAgICAgICBfZm91bmQ9MAogICAgICAgIGZvciBm
+IGluICIkX0VYX0MiLyo7IGRvCiAgICAgICAgICAgIFsgLWYgIiRmIiBdIHx8IGNvbnRpbnVlCiAg
+ICAgICAgICAgIF9mb3VuZD0xCiAgICAgICAgICAgIF9uYW1lPSQoYmFzZW5hbWUgIiRmIikKICAg
+ICAgICAgICAgX2Rlc2M9JChoZWFkIC0zICIkZiIgfCBncmVwIC1tMSAiXi8vIiB8IHNlZCAnc3xe
+Ly8gKnx8JykKICAgICAgICAgICAgcHJpbnRmICIgIFwwMzNbMTszM20lLTIwc1wwMzNbMG0gXDAz
+M1swOzkwbSVzXDAzM1swbVxuIiAiJF9uYW1lIiAiJF9kZXNjIgogICAgICAgIGRvbmUKICAgICAg
+ICBbICIkX2ZvdW5kIiA9ICIwIiBdICYmIHByaW50ZiAiICBcMDMzWzA7OTBtKG5lbmh1bSBzY3Jp
+cHQgQyBpbnN0YWxhZG8gYWluZGEpXDAzM1swbVxuIgogICAgICAgIHByaW50ZiAiXG5cMDMzWzA7
+OTBtICBVc286IG1zIC0tY3NjcmlwdCA8bm9tZS5jPiAtLSBbYXJnc10gICAoY29tcGlsYSBlIGV4
+ZWN1dGEpXDAzM1swbVxuIgogICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICAgICBtcyAtLWNz
+Y3JpcHQgPGJpbmFyaW8+IC0tIFthcmdzXSAgIChleGVjdXRhIGRpcmV0bylcMDMzWzBtXG4iCiAg
+ICAgICAgZXhpdCAwCiAgICBmaQogICAgc2hpZnQKICAgIFsgIiQxIiA9ICItLSIgXSAmJiBzaGlm
+dAogICAgaWYgWyAteCAiJF9FWF9DLyRfU0MiIF0gJiYgISBlY2hvICIkX1NDIiB8IGdyZXAgLXEg
+J1wuYyQnOyB0aGVuCiAgICAgICAgIiRfRVhfQy8kX1NDIiAiJEAiCiAgICBlbHNlCiAgICAgICAg
+X1NSQz0iJF9TQyIKICAgICAgICBjYXNlICIkX1NSQyIgaW4gKi5jKSA7OyAqKSBfU1JDPSIke19T
+UkN9LmMiIDs7IGVzYWMKICAgICAgICBpZiBbICEgLWYgIiRfRVhfQy8kX1NSQyIgXTsgdGhlbgog
+ICAgICAgICAgICBwcmludGYgIlwwMzNbMTszMW1FcnJvOiAnJF9TUkMnIG5hbyBlbmNvbnRyYWRv
+IGVtICRfRVhfQ1wwMzNbMG1cbiIKICAgICAgICAgICAgZXhpdCAxCiAgICAgICAgZmkKICAgICAg
+ICBta2RpciAtcCAiJHtUTVBESVI6LSRIT01FLy5jYWNoZS9lbGxpb3R9IiAyPi9kZXYvbnVsbCB8
+fCB0cnVlCiAgICAgICAgX0NCSU49IiQobWt0ZW1wICIke1RNUERJUjotJEhPTUUvLmNhY2hlL2Vs
+bGlvdH0vZWxsaW90X2NzY3JpcHRfWFhYWFhYIikiCiAgICAgICAgY3h4ICIkX0VYX0MvJF9TUkMi
+IC1vICIkX0NCSU4iIDI+JjEgJiYgY2htb2QgK3ggIiRfQ0JJTiIgJiYgIiRfQ0JJTiIgIiRAIgog
+ICAgICAgIHJtIC1mICIkX0NCSU4iCiAgICBmaQogICAgOzsKICAtLWxpc3RlbikKICAgIHNoaWZ0
+CiAgICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7CmxvY2FsIEVTQz1zdHJpbmcuY2hh
+cigyNykKbG9jYWwgQz1FU0MuLidbMTszNm0nIGxvY2FsIFc9RVNDLi4nWzE7MzdtJwpsb2NhbCBE
+PUVTQy4uJ1swOzkwbScgbG9jYWwgRz1FU0MuLidbMTszMm0nIGxvY2FsIFI9RVNDLi4nWzE7MzFt
+JyBsb2NhbCBaPUVTQy4uJ1swbScKbG9jYWwgcG9ydD10b251bWJlcignJDEnKQppZiBub3QgcG9y
+dCB0aGVuIHByaW50KCd1c286IG1zIC0tbGlzdGVuIHBvcnRhJykgb3MuZXhpdCgxKSBlbmQKcHJp
+bnQoQy4uJ1tuZXRdJy4uWi4uJyBPdXZpbmRvIGVtICcuLlcuLicwLjAuMC4wOicuLnBvcnQuLlop
+CnByaW50KEQuLicgIEN0cmwrQyBwYXJhIGVuY2VycmFyJy4uWikKbG9jYWwgc3J2ID0gbmV0Lmxp
+c3Rlbihwb3J0LCcwLjAuMC4wJyw0KQppZiBub3Qgc3J2IHRoZW4gcHJpbnQoUi4uJ07Do28gZm9p
+IHBvc3PDrXZlbCBhYnJpciBhIHBvcnRhICcuLnBvcnQuLlopIG9zLmV4aXQoMSkgZW5kCndoaWxl
+IHRydWUgZG8KICBsb2NhbCBjbGllbnQgPSBuZXQuYWNjZXB0KHNydikKICBpZiBjbGllbnQgdGhl
+bgogICAgbG9jYWwgZGF0YSA9IG5ldC5yZWN2KGNsaWVudCkKICAgIGlmIGRhdGEgYW5kICNkYXRh
+ID4gMCB0aGVuCiAgICAgIHByaW50KEcuLidbK10nLi5aLi4nICcuLmRhdGE6Z3N1YignW1xyXG5d
+KycsJyAnKSkKICAgIGVuZAogICAgbmV0LmNsb3NlKGNsaWVudCkKICBlbmQKZW5kIgogICAgOzsK
+ICAteHwtLXhzcykKICAgIHNoaWZ0CiAgICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7
+bW9kLnhzcygnJDEnLG5pbCwkezI6LTF9KSIKICAgIDs7CiAgLXF8LS1zcWxpKQogICAgc2hpZnQK
+ICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTttb2Quc3FsaSgnJDEnLG5pbCwkezI6
+LTF9KSIKICAgIDs7CiAgLWx8LS1sZmkpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVx
+dWlyZSgnQHN0ZCcpO21vZC5sZmkoJyQxJyxuaWwsJHsyOi0xfSkiCiAgICA7OwogIC1yfC0tcmNl
+KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTttb2QucmNlKCck
+MScsbmlsLCR7MjotMX0pIgogICAgOzsKICAtLXNzcmYpCiAgICBzaGlmdAogICAgZXhlYyAiJF9C
+IiAtZSAicmVxdWlyZSgnQHN0ZCcpO21vZC5zc3JmKCckMScsbmlsLCR7MjotMX0pIgogICAgOzsK
+ICAtLXJlZGlyKQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtt
+b2QucmVkaXIoJyQxJyxuaWwsJHsyOi0xfSkiCiAgICA7OwogIC0tc3N0aSkKICAgIHNoaWZ0CiAg
+ICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7bW9kLnNzdGkoJyQxJyxuaWwsJHsyOi0x
+fSkiCiAgICA7OwogIC1OfC0tbm9zcWwpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVx
+dWlyZSgnQHN0ZCcpO21vZC5ub3NxbCgnJDEnKSIKICAgIDs7CiAgLS1zY2FuLWFsbCkKICAgICMg
+cm9kYSB0b2RvcyBvcyBzY2FubmVycyBlbSB1bWEgVVJMIGNvbSBzcGlkZXIgaW50ZWdyYWRvCiAg
+ICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcpOwpsb2NhbCB1cmw9JyQx
+Jwpsb2NhbCBsaW09dG9udW1iZXIoJyR7MjotMH0nKSBvciAwCnByaW50KCdcblwwMjdbMTszNW1b
+c2Nhbi1hbGxdICcuLnVybC4uJ1wwMjdbMG0nKQoKLS0gU3BpZGVyIHByaW1laXJvOiBjb2xldGEg
+ZW5kcG9pbnRzIHJlYWlzCmxvY2FsIGVuZHBvaW50cz17fQpsb2NhbCBva19zcCxzcD1wY2FsbCht
+b2Quc3BpZGVyLHVybCwyMCkKaWYgb2tfc3AgYW5kIHR5cGUoc3ApPT0ndGFibGUnIGFuZCBzcC5h
+bGwgYW5kICNzcC5hbGw+MCB0aGVuCiAgZW5kcG9pbnRzPXNwLmFsbAogIHByaW50KCdcMDI3WzE7
+MzJtW3NwaWRlcl0gJy4uI2VuZHBvaW50cy4uJyBlbmRwb2ludHMgY29sZXRhZG9zXDAyN1swbScp
+CmVsc2UKICBlbmRwb2ludHM9e3VybH0KICBwcmludCgnXDAyN1swOzMzbVtzcGlkZXJdIGZhbGxi
+YWNrIHBhcmEgVVJMIGJhc2VcMDI3WzBtJykKZW5kCgpsb2NhbCB0b3RhbF92dWxucz0wCmxvY2Fs
+IG1vZHM9eyd4c3MnLCdzcWxpJywnbGZpJywncmNlJywnc3NyZicsJ2NzcmYnLCdjb3JzJywnaGVh
+ZGVycycsJ3h4ZScsJ3NzdGknLCdyZWRpcicsJ2lkb3InfQpmb3IgXyxlcCBpbiBpcGFpcnMoZW5k
+cG9pbnRzKSBkbwogIHByaW50KCdcblwwMjdbMTszNm1bK10gJy4uZXAuLidcMDI3WzBtJykKICBm
+b3IgXyxtIGluIGlwYWlycyhtb2RzKSBkbwogICAgaWYgdHlwZShtb2RbbV0pPT0nZnVuY3Rpb24n
+IHRoZW4KICAgICAgbG9jYWwgb2ssbj1wY2FsbChtb2RbbV0sZXAsbmlsLGxpbSkKICAgICAgbG9j
+YWwgaGl0cz1vayBhbmQgdG9udW1iZXIobikgb3IgMAogICAgICBpZiBoaXRzIGFuZCBoaXRzPjAg
+dGhlbgogICAgICAgIHByaW50KCcgIFwwMjdbMTszMW1bJy4ubS4uJ10gJy4uaGl0cy4uJyB2dWxu
+KHMpXDAyN1swbScpCiAgICAgICAgdG90YWxfdnVsbnM9dG90YWxfdnVsbnMraGl0cwogICAgICBl
+bmQKICAgIGVuZAogIGVuZAplbmQKcHJpbnQoJ1xuXDAyN1sxOzM1bVtzY2FuLWFsbF0gVG90YWw6
+ICcuLnRvdGFsX3Z1bG5zLi4nIHZ1bG5lcmFiaWxpZGFkZShzKVwwMjdbMG0nKQoiCiAgICA7Owog
+IC0tZXhwbG9pdC1yY2UpCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAiZXhwbG9pdC5yY2Uo
+JyQxJykiCiAgICA7OwogIC0tZXhwbG9pdC1zcWxpKQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIg
+LWUgImV4cGxvaXQuc3FsaSgnJDEnKSIKICAgIDs7CiAgLS1leHBsb2l0LWxmaSkKICAgIHNoaWZ0
+CiAgICBleGVjICIkX0IiIC1lICJleHBsb2l0LmxmaSgnJDEnKSIKICAgIDs7CgogICMg4pSA4pSA
+IEZpbGVzeXN0ZW0g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgLS1sb2dzKQogICAgc2hpZnQK
+ICAgIF9sb2dkaXI9IiRIT01FLy5lbGxpb3RfbG9ncyIKICAgIF9sb2dmaWxlPSIkX2xvZ2Rpci92
+dWxucy50eHQiCiAgICBpZiBbICEgLWYgIiRfbG9nZmlsZSIgXTsgdGhlbgogICAgICAgIHByaW50
+ZiAiXDAzM1sxOzMzbVsqXVwwMzNbMG0gTmVuaHVtIGxvZyBlbmNvbnRyYWRvIGVtICRfbG9nZmls
+ZVxuIgogICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICBFeGVjdXRlIHNjYW5uZXJzIHByaW1l
+aXJvLiBPIGxvZyDDqSBjcmlhZG8gYXV0b21hdGljYW1lbnRlLlwwMzNbMG1cbiIKICAgIGVsc2UK
+ICAgICAgICBwcmludGYgIlwwMzNbMTszNW3ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZdcMDMzWzBtXG4i
+CiAgICAgICAgcHJpbnRmICJcMDMzWzE7MzVt4pWRICBFbGxpb3RPUyDigJQgTG9nIGRlIFZ1bG5l
+cmFiaWxpZGFkZXMgICAgICAgICAgICAgICAgICAgICAgICAgIOKVkVwwMzNbMG1cbiIKICAgICAg
+ICBwcmludGYgIlwwMzNbMTszNW3ilZrilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZ1cMDMzWzBtXG5cbiIKICAg
+ICAgICAjIENvbnRhIHBvciB0aXBvCiAgICAgICAgcHJpbnRmICJcMDMzWzE7MzNtWypdIFJlc3Vt
+bzpcMDMzWzBtXG4iCiAgICAgICAgZm9yIF90IGluIENSSVRJQ0FMIFhTUyBTUUxpIE5vU1FMaSBD
+UkxGIEJBQ0tVUCBQQVJBTTsgZG8KICAgICAgICAgICAgX249JChncmVwIC1jICJcWyRfdFxdIiAi
+JF9sb2dmaWxlIiAyPi9kZXYvbnVsbCB8fCBlY2hvIDApCiAgICAgICAgICAgIFsgIiRfbiIgLWd0
+IDAgXSAmJiBwcmludGYgIiAgICBcMDMzWzE7MzFtJS0xMHMgJWRcMDMzWzBtXG4iICIkX3QiICIk
+X24iCiAgICAgICAgZG9uZQogICAgICAgIHByaW50ZiAiXG5cMDMzWzE7MzNtWypdIMOabHRpbWFz
+IDMwIGVudHJhZGFzOlwwMzNbMG1cblxuIgogICAgICAgIHRhaWwgLTMwICIkX2xvZ2ZpbGUiCiAg
+ICBmaQogICAgOzsKICAtLWxvZ3MtY2xlYXIpCiAgICBybSAtZiAiJEhPTUUvLmVsbGlvdF9sb2dz
+L3Z1bG5zLnR4dCIKICAgIHByaW50ZiAiXDAzM1sxOzMybVvinJNdIExvZyBsaW1wby5cMDMzWzBt
+XG4iCiAgICA7OwogIC0tY2F0KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUo
+J0BzdGQnKTtwcmludChmcy5yZWFkKCckMScpKSIKICAgIDs7CiAgLS1scykKICAgIHNoaWZ0CiAg
+ICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7Zm9yIF8sZiBpbiBpcGFpcnMoZnMuZ2xv
+YignJHsxOi0ufS8qJykpIGRvIHByaW50KGYpIGVuZCIKICAgIDs7CiAgLS13cml0ZSkKICAgICMg
+bXMgLS13cml0ZSBhcnF1aXZvICJjb250ZXVkbyIKICAgIHNoaWZ0CiAgICBleGVjICIkX0IiIC1l
+ICJyZXF1aXJlKCdAc3RkJyk7ZnMud3JpdGUoJyQxJywnJDInKSBwcmludCgnZXNjcml0bzogJDEn
+KSIKICAgIDs7CgogICMg4pSA4pSAIEx1YSBTY2FubmVyIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAog
+IC0tbHVhLXNjYW4pCiAgICBzaGlmdAogICAgX1NDQU5fRElSPSIke1BXRH0iCiAgICBfU0NBTl9F
+WFBPUlQ9IiIKICAgIF9TQ0FOX09VVEZJTEU9IiIKCiAgICAjIFByb2Nlc3NhIGFyZ3VtZW50b3M6
+IFtkaXJdIFstLWV4cG9ydCBbYXJxdWl2b11dCiAgICB3aGlsZSBbICIkIyIgLWd0IDAgXTsgZG8K
+ICAgICAgY2FzZSAiJDEiIGluCiAgICAgICAgLS1leHBvcnQpCiAgICAgICAgICBfU0NBTl9FWFBP
+UlQ9MQogICAgICAgICAgc2hpZnQKICAgICAgICAgICMgUHLDs3hpbW8gYXJnIMOpIG8gbm9tZSBk
+byBhcnF1aXZvIGRlIHNhw61kYSAob3BjaW9uYWwpCiAgICAgICAgICBpZiBbIC1uICIkezE6LX0i
+IF0gJiYgWyAiJHsxIy19IiA9ICIkMSIgXTsgdGhlbgogICAgICAgICAgICBfU0NBTl9PVVRGSUxF
+PSIkMSI7IHNoaWZ0CiAgICAgICAgICBmaQogICAgICAgICAgOzsKICAgICAgICAqKQogICAgICAg
+ICAgIyBQcmltZWlybyBhcmcgbsOjby1mbGFnIMOpIG8gZGlyZXTDs3JpbwogICAgICAgICAgaWYg
+WyAtZCAiJDEiIF07IHRoZW4KICAgICAgICAgICAgX1NDQU5fRElSPSIkMSIKICAgICAgICAgIGVs
+c2UKICAgICAgICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl11cMDMzWzBtIERpcmV0w7NyaW8g
+bsOjbyBlbmNvbnRyYWRvOiAkMVxuIgogICAgICAgICAgICBleGl0IDEKICAgICAgICAgIGZpCiAg
+ICAgICAgICBzaGlmdAogICAgICAgICAgOzsKICAgICAgZXNhYwogICAgZG9uZQoKICAgICMgQ29s
+ZXRhIGFycXVpdm9zIC5sdWEgbm8gZGlyZXTDs3JpbwogICAgX0xVQV9GSUxFUz0kKGZpbmQgIiRf
+U0NBTl9ESVIiIC1tYXhkZXB0aCAxIC1uYW1lICIqLmx1YSIgMj4vZGV2L251bGwgfCBzb3J0KQoK
+ICAgIGlmIFsgLXogIiRfTFVBX0ZJTEVTIiBdOyB0aGVuCiAgICAgIHByaW50ZiAiXDAzM1sxOzMz
+bVshXVwwMzNbMG0gTmVuaHVtIGFycXVpdm8gLmx1YSBlbmNvbnRyYWRvIGVtOiBcMDMzWzE7Mzdt
+JF9TQ0FOX0RJUlwwMzNbMG1cbiIKICAgICAgZXhpdCAwCiAgICBmaQoKICAgICMgQ29udGEgZSBs
+aXN0YQogICAgX0xVQV9DT1VOVD0kKHByaW50ZiAnJXNcbicgIiRfTFVBX0ZJTEVTIiB8IHdjIC1s
+IHwgdHIgLWQgJyAnKQogICAgcHJpbnRmICJcblwwMzNbMTszNW3ilIDilIAgTHVhIFNjYW5uZXIg
+4oCUIEVsbGlvdE9TIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgFwwMzNbMG1cbiIKICAgIHByaW50ZiAiXDAzM1swOzkwbSAgRGlyZXTDs3Jp
+bzogJF9TQ0FOX0RJUlwwMzNbMG1cbiIKICAgIHByaW50ZiAiXDAzM1sxOzMybSAgJXMgYXJxdWl2
+byhzKSAubHVhIGVuY29udHJhZG8ocyk6XDAzM1swbVxuXG4iICIkX0xVQV9DT1VOVCIKCiAgICBf
+SURYPTEKICAgIGZvciBfRiBpbiAkX0xVQV9GSUxFUzsgZG8KICAgICAgX0ZOQU1FPSQoYmFzZW5h
+bWUgIiRfRiIpCiAgICAgIF9GU0laRT0kKHdjIC1jIDwgIiRfRiIgMj4vZGV2L251bGwgfCB0ciAt
+ZCAnICcpCiAgICAgIF9GTElORVM9JCh3YyAtbCA8ICIkX0YiIDI+L2Rldi9udWxsIHwgdHIgLWQg
+JyAnKQogICAgICBwcmludGYgIiAgXDAzM1sxOzM2bVslZF1cMDMzWzBtIFwwMzNbMTszN20lLTI4
+c1wwMzNbMG0gXDAzM1swOzkwbSVzIGJ5dGVzIC8gJXMgbGluaGFzXDAzM1swbVxuIiAiJF9JRFgi
+ICIkX0ZOQU1FIiAiJF9GU0laRSIgIiRfRkxJTkVTIgogICAgICBfSURYPSQoKF9JRFggKyAxKSkK
+ICAgIGRvbmUKICAgIHByaW50ZiAiXG4iCgogICAgIyBNb2RvIGV4cG9ydDoganVudGEgdHVkbyBl
+bSB1bSBhcnF1aXZvCiAgICBpZiBbIC1uICIkX1NDQU5fRVhQT1JUIiBdOyB0aGVuCiAgICAgIF9P
+VVRGSUxFPSIke19TQ0FOX09VVEZJTEU6LSR7X1NDQU5fRElSfS9idW5kbGVfJChkYXRlICslWSVt
+JWRfJUglTSVTKS5sdWF9IgogICAgICBwcmludGYgIlwwMzNbMTszM21bKl1cMDMzWzBtIEV4cG9y
+dGFuZG8gcGFyYTogXDAzM1sxOzM3bSRfT1VURklMRVwwMzNbMG1cblxuIgoKICAgICAgIyBDYWJl
+w6dhbGhvIGRvIGJ1bmRsZQogICAgICBwcmludGYgIi0tID09PT09PT09PT09PT09PT09PT09PT09
+PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PVxuIiA+ICIkX09VVEZJTEUiCiAg
+ICAgIHByaW50ZiAiLS0gRWxsaW90T1MgTHVhIEJ1bmRsZSDigJQgZ2VyYWRvIGVtICVzXG4iICIk
+KGRhdGUpIiA+PiAiJF9PVVRGSUxFIgogICAgICBwcmludGYgIi0tIERpcmV0w7NyaW86ICVzXG4i
+ICIkX1NDQU5fRElSIiA+PiAiJF9PVVRGSUxFIgogICAgICBwcmludGYgIi0tIEFycXVpdm9zOiAl
+c1xuIiAiJF9MVUFfQ09VTlQiID4+ICIkX09VVEZJTEUiCiAgICAgIHByaW50ZiAiLS0gPT09PT09
+PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09XG5c
+biIgPj4gIiRfT1VURklMRSIKCiAgICAgICMgSW5qZXRhIGNhZGEgYXJxdWl2byBjb20gc2VwYXJh
+ZG9yCiAgICAgIGZvciBfRiBpbiAkX0xVQV9GSUxFUzsgZG8KICAgICAgICBfRk5BTUU9JChiYXNl
+bmFtZSAiJF9GIikKICAgICAgICBwcmludGYgIi0tIOKUgOKUgCAlcyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIBcbiIgIiRfRk5BTUUiID4+ICIkX09VVEZJTEUiCiAgICAgICAgcHJpbnRmICJkbyAt
+LSBpbsOtY2lvOiAlc1xuIiAiJF9GTkFNRSIgPj4gIiRfT1VURklMRSIKICAgICAgICBjYXQgIiRf
+RiIgPj4gIiRfT1VURklMRSIKICAgICAgICBwcmludGYgIlxuZW5kIC0tIGZpbTogJXNcblxuIiAi
+JF9GTkFNRSIgPj4gIiRfT1VURklMRSIKICAgICAgICBwcmludGYgIiAgXDAzM1sxOzMybeKck1ww
+MzNbMG0gJXNcbiIgIiRfRk5BTUUiCiAgICAgIGRvbmUKCiAgICAgIF9CVU5ETEVfU0laRT0kKHdj
+IC1jIDwgIiRfT1VURklMRSIgMj4vZGV2L251bGwgfCB0ciAtZCAnICcpCiAgICAgIF9CVU5ETEVf
+TElORVM9JCh3YyAtbCA8ICIkX09VVEZJTEUiIDI+L2Rldi9udWxsIHwgdHIgLWQgJyAnKQogICAg
+ICBwcmludGYgIlxuXDAzM1sxOzMybVvinJRdXDAzM1swbSBCdW5kbGUgY3JpYWRvOiBcMDMzWzE7
+MzdtJF9PVVRGSUxFXDAzM1swbVxuIgogICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgJXMgYnl0
+ZXMgLyAlcyBsaW5oYXMgdG90YWlzXDAzM1swbVxuXG4iICIkX0JVTkRMRV9TSVpFIiAiJF9CVU5E
+TEVfTElORVMiCiAgICBlbHNlCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgRGljYTogdXNlIC0t
+ZXhwb3J0IHBhcmEganVudGFyIHR1ZG8gZW0gdW0gw7puaWNvIGFycXVpdm8uXDAzM1swbVxuIgog
+ICAgICBwcmludGYgIlwwMzNbMDs5MG0gIEV4OiBtcyAtLWx1YS1zY2FuICRfU0NBTl9ESVIgLS1l
+eHBvcnQgYnVuZGxlLmx1YVwwMzNbMG1cblxuIgogICAgZmkKICAgIDs7CgogICMg4pSA4pSAIENy
+eXB0byDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAtLW1kNSkKICAgIHNo
+aWZ0CiAgICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7cHJpbnQoY3J5cHRvLm1kNSgn
+JConKSkiCiAgICA7OwogIC0tc2hhMjU2KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJl
+cXVpcmUoJ0BzdGQnKTtwcmludChjcnlwdG8uc2hhMjU2KCckKicpKSIKICAgIDs7CiAgLS1iNjRl
+KQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0BzdGQnKTtwcmludChtcy5i
+NjQuZW5jKCckKicpKSIKICAgIDs7CiAgLS1iNjRkKQogICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIg
+LWUgInJlcXVpcmUoJ0BzdGQnKTtwcmludChtcy5iNjQuZGVjKCckKicpKSIKICAgIDs7CgogICMg
+4pSA4pSAIFNoZWxsL1N5cyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAtLXNoKQog
+ICAgc2hpZnQKICAgIGV4ZWMgIiRfQiIgLWUgInByaW50KHNoLmNhcHR1cmUoJyQqJykpIgogICAg
+OzsKICAtLXBzKQogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcpO3N5cy5saXN0KCki
+CiAgICA7OwogIC0ta2lsbCkKICAgIHNoaWZ0CiAgICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdA
+c3RkJyk7c3lzLmtpbGwoJDEpIgogICAgOzsKICAtLWVudikKICAgIHNoaWZ0CiAgICBpZiBbIC1u
+ICIkMSIgXTsgdGhlbgogICAgICBleGVjICIkX0IiIC1lICJyZXF1aXJlKCdAc3RkJyk7cHJpbnQo
+c3lzLmVudignJDEnKSkiCiAgICBlbHNlCiAgICAgIGV4ZWMgIiRfQiIgLWUgInJlcXVpcmUoJ0Bz
+dGQnKTtmb3Igayx2IGluIHBhaXJzKHN5cy5lbnYoKSkgZG8gcHJpbnQoay4uJz0nLi52KSBlbmQi
+CiAgICBmaQogICAgOzsKCiAgIyDilIDilIAgQVBLIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIC0tYXBrKQogICAgc2hpZnQKICAgIGlmIFsgIiQj
+IiAtZXEgMCBdOyB0aGVuCiAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddXDAzM1swbSBVc286
+IG1zIC0tYXBrIGFycXVpdm8uYXBrIFthcnF1aXZvMi5hcGsgYXJxdWl2bzMuYXBrIC4uLl1cbiIK
+ICAgICAgZXhpdCAxCiAgICBmaQoKICAgICMg4pSA4pSAIGNoZWNrcyBkZSBhbWJpZW50ZTogcm9k
+YW0gVU1BIFZFWiBzw7MsIGFudGVzIGRvIGxvdGUg4oCUIG7Do28gZmF6ZW0KICAgICMgc2VudGlk
+byByZXBldGlyIHBvciBhcGsgKG5hbyBtdWRhbSBlbnRyZSB1bSBhcnF1aXZvIGUgb3V0cm8pLCBl
+IHNlCiAgICAjIGZhbGhhcmVtIG5hbyBoYSBtb3Rpdm8gcHJhIHRlbnRhciBuZW5odW0gYXBrIGRh
+IGxpc3RhLgogICAgX0FQS19CSU49IiQoY29tbWFuZCAtdiBhcGt0b29sIDI+L2Rldi9udWxsKSIK
+ICAgIGlmIFsgLXogIiRfQVBLX0JJTiIgXTsgdGhlbgogICAgICBwcmludGYgIlwwMzNbMTszMW1b
+4pyXXSBhcGt0b29sIG7Do28gZW5jb250cmFkby4gUm9kZTogeHBtIGluc3RhbGwgYXBrdG9vbFww
+MzNbMG1cbiIKICAgICAgZXhpdCAxCiAgICBmaQogICAgaWYgISBjb21tYW5kIC12IGphdmEgPi9k
+ZXYvbnVsbCAyPiYxOyB0aGVuCiAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddIGphdmEgbsOj
+byBlbmNvbnRyYWRvIOKAlCBhcGt0b29sIG7Do28gdmFpIHJvZGFyXDAzM1swbVxuIgogICAgICBl
+eGl0IDEKICAgIGZpCgogICAgIyDilIDilIAgbW9kbyBsb3RlOiB1bSBvdSBtYWlzIGFwa3MgbmEg
+bGluaGEgZGUgY29tYW5kby4gQ2FkYSB1bSByb2RhIG8KICAgICMgY2hlY2sgY29tcGxldG8gaXNv
+bGFkbyAod29ya2Rpci9sb2cva2V5c3RvcmUgcHLDs3ByaW9zKSwgY29tIHVtCiAgICAjIGNhYmXD
+p2FsaG8gW2kvTl0gc2VwYXJhbmRvIG9zIHJlbGF0w7NyaW9zIHF1YW5kbyBow6EgbWFpcyBkZSB1
+bS4gVW1hCiAgICAjIGZhbGhhIGluZGl2aWR1YWwgTlVOQ0EgYWJvcnRhIG8gbG90ZSBpbnRlaXJv
+IOKAlCBzw7Mgw6kgY29udGFiaWxpemFkYSwKICAgICMgZSBvIHByw7N4aW1vIGFwayBjb250aW51
+YSBub3JtYWxtZW50ZS4KICAgIF9CQVRDSF9OPSIkIyIKICAgIF9CQVRDSF9JPTAKICAgIF9CQVRD
+SF9PSz0wCiAgICBfQkFUQ0hfRkFJTEVEPSIiCgogICAgZm9yIF9BUEsgaW4gIiRAIjsgZG8KICAg
+IF9CQVRDSF9JPSQoKF9CQVRDSF9JKzEpKQogICAgaWYgWyAiJF9CQVRDSF9OIiAtZ3QgMSBdOyB0
+aGVuCiAgICAgIHByaW50ZiAiXG5cMDMzWzE7MzVt4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQIFsl
+ZC8lZF0gJXMg4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXDAzM1swbVxuIiAiJF9CQVRDSF9JIiAi
+JF9CQVRDSF9OIiAiJF9BUEsiCiAgICBmaQoKICAgIGlmIFsgISAtZiAiJF9BUEsiIF07IHRoZW4K
+ICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl10gQXJxdWl2byBuw6NvIGVuY29udHJhZG86ICVz
+XDAzM1swbVxuIiAiJF9BUEsiCiAgICAgIF9CQVRDSF9GQUlMRUQ9IiRfQkFUQ0hfRkFJTEVEICRf
+QVBLIgogICAgICBjb250aW51ZQogICAgZmkKCiAgICBfQVBLX1BBU1M9MAogICAgX0FQS19GQUlM
+PTAKICAgIF9BUEtfUkVBTF9DT05GSVJNRUQ9MAogICAgX0FQS19TSUdfQ09ORkxJQ1Q9MAogICAg
+X0FQS19XT1JLPSIkKG1rdGVtcCAtZCkiCiAgICBfQVBLX1RJRVI9InBhZHLDo28iCiAgICBfQVBL
+X1RPT0xESVI9IiRIT01FLy54cG0vdG9vbHMvYXBrdG9vbCIKICAgIF9BUEtfQVBLVE9PTDM9IiRf
+QVBLX1RPT0xESVIvYXBrdG9vbDMuamFyIgogICAgX0FQS19BQVBUMj0iJF9BUEtfVE9PTERJUi9h
+YXB0MiIKICAgIF9BUEtfREVDT0RFX09LPTAKICAgIF9BUEtfQlVJTERfT0s9MAogICAgX0FQS19J
+TlNUQUxMQUJMRT0wCiAgICBfQVBLX0xBU1RMT0c9IiIKCiAgICAjIOKUgOKUgCBpc29sYSwgdW0g
+cmVjdXJzbyAueG1sIHBvciB2ZXosIHF1YWwgYXJxdWl2byBmYXogbyBhYXB0MiByZWN1c2FyIG8K
+ICAgICMgbG90ZSBpbnRlaXJvLiAiYWFwdDIgY29tcGlsZSAtLWRpciIgKG8gcXVlIG8gYXBrdG9v
+bCBjaGFtYSBwb3IgYmFpeG8pCiAgICAjIMOpIGF0w7RtaWNvOiB1bSDDum5pY28gcmVjdXJzbyBp
+bnbDoWxpZG8gZGVycnViYSBhIGNvbXBpbGHDp8OjbyBkZSBUT0RPUyBvcwogICAgIyBvdXRyb3Ms
+IHNlbSBhcG9udGFyIHF1YWwgZm9pIOKAlCDDqSBleGF0YW1lbnRlIG8gcXVlIGFwYXJlY2Ugbm9z
+IGxvZ3MKICAgICMgY29tbyB1bWEgQW5kcm9saWJFeGNlcHRpb24gZ2Vuw6lyaWNhIHNlbSBwaXN0
+YSBuZW5odW1hIGRhIGNhdXNhIHJlYWwuCiAgICAjIEEgcXVhcmVudGVuYSBwb3IgbWFnaWMtYnl0
+ZSBxdWUgasOhIHJvZGEgZGVudHJvIGRlIHRvZG8gImFwa3Rvb2wgYiIKICAgICMgKHZpYSB3cmFw
+cGVyLCBhY2ltYSkgc8OzIGNvYnJlIHVtIGFycXVpdm8gLnhtbCBxdWUgbmEgcmVhbCDDqSBvdXRy
+YQogICAgIyBjb2lzYSAoUE5HL0pQRUcvQVhNTCBjcnUpIOKAlCBpc3NvIMOpIHJlamVpdGFkbyBB
+TlRFUyBtZXNtbyBkZSBjaGVnYXIKICAgICMgbm8gYWFwdDIuIE8gcXVlIGVsYSBuw6NvIGNvYnJl
+OiB1bSBhcnF1aXZvIHF1ZSDDiSB4bWwgZGUgdmVyZGFkZQogICAgIyAoY29tZcOnYSBjb20gIjw/
+eG1sIiwgcGFzc2EgbyBwYXJzZXIpIG1hcyBxdWUgbyBhYXB0MiByZXByb3ZhIG5hCiAgICAjIHZh
+bGlkYcOnw6NvIHNlbcOibnRpY2EgZGVsZSDigJQgYSBtYXJjYSBkZSB1bSByZXNvdXJjZXMuYXJz
+YyBhZHVsdGVyYWRvCiAgICAjIGRlIHByb3DDs3NpdG8gKHByb3Rlw6fDo28gYW50aS1SRSkgcXVl
+IHNvYnJldml2ZSBhbyBkZWNvZGUgaW50ZWlyby4KICAgICMgU8OzIGVudHJhIGVtIGHDp8OjbyBj
+b21vIGZhbGxiYWNrLCBudW5jYSBubyBidWlsZCBub3JtYWwsIHByYSBuw6NvIHBhZ2FyCiAgICAj
+IHVtYSBjaGFtYWRhIGRlIGFhcHQyIHBvciBhcnF1aXZvIGVtIHRvZGEgcmVjb21waWxhw6fDo28g
+c2F1ZMOhdmVsLgogICAgX2Fwa19wcmVmbGlnaHRfcXVhcmFudGluZSgpIHsKICAgICAgbG9jYWwg
+cHJvaj0iJDEiIGFhcHQyPSIkMiIKICAgICAgWyAtZCAiJHByb2ovcmVzIiBdIHx8IHJldHVybiAx
+CiAgICAgIFsgLXggIiRhYXB0MiIgXSB8fCByZXR1cm4gMQoKICAgICAgbG9jYWwgX3BmOyBfcGY9
+IiQobWt0ZW1wIC1kKSIKICAgICAgbG9jYWwgZiByZWwgYmFkPTAgY2F0ZWdvcnkKICAgICAgIyBm
+aW5kIC4uLiA+IGFycXVpdm8sIGRlcG9pcyAid2hpbGUgcmVhZCA8IGFycXVpdm8iIChzZW0gcHJv
+Y2VzcwogICAgICAjIHN1YnN0aXR1dGlvbiAiPCguLi4pIiBlIHNlbSAicmVhZCAtZCIg4oCUIG9z
+IGRvaXMgc8OjbyBleHRlbnPDtWVzIHPDswogICAgICAjIGRvIGJhc2guIE8gIm1zIiByb2RhIGVt
+IC91c3IvYmluL3NoIChkYXNoIG5vIFRlcm11eCwgbsOjbyBiYXNoKSwgZQogICAgICAjICI8KC4u
+LikiIG5lbSBjaGVnYSBhIHNlciBzaW50YXhlIHbDoWxpZGEgcHJvIHBhcnNlciBkbyBkYXNoOiBx
+dWVicmEKICAgICAgIyBvIHNjcmlwdCBJTlRFSVJPIG5vIGxvYWQsIG7Do28gc8OzIGVzc2EgZnVu
+w6fDo28gKGZvaSBleGF0YW1lbnRlIG8gYnVnCiAgICAgICMgcmVsYXRhZG8g4oCUICJTeW50YXgg
+ZXJyb3I6IHJlZGlyZWN0aW9uIHVuZXhwZWN0ZWQiLCBhdMOpIGVtICJtcyIgc2VtCiAgICAgICMg
+YXJndW1lbnRvIG5lbmh1bSwgcG9ycXVlIG8gZGFzaCBwcmVjaXNhIGNvbnNlZ3VpciBwYXJzZWFy
+IGNhZGEKICAgICAgIyBicmFuY2ggZG8gY2FzZS9lc2FjIHByYSBhY2hhciBvcyAiOzsiLCBtZXNt
+byBvcyBxdWUgbsOjbyB2w6NvCiAgICAgICMgZXhlY3V0YXIpLiBEZWxpbWl0YWRvciBwb3IgbGlu
+aGEgKGVtIHZleiBkZSBOVUwvLXByaW50MCkgw6kgc2VndXJvCiAgICAgICMgYXF1aSBwb3JxdWUg
+bm9tZSBkZSByZWN1cnNvIGRvIEFuZHJvaWQgbsOjbyBhY2VpdGEgcXVlYnJhIGRlIGxpbmhhLgog
+ICAgICBmaW5kICIkcHJvai9yZXMiIC10eXBlIGYgLW5hbWUgIioueG1sIiAyPi9kZXYvbnVsbCA+
+ICIkX3BmL2ZpbGVsaXN0IgogICAgICB3aGlsZSBJRlM9IHJlYWQgLXIgZjsgZG8KICAgICAgICBb
+IC1uICIkZiIgXSB8fCBjb250aW51ZQogICAgICAgIGlmICEgIiRhYXB0MiIgY29tcGlsZSAtLWxl
+Z2FjeSAtbyAiJF9wZiIgIiRmIiA+IiRfcGYvb25lLmxvZyIgMj4mMTsgdGhlbgogICAgICAgICAg
+cmVsPSIke2YjJHByb2ovfSIKICAgICAgICAgIG12IC1mICIkZiIgIiRmLnhwbS1xdWFyYW50aW5l
+IgogICAgICAgICAgcHJpbnRmICIgIFtYUE1dIHJlY3Vyc28gY29ycm9tcGlkby9hZHVsdGVyYWRv
+OiAlcyAocmVqZWl0YWRvIHBlbG8gYWFwdDIgaXNvbGFkYW1lbnRlKSDigJQgb3JpZ2luYWwgcHJl
+c2VydmFkbyBlbSAlcy54cG0tcXVhcmFudGluZVxuIiAiJHJlbCIgIiQoYmFzZW5hbWUgIiRmIiki
+CiAgICAgICAgICBwcmludGYgIiAgW1hQTV0gICBtb3Rpdm8gZG8gYWFwdDI6ICVzXG4iICIkKGdy
+ZXAgLW0xICdlcnJvcjonICIkX3BmL29uZS5sb2ciIDI+L2Rldi9udWxsIHx8IHRhaWwgLTEgIiRf
+cGYvb25lLmxvZyIpIgogICAgICAgICAgY2F0ZWdvcnk9IiQoYmFzZW5hbWUgIiQoZGlybmFtZSAi
+JGYiKSIpIjsgY2F0ZWdvcnk9IiR7Y2F0ZWdvcnklJS0qfSIKICAgICAgICAgIGNhc2UgIiRjYXRl
+Z29yeSIgaW4KICAgICAgICAgICAgZHJhd2FibGV8bWlwbWFwKSBwcmludGYgJyVzXG4nICc8P3ht
+bCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJ1dGYtOCI/PicgJzxzaGFwZSB4bWxuczphbmRyb2lk
+PSJodHRwOi8vc2NoZW1hcy5hbmRyb2lkLmNvbS9hcGsvcmVzL2FuZHJvaWQiIGFuZHJvaWQ6c2hh
+cGU9InJlY3RhbmdsZSIgLz4nID4gIiRmIiA7OwogICAgICAgICAgICBhbmltKSAgICAgICAgICAg
+IHByaW50ZiAnJXNcbicgJzw/eG1sIHZlcnNpb249IjEuMCIgZW5jb2Rpbmc9InV0Zi04Ij8+JyAn
+PGFscGhhIHhtbG5zOmFuZHJvaWQ9Imh0dHA6Ly9zY2hlbWFzLmFuZHJvaWQuY29tL2Fway9yZXMv
+YW5kcm9pZCIgYW5kcm9pZDpmcm9tQWxwaGE9IjEuMCIgYW5kcm9pZDp0b0FscGhhPSIxLjAiIGFu
+ZHJvaWQ6ZHVyYXRpb249IjEiIC8+JyA+ICIkZiIgOzsKICAgICAgICAgICAgYW5pbWF0b3IpICAg
+ICAgICBwcmludGYgJyVzXG4nICc8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJ1dGYtOCI/
+PicgJzxzZXQgeG1sbnM6YW5kcm9pZD0iaHR0cDovL3NjaGVtYXMuYW5kcm9pZC5jb20vYXBrL3Jl
+cy9hbmRyb2lkIiAvPicgPiAiJGYiIDs7CiAgICAgICAgICAgIG1lbnUpICAgICAgICAgICAgcHJp
+bnRmICclc1xuJyAnPD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4nICc8bWVu
+dSB4bWxuczphbmRyb2lkPSJodHRwOi8vc2NoZW1hcy5hbmRyb2lkLmNvbS9hcGsvcmVzL2FuZHJv
+aWQiIC8+JyA+ICIkZiIgOzsKICAgICAgICAgICAgbGF5b3V0KSAgICAgICAgICBwcmludGYgJyVz
+XG4nICc8P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJ1dGYtOCI/PicgJzxtZXJnZSB4bWxu
+czphbmRyb2lkPSJodHRwOi8vc2NoZW1hcy5hbmRyb2lkLmNvbS9hcGsvcmVzL2FuZHJvaWQiIC8+
+JyA+ICIkZiIgOzsKICAgICAgICAgICAgKikgICAgICAgICAgICAgICBwcmludGYgJyVzXG4nICc8
+P3htbCB2ZXJzaW9uPSIxLjAiIGVuY29kaW5nPSJ1dGYtOCI/PicgJzxyZXNvdXJjZXMgLz4nID4g
+IiRmIiA7OwogICAgICAgICAgZXNhYwogICAgICAgICAgYmFkPSQoKGJhZCsxKSkKICAgICAgICBm
+aQogICAgICBkb25lIDwgIiRfcGYvZmlsZWxpc3QiCgogICAgICBybSAtcmYgIiRfcGYiCiAgICAg
+IFsgIiRiYWQiIC1ndCAwIF0KICAgIH0KCiAgICAjIGhlYXAgZGUgcmV0cnk6IG1haXMgYWdyZXNz
+aXZvIHF1ZSBvIHBhZHLDo28gZG8gd3JhcHBlciAocXVlIGrDoSDDqQogICAgIyBhZGFwdGF0aXZv
+KSDigJQgdXNhZG8gc8OzIHF1YW5kbyBhIHRlbnRhdGl2YSBub3JtYWwgasOhIGZhbGhvdSBwb3Ig
+T09NLgogICAgX0FQS19SRVRSWV9YTVg9IiQoYXdrICcvXk1lbUF2YWlsYWJsZTove3Y9aW50KCQy
+KjAuNzUvMTAyNCk7IGlmKHY8NTEyKXY9NTEyOyBpZih2PjQwOTYpdj00MDk2OyBwcmludCB2OyBm
+PTF9IEVORHtpZighZikgcHJpbnQgMTUzNn0nIC9wcm9jL21lbWluZm8gMj4vZGV2L251bGwpIgog
+ICAgWyAteiAiJF9BUEtfUkVUUllfWE1YIiBdICYmIF9BUEtfUkVUUllfWE1YPTE1MzYKCiAgICBw
+cmludGYgIlwwMzNbMTszNW3ilZTilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZdcMDMzWzBtXG4iCiAgICBwcmlu
+dGYgIlwwMzNbMTszNW3ilZEgIEVsbGlvdE9TIOKAlCBBUEsgQ29tcGF0aWJpbGl0eSBDaGVjayAg
+ICAgICAgICAgICAgICAgICAgICAgICAg4pWRXDAzM1swbVxuIgogICAgcHJpbnRmICJcMDMzWzE7
+MzVt4pWa4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWdXDAzM1swbVxuXG4iCgogICAgcHJpbnRmICJcMDMzWzE7
+MzZtWypdXDAzM1swbSBhcGt0b29sOiAlc1xuIiAiJF9BUEtfQklOIgogICAgaWYgY29tbWFuZCAt
+diBhcGt0b29sID4vZGV2L251bGwgMj4vZGV2L251bGw7IHRoZW4KICAgICAgcHJpbnRmICJcMDMz
+WzE7MzJtW+Kck11cMDMzWzBtIGFwa3Rvb2wgJChhcGt0b29sIC0tdmVyc2lvbiAyPi9kZXYvbnVs
+bCB8IGhlYWQgLTEpXG4iCiAgICAgIF9BUEtfUEFTUz0kKChfQVBLX1BBU1MrMSkpCiAgICBlbHNl
+CiAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddXDAzM1swbSB3cmFwcGVyIE7Dg08gZXN0w6Eg
+bmEgVjE1IOKAlCByb2RlICd4cG0gaW5zdGFsbCBhcGt0b29sJyBkZSBub3ZvIG91IGVzcGVyZSBv
+IC0tZG9jdG9yIGNvcnJpZ2lyXG4iCiAgICAgIF9BUEtfRkFJTD0kKChfQVBLX0ZBSUwrMSkpCiAg
+ICBmaQogICAgcHJpbnRmICJcMDMzWzE7MzJtW+Kck11cMDMzWzBtIGphdmEgZW5jb250cmFkb1xu
+IgogICAgX0FQS19QQVNTPSQoKF9BUEtfUEFTUysxKSkKCiAgICAjIOKUgOKUgCBwcsOpLXZvbzog
+ZMOhIHByYSBzYWJlciBkZSBncmHDp2EgKHPDsyBvbGhhbmRvIG8gWklQKSBxdWUgaXNzbyBudW5j
+YQogICAgIyB2YWkgZmVjaGFyLCBzZW0gbmVtIGNoYW1hciBvIGFwa3Rvb2wg4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICBfQVBLX1NaPSQoc3RhdCAtYyVzICIkX0FQ
+SyIgMj4vZGV2L251bGwgfHwgZWNobyAwKQogICAgX0FQS19IQVNfU1BMSVRfUkVRPTAKICAgIF9B
+UEtfREVYX0VOQ1JZUFRFRD0wCiAgICBpZiBjb21tYW5kIC12IHVuemlwID4vZGV2L251bGwgMj4m
+MTsgdGhlbgogICAgICBpZiB1bnppcCAtbCAiJF9BUEsiIDI+L2Rldi9udWxsIHwgZ3JlcCAtcSAn
+QnVuZGxlQ29uZmlnXC5wYic7IHRoZW4KICAgICAgICBwcmludGYgIlwwMzNbMTszMW1b4pyXXSBJ
+c3NvIMOpIHVtIEFuZHJvaWQgQXBwIEJ1bmRsZSAoLmFhYiksIG7Do28gdW0gLmFwayBpbnN0YWzD
+oXZlbC5cMDMzWzBtXG4iCiAgICAgICAgcHJpbnRmICJcMDMzWzA7OTBtICAgIE8gYXBrdG9vbCBu
+w6NvIGRlY29kaWZpY2EgLmFhYiBkaXJldGFtZW50ZSDigJQgZ2VyZSB1bSAuYXBrXDAzM1swbVxu
+IgogICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICB1bml2ZXJzYWwgcHJpbWVpcm8gKGV4OiBi
+dW5kbGV0b29sIGJ1aWxkLWFwa3MpIGUgdGVzdGUgbmVsZS5cMDMzWzBtXG4iCiAgICAgICAgcm0g
+LXJmICIkX0FQS19XT1JLIgogICAgICAgIF9CQVRDSF9GQUlMRUQ9IiRfQkFUQ0hfRkFJTEVEICRf
+QVBLIgogICAgICAgIGNvbnRpbnVlCiAgICAgIGZpCiAgICAgIGlmICEgdW56aXAgLWwgIiRfQVBL
+IiAyPi9kZXYvbnVsbCB8IGdyZXAgLXFFICdjbGFzc2VzWzAtOV0qXC5kZXgnOyB0aGVuCiAgICAg
+ICAgcHJpbnRmICJcMDMzWzE7MzNtWyFdXDAzM1swbSBOZW5odW0gY2xhc3Nlcy5kZXgg4oCUIHBh
+cmVjZSB1bSBzcGxpdC9jb25maWcgQVBLIChpZGlvbWEvQUJJKVxuIgogICAgICAgIHByaW50ZiAi
+XDAzM1swOzkwbSAgICBvdSB1bWEgb3ZlcmxheS9SUk8gc2VtIGPDs2RpZ28uIFNlIGEgaWRlaWEg
+ZXJhIHRlc3RhciBvIGFwcCBpbnRlaXJvLFwwMzNbMG1cbiIKICAgICAgICBwcmludGYgIlwwMzNb
+MDs5MG0gICAgdXNlIG8gYmFzZS5hcGsgKG8gcXVlIGNhcnJlZ2EgbyBjw7NkaWdvKSBqdW50byBj
+b20gZXNzZS5cMDMzWzBtXG4iCiAgICAgIGZpCgogICAgICAjIOKUgOKUgCBkZXRlY8Onw6NvIGRl
+IERFWCBjcmlwdG9ncmFmYWRvIOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgAogICAgICAjIEFQS3MgcHJvdGVnaWRvcyAoRGV4R3VhcmQsIEJhbmdjbGUsIGxpYmpp
+YWd1KSB0w6ptIGNsYXNzZXMuZGV4IGNvbQogICAgICAjIG1hZ2ljLWJ5dGUgaW52w6FsaWRvIG91
+IHRhbWFuaG8gc3VzcGVpdG8gKDwgNTAwIEtCID0gc3R1YiBtw61uaW1vLAogICAgICAjID4gMzAg
+TUIgPSBERVggZW1wYWNvdGFkbyBjb20gZGFkb3MgY3JpcHRvZ3JhZmFkb3MpLiBPIHJvdW5kLXRy
+aXAKICAgICAgIyBkZWNvZGUvcmVidWlsZCBwYXNzYSwgbWFzIG8gQVBLIHJlc3VsdGFudGUgZmFs
+aGEgZW0gcnVudGltZSBwb3JxdWUKICAgICAgIyBvIGxvYWRlciBkbyBwcm90ZWN0b3IgbsOjbyBl
+bmNvbnRyYSBvIGJsb2NvIGNyaXB0b2dyYWZhZG8gcXVlIG8KICAgICAgIyBhcGt0b29sIGRlc2Nh
+cnRvdSBzaWxlbmNpb3NhbWVudGUuIE1lbGhvciBhdmlzYXIgY2Vkby4KICAgICAgX0RFWF9TWj0k
+KHVuemlwIC1wICIkX0FQSyIgY2xhc3Nlcy5kZXggMj4vZGV2L251bGwgfCB3YyAtYykKICAgICAg
+aWYgWyAiJF9ERVhfU1oiIC1sdCA1MjQyODggXSAyPi9kZXYvbnVsbCAmJiBbICIkX0RFWF9TWiIg
+LWd0IDAgXSAyPi9kZXYvbnVsbDsgdGhlbgogICAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVshXVww
+MzNbMG0gY2xhc3Nlcy5kZXggbXVpdG8gcGVxdWVubyAoJWQgS0IpIOKAlCBwb2RlIHNlciBzdHVi
+IGRlIEFQSyBwcm90ZWdpZG9cbiIgIiQoKF9ERVhfU1ovMTAyNCkpIgogICAgICAgIHByaW50ZiAi
+XDAzM1swOzkwbSAgICBPIHJvdW5kLXRyaXAgcG9kZSBmZWNoYXIgbWFzIG8gQVBLIGZhbGhhciBl
+bSBydW50aW1lIHNlIG8gREVYIGZvciBsb2FkZXIuXDAzM1swbVxuIgogICAgICAgIF9BUEtfREVY
+X0VOQ1JZUFRFRD0xCiAgICAgIGVsaWYgWyAiJF9ERVhfU1oiIC1ndCAzMTQ1NzI4MCBdIDI+L2Rl
+di9udWxsOyB0aGVuCiAgICAgICAgcHJpbnRmICJcMDMzWzE7MzNtWyFdXDAzM1swbSBjbGFzc2Vz
+LmRleCBtdWl0byBncmFuZGUgKCVkIE1CKSDigJQgcG9zc8OtdmVsIERFWCBlbXBhY290YWRvIGNv
+bSBwYXlsb2FkIGNyaXB0b2dyYWZhZG9cbiIgIiQoKF9ERVhfU1ovMTA0ODU3NikpIgogICAgICAg
+IHByaW50ZiAiXDAzM1swOzkwbSAgICBPIHJlYnVpbGQgcG9kZSBnZXJhciBBUEsgbWVub3IgcXVl
+IG8gb3JpZ2luYWwgZSBmYWxoYXIgZW0gcnVudGltZS5cMDMzWzBtXG4iCiAgICAgICAgX0FQS19E
+RVhfRU5DUllQVEVEPTEKICAgICAgZmkKCiAgICAgICMg4pSA4pSAIGRldGVjw6fDo28gZGUgYW5k
+cm9pZDppc1NwbGl0UmVxdWlyZWQg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICMg
+QXRyaWJ1dG8gaW50cm9kdXppZG8gbmEgQVBJIDI5LCBuw6NvIHN1cG9ydGFkbyBwZWxvIGFhcHQg
+ZG8gYXBrdG9vbAogICAgICAjIG5hIHJlY29tcGlsYcOnw6NvIOKAlCBnZXJhICJObyByZXNvdXJj
+ZSBpZGVudGlmaWVyIGZvdW5kIGZvciBhdHRyaWJ1dGUKICAgICAgIyBpc1NwbGl0UmVxdWlyZWQi
+LiBGaXg6IHJlbW92ZXIgZG8gQW5kcm9pZE1hbmlmZXN0IGFww7NzIG8gZGVjb2RlLgogICAgICBp
+ZiB1bnppcCAtcCAiJF9BUEsiIEFuZHJvaWRNYW5pZmVzdC54bWwgMj4vZGV2L251bGwgfCBzdHJp
+bmdzIHwgZ3JlcCAtcSAnaXNTcGxpdFJlcXVpcmVkJzsgdGhlbgogICAgICAgIHByaW50ZiAiXDAz
+M1swOzkwbVsqXSBBbmRyb2lkTWFuaWZlc3QueG1sIGNvbnTDqW0gaXNTcGxpdFJlcXVpcmVkIOKA
+lCBzZXLDoSByZW1vdmlkbyBubyBkZWNvZGUgcHJhIGNvbXBhdGliaWxpZGFkZSBjb20gYXBrdG9v
+bC5cMDMzWzBtXG4iCiAgICAgICAgX0FQS19IQVNfU1BMSVRfUkVRPTEKICAgICAgZmkKICAgIGZp
+CiAgICBpZiBbICIkX0FQS19TWiIgLWd0IDMxNDU3MjgwMCBdIDI+L2Rldi9udWxsOyB0aGVuCiAg
+ICAgIHByaW50ZiAiXDAzM1swOzkwbVsqXSBBUEsgZ3JhbmRlICh+JWQgTUIsIHTDrXBpY28gZGUg
+am9nbykg4oCUIGhlYXAgYWp1c3RhZG8gYXV0b21hdGljYW1lbnRlXDAzM1swbVxuIiAiJCgoX0FQ
+S19TWi8xMDQ4NTc2KSkiCiAgICBmaQogICAgcHJpbnRmICJcbiIKCiAgICBfQVBLX09VVD0iJF9B
+UEtfV09SSy9kZWNvZGVkIgogICAgX0FQS19SRUJVSUxUPSIkX0FQS19XT1JLL3JlYnVpbHQuYXBr
+IgoKICAgICMg4pSA4pSAIHNwaW5uZXIgY29tIHRlbXBvIGRlY29ycmlkbyDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAgICMgUm9k
+YSBlbSBiYWNrZ3JvdW5kIGVucXVhbnRvIG8gYXBrdG9vbCB0cmFiYWxoYS4gTW9zdHJhIHVtIHNw
+aW5uZXIKICAgICMgYW5pbWFkbyArIHRlbXBvIGRlY29ycmlkbyBlbSBzZWd1bmRvcyBuYSBtZXNt
+YSBsaW5oYSAoc29icmVzY3JldmUKICAgICMgY29tIFxyKS4gTWF0YSBvIHByb2Nlc3NvIGFvIHJl
+Y2ViZXIgU0lHVVNSMS4KICAgIF9hcGtfc3Bpbm5lcigpIHsKICAgICAgbG9jYWwgbGFiZWw9IiQx
+IiBwaWQ9IiQyIgogICAgICBsb2NhbCBmcmFtZXM9J+Kgi+KgmeKgueKguOKgvOKgtOKgpuKgp+Kg
+h+KgjycKICAgICAgbG9jYWwgaT0wIHQ9MAogICAgICB3aGlsZSBraWxsIC0wICIkcGlkIiAyPi9k
+ZXYvbnVsbDsgZG8KICAgICAgICBpPSQoKCAoaSsxKSAlIDEwICkpCiAgICAgICAgZj0iJChwcmlu
+dGYgJyVzJyAiJGZyYW1lcyIgfCBjdXQgLWMkKChpKzEpKSkiCiAgICAgICAgcHJpbnRmICJcclww
+MzNbMDs5MG0gICAgJXMgJXMgICVkc1wwMzNbMG0iICIkZiIgIiRsYWJlbCIgIiR0IgogICAgICAg
+IHNsZWVwIDEKICAgICAgICB0PSQoKHQrMSkpCiAgICAgIGRvbmUKICAgICAgcHJpbnRmICJcclww
+MzNbMksiICAjIGxpbXBhIGEgbGluaGEgZG8gc3Bpbm5lcgogICAgfQoKICAgIHByaW50ZiAiXDAz
+M1sxOzM2bVsqXVwwMzNbMG0gVGVzdGFuZG86ICVzXG4iICIkX0FQSyIKICAgIHByaW50ZiAiXDAz
+M1swOzkwbSAgICAtPiBhcGt0b29sIGQgLi4uXDAzM1swbVxuIgogICAgX0FQS19MQVNUTE9HPSIk
+X0FQS19XT1JLL2RlY29kZS5sb2ciCiAgICBfQVBLX1QwPSIkKGRhdGUgKyVzIDI+L2Rldi9udWxs
+IHx8IGVjaG8gMCkiCiAgICBhcGt0b29sIGQgLWYgLW8gIiRfQVBLX09VVCIgIiRfQVBLIiA+ICIk
+X0FQS19MQVNUTE9HIiAyPiYxICYKICAgIF9BUEtfUElEPSQhCiAgICBfYXBrX3NwaW5uZXIgImRl
+Y29tcGlsYW5kby4uLiIgIiRfQVBLX1BJRCIKICAgIHdhaXQgIiRfQVBLX1BJRCI7IF9BUEtfRF9S
+Qz0kPwogICAgX0FQS19UMT0iJChkYXRlICslcyAyPi9kZXYvbnVsbCB8fCBlY2hvIDApIgogICAg
+X0FQS19ERUNPREVfVElNRT0kKChfQVBLX1QxIC0gX0FQS19UMCkpCiAgICBpZiBbICIkX0FQS19E
+X1JDIiA9ICIwIiBdOyB0aGVuCiAgICAgIF9BUEtfREVDT0RFX09LPTEKCiAgICAgICMg4pSA4pSA
+IGZpeCBww7NzLWRlY29kZSAxOiByZW1vdmUgaXNTcGxpdFJlcXVpcmVkIGRvIG1hbmlmZXN0IOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICBpZiBbICIkX0FQS19IQVNfU1BMSVRfUkVR
+IiA9ICIxIiBdICYmIFsgLWYgIiRfQVBLX09VVC9BbmRyb2lkTWFuaWZlc3QueG1sIiBdOyB0aGVu
+CiAgICAgICAgc2VkIC1pICdzLyBhbmRyb2lkOmlzU3BsaXRSZXF1aXJlZD0iW14iXSoiLy9nJyAi
+JF9BUEtfT1VUL0FuZHJvaWRNYW5pZmVzdC54bWwiIDI+L2Rldi9udWxsCiAgICAgICAgcHJpbnRm
+ICJcMDMzWzA7OTBtICAgIFtmaXhdIGFuZHJvaWQ6aXNTcGxpdFJlcXVpcmVkIHJlbW92aWRvIGRv
+IEFuZHJvaWRNYW5pZmVzdC54bWxcMDMzWzBtXG4iCiAgICAgIGZpCgogICAgICAjIOKUgOKUgCBm
+aXggcMOzcy1kZWNvZGUgMjogcmVzdGF1cmEgdW5rbm93bi8gbm8gQVBLIGZpbmFsIOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICAjIE8gYXBrdG9vbCBtb3ZlIHBy
+YSB1bmtub3duLyBxdWFscXVlciBhcnF1aXZvIHF1ZSBuw6NvIHNhYmUgY2F0ZWdvcml6YXIKICAg
+ICAgIyAoYXNzZXRzIGRlIGVuZ2luZSwgYmlibGlvdGVjYXMgbmF0aXZhcyBleHRyYXMsIGFycXVp
+dm9zIHByw7NwcmlvcyBkbwogICAgICAjIHByb3RlY3RvciwgZXRjLikuIE5vIHJlYnVpbGQgZWxl
+IG7Do28gaW5jbHVpIGVzc2VzIGFycXVpdm9zIGRlIHZvbHRhLAogICAgICAjIG8gcXVlIGZheiBv
+IGFwcCBjcmFzaGFyIGVtIHJ1bnRpbWUgcG9yIHJlY3Vyc28gZmFsdGFuZG8uIEZpeDoKICAgICAg
+IyBpbmpldGFyIG8gY29udGXDumRvIGRlIHVua25vd24vIGRlIHZvbHRhIG5vIEFQSyBmaW5hbCB2
+aWEgemlwIGFww7NzCiAgICAgICMgbyBidWlsZC4gQSB2YXJpw6F2ZWwgX0FQS19IQVNfVU5LTk9X
+TiDDqSBzZXRhZGEgYXF1aSBlIHVzYWRhIGzDoS4KICAgICAgX0FQS19IQVNfVU5LTk9XTj0wCiAg
+ICAgIGlmIFsgLWQgIiRfQVBLX09VVC91bmtub3duIiBdICYmIFsgLW4gIiQobHMgLUEgIiRfQVBL
+X09VVC91bmtub3duIiAyPi9kZXYvbnVsbCkiIF07IHRoZW4KICAgICAgICBfQVBLX0hBU19VTktO
+T1dOPTEKICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgW2luZm9dIHBhc3RhIHVua25vd24v
+IGVuY29udHJhZGEg4oCUIHNlcsOhIHJlaW5zZXJpZGEgbm8gQVBLIGZpbmFsXDAzM1swbVxuIgog
+ICAgICBmaQoKICAgIGVsaWYgZ3JlcCAtcSAnT3V0T2ZNZW1vcnlFcnJvcicgIiRfQVBLX0xBU1RM
+T0ciOyB0aGVuCiAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVshXSBkZWNvZGUgZmljb3Ugc2VtIG1l
+bcOzcmlhIOKAlCB0ZW50YW5kbyBkZSBub3ZvIChoZWFwIG1haW9yLCBtZW5vcyB0aHJlYWRzKS4u
+LlwwMzNbMG1cbiIKICAgICAgX0FQS19MQVNUTE9HPSIkX0FQS19XT1JLL2RlY29kZV9yZXRyeS5s
+b2ciCiAgICAgIF9BUEtfVDA9IiQoZGF0ZSArJXMgMj4vZGV2L251bGwgfHwgZWNobyAwKSIKICAg
+ICAgX0pBVkFfT1BUSU9OUz0iLVhteCR7X0FQS19SRVRSWV9YTVh9bSIgYXBrdG9vbCBkIC1mIC1q
+IDIgLW8gIiRfQVBLX09VVCIgIiRfQVBLIiA+ICIkX0FQS19MQVNUTE9HIiAyPiYxICYKICAgICAg
+X0FQS19QSUQ9JCE7IF9hcGtfc3Bpbm5lciAiZGVjb21waWxhbmRvIChoZWFwIG1haW9yKS4uLiIg
+IiRfQVBLX1BJRCI7IHdhaXQgIiRfQVBLX1BJRCI7IF9BUEtfRF9SQz0kPwogICAgICBfQVBLX1Qx
+PSIkKGRhdGUgKyVzIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiOyBfQVBLX0RFQ09ERV9USU1FPSQo
+KF9BUEtfVDEtX0FQS19UMCkpCiAgICAgIGlmIFsgIiRfQVBLX0RfUkMiID0gIjAiIF07IHRoZW4K
+ICAgICAgICBfQVBLX0RFQ09ERV9PSz0xCiAgICAgICAgX0FQS19USUVSPSJoZWFwIGFqdXN0YWRv
+IgogICAgICBmaQogICAgZmkKCiAgICBpZiBbICIkX0FQS19ERUNPREVfT0siID0gIjEiIF07IHRo
+ZW4KICAgICAgcHJpbnRmICJcMDMzWzE7MzJtW+Kck10gZGVjb2RlIE9LXDAzM1swbSBcMDMzWzA7
+OTBtKCVkcylcMDMzWzBtXG4iICIke19BUEtfREVDT0RFX1RJTUU6LTB9IgogICAgICBfQVBLX1BB
+U1M9JCgoX0FQS19QQVNTKzEpKQoKICAgICAgIyDilIDilIAgbcOpdHJpY2FzIGRvIEFQSyBkZWNv
+ZGlmaWNhZG8g4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAg
+ICAgICMgTW9zdHJhIGV4YXRhbWVudGUgY29tIG8gcXVlIGVzdGFtb3MgbGlkYW5kbyBhbnRlcyBk
+byBidWlsZDoKICAgICAgIyBxdWFudGlkYWRlIGRlIERFWCwgc21hbGksIGFycXVpdm9zIGRlIHJl
+Y3Vyc28sIHRhbWFuaG8gdG90YWwuCiAgICAgICMgSW5mb3JtYcOnw6NvIGVzc2VuY2lhbCBwcmEg
+ZGlhZ25vc3RpY2FyIGVycm9zIGUgZW50ZW5kZXIgQVBLcyBjb21wbGV4b3MuCiAgICAgIHByaW50
+ZiAiXG5cMDMzWzE7MzZtICDilIzilIAgTcOpdHJpY2FzIGRvIEFQSyDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJBcMDMz
+WzBtXG4iCgogICAgICAjIERFWCBmaWxlcyAobXVsdGlkZXgpCiAgICAgIF9NX0RFWD0kKHVuemlw
+IC1sICIkX0FQSyIgMj4vZGV2L251bGwgfCBncmVwIC1jRSAnY2xhc3Nlc1swLTldKlwuZGV4JyB8
+fCBlY2hvIDApCiAgICAgIHByaW50ZiAiICBcMDMzWzE7MzZt4pSCXDAzM1swbSAgREVYIGZpbGVz
+ICAgICA6IFwwMzNbMTszM20lZFwwMzNbMG0iICIkX01fREVYIgogICAgICBpZiBbICIkX01fREVY
+IiAtZ3QgMSBdOyB0aGVuIHByaW50ZiAiIFwwMzNbMDs5MG0obXVsdGlkZXgpXDAzM1swbSI7IGZp
+CiAgICAgIHByaW50ZiAiXG4iCgogICAgICAjIHNtYWxpIGZpbGVzIChjbGFzc2VzIGRlY29tcGls
+YWRhcykKICAgICAgX01fU01BTEk9JChmaW5kICIkX0FQS19PVVQiIC1uYW1lICcqLnNtYWxpJyAy
+Pi9kZXYvbnVsbCB8IHdjIC1sKQogICAgICBwcmludGYgIiAgXDAzM1sxOzM2beKUglwwMzNbMG0g
+IFNtYWxpIGZpbGVzICAgOiBcMDMzWzE7MzNtJWRcMDMzWzBtXG4iICIkX01fU01BTEkiCgogICAg
+ICAjIGFycXVpdm9zIGRlIHJlY3Vyc28KICAgICAgX01fUkVTPSQoZmluZCAiJF9BUEtfT1VUL3Jl
+cyIgLXR5cGUgZiAyPi9kZXYvbnVsbCB8IHdjIC1sKQogICAgICBwcmludGYgIiAgXDAzM1sxOzM2
+beKUglwwMzNbMG0gIFJlY3Vyc29zIChyZXMvKTogXDAzM1sxOzMzbSVkXDAzM1swbVxuIiAiJF9N
+X1JFUyIKCiAgICAgICMgYXJxdWl2b3MgZW0gdW5rbm93bi8KICAgICAgX01fVU5LPSQoZmluZCAi
+JF9BUEtfT1VUL3Vua25vd24iIC10eXBlIGYgMj4vZGV2L251bGwgfCB3YyAtbCkKICAgICAgaWYg
+WyAiJF9NX1VOSyIgLWd0IDAgXTsgdGhlbgogICAgICAgIHByaW50ZiAiICBcMDMzWzE7MzZt4pSC
+XDAzM1swbSAgVW5rbm93bi8gICAgICA6IFwwMzNbMTszM20lZFwwMzNbMG0gXDAzM1swOzkwbShz
+ZXLDo28gcmVpbnNlcmlkb3Mgbm8gQVBLIGZpbmFsKVwwMzNbMG1cbiIgIiRfTV9VTksiCiAgICAg
+IGZpCgogICAgICAjIGFzc2V0cwogICAgICBfTV9BU1NFVFM9JChmaW5kICIkX0FQS19PVVQvYXNz
+ZXRzIiAtdHlwZSBmIDI+L2Rldi9udWxsIHwgd2MgLWwpCiAgICAgIGlmIFsgIiRfTV9BU1NFVFMi
+IC1ndCAwIF07IHRoZW4KICAgICAgICBwcmludGYgIiAgXDAzM1sxOzM2beKUglwwMzNbMG0gIEFz
+c2V0cyAgICAgICAgOiBcMDMzWzE7MzNtJWRcMDMzWzBtXG4iICIkX01fQVNTRVRTIgogICAgICBm
+aQoKICAgICAgIyBiaWJsaW90ZWNhcyBuYXRpdmFzCiAgICAgIF9NX1NPPSQoZmluZCAiJF9BUEtf
+T1VUL2xpYiIgLW5hbWUgJyouc28nIDI+L2Rldi9udWxsIHwgd2MgLWwpCiAgICAgIGlmIFsgIiRf
+TV9TTyIgLWd0IDAgXTsgdGhlbgogICAgICAgIF9NX0FCST0kKGZpbmQgIiRfQVBLX09VVC9saWIi
+IC1taW5kZXB0aCAxIC1tYXhkZXB0aCAxIC10eXBlIGQgMj4vZGV2L251bGwgfCB4YXJncyAtSXt9
+IGJhc2VuYW1lIHt9IDI+L2Rldi9udWxsIHwgdHIgJ1xuJyAnICcpCiAgICAgICAgcHJpbnRmICIg
+IFwwMzNbMTszNm3ilIJcMDMzWzBtICBMaWJzIG5hdGl2YXMgIDogXDAzM1sxOzMzbSVkIC5zb1ww
+MzNbMG0gXDAzM1swOzkwbShBQklzOiAlcylcMDMzWzBtXG4iICIkX01fU08iICIkX01fQUJJIgog
+ICAgICBmaQoKICAgICAgIyB0YW1hbmhvIG9yaWdpbmFsIHZzIHRhbWFuaG8gZGVjb2RpZmljYWRv
+CiAgICAgIF9NX1NaX0FQSz0kKHN0YXQgLWMlcyAiJF9BUEsiIDI+L2Rldi9udWxsIHx8IGVjaG8g
+MCkKICAgICAgX01fU1pfREVDPSQoZHUgLXNiICIkX0FQS19PVVQiIDI+L2Rldi9udWxsIHwgYXdr
+ICd7cHJpbnQgJDF9JyB8fCBlY2hvIDApCiAgICAgIHByaW50ZiAiICBcMDMzWzE7MzZt4pSCXDAz
+M1swbSAgVGFtYW5obyBBUEsgICA6IFwwMzNbMTszM20lZCBNQlwwMzNbMG0gIOKGkiAgZGVjb2Rp
+ZmljYWRvOiBcMDMzWzE7MzNtJWQgTUJcMDMzWzBtXG4iIFwKICAgICAgICAiJCgoX01fU1pfQVBL
+LzEwNDg1NzYpKSIgIiQoKF9NX1NaX0RFQy8xMDQ4NTc2KSkiCgogICAgICAjIG7DrXZlbCBkZSBB
+UEkgYWx2byAoZG8gYXBrdG9vbC55bWwpCiAgICAgIF9NX0FQST0kKGdyZXAgJ3RhcmdldFNka1Zl
+cnNpb25cfG1pblNka1ZlcnNpb24nICIkX0FQS19PVVQvYXBrdG9vbC55bWwiIDI+L2Rldi9udWxs
+IHwgdHIgJ1xuJyAnICAnIHwgc2VkICJzLycvL2ciKQogICAgICBbIC1uICIkX01fQVBJIiBdICYm
+IHByaW50ZiAiICBcMDMzWzE7MzZt4pSCXDAzM1swbSAgU0RLICAgICAgICAgICA6IFwwMzNbMDs5
+MG0lc1wwMzNbMG1cbiIgIiRfTV9BUEkiCgogICAgICAjIHByb3Rlw6fDo28gZGV0ZWN0YWRhCiAg
+ICAgIGlmIFsgIiRfQVBLX0RFWF9FTkNSWVBURUQiID0gIjEiIF07IHRoZW4KICAgICAgICBwcmlu
+dGYgIiAgXDAzM1sxOzM2beKUglwwMzNbMG0gIFwwMzNbMTszM23imqAgREVYIHN1c3BlaXRvXDAz
+M1swbSDigJQgcG9zc8OtdmVsIHN0dWIvbG9hZGVyIChwcm90ZWN0b3Igb3UgcGFja2VyKVxuIgog
+ICAgICBmaQogICAgICBpZiBbICIkX0FQS19IQVNfU1BMSVRfUkVRIiA9ICIxIiBdOyB0aGVuCiAg
+ICAgICAgcHJpbnRmICIgIFwwMzNbMTszNm3ilIJcMDMzWzBtICBcMDMzWzA7OTBt4oS5IGlzU3Bs
+aXRSZXF1aXJlZCBkZXRlY3RhZG8g4oCUIHJlbW92aWRvIGRvIG1hbmlmZXN0XDAzM1swbVxuIgog
+ICAgICBmaQoKICAgICAgcHJpbnRmICIgIFwwMzNbMTszNm3ilJTilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilJhcMDMzWzBt
+XG5cbiIKCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICAtPiBhcGt0b29sIGIgLi4uXDAzM1sw
+bVxuIgogICAgICBfQVBLX0xBU1RMT0c9IiRfQVBLX1dPUksvYnVpbGQubG9nIgogICAgICBfQVBL
+X0IwPSIkKGRhdGUgKyVzIDI+L2Rldi9udWxsIHx8IGVjaG8gMCkiCiAgICAgIGFwa3Rvb2wgYiAi
+JF9BUEtfT1VUIiAtbyAiJF9BUEtfUkVCVUlMVCIgPiAiJF9BUEtfTEFTVExPRyIgMj4mMSAmCiAg
+ICAgIF9BUEtfUElEPSQhOyBfYXBrX3NwaW5uZXIgImNvbXBpbGFuZG8uLi4iICIkX0FQS19QSUQi
+OyB3YWl0ICIkX0FQS19QSUQiOyBfQVBLX0JfUkM9JD8KICAgICAgX0FQS19CMT0iJChkYXRlICsl
+cyAyPi9kZXYvbnVsbCB8fCBlY2hvIDApIjsgX0FQS19CVUlMRF9USU1FPSQoKF9BUEtfQjEtX0FQ
+S19CMCkpCiAgICAgIGlmIFsgIiRfQVBLX0JfUkMiID0gIjAiIF07IHRoZW4KICAgICAgICBfQVBL
+X0JVSUxEX09LPTEKICAgICAgZWxpZiBncmVwIC1xICdPdXRPZk1lbW9yeUVycm9yJyAiJF9BUEtf
+TEFTVExPRyI7IHRoZW4KICAgICAgICBwcmludGYgIlwwMzNbMTszM21bIV0gYnVpbGQgZmljb3Ug
+c2VtIG1lbcOzcmlhIOKAlCB0ZW50YW5kbyBkZSBub3ZvIChoZWFwIG1haW9yLCBtZW5vcyB0aHJl
+YWRzKS4uLlwwMzNbMG1cbiIKICAgICAgICBfQVBLX0xBU1RMT0c9IiRfQVBLX1dPUksvYnVpbGRf
+cmV0cnlfaGVhcC5sb2ciCiAgICAgICAgX0FQS19CMD0iJChkYXRlICslcyAyPi9kZXYvbnVsbCB8
+fCBlY2hvIDApIgogICAgICAgIF9KQVZBX09QVElPTlM9Ii1YbXgke19BUEtfUkVUUllfWE1YfW0i
+IGFwa3Rvb2wgYiAtaiAyICIkX0FQS19PVVQiIC1vICIkX0FQS19SRUJVSUxUIiA+ICIkX0FQS19M
+QVNUTE9HIiAyPiYxICYKICAgICAgICBfQVBLX1BJRD0kITsgX2Fwa19zcGlubmVyICJjb21waWxh
+bmRvIChoZWFwIG1haW9yKS4uLiIgIiRfQVBLX1BJRCI7IHdhaXQgIiRfQVBLX1BJRCI7IF9BUEtf
+Ql9SQz0kPwogICAgICAgIF9BUEtfQjE9IiQoZGF0ZSArJXMgMj4vZGV2L251bGwgfHwgZWNobyAw
+KSI7IF9BUEtfQlVJTERfVElNRT0kKChfQVBLX0IxLV9BUEtfQjApKQogICAgICAgIGlmIFsgIiRf
+QVBLX0JfUkMiID0gIjAiIF07IHRoZW4KICAgICAgICAgIF9BUEtfQlVJTERfT0s9MQogICAgICAg
+ICAgX0FQS19USUVSPSJoZWFwIGFqdXN0YWRvIgogICAgICAgIGZpCiAgICAgIGVsaWYgZ3JlcCAt
+cUUgJ05vIHJlc291cmNlIGlkZW50aWZpZXIgZm91bmQgZm9yIGF0dHJpYnV0ZXxlcnJvcjogZmFp
+bGVkIHByb2Nlc3NpbmcgbWFuaWZlc3QnICIkX0FQS19MQVNUTE9HIjsgdGhlbgogICAgICAgIHBy
+aW50ZiAiXDAzM1sxOzMzbVshXSBwb3Nzw612ZWwgZnJhbWV3b3JrIGRlc2F0dWFsaXphZG8gKGF0
+cmlidXRvIG7Do28gcmVjb25oZWNpZG8pIOKAlCByZW5vdmFuZG8gY2FjaGUuLi5cMDMzWzBtXG4i
+CiAgICAgICAgYXBrdG9vbCBlbXB0eS1mcmFtZXdvcmstZGlyIC0tZm9yY2UgPi9kZXYvbnVsbCAy
+PiYxCiAgICAgICAgX0FQS19MQVNUTE9HPSIkX0FQS19XT1JLL2J1aWxkX3JldHJ5X2ZyYW1lLmxv
+ZyIKICAgICAgICBpZiBhcGt0b29sIGIgIiRfQVBLX09VVCIgLW8gIiRfQVBLX1JFQlVJTFQiID4g
+IiRfQVBLX0xBU1RMT0ciIDI+JjE7IHRoZW4KICAgICAgICAgIF9BUEtfQlVJTERfT0s9MQogICAg
+ICAgICAgX0FQS19USUVSPSJmcmFtZXdvcmsgcmVub3ZhZG8iCiAgICAgICAgZmkKICAgICAgZmkK
+ICAgIGZpCgogICAgaWYgWyAiJF9BUEtfQlVJTERfT0siICE9ICIxIiBdICYmIFsgIiRfQVBLX0RF
+Q09ERV9PSyIgPSAiMSIgXTsgdGhlbgogICAgICAjIOKUgOKUgCBmYWxsYmFjayAwZDogLS1hcGkt
+bGV2ZWwgZXhwbMOtY2l0byDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAgICAgIyAiTm8gcmVz
+b3VyY2UgaWRlbnRpZmllciBmb3VuZCBmb3IgYXR0cmlidXRlIFggaW4gcGFja2FnZSBhbmRyb2lk
+IgogICAgICAjIG9jb3JyZSBxdWFuZG8gbyBmcmFtZXdvcmsgaW5zdGFsYWRvIG7Do28gdGVtIG8g
+YXRyaWJ1dG8gcXVlIG8gQVBLCiAgICAgICMgdXNhIChBUEkgbWFpcyBhbHRhIHF1ZSBvIGZyYW1l
+d29yayBkbyBhcGt0b29sKS4gRml4OiBmb3LDp2FyIHVtCiAgICAgICMgYXBpLWxldmVsIGFsdG8g
+KDM1ID0gQW5kcm9pZCAxNSkgbm8gZGVjb2RlIHByYSBvIGFwa3Rvb2wgbsOjbwogICAgICAjIHRl
+bnRhciByZXNvbHZlciBhdHJpYnV0b3MgZGVzY29uaGVjaWRvcyBjb250cmEgbyBmcmFtZXdvcmsg
+bG9jYWwuCiAgICAgIGlmIGdyZXAgLXEgJ05vIHJlc291cmNlIGlkZW50aWZpZXIgZm91bmQgZm9y
+IGF0dHJpYnV0ZScgIiRfQVBLX0xBU1RMT0ciIDI+L2Rldi9udWxsIFwKICAgICAgfHwgZ3JlcCAt
+cSAnTm8gcmVzb3VyY2UgaWRlbnRpZmllciBmb3VuZCBmb3IgYXR0cmlidXRlJyAiJF9BUEtfV09S
+Sy9idWlsZF9yZXRyeSIqLmxvZyAyPi9kZXYvbnVsbDsgdGhlbgogICAgICAgIHByaW50ZiAiXDAz
+M1sxOzMzbVshXSBhdHJpYnV0byBkZXNjb25oZWNpZG8g4oCUIHRlbnRhbmRvIGNvbSAtLWFwaS1s
+ZXZlbCAzNSAoQW5kcm9pZCAxNSkuLi5cMDMzWzBtXG4iCiAgICAgICAgX0FQS19PVVRfQVBJPSIk
+X0FQS19XT1JLL2RlY29kZWRfYXBpMzUiCiAgICAgICAgX0FQS19MQVNUTE9HPSIkX0FQS19XT1JL
+L2J1aWxkX3JldHJ5X2FwaTM1LmxvZyIKICAgICAgICBpZiBhcGt0b29sIGQgLWYgLS1hcGktbGV2
+ZWwgMzUgLW8gIiRfQVBLX09VVF9BUEkiICIkX0FQSyIgPiAiJF9BUEtfTEFTVExPRyIgMj4mMTsg
+dGhlbgogICAgICAgICAgWyAiJF9BUEtfSEFTX1NQTElUX1JFUSIgPSAiMSIgXSAmJiBcCiAgICAg
+ICAgICAgIHNlZCAtaSAncy8gYW5kcm9pZDppc1NwbGl0UmVxdWlyZWQ9IlteIl0qIi8vZycgIiRf
+QVBLX09VVF9BUEkvQW5kcm9pZE1hbmlmZXN0LnhtbCIgMj4vZGV2L251bGwKICAgICAgICAgIGlm
+IGFwa3Rvb2wgYiAiJF9BUEtfT1VUX0FQSSIgLW8gIiRfQVBLX1JFQlVJTFQiID4+ICIkX0FQS19M
+QVNUTE9HIiAyPiYxOyB0aGVuCiAgICAgICAgICAgIF9BUEtfQlVJTERfT0s9MQogICAgICAgICAg
+ICBfQVBLX0RFQ09ERV9PSz0xCiAgICAgICAgICAgIF9BUEtfVElFUj0iLS1hcGktbGV2ZWwgMzUi
+CiAgICAgICAgICAgIF9BUEtfT1VUPSIkX0FQS19PVVRfQVBJIgogICAgICAgICAgZmkKICAgICAg
+ICBmaQogICAgICBmaQogICAgZmkKCiAgICBpZiBbICIkX0FQS19CVUlMRF9PSyIgIT0gIjEiIF0g
+JiYgWyAiJF9BUEtfREVYX0VOQ1JZUFRFRCIgPSAiMSIgXTsgdGhlbgogICAgICAjIOKUgOKUgCBm
+YWxsYmFjayAwZTogLS1uby1zcmMgcGFyYSBBUEtzIGNvbSBERVggc3VzcGVpdG8g4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICMgQVBLcyBjb20gREVYIHN0dWIv
+bG9hZGVyOiBvIGJha3NtYWxpIGZhbGhhIG91IGdlcmEgc21hbGkgaW7DunRpbC4KICAgICAgIyAt
+LW5vLXNyYyBwdWxhIG8gZGlzYXNzZW1ibHkgZG8gREVYIGNvbXBsZXRhbWVudGUg4oCUIG9zIGFy
+cXVpdm9zCiAgICAgICMgLmRleCBvcmlnaW5haXMgc8OjbyBjb3BpYWRvcyBpbnRhY3Rvcy4gTyBy
+ZWJ1aWxkIGZlY2hhIGUgbyBBUEsKICAgICAgIyBmdW5jaW9uYSBlbSBydW50aW1lIHBvcnF1ZSBv
+IERFWCBudW5jYSBmb2kgdG9jYWRvLgogICAgICBwcmludGYgIlwwMzNbMTszM21bIV0gREVYIHN1
+c3BlaXRvIOKAlCB0ZW50YW5kbyByb3VuZC10cmlwIGNvbSAtLW5vLXNyYyAoREVYIHByZXNlcnZh
+ZG8gaW50YWN0bykuLi5cMDMzWzBtXG4iCiAgICAgIF9BUEtfT1VUX05PU1JDPSIkX0FQS19XT1JL
+L2RlY29kZWRfbm9zcmMiCiAgICAgIF9BUEtfTEFTVExPRz0iJF9BUEtfV09SSy9idWlsZF9yZXRy
+eV9ub3NyYy5sb2ciCiAgICAgIGlmIGFwa3Rvb2wgZCAtZiAtLW5vLXNyYyAtbyAiJF9BUEtfT1VU
+X05PU1JDIiAiJF9BUEsiID4gIiRfQVBLX0xBU1RMT0ciIDI+JjE7IHRoZW4KICAgICAgICBbICIk
+X0FQS19IQVNfU1BMSVRfUkVRIiA9ICIxIiBdICYmIFwKICAgICAgICAgIHNlZCAtaSAncy8gYW5k
+cm9pZDppc1NwbGl0UmVxdWlyZWQ9IlteIl0qIi8vZycgIiRfQVBLX09VVF9OT1NSQy9BbmRyb2lk
+TWFuaWZlc3QueG1sIiAyPi9kZXYvbnVsbAogICAgICAgIGlmIGFwa3Rvb2wgYiAiJF9BUEtfT1VU
+X05PU1JDIiAtbyAiJF9BUEtfUkVCVUlMVCIgPj4gIiRfQVBLX0xBU1RMT0ciIDI+JjE7IHRoZW4K
+ICAgICAgICAgIF9BUEtfQlVJTERfT0s9MQogICAgICAgICAgX0FQS19ERUNPREVfT0s9MQogICAg
+ICAgICAgX0FQS19USUVSPSItLW5vLXNyYyAoREVYIHByZXNlcnZhZG8gaW50YWN0bykiCiAgICAg
+ICAgICBfQVBLX09VVD0iJF9BUEtfT1VUX05PU1JDIgogICAgICAgIGZpCiAgICAgIGZpCiAgICBm
+aQoKICAgIGlmIFsgIiRfQVBLX0JVSUxEX09LIiAhPSAiMSIgXSAmJiBbICIkX0FQS19ERUNPREVf
+T0siID0gIjEiIF07IHRoZW4KICAgICAgIyDilIDilIAgZmFsbGJhY2sgMGE6IHNhbml0aXphw6fD
+o28gZGUgbm9tZXMgY29tICckJyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAgICAgIyBPIGFhcHQyIHJl
+amVpdGEgcXVhbHF1ZXIgZW50cmFkYSBkZSByZWN1cnNvIGN1am8gbm9tZSBjb250ZW5oYSAnJCcK
+ICAgICAgIyAoZXg6ICckYXZkX2hpZGVfcGFzc3dvcmRfXzAnLCBnZXJhZG8gcGVsbyBBbmRyb2lk
+IFN0dWRpbyBwcmEgYW5pbWHDp8O1ZXMKICAgICAgIyB2ZXRvcmlhaXMpLiBPIGVycm8gYXBhcmVj
+ZSBjb21vICJoYXMgaW52YWxpZCBlbnRyeSBuYW1lIiBlbSBwdWJsaWMueG1sCiAgICAgICMgZSBk
+ZXJydWJhIGEgY29tcGlsYcOnw6NvIGludGVpcmEuIEZpeDogcmVub21laWEgb3MgYXJxdWl2b3Mg
+KCQg4oaSIHhkXykgZQogICAgICAjIGNvcnJpZ2UgdG9kYXMgYXMgcmVmZXLDqm5jaWFzIGRlbnRy
+byBkZSBwdWJsaWMueG1sIGUgZG9zIFhNTHMgZG8gcHJvamV0by4KICAgICAgIyBSb2RhIGFudGVz
+IGRhIHF1YXJlbnRlbmEgZGUgY29udGXDumRvOiDDqSBjaXLDunJnaWNvIChzw7MgdG9jYSBvIG5v
+bWUpLAogICAgICAjIG7Do28gZGVzY2FydGEgbyByZWN1cnNvLCBlIG7Do28gcHJlY2lzYSBkbyBh
+YXB0MiBwcmEgZGlhZ25vc3RpY2FyLgogICAgICBfYXBrX3Nhbml0aXplX2RvbGxhcl9uYW1lcygp
+IHsKICAgICAgICBsb2NhbCBwcm9qPSIkMSIKICAgICAgICBbIC1kICIkcHJvai9yZXMiIF0gfHwg
+cmV0dXJuIDEKICAgICAgICBsb2NhbCBfZml4ZWQ9MCBmIG5ld2YgYmFzZSBuZXdiYXNlIGRpciBy
+ZWwgcmVmcwoKICAgICAgICAjIGxpc3RhIHRvZG9zIG9zIGFycXVpdm9zIChxdWFscXVlciB0aXBv
+KSBjb20gJyQnIG5vIG5vbWUKICAgICAgICBmaW5kICIkcHJvai9yZXMiIC1uYW1lICcqJConIC10
+eXBlIGYgMj4vZGV2L251bGwgPiAiJF9BUEtfV09SSy9kb2xsYXJfZmlsZXMiCiAgICAgICAgWyAt
+cyAiJF9BUEtfV09SSy9kb2xsYXJfZmlsZXMiIF0gfHwgcmV0dXJuIDEKCiAgICAgICAgd2hpbGUg
+SUZTPSByZWFkIC1yIGY7IGRvCiAgICAgICAgICBbIC1uICIkZiIgXSB8fCBjb250aW51ZQogICAg
+ICAgICAgZGlyPSIkKGRpcm5hbWUgIiRmIikiCiAgICAgICAgICBiYXNlPSIkKGJhc2VuYW1lICIk
+ZiIpIgogICAgICAgICAgIyBzdWJzdGl0dWkgdG9kb3Mgb3MgJyQnIHBvciAneGRfJyBubyBub21l
+IGRvIGFycXVpdm8KICAgICAgICAgIG5ld2Jhc2U9IiQocHJpbnRmICclcycgIiRiYXNlIiB8IHRy
+ICckJyAnXycgfCBzZWQgJ3MvXl8veGRfLycpIgogICAgICAgICAgbmV3Zj0iJGRpci8kbmV3YmFz
+ZSIKICAgICAgICAgIFsgIiRmIiA9ICIkbmV3ZiIgXSAmJiBjb250aW51ZQogICAgICAgICAgbXYg
+LWYgIiRmIiAiJG5ld2YiIDI+L2Rldi9udWxsIHx8IGNvbnRpbnVlCgogICAgICAgICAgIyBub21l
+IHNlbSBleHRlbnPDo28gcHJhIGNvcnJpZ2lyIHJlZmVyw6puY2lhcyBlbSBYTUwKICAgICAgICAg
+IHJlbD0iJHtiYXNlJS4qfSIKICAgICAgICAgIHJlZnM9IiR7bmV3YmFzZSUuKn0iCgogICAgICAg
+ICAgIyBjb3JyaWdlIHB1YmxpYy54bWwg4oCUIHJlZmVyZW5jaWEgcG9yIG5vbWUgc2VtIGV4dGVu
+c8OjbwogICAgICAgICAgZmluZCAiJHByb2ovcmVzIiAtbmFtZSAncHVibGljLnhtbCcgLXR5cGUg
+ZiAyPi9kZXYvbnVsbCB8IHdoaWxlIElGUz0gcmVhZCAtciBweDsgZG8KICAgICAgICAgICAgc2Vk
+IC1pICJzL25hbWU9XCIkcmVsXCIvbmFtZT1cIiRyZWZzXCIvZyIgIiRweCIgMj4vZGV2L251bGwK
+ICAgICAgICAgIGRvbmUKCiAgICAgICAgICAjIGNvcnJpZ2UgcmVmZXLDqm5jaWFzIGVtIHRvZG9z
+IG9zIFhNTHMgZG8gcHJvamV0byAodmFsb3JlcywgbGF5b3V0cywgZXRjLikKICAgICAgICAgIGZp
+bmQgIiRwcm9qL3JlcyIgLW5hbWUgJyoueG1sJyAtdHlwZSBmIDI+L2Rldi9udWxsIHwgd2hpbGUg
+SUZTPSByZWFkIC1yIHJ4OyBkbwogICAgICAgICAgICBzZWQgLWkgInMvQGRyYXdhYmxlXC8kcmVs
+L0BkcmF3YWJsZVwvJHJlZnMvZyIgIiRyeCIgMj4vZGV2L251bGwKICAgICAgICAgICAgc2VkIC1p
+ICJzL0BhbmltXC8kcmVsL0BhbmltXC8kcmVmcy9nIiAiJHJ4IiAyPi9kZXYvbnVsbAogICAgICAg
+ICAgICBzZWQgLWkgInMvQGFuaW1hdG9yXC8kcmVsL0BhbmltYXRvclwvJHJlZnMvZyIgIiRyeCIg
+Mj4vZGV2L251bGwKICAgICAgICAgIGRvbmUKCiAgICAgICAgICBwcmludGYgIiAgW1hQTV0gbm9t
+ZSBzYW5pdGl6YWRvOiAlcyDihpIgJXNcbiIgIiRiYXNlIiAiJG5ld2Jhc2UiCiAgICAgICAgICBf
+Zml4ZWQ9JCgoX2ZpeGVkKzEpKQogICAgICAgIGRvbmUgPCAiJF9BUEtfV09SSy9kb2xsYXJfZmls
+ZXMiCgogICAgICAgIHJtIC1mICIkX0FQS19XT1JLL2RvbGxhcl9maWxlcyIKICAgICAgICBbICIk
+X2ZpeGVkIiAtZ3QgMCBdCiAgICAgIH0KCiAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVshXSBidWls
+ZCBuw6NvIGZlY2hvdSDigJQgdmVyaWZpY2FuZG8gbm9tZXMgZGUgcmVjdXJzb3MgY29tICckJyAo
+YWFwdDIgcmVqZWl0YSkuLi5cMDMzWzBtXG4iCiAgICAgIF9BUEtfTEFTVExPRz0iJF9BUEtfV09S
+Sy9idWlsZF9yZXRyeV9kb2xsYXIubG9nIgogICAgICBpZiBfYXBrX3Nhbml0aXplX2RvbGxhcl9u
+YW1lcyAiJF9BUEtfT1VUIiA+ICIkX0FQS19MQVNUTE9HIiAyPiYxOyB0aGVuCiAgICAgICAgcHJp
+bnRmICJcMDMzWzA7OTBtICAgIHJlY3Vyc29zIGNvbSAnJCcgcmVub21lYWRvcyDigJQgdGVudGFu
+ZG8gcmVidWlsZC4uLlwwMzNbMG1cbiIKICAgICAgICBpZiBhcGt0b29sIGIgIiRfQVBLX09VVCIg
+LW8gIiRfQVBLX1JFQlVJTFQiID4+ICIkX0FQS19MQVNUTE9HIiAyPiYxOyB0aGVuCiAgICAgICAg
+ICBfQVBLX0JVSUxEX09LPTEKICAgICAgICAgIF9BUEtfVElFUj0ibm9tZXMgY29tICckJyBzYW5p
+dGl6YWRvcyIKICAgICAgICBmaQogICAgICBlbHNlCiAgICAgICAgcHJpbnRmICJcMDMzWzA7OTBt
+ICAgIG5lbmh1bSBhcnF1aXZvIGNvbSAnJCcgZW5jb250cmFkbyDigJQgY2F1c2EgZGlmZXJlbnRl
+LlwwMzNbMG1cbiIKICAgICAgZmkKICAgIGZpCgogICAgaWYgWyAiJF9BUEtfQlVJTERfT0siICE9
+ICIxIiBdICYmIFsgIiRfQVBLX0RFQ09ERV9PSyIgPSAiMSIgXTsgdGhlbgogICAgICAjIOKUgOKU
+gCBmYWxsYmFjayAwYjogLS1rZWVwLWJyb2tlbi1yZXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICMgQWxndW5zIEFQS3MgYW50aWdvcyB0w6pt
+IGVudHJhZGFzIGVtIHJlc291cmNlcy5hcnNjIHF1ZSBvIGFwa3Rvb2wKICAgICAgIyBkZWNvZGlm
+aWNhIGNvbSB3YXJuaW5nIG1hcyBuw6NvIGNvbnNlZ3VlIHJlY29tcGlsYXIgbm8gbW9kbyBwYWRy
+w6NvLgogICAgICAjIC0ta2VlcC1icm9rZW4tcmVzIGluc3RydWkgbyBhcGt0b29sIGEgcHJlc2Vy
+dmFyIGVzc2FzIGVudHJhZGFzIGNvbW8KICAgICAgIyBibG9icyBiaW7DoXJpb3MgZW0gdmV6IGRl
+IHRlbnRhciByZWNvbXBpbMOhLWxhcywgbyBxdWUgZmVjaGEgbyBidWlsZAogICAgICAjIG5hIG1h
+aW9yaWEgZG9zIGNhc29zIHNlbSBwcmVjaXNhciBzYWNyaWZpY2FyIHRvZG9zIG9zIHJlY3Vyc29z
+LgogICAgICBwcmludGYgIlwwMzNbMTszM21bIV0gYnVpbGQgbsOjbyBmZWNob3Ug4oCUIHRlbnRh
+bmRvIGNvbSAtLWtlZXAtYnJva2VuLXJlcyAoQVBLcyBjb20gcmVjdXJzb3MgbWFsZm9ybWFkb3Mp
+Li4uXDAzM1swbVxuIgogICAgICBfQVBLX09VVF9LQlI9IiRfQVBLX1dPUksvZGVjb2RlZF9rYnIi
+CiAgICAgIF9BUEtfTEFTVExPRz0iJF9BUEtfV09SSy9idWlsZF9yZXRyeV9rYnIubG9nIgogICAg
+ICBpZiBhcGt0b29sIGQgLWYgLS1rZWVwLWJyb2tlbi1yZXMgLW8gIiRfQVBLX09VVF9LQlIiICIk
+X0FQSyIgPiAiJF9BUEtfTEFTVExPRyIgMj4mMSAmJiBcCiAgICAgICAgIGFwa3Rvb2wgYiAiJF9B
+UEtfT1VUX0tCUiIgLW8gIiRfQVBLX1JFQlVJTFQiID4+ICIkX0FQS19MQVNUTE9HIiAyPiYxOyB0
+aGVuCiAgICAgICAgX0FQS19CVUlMRF9PSz0xCiAgICAgICAgX0FQS19ERUNPREVfT0s9MQogICAg
+ICAgIF9BUEtfVElFUj0iLS1rZWVwLWJyb2tlbi1yZXMiCiAgICAgICAgX0FQS19PVVQ9IiRfQVBL
+X09VVF9LQlIiCiAgICAgIGZpCiAgICBmaQoKICAgIGlmIFsgIiRfQVBLX0JVSUxEX09LIiAhPSAi
+MSIgXSAmJiBbICIkX0FQS19ERUNPREVfT0siID0gIjEiIF07IHRoZW4KICAgICAgIyDilIDilIAg
+ZmFsbGJhY2sgMGM6IHByw6ktdm9vIGRlIGNvbXBpbGHDp8OjbyBwb3ItcmVjdXJzbyAoZnVuw6fD
+o28gZGVmaW5pZGEKICAgICAgIyBsw6EgZW0gY2ltYSkg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICMgUm9kYSBBTlRFUyBkbyAtLW5vLXJlcyBkZSBw
+cm9ww7NzaXRvOiDDqSBiZW0gbWVub3MgZGVzdHJ1dGl2bywgasOhCiAgICAgICMgcXVlIHPDsyB0
+cm9jYSBvKHMpIHJlY3Vyc28ocykgcXVlIHJlYWxtZW50ZSBxdWVicmFtIG8gYWFwdDIg4oCUIG8K
+ICAgICAgIyByZXN0byBkbyBwcm9qZXRvIChhIGltZW5zYSBtYWlvcmlhLCBlbSBxdWFscXVlciBh
+cHAgcmVhbCkgY29udGludWEKICAgICAgIyBkZWNvZGlmaWNhZG8gZSBlZGl0w6F2ZWwgbm9ybWFs
+bWVudGUsIGFvIGNvbnRyw6FyaW8gZG8gLS1uby1yZXMgcXVlCiAgICAgICMgc2FjcmlmaWNhIFRP
+RE9TIG9zIHJlY3Vyc29zIGRlIHVtYSB2ZXogc8OzLiBSZWFwcm92ZWl0YSBvIG1lc21vCiAgICAg
+ICMgZGlyZXTDs3JpbyBqw6EgZGVjb2RpZmljYWRvICgkX0FQS19PVVQpLCBzZW0gcHJlY2lzYXIg
+ZGVjb2RpZmljYXIKICAgICAgIyBkZSBub3ZvLgogICAgICBwcmludGYgIlwwMzNbMTszM21bIV0g
+YnVpbGQgbsOjbyBmZWNob3Ug4oCUIGlzb2xhbmRvIHJlY3Vyc28ocykgLnhtbCBxdWUgbyBhYXB0
+MiByZWplaXRhIGluZGl2aWR1YWxtZW50ZS4uLlwwMzNbMG1cbiIKICAgICAgX0FQS19MQVNUTE9H
+PSIkX0FQS19XT1JLL2J1aWxkX3JldHJ5X3ByZWZsaWdodC5sb2ciCiAgICAgIGlmIF9hcGtfcHJl
+ZmxpZ2h0X3F1YXJhbnRpbmUgIiRfQVBLX09VVCIgIiRfQVBLX0FBUFQyIiA+ICIkX0FQS19MQVNU
+TE9HIiAyPiYxOyB0aGVuCiAgICAgICAgaWYgYXBrdG9vbCBiICIkX0FQS19PVVQiIC1vICIkX0FQ
+S19SRUJVSUxUIiA+PiAiJF9BUEtfTEFTVExPRyIgMj4mMTsgdGhlbgogICAgICAgICAgX0FQS19C
+VUlMRF9PSz0xCiAgICAgICAgICBfQVBLX1RJRVI9InJlY3Vyc28ocykgaXNvbGFkbyhzKSBpbmRp
+dmlkdWFsbWVudGUiCiAgICAgICAgZmkKICAgICAgZWxzZQogICAgICAgIHByaW50ZiAiXDAzM1sw
+OzkwbSAgICBuZW5odW0gLnhtbCBmYWxob3Ugc296aW5obyBubyBhYXB0MiDigJQgYSBjYXVzYSBl
+c3TDoSBlbSBvdXRybyBsdWdhciAocmVzb3VyY2VzLmFyc2MgYmluw6FyaW8sIHJlY3Vyc28gbsOj
+by14bWwsIGV0Yy4pXDAzM1swbVxuIgogICAgICBmaQogICAgZmkKCiAgICBpZiBbICIkX0FQS19C
+VUlMRF9PSyIgIT0gIjEiIF07IHRoZW4KICAgICAgIyDilIDilIAgZmFsbGJhY2sgMTogLS1uby1y
+ZXMg4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAgICMgUmVjb21lbmRhw6fDo28gb2ZpY2lhbCBk
+byBwcsOzcHJpbyBwcm9qZXRvIGFwa3Rvb2wgcHJhIGVzc2EgY2xhc3NlIGRlCiAgICAgICMgZmFs
+aGE6IHByZXNlcnZhIG8gcmVzb3VyY2VzLmFyc2Mgc2VtIGRlY29kZS9yZWNvbXBpbGHDp8Ojby4g
+Q29icmUgZGUKICAgICAgIyB0YWJhbGhvIHF1YWxxdWVyIG5vbWUvYXRyaWJ1dG8gImVzdHJhbmhv
+IiBxdWUgb3MgZml4ZXMgZXNwZWPDrWZpY29zCiAgICAgICMgYWNpbWEgbsOjbyBwcmV2aWFtLiBD
+dXN0bzogbGF5b3V0cy92YWx1ZXMgZGVpeGFtIGRlIHNlciBlZGl0w6F2ZWlzCiAgICAgICMgY29t
+byB0ZXh0byDigJQgbWFzIHNtYWxpIGUgQW5kcm9pZE1hbmlmZXN0IGNvbnRpbnVhbSAxMDAlIGRl
+Y29kaWZpY2Fkb3MKICAgICAgIyAobyBxdWUgYmFzdGEgcHJvIHF1ZSBvIHBlbnRlc3QvbXNmdmVu
+b20gcHJlY2lzYSBmYXplcikuCiAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVshXSBtb2RvIG5vcm1h
+bCBuw6NvIGZlY2hvdSDigJQgdGVudGFuZG8gcm91bmQtdHJpcCBlbSAtLW5vLXJlcyAocmVjdXJz
+b3MgcHJlc2VydmFkb3MpLi4uXDAzM1swbVxuIgogICAgICBfQVBLX09VVF9BTFQ9IiRfQVBLX1dP
+UksvZGVjb2RlZF9ub3JlcyIKICAgICAgX0FQS19SRUJVSUxUX0FMVD0iJF9BUEtfV09SSy9yZWJ1
+aWx0X25vcmVzLmFwayIKICAgICAgX0FQS19MQVNUTE9HPSIkX0FQS19XT1JLL25vcmVzLmxvZyIK
+ICAgICAgaWYgYXBrdG9vbCBkIC1mIC0tbm8tcmVzIC1vICIkX0FQS19PVVRfQUxUIiAiJF9BUEsi
+ID4gIiRfQVBLX0xBU1RMT0ciIDI+JjEgJiYgXAogICAgICAgICBhcGt0b29sIGIgIiRfQVBLX09V
+VF9BTFQiIC1vICIkX0FQS19SRUJVSUxUX0FMVCIgPj4gIiRfQVBLX0xBU1RMT0ciIDI+JjE7IHRo
+ZW4KICAgICAgICBfQVBLX0JVSUxEX09LPTEKICAgICAgICBfQVBLX0RFQ09ERV9PSz0xCiAgICAg
+ICAgX0FQS19USUVSPSItLW5vLXJlcyAocmVjdXJzb3MgbsOjbyBkZWNvZGlmaWNhZG9zKSIKICAg
+ICAgICBfQVBLX1JFQlVJTFQ9IiRfQVBLX1JFQlVJTFRfQUxUIgogICAgICBlbGlmIFsgLWYgIiRf
+QVBLX0FQS1RPT0wzIiBdOyB0aGVuCiAgICAgICAgIyDilIDilIAgZmFsbGJhY2sgMjogbW90b3Ig
+YXBrdG9vbCAzLnggKHPDsyBleGlzdGUgc2UgbyBkb3dubG9hZCBvcGNpb25hbAogICAgICAgICMg
+ZGV1IGNlcnRvIG5hIGluc3RhbGHDp8Ojbykg4oCUIGNhY2hlIGRlIGZyYW1ld29yayBpc29sYWRv
+IGRvIG1vdG9yCiAgICAgICAgIyBwcmluY2lwYWwsIHByYSBudW5jYSBjb250YW1pbmFyIG8gcXVl
+IG8gbXNmdmVub20gdXNhLiDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAK
+ICAgICAgICBwcmludGYgIlwwMzNbMTszM21bIV0gLS1uby1yZXMgdGFtYsOpbSBuw6NvIGZlY2hv
+dSDigJQgdGVudGFuZG8gY29tIG8gbW90b3IgYXBrdG9vbCAzLnguLi5cMDMzWzBtXG4iCiAgICAg
+ICAgX0FQS19GUkFNRTM9IiRfQVBLX1RPT0xESVIvZnJhbWV3b3JrMyIKICAgICAgICBta2RpciAt
+cCAiJF9BUEtfRlJBTUUzIiAyPi9kZXYvbnVsbAogICAgICAgIF9BUEtfT1VUMz0iJF9BUEtfV09S
+Sy9kZWNvZGVkX3YzIgogICAgICAgIF9BUEtfUkVCVUlMVDM9IiRfQVBLX1dPUksvcmVidWlsdF92
+My5hcGsiCiAgICAgICAgX0FQS19MQVNUTE9HPSIkX0FQS19XT1JLL3YzLmxvZyIKICAgICAgICBp
+ZiBqYXZhIC1qYXIgIiRfQVBLX0FQS1RPT0wzIiBkIC1mIC1wICIkX0FQS19GUkFNRTMiIC1vICIk
+X0FQS19PVVQzIiAiJF9BUEsiID4gIiRfQVBLX0xBU1RMT0ciIDI+JjEgJiYgXAogICAgICAgICAg
+IGphdmEgLWphciAiJF9BUEtfQVBLVE9PTDMiIGIgIiRfQVBLX09VVDMiIC1wICIkX0FQS19GUkFN
+RTMiIC0tYWFwdCAiJF9BUEtfQUFQVDIiIC1vICIkX0FQS19SRUJVSUxUMyIgPj4gIiRfQVBLX0xB
+U1RMT0ciIDI+JjE7IHRoZW4KICAgICAgICAgIF9BUEtfQlVJTERfT0s9MQogICAgICAgICAgX0FQ
+S19ERUNPREVfT0s9MQogICAgICAgICAgX0FQS19USUVSPSJtb3RvciBhcGt0b29sIDMueCIKICAg
+ICAgICAgIF9BUEtfUkVCVUlMVD0iJF9BUEtfUkVCVUlMVDMiCiAgICAgICAgZmkKICAgICAgZmkK
+ICAgIGZpCgogICAgaWYgWyAiJF9BUEtfQlVJTERfT0siID0gIjEiIF07IHRoZW4KICAgICAgIyDi
+lIDilIAgcMOzcy1idWlsZCAxOiByZWluc2VyZSB1bmtub3duLyBubyBBUEsgZmluYWwg4pSA4pSA
+4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSA4pSACiAgICAg
+ICMgTyBhcGt0b29sIG7Do28gaW5jbHVpIG8gY29udGXDumRvIGRlIHVua25vd24vIG5vIHJlYnVp
+bGQuIFNlbSBpc3NvLAogICAgICAjIGFwcHMgcXVlIGRlcGVuZGVtIGRlc3NlcyBhcnF1aXZvcyAo
+ZW5naW5lcywgcHJvdGVjdG9ycywgYXNzZXRzCiAgICAgICMgY3VzdG9taXphZG9zKSBjcmFzaGFt
+IGVtIHJ1bnRpbWUgbWVzbW8gY29tIGJ1aWxkIGUgaW5zdGFsbCBPSy4KICAgICAgaWYgWyAiJF9B
+UEtfSEFTX1VOS05PV04iID0gIjEiIF0gJiYgWyAtZCAiJF9BUEtfT1VUL3Vua25vd24iIF07IHRo
+ZW4KICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgLT4gcmVpbnNlcmluZG8gdW5rbm93bi8g
+bm8gQVBLIGZpbmFsLi4uXDAzM1swbVxuIgogICAgICAgIF9BUEtfUkVCVUlMVF9VTks9IiRfQVBL
+X1dPUksvcmVidWlsdF93aXRoX3Vua25vd24uYXBrIgogICAgICAgIGNwICIkX0FQS19SRUJVSUxU
+IiAiJF9BUEtfUkVCVUlMVF9VTksiIDI+L2Rldi9udWxsCiAgICAgICAgKCBjZCAiJF9BUEtfT1VU
+L3Vua25vd24iICYmIGZpbmQgLiAtdHlwZSBmIDI+L2Rldi9udWxsIHwgd2hpbGUgSUZTPSByZWFk
+IC1yIHVmOyBkbwogICAgICAgICAgICByZWw9IiR7dWYjLi99IgogICAgICAgICAgICB6aXAgLXUg
+IiRfQVBLX1JFQlVJTFRfVU5LIiAiJHJlbCIgPi9kZXYvbnVsbCAyPiYxCiAgICAgICAgICBkb25l
+ICkKICAgICAgICBpZiBbIC1mICIkX0FQS19SRUJVSUxUX1VOSyIgXTsgdGhlbgogICAgICAgICAg
+X0FQS19SRUJVSUxUPSIkX0FQS19SRUJVSUxUX1VOSyIKICAgICAgICAgIHByaW50ZiAiXDAzM1sw
+OzkwbSAgICBbZml4XSB1bmtub3duLyByZWluc2VyaWRhIG5vIEFQS1wwMzNbMG1cbiIKICAgICAg
+ICBmaQogICAgICBmaQoKICAgICAgIyDilIDilIAgcMOzcy1idWlsZCAyOiBnYXJhbnRlIHJlc291
+cmNlcy5hcnNjIHNlbSBjb21wcmVzc8OjbyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIAKICAgICAgIyBBbmRyb2lkIDExKyAoQVBJIDMwKykgcmVjdXNhIEFQS3Mgb25kZSByZXNvdXJj
+ZXMuYXJzYyBlc3TDoQogICAgICAjIGNvbXByaW1pZG86ICJUYXJnZXRpbmcgUisgcmVxdWlyZXMg
+cmVzb3VyY2VzLmFyc2MgdG8gYmUgc3RvcmVkCiAgICAgICMgdW5jb21wcmVzc2VkIiAoZXJybyAt
+MTI0KS4gTyBhcGt0b29sIMOgcyB2ZXplcyBjb21wcmltZSBzZW0gYXZpc28uCiAgICAgICMgRml4
+OiB2ZXJpZmljYXIgZSBmb3LDp2FyIHNlbSBjb21wcmVzc8OjbyB2aWEgemlwIC0wLgogICAgICBp
+ZiBjb21tYW5kIC12IHVuemlwID4vZGV2L251bGwgMj4mMSAmJiBjb21tYW5kIC12IHppcCA+L2Rl
+di9udWxsIDI+JjE7IHRoZW4KICAgICAgICBfQVJTQ19NRVRIT0Q9JCh1bnppcCAtdiAiJF9BUEtf
+UkVCVUlMVCIgMj4vZGV2L251bGwgfCBhd2sgJy9yZXNvdXJjZXNcLmFyc2Mve3ByaW50ICQ1fScp
+CiAgICAgICAgaWYgWyAiJF9BUlNDX01FVEhPRCIgIT0gIlN0b3JlZCIgXSAmJiBbIC1uICIkX0FS
+U0NfTUVUSE9EIiBdOyB0aGVuCiAgICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgLT4gcmVz
+b3VyY2VzLmFyc2MgY29tcHJpbWlkbyAobWV0aG9kPSRfQVJTQ19NRVRIT0QpIOKAlCBmb3LDp2Fu
+ZG8gc2VtIGNvbXByZXNzw6NvIChmaXggQW5kcm9pZCAxMSspLi4uXDAzM1swbVxuIgogICAgICAg
+ICAgX0FQS19SRUJVSUxUX0FSU0M9IiRfQVBLX1dPUksvcmVidWlsdF9hcnNjX2ZpeC5hcGsiCiAg
+ICAgICAgICBfQVJTQ19UTVA9IiRfQVBLX1dPUksvYXJzY190bXAiCiAgICAgICAgICBta2RpciAt
+cCAiJF9BUlNDX1RNUCIKICAgICAgICAgIHVuemlwIC1wICIkX0FQS19SRUJVSUxUIiByZXNvdXJj
+ZXMuYXJzYyA+ICIkX0FSU0NfVE1QL3Jlc291cmNlcy5hcnNjIiAyPi9kZXYvbnVsbAogICAgICAg
+ICAgY3AgIiRfQVBLX1JFQlVJTFQiICIkX0FQS19SRUJVSUxUX0FSU0MiCiAgICAgICAgICAoIGNk
+ICIkX0FSU0NfVE1QIiAmJiB6aXAgLTAgIiRfQVBLX1JFQlVJTFRfQVJTQyIgcmVzb3VyY2VzLmFy
+c2MgPi9kZXYvbnVsbCAyPiYxICkKICAgICAgICAgIGlmIFsgLWYgIiRfQVBLX1JFQlVJTFRfQVJT
+QyIgXTsgdGhlbgogICAgICAgICAgICBfQVBLX1JFQlVJTFQ9IiRfQVBLX1JFQlVJTFRfQVJTQyIK
+ICAgICAgICAgICAgcHJpbnRmICJcMDMzWzA7OTBtICAgIFtmaXhdIHJlc291cmNlcy5hcnNjIGFn
+b3JhIHNlbSBjb21wcmVzc8Ojb1wwMzNbMG1cbiIKICAgICAgICAgIGZpCiAgICAgICAgICBybSAt
+cmYgIiRfQVJTQ19UTVAiCiAgICAgICAgZmkKICAgICAgZmkKCiAgICAgIHByaW50ZiAiXDAzM1sx
+OzMybVvinJNdIGJ1aWxkIE9LIC0+ICVzXDAzM1swbSBcMDMzWzA7OTBtKCVkcylcMDMzWzBtXG4i
+ICIkX0FQS19SRUJVSUxUIiAiJHtfQVBLX0JVSUxEX1RJTUU6LTB9IgogICAgICBfQVBLX1BBU1M9
+JCgoX0FQS19QQVNTKzEpKQogICAgICBpZiBncmVwIC1xICdcW1hQTVxdIHJlY3Vyc28gY29ycm9t
+cGlkbycgIiRfQVBLX0xBU1RMT0ciIDI+L2Rldi9udWxsOyB0aGVuCiAgICAgICAgcHJpbnRmICJc
+MDMzWzE7MzNtWyFdIGNvbSByZWN1cnNvcyBlbSBxdWFyZW50ZW5hIChjb250ZcO6ZG8gb3JpZ2lu
+YWwgc3Vic3RpdHXDrWRvKTpcMDMzWzBtXG4iCiAgICAgICAgZ3JlcCAnXFtYUE1cXScgIiRfQVBL
+X0xBU1RMT0ciCiAgICAgIGZpCgogICAgICAjIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAog
+ICAgICAjIFZBTElEQcOHw4NPIERFIElOU1RBTEFCSUxJREFERSDigJQgImJ1aWxkIE9LIiBzw7Mg
+cHJvdmEgcXVlIG8gcm91bmQtdHJpcAogICAgICAjIGRlY29kZS9yZWNvbXBpbGHDp8OjbyBmZWNo
+b3UuIE8gYXBrdG9vbCBkb2N1bWVudGEgb2ZpY2lhbG1lbnRlIHF1ZQogICAgICAjIFNFTVBSRSBn
+ZXJhIEFQSyBzZW0gYXNzaW5hdHVyYSBlIHNlbSB6aXBhbGlnbiAoRkFRIG9maWNpYWwgZG8KICAg
+ICAgIyBwcm9qZXRvOiAiQXBrdG9vbCBidWlsZHMgdW5zaWduZWQgQVBLcyIpLiBTZW0gb3MgcGFz
+c29zIGFiYWl4bywKICAgICAgIyBlc3NlIFBBU1Mgw6kgZmFsc28tcG9zaXRpdm8gZW0gcGVsbyBt
+ZW5vcyBkb2lzIGNhc29zIHJlYWlzIGUKICAgICAgIyBkb2N1bWVudGFkb3M6CiAgICAgICMgICAx
+KSBhIHBhcnRpciBkbyBBbmRyb2lkIDExIChBUEkgMzApLCBvIFBhY2thZ2VNYW5hZ2VyIGV4aWdl
+CiAgICAgICMgICAgICByZXNvdXJjZXMuYXJzYyBTRU0gY29tcHJlc3PDo28gZSBhbGluaGFkbyBl
+bSA0IGJ5dGVzLCBzZW7Do28KICAgICAgIyAgICAgIHJlY3VzYSBvIGluc3RhbGwgY29tICJGYWls
+ZWQgcGFyc2UgLi4uIHJlcXVpcmVzIHJlc291cmNlcy5hcnNjCiAgICAgICMgICAgICAuLi4gc3Rv
+cmVkIHVuY29tcHJlc3NlZCBhbmQgYWxpZ25lZCIgKGVycm8gLTEyNCkg4oCUIG8gYXBrdG9vbAog
+ICAgICAjICAgICAgbnVuY2EgZ2FyYW50ZSBpc3NvIHNvemluaG8uCiAgICAgICMgICAyKSBzZSBv
+IGFwcCB0ZW0gZXh0cmFjdE5hdGl2ZUxpYnM9ImZhbHNlIiAoY29tdW0gZW0gYXBwcwogICAgICAj
+ICAgICAgbW9kZXJub3MpLCBvcyAuc28gcHJlY2lzYW0gZXN0YXIgc2VtIGNvbXByZXNzw6NvIEUg
+YWxpbmhhZG9zCiAgICAgICMgICAgICBlbSBww6FnaW5hLCBzZW7Do28gbyBpbnN0YWxsIGZhbGhh
+IGNvbSAiRmFpbGVkIHRvIGV4dHJhY3QKICAgICAgIyAgICAgIG5hdGl2ZSBsaWJyYXJpZXMsIHJl
+cz0tMiIg4oCUIMOpIHNhYmlkbyBxdWUgbyByb3VuZC10cmlwIGRvCiAgICAgICMgICAgICBhcGt0
+b29sIG7Do28gcHJlc2VydmEgZXNzZSBhbGluaGFtZW50by4KICAgICAgIyB6aXBhbGlnbiByb2Rh
+IFNFTVBSRSBhbnRlcyBkZSBhc3NpbmFyOiBvIEFQSyBTaWduYXR1cmUgU2NoZW1lIHYyL3YzCiAg
+ICAgICMgY29icmUgbyBhcnF1aXZvIGludGVpcm8gKGluY2x1aW5kbyBvIGFsaW5oYW1lbnRvKSBu
+YSBhc3NpbmF0dXJhOwogICAgICAjIGFsaW5oYXIgZGVwb2lzIGRlIGFzc2luYXIgaW52YWxpZGEg
+YSBhc3NpbmF0dXJhLgogICAgICAjIOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkAogICAgICBf
+QVBLX0FMSUdORUQ9IiRfQVBLX1dPUksvYWxpZ25lZC5hcGsiCiAgICAgIF9BUEtfU0lHTkVEPSIk
+X0FQS19XT1JLL3NpZ25lZC5hcGsiCiAgICAgIF9BUEtfWklQQUxJR05fT0s9MAogICAgICBfQVBL
+X1NJR05fT0s9MAoKICAgICAgaWYgY29tbWFuZCAtdiB6aXBhbGlnbiA+L2Rldi9udWxsIDI+JjE7
+IHRoZW4KICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgLT4gemlwYWxpZ24gKDQgYnl0ZXMg
+KyBww6FnaW5hIGRlIDE2SyBwcm9zIC5zbykgLi4uXDAzM1swbVxuIgogICAgICAgIGlmIHppcGFs
+aWduIC1QIDE2IC1mIDQgIiRfQVBLX1JFQlVJTFQiICIkX0FQS19BTElHTkVEIiA+IiRfQVBLX1dP
+UksvemlwYWxpZ24ubG9nIiAyPiYxOyB0aGVuCiAgICAgICAgICBfQVBLX1pJUEFMSUdOX09LPTEK
+ICAgICAgICBlbGlmIHppcGFsaWduIC1mIDQgIiRfQVBLX1JFQlVJTFQiICIkX0FQS19BTElHTkVE
+IiA+IiRfQVBLX1dPUksvemlwYWxpZ24ubG9nIiAyPiYxOyB0aGVuCiAgICAgICAgICAjIHppcGFs
+aWduIGFudGlnbyBkZW1haXMgcHJhIHJlY29uaGVjZXIgIi1QIiAoYWxpbmhhbWVudG8gZGUKICAg
+ICAgICAgICMgcMOhZ2luYSBkZSAxNksgcHJvcyAuc28sIGZsYWcgbWFpcyByZWNlbnRlKSDigJQg
+c2VndWUgc8OzIGNvbSBvCiAgICAgICAgICAjIGFsaW5oYW1lbnRvIGdlbsOpcmljbyBkZSA0IGJ5
+dGVzLCBxdWUgw6kgbyBxdWUgZ2FyYW50ZSBpbnN0YWxhci4KICAgICAgICAgICMgU2VtICItUCIs
+IGFwcHMgY29tIGJpYmxpb3RlY2EgbmF0aXZhIHBvZGVtIG7Do28gcm9kYXIKICAgICAgICAgICMg
+ZXNwZWNpZmljYW1lbnRlIGVtIGFwYXJlbGhvcyBjb20gcMOhZ2luYSBkZSAxNksg4oCUIG7Do28g
+YWZldGEKICAgICAgICAgICMgYSBpbnN0YWxhw6fDo28gZW0gc2kuCiAgICAgICAgICBfQVBLX1pJ
+UEFMSUdOX09LPTEKICAgICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICAoemlwYWxpZ24gc2Vt
+IHN1cG9ydGUgYSAtUCAxNiDigJQgc8OzIG8gYWxpbmhhbWVudG8gZGUgNCBieXRlczsgJ3BrZyB1
+cGdyYWRlIHppcGFsaWduJyBwcmEgY29iZXJ0dXJhIGRlIHDDoWdpbmEgZGUgMTZLKVwwMzNbMG1c
+biIKICAgICAgICBmaQogICAgICAgIGlmIFsgIiRfQVBLX1pJUEFMSUdOX09LIiA9ICIxIiBdOyB0
+aGVuCiAgICAgICAgICBfQVBLX1BBU1M9JCgoX0FQS19QQVNTKzEpKQogICAgICAgICAgcHJpbnRm
+ICJcMDMzWzE7MzJtW+Kck10gemlwYWxpZ24gT0tcMDMzWzBtXG4iCiAgICAgICAgZWxzZQogICAg
+ICAgICAgX0FQS19GQUlMPSQoKF9BUEtfRkFJTCsxKSkKICAgICAgICAgIHByaW50ZiAiXDAzM1sx
+OzMxbVvinJddIHppcGFsaWduIGZhbGhvdSAobG9nOiAlcylcMDMzWzBtXG4iICIkX0FQS19XT1JL
+L3ppcGFsaWduLmxvZyIKICAgICAgICAgIHRhaWwgLTEwICIkX0FQS19XT1JLL3ppcGFsaWduLmxv
+ZyIKICAgICAgICBmaQogICAgICBlbHNlCiAgICAgICAgcHJpbnRmICJcMDMzWzE7MzNtWyFdIHpp
+cGFsaWduIG7Do28gaW5zdGFsYWRvIOKAlCBwdWxhbmRvIHZhbGlkYcOnw6NvIGRlIGluc3RhbGFi
+aWxpZGFkZSAocm9kZSAneHBtIGluc3RhbGwgYXBrdG9vbCcgZGUgbm92byBwcmEgYXR1YWxpemFy
+KVwwMzNbMG1cbiIKICAgICAgZmkKCiAgICAgIGlmIFsgIiRfQVBLX1pJUEFMSUdOX09LIiA9ICIx
+IiBdICYmIGNvbW1hbmQgLXYgYXBrc2lnbmVyID4vZGV2L251bGwgMj4mMSAmJiBjb21tYW5kIC12
+IGtleXRvb2wgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgICAgICAgX0FQS19LUz0iJF9BUEtfVE9P
+TERJUi94cG0tY29tcGF0LXRlc3Qua2V5c3RvcmUiCiAgICAgICAgaWYgWyAhIC1mICIkX0FQS19L
+UyIgXTsgdGhlbgogICAgICAgICAgIyBjaGF2ZSBkZSBURVNURSwgc8OzIHByYSBlc3NlIGNoZWNr
+IGRlIGNvbXBhdGliaWxpZGFkZSBmZWNoYXIgbwogICAgICAgICAgIyBjaWNsbyBhc3NpbmFyLT52
+ZXJpZmljYXIuIE51bmNhIHNlcnZlIHByYSBwdWJsaWNhci9kaXN0cmlidWlyCiAgICAgICAgICAj
+IG5hZGEg4oCUIHBvciBpc3NvIHNlbmhhIGZpeGEgZSBjb25oZWNpZGEsIGEgbWVzbWEgbMOzZ2lj
+YSBkbwogICAgICAgICAgIyBkZWJ1Zy5rZXlzdG9yZSBwYWRyw6NvIGRvIHByw7NwcmlvIEFuZHJv
+aWQgKHF1ZSB0YW1iw6ltIHVzYSB1bWEKICAgICAgICAgICMgc2VuaGEgZml4YSBlIGRvY3VtZW50
+YWRhLCAiYW5kcm9pZCIpLgogICAgICAgICAga2V5dG9vbCAtZ2Vua2V5cGFpciAtc3RvcmVwYXNz
+IHhwbS1jb21wYXQtdGVzdCAta2V5cGFzcyB4cG0tY29tcGF0LXRlc3QgXAogICAgICAgICAgICAt
+YWxpYXMgeHBtLWNvbXBhdC10ZXN0IC1rZXlhbGcgUlNBIC1rZXlzaXplIDIwNDggLXZhbGlkaXR5
+IDEwMDAwIFwKICAgICAgICAgICAgLWRuYW1lICJDTj1FbGxpb3RPUyBYUE0gQ29tcGF0IFRlc3Qs
+Tz1FbGxpb3RPUyxDPUJSIiAtZGVzdHN0b3JldHlwZSBwa2NzMTIgXAogICAgICAgICAgICAta2V5
+c3RvcmUgIiRfQVBLX0tTIiA+L2Rldi9udWxsIDI+JjEKICAgICAgICBmaQogICAgICAgIGlmIFsg
+LWYgIiRfQVBLX0tTIiBdOyB0aGVuCiAgICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgLT4g
+YXBrc2lnbmVyIHNpZ24gKGNoYXZlIGRlIHRlc3RlIGRvIHhwbSkgLi4uXDAzM1swbVxuIgogICAg
+ICAgICAgaWYgYXBrc2lnbmVyIHNpZ24gLS1rcyAiJF9BUEtfS1MiIC0ta3MtcGFzcyBwYXNzOnhw
+bS1jb21wYXQtdGVzdCAtLWtleS1wYXNzIHBhc3M6eHBtLWNvbXBhdC10ZXN0IFwKICAgICAgICAg
+ICAgIC0tb3V0ICIkX0FQS19TSUdORUQiICIkX0FQS19BTElHTkVEIiA+IiRfQVBLX1dPUksvc2ln
+bi5sb2ciIDI+JjE7IHRoZW4KICAgICAgICAgICAgX0FQS19TSUdOX09LPTEKICAgICAgICAgICAg
+X0FQS19QQVNTPSQoKF9BUEtfUEFTUysxKSkKICAgICAgICAgICAgcHJpbnRmICJcMDMzWzE7MzJt
+W+Kck10gYXNzaW5hZG9cMDMzWzBtXG4iCiAgICAgICAgICBlbHNlCiAgICAgICAgICAgIF9BUEtf
+RkFJTD0kKChfQVBLX0ZBSUwrMSkpCiAgICAgICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJdd
+IGFwa3NpZ25lciBmYWxob3UgKGxvZzogJXMpXDAzM1swbVxuIiAiJF9BUEtfV09SSy9zaWduLmxv
+ZyIKICAgICAgICAgICAgdGFpbCAtMTAgIiRfQVBLX1dPUksvc2lnbi5sb2ciCiAgICAgICAgICBm
+aQogICAgICAgIGVsc2UKICAgICAgICAgIHByaW50ZiAiXDAzM1sxOzMzbVshXSBuw6NvIGNvbnNl
+Z3VpIGdlcmFyL2FjaGFyIG8ga2V5c3RvcmUgZGUgdGVzdGUg4oCUIHB1bGFuZG8gYXNzaW5hdHVy
+YVwwMzNbMG1cbiIKICAgICAgICBmaQogICAgICBmaQoKICAgICAgaWYgWyAiJF9BUEtfU0lHTl9P
+SyIgPSAiMSIgXTsgdGhlbgogICAgICAgIF9BUEtfU1RSVUNUX09LPTEKICAgICAgICBpZiAhIHpp
+cGFsaWduIC1jIC12IDQgIiRfQVBLX1NJR05FRCIgPiIkX0FQS19XT1JLL3ZlcmlmeV9hbGlnbi5s
+b2ciIDI+JjE7IHRoZW4KICAgICAgICAgIF9BUEtfU1RSVUNUX09LPTAKICAgICAgICAgIHByaW50
+ZiAiXDAzM1sxOzMxbVvinJddIGFsaW5oYW1lbnRvIG7Do28gY29uZmVyZSBkZXBvaXMgZGUgYXNz
+aW5hclwwMzNbMG1cbiIKICAgICAgICBmaQogICAgICAgIGlmICEgYXBrc2lnbmVyIHZlcmlmeSAi
+JF9BUEtfU0lHTkVEIiA+IiRfQVBLX1dPUksvdmVyaWZ5X3NpZ24ubG9nIiAyPiYxOyB0aGVuCiAg
+ICAgICAgICBfQVBLX1NUUlVDVF9PSz0wCiAgICAgICAgICBwcmludGYgIlwwMzNbMTszMW1b4pyX
+XSBhcGtzaWduZXIgdmVyaWZ5IHJlcHJvdm91IG8gcGFjb3RlIGZpbmFsXDAzM1swbVxuIgogICAg
+ICAgICAgdGFpbCAtMTAgIiRfQVBLX1dPUksvdmVyaWZ5X3NpZ24ubG9nIgogICAgICAgIGZpCiAg
+ICAgICAgaWYgWyAteCAiJF9BUEtfQUFQVDIiIF0gJiYgISAiJF9BUEtfQUFQVDIiIGR1bXAgYmFk
+Z2luZyAiJF9BUEtfU0lHTkVEIiA+IiRfQVBLX1dPUksvYmFkZ2luZy5sb2ciIDI+JjE7IHRoZW4K
+ICAgICAgICAgIF9BUEtfU1RSVUNUX09LPTAKICAgICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvi
+nJddIGFhcHQyIGR1bXAgYmFkZ2luZyBuw6NvIGNvbnNlZ3VpdSBsZXIgbyBwYWNvdGUgZmluYWwg
+KG8gUGFja2FnZU1hbmFnZXIgcmVhbCBwcm92YXZlbG1lbnRlIHRhbWLDqW0gbsOjbyB2YWkgY29u
+c2VndWlyKVwwMzNbMG1cbiIKICAgICAgICBmaQoKICAgICAgICBpZiBbICIkX0FQS19TVFJVQ1Rf
+T0siID0gIjEiIF07IHRoZW4KICAgICAgICAgIF9BUEtfUEFTUz0kKChfQVBLX1BBU1MrMSkpCiAg
+ICAgICAgICBfQVBLX0lOU1RBTExBQkxFPTEKICAgICAgICAgIHByaW50ZiAiXDAzM1sxOzMybVvi
+nJNdIHZlcmlmaWNhw6fDo28gZXN0cnV0dXJhbCBPSyAoYWxpbmhhbWVudG8gKyBhc3NpbmF0dXJh
+ICsgbWFuaWZlc3QgcGFyc2XDoXZlbClcMDMzWzBtXG4iCgogICAgICAgICAgIyDilIDilIAgZW50
+cmVnYSBvIEFQSyBpbnN0YWzDoXZlbCBhbyBsYWRvIGRvIG9yaWdpbmFsIOKUgOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogICAgICAgICAgX0FQS19ERUxJVkVSX0RJUj0i
+JChkaXJuYW1lICIkX0FQSyIpIgogICAgICAgICAgX0FQS19ERUxJVkVSX0JBU0U9IiQoYmFzZW5h
+bWUgIiRfQVBLIiAuYXBrKSIKICAgICAgICAgIF9BUEtfREVMSVZFUj0iJF9BUEtfREVMSVZFUl9E
+SVIvJHtfQVBLX0RFTElWRVJfQkFTRX0tc2lnbmVkLmFwayIKICAgICAgICAgIGlmIGNwIC1mICIk
+X0FQS19TSUdORUQiICIkX0FQS19ERUxJVkVSIiAyPi9kZXYvbnVsbDsgdGhlbgogICAgICAgICAg
+ICBwcmludGYgIlwwMzNbMTszMm1b4pyTXSBBUEsgaW5zdGFsw6F2ZWwgc2Fsdm8gZW06ICVzXDAz
+M1swbVxuIiAiJF9BUEtfREVMSVZFUiIKICAgICAgICAgIGVsc2UKICAgICAgICAgICAgcHJpbnRm
+ICJcMDMzWzE7MzNtWyFdIG7Do28gY29uc2VndWkgY29waWFyIG8gQVBLIGFzc2luYWRvIHByYSAl
+cyDigJQgZWxlIGFpbmRhIGVzdMOhIGVtOiAlc1wwMzNbMG1cbiIgIiRfQVBLX0RFTElWRVIiICIk
+X0FQS19TSUdORUQiID4mMgogICAgICAgICAgZmkKCiAgICAgICAgICAjIOKUgOKUgCB0ZXN0ZSBk
+ZSBpbnN0YWxhw6fDo28gcmVhbCwgT1BDSU9OQUwg4oCUIHPDsyByb2RhIHNlIG8gcmlzaCBqw6EK
+ICAgICAgICAgICMgZXN0aXZlciBwYXJlYWRvIG5lc3NlIGFwYXJlbGhvIChudW5jYSBkaXNwYXJh
+IG8gZmx1eG8gZGUKICAgICAgICAgICMgcGFyZWFtZW50byBkbyBTaGl6dWt1IGEgcGFydGlyIGRh
+cXVpLCBzw7MgY2hlY2Egc2UgasOhIGV4aXN0ZSkuCiAgICAgICAgICBpZiBbIC1mICIkSE9NRS8u
+bG9jYWwvcmlzaC9yaXNoIiBdOyB0aGVuCiAgICAgICAgICAgIF9BUEtfUEtHTkFNRT0iJCgiJF9B
+UEtfQUFQVDIiIGR1bXAgYmFkZ2luZyAiJF9BUEtfU0lHTkVEIiAyPi9kZXYvbnVsbCB8IGdyZXAg
+Il5wYWNrYWdlOiIgfCBzZWQgLUUgInMvLipuYW1lPScoW14nXSspJy4qL1wxLyIpIgogICAgICAg
+ICAgICBpZiBbIC1uICIkX0FQS19QS0dOQU1FIiBdOyB0aGVuCiAgICAgICAgICAgICAgaWYgYmFz
+aCAiJEhPTUUvLmxvY2FsL3Jpc2gvcmlzaCIgLWMgInBtIGxpc3QgcGFja2FnZXMgJF9BUEtfUEtH
+TkFNRSIgMj4vZGV2L251bGwgfCBncmVwIC1xICJecGFja2FnZTokX0FQS19QS0dOQU1FJCI7IHRo
+ZW4KICAgICAgICAgICAgICAgICMgasOhIGluc3RhbGFkbyDigJQgTsODTyBkw6EgcHJhIHJvZGFy
+ICJwbSBpbnN0YWxsIC1yIiBkaXJldG8gc2VtCiAgICAgICAgICAgICAgICAjIHJpc2NvIGRlIG1l
+eGVyIG5vIGFwcCBkZSB2ZXJkYWRlIGRvIHVzdcOhcmlvLiBBbnRlcyBpc3NvIHPDswogICAgICAg
+ICAgICAgICAgIyBwdWxhdmEgY29tIHVtIGF2aXNvIGUgbyB2ZXJlZGl0byBmaW5hbCBjb250aW51
+YXZhICJTSU0KICAgICAgICAgICAgICAgICMgaW5zdGFsw6F2ZWwiIChmYWxzby1wb3NpdGl2byk6
+IHNlIGFzIGFzc2luYXR1cmFzIGZvcmVtCiAgICAgICAgICAgICAgICAjIGRpZmVyZW50ZXMsIG8g
+QW5kcm9pZCBTRU1QUkUgdmFpIHJlY3VzYXIgaW5zdGFsYXIgcG9yIGNpbWEKICAgICAgICAgICAg
+ICAgICMgZGEgdmVyc8OjbyBleGlzdGVudGUsIGUgaXNzbyBuw6NvIHRlbSBuYWRhIGEgdmVyIGNv
+bSBvCiAgICAgICAgICAgICAgICAjIGFwa3Rvb2wveHBtIHRlciBmZWl0byB1bSByZWJ1aWxkIHJ1
+aW0uIEFnb3JhIGNvbXBhcmFtb3MgYXMKICAgICAgICAgICAgICAgICMgYXNzaW5hdHVyYXMgZGUg
+dmVyZGFkZSwgMTAwJSBzb21lbnRlLWxlaXR1cmE6IHB1eGEgdW1hCiAgICAgICAgICAgICAgICAj
+IGPDs3BpYSBkbyBhcGsgasOhIGluc3RhbGFkbyB2aWEgcmlzaCAobyBzaGVsbCBkbyBBbmRyb2lk
+IHRlbQogICAgICAgICAgICAgICAgIyBwZXJtaXNzw6NvIGRlIGxlaXR1cmEgZW0gL2RhdGEvYXBw
+Ly4uLi9iYXNlLmFwayDigJQgw6kgYXNzaW0KICAgICAgICAgICAgICAgICMgcXVlICJhZGIgcHVs
+bCIgZGUgYXBrIGluc3RhbGFkbyBmdW5jaW9uYSkgZSBjb21wYXJhIG8KICAgICAgICAgICAgICAg
+ICMgY2VydGlmaWNhZG8gY29tIG8gbm9zc28sIHNlbSB0b2NhciBlbSBuYWRhIGRvIHVzdcOhcmlv
+LgogICAgICAgICAgICAgICAgX0FQS19JTlNUQUxMRURfUEFUSD0iJChiYXNoICIkSE9NRS8ubG9j
+YWwvcmlzaC9yaXNoIiAtYyAicG0gcGF0aCAkX0FQS19QS0dOQU1FIiAyPi9kZXYvbnVsbCB8IGhl
+YWQgLTEgfCBzZWQgJ3MvXnBhY2thZ2U6Ly8nKSIKICAgICAgICAgICAgICAgIF9BUEtfSU5TVEFM
+TEVEX0NPUFk9IiRfQVBLX1dPUksvaW5zdGFsbGVkX29yaWcuYXBrIgogICAgICAgICAgICAgICAg
+aWYgWyAtbiAiJF9BUEtfSU5TVEFMTEVEX1BBVEgiIF0gJiYgYmFzaCAiJEhPTUUvLmxvY2FsL3Jp
+c2gvcmlzaCIgLWMgImNhdCAnJF9BUEtfSU5TVEFMTEVEX1BBVEgnIiA+ICIkX0FQS19JTlNUQUxM
+RURfQ09QWSIgMj4vZGV2L251bGwgJiYgWyAtcyAiJF9BUEtfSU5TVEFMTEVEX0NPUFkiIF07IHRo
+ZW4KICAgICAgICAgICAgICAgICAgX0FQS19DRVJUX0lOU1RBTExFRD0iJChhcGtzaWduZXIgdmVy
+aWZ5IC0tcHJpbnQtY2VydHMgIiRfQVBLX0lOU1RBTExFRF9DT1BZIiAyPi9kZXYvbnVsbCB8IGdy
+ZXAgLWkgJ1NIQS0yNTYgZGlnZXN0JykiCiAgICAgICAgICAgICAgICAgIF9BUEtfQ0VSVF9PVVJT
+PSIkKGFwa3NpZ25lciB2ZXJpZnkgLS1wcmludC1jZXJ0cyAiJF9BUEtfU0lHTkVEIiAyPi9kZXYv
+bnVsbCB8IGdyZXAgLWkgJ1NIQS0yNTYgZGlnZXN0JykiCiAgICAgICAgICAgICAgICAgIGlmIFsg
+LW4gIiRfQVBLX0NFUlRfSU5TVEFMTEVEIiBdICYmIFsgIiRfQVBLX0NFUlRfSU5TVEFMTEVEIiA9
+ICIkX0FQS19DRVJUX09VUlMiIF07IHRoZW4KICAgICAgICAgICAgICAgICAgICAjIG1lc21hIGFz
+c2luYXR1cmEgKGV4OiByZXRlc3RlIGRlIHVtYSBidWlsZCBqw6EgaW5zdGFsYWRhCiAgICAgICAg
+ICAgICAgICAgICAgIyBjb20gYSBjaGF2ZSBkZSB0ZXN0ZSBkbyB4cG0pIOKAlCBzZWd1cm8gdGVz
+dGFyIHVwZGF0ZSByZWFsLgogICAgICAgICAgICAgICAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAg
+ICAtPiBwbSBpbnN0YWxsIGRlIHRlc3RlIHZpYSByaXNoIChtZXNtYSBhc3NpbmF0dXJhIGRvIGrD
+oSBpbnN0YWxhZG8pIC4uLlwwMzNbMG1cbiIKICAgICAgICAgICAgICAgICAgICBfQVBLX0lOU1RB
+TExfT1VUPSIkKGJhc2ggIiRIT01FLy5sb2NhbC9yaXNoL3Jpc2giIC1jICJwbSBpbnN0YWxsIC10
+IC1yICckX0FQS19TSUdORUQnIiAyPiYxKSIKICAgICAgICAgICAgICAgICAgICBpZiBwcmludGYg
+JyVzJyAiJF9BUEtfSU5TVEFMTF9PVVQiIHwgZ3JlcCAtcSAiXlN1Y2Nlc3MiOyB0aGVuCiAgICAg
+ICAgICAgICAgICAgICAgICBfQVBLX1BBU1M9JCgoX0FQS19QQVNTKzEpKQogICAgICAgICAgICAg
+ICAgICAgICAgX0FQS19SRUFMX0NPTkZJUk1FRD0xCiAgICAgICAgICAgICAgICAgICAgICBwcmlu
+dGYgIlwwMzNbMTszMm1b4pyTXSBpbnN0YWxhw6fDo28gcmVhbCBjb25maXJtYWRhIOKAlCBkZXNp
+bnN0YWxhbmRvIG8gdGVzdGUuLi5cMDMzWzBtXG4iCiAgICAgICAgICAgICAgICAgICAgICBiYXNo
+ICIkSE9NRS8ubG9jYWwvcmlzaC9yaXNoIiAtYyAicG0gdW5pbnN0YWxsICRfQVBLX1BLR05BTUUi
+ID4vZGV2L251bGwgMj4mMQogICAgICAgICAgICAgICAgICAgICAgX0FQS19USUVSPSIkX0FQS19U
+SUVSICsgaW5zdGFsYcOnw6NvIHJlYWwgY29uZmlybWFkYSIKICAgICAgICAgICAgICAgICAgICBl
+bHNlCiAgICAgICAgICAgICAgICAgICAgICBfQVBLX0ZBSUw9JCgoX0FQS19GQUlMKzEpKQogICAg
+ICAgICAgICAgICAgICAgICAgX0FQS19JTlNUQUxMQUJMRT0wCiAgICAgICAgICAgICAgICAgICAg
+ICBwcmludGYgIlwwMzNbMTszMW1b4pyXXSBwbSBpbnN0YWxsIHJlY3Vzb3UgbyBwYWNvdGU6XDAz
+M1swbVxuIgogICAgICAgICAgICAgICAgICAgICAgcHJpbnRmICclc1xuJyAiJF9BUEtfSU5TVEFM
+TF9PVVQiIHwgdGFpbCAtNQogICAgICAgICAgICAgICAgICAgIGZpCiAgICAgICAgICAgICAgICAg
+IGVsc2UKICAgICAgICAgICAgICAgICAgICAjIGFzc2luYXR1cmFzIGRpZmVyZW50ZXMgZGUgZmF0
+byDigJQgbyBBbmRyb2lkIFZBSSByZWN1c2FyCiAgICAgICAgICAgICAgICAgICAgIyBpbnN0YWxh
+ciBlc3NhIGJ1aWxkIHBvciBjaW1hIGRhIGV4aXN0ZW50ZSBwb3IgY29uZmxpdG8KICAgICAgICAg
+ICAgICAgICAgICAjIGRlIGNlcnRpZmljYWRvLiBJc3NvIMOpIGVzcGVyYWRvICh2b2PDqiBuw6Nv
+IHRlbSBhIGNoYXZlCiAgICAgICAgICAgICAgICAgICAgIyBwcml2YWRhIG9yaWdpbmFsKSBlIE7D
+g08gw6kgYnVnIGRvIGFwa3Rvb2wveHBtLgogICAgICAgICAgICAgICAgICAgIF9BUEtfU0lHX0NP
+TkZMSUNUPTEKICAgICAgICAgICAgICAgICAgICBwcmludGYgIlwwMzNbMTszM21bIV0gJXMgasOh
+IGVzdMOhIGluc3RhbGFkbyBjb20gdW1hIGFzc2luYXR1cmEgRElGRVJFTlRFIGRhIG5vc3NhIGNo
+YXZlIGRlIHRlc3RlXDAzM1swbVxuIiAiJF9BUEtfUEtHTkFNRSIKICAgICAgICAgICAgICAgICAg
+ICBwcmludGYgIlwwMzNbMDs5MG0gICAgLT4gbyBBbmRyb2lkIHZhaSByZWN1c2FyIGVzc2EgYnVp
+bGQgcG9yIGNpbWEgZGEgZXhpc3RlbnRlIChjb25mbGl0byBkZVwwMzNbMG1cbiIKICAgICAgICAg
+ICAgICAgICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgICAgY2VydGlmaWNhZG8pIOKAlCBpc3Nv
+IE7Dg08gw6kgdW1hIGZhbGhhIGRlIGNvbXBhdGliaWxpZGFkZSBkbyBhcGt0b29sL3hwbS5cMDMz
+WzBtXG4iCiAgICAgICAgICAgICAgICAgICAgcHJpbnRmICJcMDMzWzA7OTBtICAgICAgIERlc2lu
+c3RhbGUgbyBhcHAgb3JpZ2luYWwgcHJpbWVpcm8gc2UgcXVpc2VyIHRlc3RhciBlc3NhIGJ1aWxk
+LCBvdSBtdWRlXDAzM1swbVxuIgogICAgICAgICAgICAgICAgICAgIHByaW50ZiAiXDAzM1swOzkw
+bSAgICAgICBvIGFwcGxpY2F0aW9uSWQgcHJhIGluc3RhbGFyIGNvbW8gdW0gYXBwIHNlcGFyYWRv
+LlwwMzNbMG1cbiIKICAgICAgICAgICAgICAgICAgZmkKICAgICAgICAgICAgICAgIGVsc2UKICAg
+ICAgICAgICAgICAgICAgcHJpbnRmICJcMDMzWzA7OTBtWypdICVzIGrDoSBpbnN0YWxhZG8sIG1h
+cyBuw6NvIGNvbnNlZ3VpIGxlciBhIGPDs3BpYSBpbnN0YWxhZGEgcHJhIGNvbXBhcmFyIGFzc2lu
+YXR1cmFcMDMzWzBtXG4iICIkX0FQS19QS0dOQU1FIgogICAgICAgICAgICAgICAgICBwcmludGYg
+IlwwMzNbMDs5MG0gICAgKHNlbSBwZXJtaXNzw6NvIHZpYSByaXNoPykg4oCUIHB1bGFuZG8gdGVz
+dGUgZGUgaW5zdGFsYcOnw6NvIHJlYWwgY29tIHNlZ3VyYW7Dp2FcMDMzWzBtXG4iCiAgICAgICAg
+ICAgICAgICBmaQogICAgICAgICAgICAgIGVsc2UKICAgICAgICAgICAgICAgIHByaW50ZiAiXDAz
+M1swOzkwbSAgICAtPiBwbSBpbnN0YWxsIGRlIHRlc3RlIHZpYSByaXNoIC4uLlwwMzNbMG1cbiIK
+ICAgICAgICAgICAgICAgIF9BUEtfSU5TVEFMTF9PVVQ9IiQoYmFzaCAiJEhPTUUvLmxvY2FsL3Jp
+c2gvcmlzaCIgLWMgInBtIGluc3RhbGwgLXQgLXIgJyRfQVBLX1NJR05FRCciIDI+JjEpIgogICAg
+ICAgICAgICAgICAgaWYgcHJpbnRmICclcycgIiRfQVBLX0lOU1RBTExfT1VUIiB8IGdyZXAgLXEg
+Il5TdWNjZXNzIjsgdGhlbgogICAgICAgICAgICAgICAgICBfQVBLX1BBU1M9JCgoX0FQS19QQVNT
+KzEpKQogICAgICAgICAgICAgICAgICBfQVBLX1JFQUxfQ09ORklSTUVEPTEKICAgICAgICAgICAg
+ICAgICAgcHJpbnRmICJcMDMzWzE7MzJtW+Kck10gaW5zdGFsYcOnw6NvIHJlYWwgY29uZmlybWFk
+YSDigJQgZGVzaW5zdGFsYW5kbyBvIHRlc3RlLi4uXDAzM1swbVxuIgogICAgICAgICAgICAgICAg
+ICBiYXNoICIkSE9NRS8ubG9jYWwvcmlzaC9yaXNoIiAtYyAicG0gdW5pbnN0YWxsICRfQVBLX1BL
+R05BTUUiID4vZGV2L251bGwgMj4mMQogICAgICAgICAgICAgICAgICBfQVBLX1RJRVI9IiRfQVBL
+X1RJRVIgKyBpbnN0YWxhw6fDo28gcmVhbCBjb25maXJtYWRhIgogICAgICAgICAgICAgICAgZWxz
+ZQogICAgICAgICAgICAgICAgICBfQVBLX0ZBSUw9JCgoX0FQS19GQUlMKzEpKQogICAgICAgICAg
+ICAgICAgICBfQVBLX0lOU1RBTExBQkxFPTAKICAgICAgICAgICAgICAgICAgcHJpbnRmICJcMDMz
+WzE7MzFtW+Kcl10gcG0gaW5zdGFsbCByZWN1c291IG8gcGFjb3RlOlwwMzNbMG1cbiIKICAgICAg
+ICAgICAgICAgICAgcHJpbnRmICclc1xuJyAiJF9BUEtfSU5TVEFMTF9PVVQiIHwgdGFpbCAtNQog
+ICAgICAgICAgICAgICAgZmkKICAgICAgICAgICAgICBmaQogICAgICAgICAgICBmaQogICAgICAg
+ICAgZmkKICAgICAgICBlbHNlCiAgICAgICAgICBfQVBLX0ZBSUw9JCgoX0FQS19GQUlMKzEpKQog
+ICAgICAgIGZpCiAgICAgIGZpCiAgICBlbHNlCiAgICAgIF9BUEtfVElFUj0ibmVuaHVtIOKAlCBm
+YWxob3UgZW0gdG9kb3Mgb3MgbsOtdmVpcyB0ZXN0YWRvcyIKICAgICAgaWYgWyAiJF9BUEtfREVD
+T0RFX09LIiAhPSAiMSIgXTsgdGhlbgogICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddIGRl
+Y29kZSBGQUxIT1UgKGxvZzogJXMpXDAzM1swbVxuIiAiJF9BUEtfTEFTVExPRyIKICAgICAgZWxz
+ZQogICAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddIGJ1aWxkIEZBTEhPVSAobG9nOiAlcylc
+MDMzWzBtXG4iICIkX0FQS19MQVNUTE9HIgogICAgICBmaQogICAgICBfQVBLX1JFU1Q9IiQoZ3Jl
+cCAtdkUgJ15XOiAnICIkX0FQS19MQVNUTE9HIiAyPi9kZXYvbnVsbCkiCiAgICAgIGlmIFsgLW4g
+IiRfQVBLX1JFU1QiIF07IHRoZW4KICAgICAgICBwcmludGYgIiAgICAtLS0gbGluaGFzIG7Do28t
+d2FybmluZyAoY2F1c2EgcmFpeiBwcm92w6F2ZWwpIC0tLVxuIgogICAgICAgIGVjaG8gIiRfQVBL
+X1JFU1QiIHwgaGVhZCAtNjAKICAgICAgZWxzZQogICAgICAgIHByaW50ZiAiICAgIC0tLSDDumx0
+aW1hcyBsaW5oYXMgZG8gbG9nIC0tLVxuIgogICAgICAgIHRhaWwgLTI1ICIkX0FQS19MQVNUTE9H
+IiAyPi9kZXYvbnVsbAogICAgICBmaQogICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgTmVzc2Ug
+cG9udG8gbyBtYWlzIHByb3bDoXZlbCDDqSBwcm90ZcOnw6NvIGFudGktZW5nZW5oYXJpYS1yZXZl
+cnNhXDAzM1swbVxuIgogICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgZGVsaWJlcmFkYSAocmVz
+b3VyY2VzLmFyc2MgYWR1bHRlcmFkbyBkZSBwcm9ww7NzaXRvKSDigJQgbsOjbyDDqSB1bWFcMDMz
+WzBtXG4iCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICBmYWxoYSBnZW7DqXJpY2EgZG8gYXBr
+dG9vbC9FbGxpb3RPUy4gTmVuaHVtIGRlY29tcGlsYWRvciBmZWNoYVwwMzNbMG1cbiIKICAgICAg
+cHJpbnRmICJcMDMzWzA7OTBtICAgIDEwMCUlIGRvcyBjYXNvcyBhc3NpbTsgdmVqYSBvcyAueHBt
+LXF1YXJhbnRpbmUgbm9zIGxvZ3Mgc2UgcXVpc2VyXDAzM1swbVxuIgogICAgICBwcmludGYgIlww
+MzNbMDs5MG0gICAgaW52ZXN0aWdhciBtYW51YWxtZW50ZS5cMDMzWzBtXG4iCiAgICAgIF9BUEtf
+RkFJTD0kKChfQVBLX0ZBSUwrMSkpCiAgICBmaQoKICAgIGlmIFsgLWYgIiRfQVBLX1JFQlVJTFQi
+IF07IHRoZW4KICAgICAgX0FQS19TWl9PPSQoc3RhdCAtYyVzICIkX0FQSyIgMj4vZGV2L251bGwg
+fHwgZWNobyAiPyIpCiAgICAgIF9BUEtfU1pfTj0kKHN0YXQgLWMlcyAiJF9BUEtfUkVCVUlMVCIg
+Mj4vZGV2L251bGwgfHwgZWNobyAiPyIpCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICB0YW1h
+bmhvIG9yaWdpbmFsOiAlcyBieXRlcyB8IHJlY29tcGlsYWRvOiAlcyBieXRlc1wwMzNbMG1cbiIg
+IiRfQVBLX1NaX08iICIkX0FQS19TWl9OIgogICAgZmkKCiAgICBwcmludGYgIlxu4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQXG4i
+CiAgICBwcmludGYgIiAgXDAzM1sxOzMybVBBU1M6ICVkXDAzM1swbSAgIFwwMzNbMTszMW1GQUlM
+OiAlZFwwMzNbMG1cbiIgIiRfQVBLX1BBU1MiICIkX0FQS19GQUlMIgogICAgcHJpbnRmICIgIFww
+MzNbMTszNm1Ow612ZWwgZGUgY29tcGF0aWJpbGlkYWRlOlwwMzNbMG0gJXNcbiIgIiRfQVBLX1RJ
+RVIiCiAgICBpZiBbICIkX0FQS19CVUlMRF9PSyIgPSAiMSIgXTsgdGhlbgogICAgICBpZiBbICIk
+X0FQS19JTlNUQUxMQUJMRSIgPSAiMSIgXTsgdGhlbgogICAgICAgIGlmIFsgIiRfQVBLX1JFQUxf
+Q09ORklSTUVEIiA9ICIxIiBdOyB0aGVuCiAgICAgICAgICBwcmludGYgIiAgXDAzM1sxOzM2bUlu
+c3RhbMOhdmVsOlwwMzNbMG0gXDAzM1sxOzMybVNJTVwwMzNbMG0g4oCUIGFsaW5oYWRvLCBhc3Np
+bmFkbywgbWFuaWZlc3QgcGFyc2XDoXZlbCwgaW5zdGFsYcOnw6NvIHJlYWwgY29uZmlybWFkYSB2
+aWEgcmlzaFxuIgogICAgICAgIGVsaWYgWyAiJF9BUEtfU0lHX0NPTkZMSUNUIiA9ICIxIiBdOyB0
+aGVuCiAgICAgICAgICBwcmludGYgIiAgXDAzM1sxOzM2bUluc3RhbMOhdmVsOlwwMzNbMG0gXDAz
+M1sxOzMzbVNJTSwgbWFzIHZhaSBDT05GTElUQVIgY29tIGEgdmVyc8OjbyBqw6EgaW5zdGFsYWRh
+XDAzM1swbSDigJQgYXNzaW5hdHVyYXMgZGlmZXJlbnRlcywgdmVqYSBvIFshXSBhY2ltYSAobsOj
+byDDqSBidWcgZG8gYXBrdG9vbC94cG0pXG4iCiAgICAgICAgZWxpZiBbIC1mICIkSE9NRS8ubG9j
+YWwvcmlzaC9yaXNoIiBdOyB0aGVuCiAgICAgICAgICBwcmludGYgIiAgXDAzM1sxOzM2bUluc3Rh
+bMOhdmVsOlwwMzNbMG0gXDAzM1sxOzMybVNJTVwwMzNbMG0gKGVzdHJ1dHVyYWwpIOKAlCBhbGlu
+aGFkbywgYXNzaW5hZG8gZSBjb20gbWFuaWZlc3QgcGFyc2XDoXZlbFxuIgogICAgICAgIGVsc2UK
+ICAgICAgICAgIHByaW50ZiAiICBcMDMzWzE7MzZtSW5zdGFsw6F2ZWw6XDAzM1swbSBcMDMzWzE7
+MzJtU0lNXDAzM1swbSAoZXN0cnV0dXJhbCkg4oCUIGFsaW5oYWRvLCBhc3NpbmFkbyBlIGNvbSBt
+YW5pZmVzdCBwYXJzZcOhdmVsOyByaXNoIGluZGlzcG9uw612ZWwgcHJhIGNvbmZpcm1hciBjb20g
+aW5zdGFsYcOnw6NvIHJlYWxcbiIKICAgICAgICBmaQogICAgICBlbHNlCiAgICAgICAgcHJpbnRm
+ICIgIFwwMzNbMTszNm1JbnN0YWzDoXZlbDpcMDMzWzBtIFwwMzNbMTszMW1Ow4NPIENPTkZJUk1B
+RE9cMDMzWzBtIOKAlCBidWlsZCByZXBvcnRvdSBzdWNlc3NvIG1hcyBuw6NvIHBhc3NvdSBuYSB2
+YWxpZGHDp8OjbyBkZSBpbnN0YWxhw6fDo287IHZlamEgb3MgW+Kcl10gYWNpbWFcbiIKICAgICAg
+ZmkKICAgIGZpCiAgICBwcmludGYgIuKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKV
+kOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkOKVkFxuIgoKICAgICMg4pSA4pSAIGxvZyBwZXJzaXN0
+ZW50ZSBkZSBlcnJvcyDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIAKICAgICMgU2FsdmEgdG9kb3Mgb3MgbG9ncyBkYSBz
+ZXNzw6NvIGVtIH4vLmNhY2hlL2VsbGlvdC9hcGstZXJyb3JzLyBjb20KICAgICMgdGltZXN0YW1w
+IGUgbm9tZSBkbyBBUEsuIFBlcm1pdGUgdHJhemVyIG8gbG9nIHByYSBhbsOhbGlzZSBwb3N0ZXJp
+b3IKICAgICMgc2VtIGRlcGVuZGVyIGRvIHdvcmtkaXIgdGVtcG9yw6FyaW8gcXVlIMOpIGxpbXBv
+IHBlbG8gc2lzdGVtYS4KICAgICMgU2VtcHJlIHNhbHZhIChzdWNlc3NvIG91IGZhbGhhKSDigJQg
+w7p0aWwgcHJhIGNvbXBhcmFyIHJvdW5kcy10cmlwcyBib25zCiAgICAjIGUgcnVpbnMgZG8gbWVz
+bW8gQVBLLCBlIHByYSBlc3R1ZGFyIG8gY29tcG9ydGFtZW50byBkbyBhcGt0b29sLgogICAgX0FQ
+S19FUlJESVI9IiRIT01FLy5jYWNoZS9lbGxpb3QvYXBrLWVycm9ycyIKICAgIG1rZGlyIC1wICIk
+X0FQS19FUlJESVIiCiAgICBfQVBLX0JBU0VOQU1FPSIkKGJhc2VuYW1lICIkX0FQSyIgLmFwayB8
+IHRyICcgLycgJ18tJykiCiAgICBfQVBLX1RTPSIkKGRhdGUgJyslWSVtJWRfJUglTSVTJyAyPi9k
+ZXYvbnVsbCB8fCBlY2hvICd0cycpIgogICAgX0FQS19MT0dESVI9IiRfQVBLX0VSUkRJUi8ke19B
+UEtfVFN9X18ke19BUEtfQkFTRU5BTUV9IgogICAgbWtkaXIgLXAgIiRfQVBLX0xPR0RJUiIKCiAg
+ICAjIGNvcGlhIHRvZG9zIG9zIGxvZ3MgZ2VyYWRvcyBuZXNzYSBzZXNzw6NvCiAgICBjcCAiJF9B
+UEtfV09SSyIvKi5sb2cgIiRfQVBLX0xPR0RJUi8iIDI+L2Rldi9udWxsCgogICAgIyBzYWx2YSB1
+bSByZXN1bW8gbGVnw612ZWwgZW0gdGV4dG8gcGxhbm8KICAgIHsKICAgICAgcHJpbnRmICI9PT0g
+bXMgLS1hcGsgZXJyb3IgbG9nID09PVxuIgogICAgICBwcmludGYgIkFQSyAgICAgIDogJXNcbiIg
+IiRfQVBLIgogICAgICBwcmludGYgIkRhdGEgICAgIDogJXNcbiIgIiQoZGF0ZSAnKyVZLSVtLSVk
+ICVIOiVNOiVTJyAyPi9kZXYvbnVsbCkiCiAgICAgIHByaW50ZiAiUmVzdWx0YWRvOiAlc1xuIiAi
+JChbICIkX0FQS19CVUlMRF9PSyIgPSAiMSIgXSAmJiBlY2hvICJCVUlMRCBPSyIgfHwgZWNobyAi
+QlVJTEQgRkFMSE9VIikiCiAgICAgIHByaW50ZiAiVGllciAgICAgOiAlc1xuIiAiJF9BUEtfVElF
+UiIKICAgICAgcHJpbnRmICJUZW1wbyAgICA6IGRlY29kZT0lZHMgYnVpbGQ9JWRzXG4iICIke19B
+UEtfREVDT0RFX1RJTUU6LTB9IiAiJHtfQVBLX0JVSUxEX1RJTUU6LTB9IgogICAgICBwcmludGYg
+IlBBU1M9JWQgRkFJTD0lZFxuIiAiJF9BUEtfUEFTUyIgIiRfQVBLX0ZBSUwiCiAgICAgIHByaW50
+ZiAiXG4tLS0gREVYOiAlZCB8IFNtYWxpOiAlZCB8IFJlczogJWQgfCBVbmtub3duOiAlZCB8IEFz
+c2V0czogJWQgfCAuc286ICVkIC0tLVxuIiBcCiAgICAgICAgIiR7X01fREVYOi0wfSIgIiR7X01f
+U01BTEk6LTB9IiAiJHtfTV9SRVM6LTB9IiAiJHtfTV9VTks6LTB9IiAiJHtfTV9BU1NFVFM6LTB9
+IiAiJHtfTV9TTzotMH0iCiAgICAgIHByaW50ZiAiXG4tLS0gw7psdGltbyBsb2cgLS0tXG4iCiAg
+ICAgIGNhdCAiJF9BUEtfTEFTVExPRyIgMj4vZGV2L251bGwKICAgIH0gPiAiJF9BUEtfTE9HRElS
+L3N1bW1hcnkudHh0IiAyPi9kZXYvbnVsbAoKICAgIGlmIFsgIiRfQVBLX0JVSUxEX09LIiAhPSAi
+MSIgXTsgdGhlbgogICAgICBwcmludGYgIlwwMzNbMDs5MG1Mb2cgZGUgZXJybyBzYWx2byBlbTog
+JXNcMDMzWzBtXG4iICIkX0FQS19MT0dESVIiCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbSAg4oaS
+IHRyYWdhIG8gc3VtbWFyeS50eHQgcHJhIGFuw6FsaXNlOiBjYXQgJXMvc3VtbWFyeS50eHRcMDMz
+WzBtXG4iICIkX0FQS19MT0dESVIiCiAgICBlbHNlCiAgICAgIHByaW50ZiAiXDAzM1swOzkwbUxv
+ZyBzYWx2byBlbTogJXNcMDMzWzBtXG4iICIkX0FQS19MT0dESVIiCiAgICBmaQogICAgcHJpbnRm
+ICJcMDMzWzA7OTBtTG9ncyB0ZW1wb3LDoXJpb3MgZW06ICVzXDAzM1swbVxuIiAiJF9BUEtfV09S
+SyIKCiAgICBpZiBbICIkX0FQS19GQUlMIiAtZXEgMCBdOyB0aGVuCiAgICAgIF9CQVRDSF9PSz0k
+KChfQkFUQ0hfT0srMSkpCiAgICBlbHNlCiAgICAgIF9CQVRDSF9GQUlMRUQ9IiRfQkFUQ0hfRkFJ
+TEVEICRfQVBLIgogICAgZmkKICAgIGRvbmUKCiAgICBpZiBbICIkX0JBVENIX04iIC1ndCAxIF07
+IHRoZW4KICAgICAgcHJpbnRmICJcblwwMzNbMTszNW3ilZTilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDi
+lZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZDilZdcMDMz
+WzBtXG4iCiAgICAgIHByaW50ZiAiXDAzM1sxOzM1beKVkSAgUmVzdW1vIGRvIGxvdGUgICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOKVkVwwMzNbMG1cbiIKICAg
+ICAgcHJpbnRmICJcMDMzWzE7MzVt4pWa4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ
+4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWQ4pWdXDAzM1swbVxuIgogICAg
+ICBwcmludGYgIiAgXDAzM1sxOzM2bVRvdGFsIHRlc3RhZG86XDAzM1swbSAlZFxuIiAiJF9CQVRD
+SF9OIgogICAgICBwcmludGYgIiAgXDAzM1sxOzMybU9LIChpbnN0YWzDoXZlbCk6XDAzM1swbSAl
+ZFxuIiAiJF9CQVRDSF9PSyIKICAgICAgaWYgWyAtbiAiJF9CQVRDSF9GQUlMRUQiIF07IHRoZW4K
+ICAgICAgICBwcmludGYgIiAgXDAzM1sxOzMxbUZhbGhhcmFtOlwwMzNbMG0lc1xuIiAiJF9CQVRD
+SF9GQUlMRUQiCiAgICAgIGZpCiAgICAgIHByaW50ZiAiXG4iCiAgICBmaQoKICAgIFsgIiRfQkFU
+Q0hfT0siIC1lcSAiJF9CQVRDSF9OIiBdCiAgICA7OwoKICAjIOKUgOKUgCBBUEsgc2lnbiAocsOh
+cGlkbywgc2VtIGRlY29kZS9yZWJ1aWxkKSDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAjICJtcyAtLWFwayIgYWNp
+bWEgZmF6IGRlY29kZStyZWJ1aWxkIGNvbXBsZXRvIHByYSBURVNUQVIgY29tcGF0aWJpbGlkYWRl
+CiAgIyAow6kgdW0gY2hlY2tlcikuIEVzc2UgYXF1aSDDqSBvIGNhbWluaG8gb3Bvc3RvOiB2b2PD
+qiBqw6Egcm9kb3UgImFwa3Rvb2wgYiIKICAjIHBvciBjb250YSBwcsOzcHJpYSAob3UgZWRpdG91
+IHNtYWxpL3JlY3Vyc29zIG1hbnVhbG1lbnRlKSBlIHPDsyBxdWVyIG8KICAjIHppcGFsaWduK2Fw
+a3NpZ25lciBxdWUgZmFsdGFtIHByYSBpbnN0YWxhciDigJQgc2VtIHBhZ2FyIG8gY3VzdG8gZGUK
+ICAjIGRlY29kaWZpY2FyL3JlY29tcGlsYXIgdHVkbyBkZSBub3ZvLiBSZWFwcm92ZWl0YSBhIG1l
+c21hIGtleXN0b3JlIGRlCiAgIyB0ZXN0ZSBkbyAibXMgLS1hcGsiLCBwcmEgbsOjbyBkdXBsaWNh
+ciBhc3NpbmF0dXJhIGVudHJlIG9zIGRvaXMgZmx1eG9zLgogICMgRGUgcHJvcMOzc2l0byBOw4NP
+IG1leGUgbm8gd3JhcHBlciAiYXBrdG9vbCBiIiBlbSBzaTogbyBtc2Z2ZW5vbSBpbmpldGEKICAj
+IHBheWxvYWQgZW0gY2ltYSBkbyBhcGsgY3J1IChzZW0gYXNzaW5hdHVyYSkgZSBhc3NpbmEgZG8g
+amVpdG8gZGVsZQogICMgZGVwb2lzIOKAlCBzZSAiYXBrdG9vbCBiIiBwYXNzYXNzZSBhIGFzc2lu
+YXIgc296aW5obywgcXVlYnJhcmlhIGVzc2UKICAjIGZsdXhvLiBJc3NvIGFxdWkgw6kgMTAwJSBv
+cHQtaW4sIHVtIGNvbWFuZG8gw6AgcGFydGUuCiAgLS1hcGstc2lnbikKICAgIHNoaWZ0CiAgICBf
+QVBLU19JTj0iJDEiCiAgICBpZiBbIC16ICIkX0FQS1NfSU4iIF07IHRoZW4KICAgICAgcHJpbnRm
+ICJcMDMzWzE7MzFtW+Kcl11cMDMzWzBtIFVzbzogbXMgLS1hcGstc2lnbiBhcnF1aXZvLmFwa1xu
+IgogICAgICBwcmludGYgIlwwMzNbMDs5MG0gICAgKGFsaW5oYSthc3NpbmEgdW0gYXBrIErDgSBj
+b21waWxhZG8g4oCUIGV4OiBsb2dvIGRlcG9pcyBkZSAnYXBrdG9vbCBiJy5cMDMzWzBtXG4iCiAg
+ICAgIHByaW50ZiAiXDAzM1swOzkwbSAgICAgUHJhIHRlc3RhciBjb21wYXRpYmlsaWRhZGUgY29t
+cGxldGEgZGUgZGVjb2RlK3JlYnVpbGQsIHVzZSAnbXMgLS1hcGsnKVwwMzNbMG1cbiIKICAgICAg
+ZXhpdCAxCiAgICBmaQogICAgaWYgWyAhIC1mICIkX0FQS1NfSU4iIF07IHRoZW4KICAgICAgcHJp
+bnRmICJcMDMzWzE7MzFtW+Kcl10gQXJxdWl2byBuw6NvIGVuY29udHJhZG86ICVzXDAzM1swbVxu
+IiAiJF9BUEtTX0lOIgogICAgICBleGl0IDEKICAgIGZpCiAgICBpZiAhIGNvbW1hbmQgLXYgemlw
+YWxpZ24gPi9kZXYvbnVsbCAyPiYxIHx8ICEgY29tbWFuZCAtdiBhcGtzaWduZXIgPi9kZXYvbnVs
+bCAyPiYxIHx8ICEgY29tbWFuZCAtdiBrZXl0b29sID4vZGV2L251bGwgMj4mMTsgdGhlbgogICAg
+ICBwcmludGYgIlwwMzNbMTszMW1b4pyXXSB6aXBhbGlnbi9hcGtzaWduZXIva2V5dG9vbCBuw6Nv
+IGVuY29udHJhZG9zLiBSb2RlOiB4cG0gaW5zdGFsbCBhcGt0b29sXDAzM1swbVxuIgogICAgICBl
+eGl0IDEKICAgIGZpCgogICAgX0FQS1NfVE9PTERJUj0iJEhPTUUvLnhwbS90b29scy9hcGt0b29s
+IgogICAgX0FQS1NfQUFQVDI9IiRfQVBLU19UT09MRElSL2FhcHQyIgogICAgWyAteCAiJF9BUEtT
+X0FBUFQyIiBdIHx8IF9BUEtTX0FBUFQyPSIkKGNvbW1hbmQgLXYgYWFwdDIgMj4vZGV2L251bGwp
+IgogICAgX0FQS1NfV09SSz0iJChta3RlbXAgLWQpIgogICAgX0FQS1NfQUxJR05FRD0iJF9BUEtT
+X1dPUksvYWxpZ25lZC5hcGsiCiAgICBfQVBLU19TSUdORUQ9IiRfQVBLU19XT1JLL3NpZ25lZC5h
+cGsiCgogICAgcHJpbnRmICJcMDMzWzA7OTBtICAgIC0+IHppcGFsaWduICg0IGJ5dGVzICsgcMOh
+Z2luYSBkZSAxNksgcHJvcyAuc28pIC4uLlwwMzNbMG1cbiIKICAgIGlmIHppcGFsaWduIC1QIDE2
+IC1mIDQgIiRfQVBLU19JTiIgIiRfQVBLU19BTElHTkVEIiA+IiRfQVBLU19XT1JLL3ppcGFsaWdu
+LmxvZyIgMj4mMTsgdGhlbgogICAgICBwcmludGYgIlwwMzNbMTszMm1b4pyTXSB6aXBhbGlnbiBP
+S1wwMzNbMG1cbiIKICAgIGVsaWYgemlwYWxpZ24gLWYgNCAiJF9BUEtTX0lOIiAiJF9BUEtTX0FM
+SUdORUQiID4iJF9BUEtTX1dPUksvemlwYWxpZ24ubG9nIiAyPiYxOyB0aGVuCiAgICAgIHByaW50
+ZiAiXDAzM1sxOzMybVvinJNdIHppcGFsaWduIE9LXDAzM1swbSBcMDMzWzA7OTBtKHNlbSAtUCAx
+NiDigJQgc8OzIDQgYnl0ZXM7ICdwa2cgdXBncmFkZSB6aXBhbGlnbicgcHJhIHDDoWdpbmEgZGUg
+MTZLKVwwMzNbMG1cbiIKICAgIGVsc2UKICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl10gemlw
+YWxpZ24gZmFsaG91IOKAlCBvIGFwayBwcm92YXZlbG1lbnRlIGVzdMOhIGNvcnJvbXBpZG8gb3Ug
+dHJ1bmNhZG8gKGxvZzogJXMpXDAzM1swbVxuIiAiJF9BUEtTX1dPUksvemlwYWxpZ24ubG9nIgog
+ICAgICB0YWlsIC0xMCAiJF9BUEtTX1dPUksvemlwYWxpZ24ubG9nIgogICAgICBleGl0IDEKICAg
+IGZpCgogICAgX0FQS1NfS1M9IiRfQVBLU19UT09MRElSL3hwbS1jb21wYXQtdGVzdC5rZXlzdG9y
+ZSIKICAgIGlmIFsgISAtZiAiJF9BUEtTX0tTIiBdOyB0aGVuCiAgICAgICMgbWVzbWEgY2hhdmUg
+ZGUgVEVTVEUgdXNhZGEgcGVsbyAibXMgLS1hcGsiIChzZW5oYSBmaXhhIGUgY29uaGVjaWRhLAog
+ICAgICAjIGlndWFsIGFvIGRlYnVnLmtleXN0b3JlIHBhZHLDo28gZG8gQW5kcm9pZCkg4oCUIG51
+bmNhIHNlcnZlIHByYQogICAgICAjIHB1YmxpY2FyL2Rpc3RyaWJ1aXIgbmFkYSBkZSB2ZXJkYWRl
+LgogICAgICBrZXl0b29sIC1nZW5rZXlwYWlyIC1zdG9yZXBhc3MgeHBtLWNvbXBhdC10ZXN0IC1r
+ZXlwYXNzIHhwbS1jb21wYXQtdGVzdCBcCiAgICAgICAgLWFsaWFzIHhwbS1jb21wYXQtdGVzdCAt
+a2V5YWxnIFJTQSAta2V5c2l6ZSAyMDQ4IC12YWxpZGl0eSAxMDAwMCBcCiAgICAgICAgLWRuYW1l
+ICJDTj1FbGxpb3RPUyBYUE0gQ29tcGF0IFRlc3QsTz1FbGxpb3RPUyxDPUJSIiAtZGVzdHN0b3Jl
+dHlwZSBwa2NzMTIgXAogICAgICAgIC1rZXlzdG9yZSAiJF9BUEtTX0tTIiA+L2Rldi9udWxsIDI+
+JjEKICAgIGZpCiAgICBpZiBbICEgLWYgIiRfQVBLU19LUyIgXTsgdGhlbgogICAgICBwcmludGYg
+IlwwMzNbMTszMW1b4pyXXSBuw6NvIGNvbnNlZ3VpIGdlcmFyL2FjaGFyIG8ga2V5c3RvcmUgZGUg
+dGVzdGVcMDMzWzBtXG4iCiAgICAgIGV4aXQgMQogICAgZmkKCiAgICBwcmludGYgIlwwMzNbMDs5
+MG0gICAgLT4gYXBrc2lnbmVyIHNpZ24gKGNoYXZlIGRlIHRlc3RlIGRvIHhwbSkgLi4uXDAzM1sw
+bVxuIgogICAgaWYgISBhcGtzaWduZXIgc2lnbiAtLWtzICIkX0FQS1NfS1MiIC0ta3MtcGFzcyBw
+YXNzOnhwbS1jb21wYXQtdGVzdCAtLWtleS1wYXNzIHBhc3M6eHBtLWNvbXBhdC10ZXN0IFwKICAg
+ICAgIC0tb3V0ICIkX0FQS1NfU0lHTkVEIiAiJF9BUEtTX0FMSUdORUQiID4iJF9BUEtTX1dPUksv
+c2lnbi5sb2ciIDI+JjE7IHRoZW4KICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl10gYXBrc2ln
+bmVyIGZhbGhvdSAobG9nOiAlcylcMDMzWzBtXG4iICIkX0FQS1NfV09SSy9zaWduLmxvZyIKICAg
+ICAgdGFpbCAtMTAgIiRfQVBLU19XT1JLL3NpZ24ubG9nIgogICAgICBleGl0IDEKICAgIGZpCiAg
+ICBwcmludGYgIlwwMzNbMTszMm1b4pyTXSBhc3NpbmFkb1wwMzNbMG1cbiIKCiAgICBfQVBLU19T
+VFJVQ1RfT0s9MQogICAgaWYgISB6aXBhbGlnbiAtYyAtdiA0ICIkX0FQS1NfU0lHTkVEIiA+IiRf
+QVBLU19XT1JLL3ZlcmlmeV9hbGlnbi5sb2ciIDI+JjE7IHRoZW4KICAgICAgX0FQS1NfU1RSVUNU
+X09LPTAKICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl10gYWxpbmhhbWVudG8gbsOjbyBjb25m
+ZXJlIGRlcG9pcyBkZSBhc3NpbmFyXDAzM1swbVxuIgogICAgZmkKICAgIGlmICEgYXBrc2lnbmVy
+IHZlcmlmeSAiJF9BUEtTX1NJR05FRCIgPiIkX0FQS1NfV09SSy92ZXJpZnlfc2lnbi5sb2ciIDI+
+JjE7IHRoZW4KICAgICAgX0FQS1NfU1RSVUNUX09LPTAKICAgICAgcHJpbnRmICJcMDMzWzE7MzFt
+W+Kcl10gYXBrc2lnbmVyIHZlcmlmeSByZXByb3ZvdSBvIHBhY290ZSBmaW5hbFwwMzNbMG1cbiIK
+ICAgICAgdGFpbCAtMTAgIiRfQVBLU19XT1JLL3ZlcmlmeV9zaWduLmxvZyIKICAgIGZpCiAgICBp
+ZiBbIC14ICIkX0FQS1NfQUFQVDIiIF0gJiYgISAiJF9BUEtTX0FBUFQyIiBkdW1wIGJhZGdpbmcg
+IiRfQVBLU19TSUdORUQiID4iJF9BUEtTX1dPUksvYmFkZ2luZy5sb2ciIDI+JjE7IHRoZW4KICAg
+ICAgX0FQS1NfU1RSVUNUX09LPTAKICAgICAgcHJpbnRmICJcMDMzWzE7MzFtW+Kcl10gYWFwdDIg
+ZHVtcCBiYWRnaW5nIG7Do28gY29uc2VndWl1IGxlciBvIHBhY290ZSBmaW5hbCAobyBQYWNrYWdl
+TWFuYWdlciByZWFsIHByb3ZhdmVsbWVudGUgdGFtYsOpbSBuw6NvIHZhaSBjb25zZWd1aXIpXDAz
+M1swbVxuIgogICAgZmkKICAgIGlmIFsgIiRfQVBLU19TVFJVQ1RfT0siICE9ICIxIiBdOyB0aGVu
+CiAgICAgIHByaW50ZiAiXDAzM1sxOzMxbVvinJddIHZlcmlmaWNhw6fDo28gZXN0cnV0dXJhbCBm
+YWxob3Ug4oCUIGVzc2UgYXBrIG7Do28gZGV2ZSBpbnN0YWxhci4gTG9ncyBlbTogJXNcMDMzWzBt
+XG4iICIkX0FQS1NfV09SSyIKICAgICAgZXhpdCAxCiAgICBmaQoKICAgIF9BUEtTX0RJUj0iJChk
+aXJuYW1lICIkX0FQS1NfSU4iKSIKICAgIF9BUEtTX0JBU0U9IiQoYmFzZW5hbWUgIiRfQVBLU19J
+TiIgLmFwaykiCiAgICBfQVBLU19PVVQ9IiRfQVBLU19ESVIvJHtfQVBLU19CQVNFfS1pbnN0YWxs
+YWJsZS5hcGsiCiAgICBjcCAtZiAiJF9BUEtTX1NJR05FRCIgIiRfQVBLU19PVVQiCiAgICBwcmlu
+dGYgIlwwMzNbMTszMm1b4pyTXSB2ZXJpZmljYcOnw6NvIGVzdHJ1dHVyYWwgT0sgKGFsaW5oYW1l
+bnRvICsgYXNzaW5hdHVyYSArIG1hbmlmZXN0IHBhcnNlw6F2ZWwpXDAzM1swbVxuIgogICAgcHJp
+bnRmICJcblwwMzNbMTszNm1Qcm9udG8gcHJhIGluc3RhbGFyOlwwMzNbMG0gJXNcbiIgIiRfQVBL
+U19PVVQiCiAgICBwcmludGYgIlwwMzNbMDs5MG0oYXNzaW5hZG8gY29tIGEgY2hhdmUgZGUgdGVz
+dGUgZG8geHBtIOKAlCBwcmEgcmVkaXN0cmlidWlyIGRlIHZlcmRhZGUsIGFzc2luZSBjb20gc3Vh
+IHByw7NwcmlhIGNoYXZlKVwwMzNbMG1cbiIKICAgIDs7CgogICMg4pSA4pSAIEluamVjdCDigJQg
+aW5qZcOnw6NvIGRlIHBheWxvYWQgY29tIGhvb2sgY29ycmV0byDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAK
+ICAjIFBpcGVsaW5lOgogICMgMS4gZ2VyYSBwYXlsb2FkIHB1cm8gY29tIG1zZnZlbm9tIChzZW0g
+LXgpCiAgIyAyLiBleHRyYWkgc21hbGkgZG8gcGF5bG9hZCAoYXBrdG9vbCBkIC1yIG5vIHBheWxv
+YWQuYXBrIOKAlCByw6FwaWRvLCBzZW0gcmVjdXJzb3MpCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoK
+CgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKICAjIOKUgOKUgCBOZXRIdW50ZXIg4oCU
+IGluc3RhbGEgS2FsaSBOZXRIdW50ZXIgc2VtIHJvb3QgKG11bHRpLWFyY2gpIOKUgOKUgOKUgOKU
+gOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgOKUgAogIC1uaHwtLW5ldGh1bnRlcikKICAgIHByaW50
+ZiAiXDAzM1sxOzMxbSIKICAgIHByaW50ZiAiICBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUy
+XHg5NVx4OTcgIFx4ZTJceDk2XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk1XHg5NyBceGUyXHg5Nlx4
+ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5
+Nlx4ODhceGUyXHg5NVx4OTcgXHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDk3ICAg
+ICAgXHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDk3XG4iCiAgICBwcmludGYgIiAg
+XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDkxIFx4ZTJceDk2XHg4OFx4ZTJceDk2
+XHg4OFx4ZTJceDk1XHg5NFx4ZTJceDk1XHg5ZCBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUy
+XHg5NVx4OTRceGUyXHg5NVx4OTBceGUyXHg5NVx4OTBceGUyXHg5NVx4OTBceGUyXHg5NVx4OWQg
+XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDkxICAgICAgXHhlMlx4OTZceDg4XHhl
+Mlx4OTZceDg4XHhlMlx4OTVceDkxXG4iCiAgICBwcmludGYgIiAgXHhlMlx4OTZceDg4XHhlMlx4
+OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDk0XHhl
+Mlx4OTVceDlkICBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4
+ODhceGUyXHg5Nlx4ODhceGUyXHg5NVx4OTcgICBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUy
+XHg5NVx4OTEgICAgICBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5NVx4OTFcbiIKICAg
+IHByaW50ZiAiICBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5NVx4OTRceGUyXHg5NVx4
+OTBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5NVx4OTcgIFx4ZTJceDk2XHg4OFx4ZTJc
+eDk2XHg4OFx4ZTJceDk1XHg5NFx4ZTJceDk1XHg5MFx4ZTJceDk1XHg5MFx4ZTJceDk1XHg5ZCAg
+IFx4ZTJceDk2XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk1XHg5MSAgICAgIFx4ZTJceDk2XHg4OFx4
+ZTJceDk2XHg4OFx4ZTJceDk1XHg5MVxuIgogICAgcHJpbnRmICIgIFx4ZTJceDk2XHg4OFx4ZTJc
+eDk2XHg4OFx4ZTJceDk1XHg5MSAgXHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDk3
+IFx4ZTJceDk2XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk2
+XHg4OFx4ZTJceDk2XHg4OFx4ZTJceDk1XHg5NyBceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUy
+XHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5Nlx4ODhceGUyXHg5NVx4OTcg
+XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTZceDg4XHhlMlx4OTZc
+eDg4XHhlMlx4OTZceDg4XHhlMlx4OTVceDk3XG4iCiAgICBwcmludGYgIiAgXHhlMlx4OTVceDlh
+XHhlMlx4OTVceDkwXHhlMlx4OTVceDlkICBceGUyXHg5NVx4OWFceGUyXHg5NVx4OTBceGUyXHg5
+NVx4OWQgXHhlMlx4OTVceDlhXHhlMlx4OTVceDkwXHhlMlx4OTVceDkwXHhlMlx4OTVceDkwXHhl
+Mlx4OTVceDkwXHhlMlx4OTVceDkwXHhlMlx4OTVceDlkIFx4ZTJceDk1XHg5YVx4ZTJceDk1XHg5
+MFx4ZTJceDk1XHg5MFx4ZTJceDk1XHg5MFx4ZTJceDk1XHg5MFx4ZTJceDk1XHg5MFx4ZTJceDk1
+XHg5ZCBceGUyXHg5NVx4OWFceGUyXHg5NVx4OTBceGUyXHg5NVx4OTBceGUyXHg5NVx4OTBceGUy
+XHg5NVx4OTBceGUyXHg5NVx4OTBceGUyXHg5NVx4OWRcbiIKICAgIHByaW50ZiAiXDAzM1swbSIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7OTBtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXDAzM1swbVxuIgogICAgcHJpbnRm
+ICIgIFwwMzNbMTszMW1FbGxpb3RPUyAtLSBLYWxpIExpbnV4IE5ldEh1bnRlciBJbnN0YWxsZXIg
+KHNlbSByb290IC4gYXJtNjQpXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTs5MG1ieSBN
+aWtlIEVsbGlvdCAuIGdpdGh1Yi5jb20vbWlrZWVsbGlvdDIxOC9FbGxpb3RPU1wwMzNbMG1cbiIK
+ICAgIHByaW50ZiAiICBcMDMzWzE7OTBtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tXDAzM1swbVxuXG4iCgogICAgQ09O
+VEFJTkVSPSJrYWxpIgogICAgSU1BR0U9ImthbGlsaW51eC9rYWxpLXJvbGxpbmciCiAgICBBUkNI
+SVRFQ1RVUkU9ImFybTY0IgogICAgUFJFRklYPSIke1BSRUZJWDotL2RhdGEvZGF0YS9jb20udGVy
+bXV4L2ZpbGVzL3Vzcn0iCiAgICBMQVVOQ0hFUj0iJFBSRUZJWC9iaW4vbmgiCiAgICBpbmZvKCkg
+eyBwcmludGYgIiAgXDAzM1sxOzM2bS0+XDAzM1swbSAlc1xuIiAiJDEiOyB9CiAgICBvaygpICAg
+eyBwcmludGYgIiAgXDAzM1sxOzMybVt2XVwwMzNbMG0gJXNcbiIgIiQxIjsgfQogICAgYXZpc28o
+KXsgcHJpbnRmICIgIFwwMzNbMTszM21bIV1cMDMzWzBtICVzXG4iICIkMSI7IH0KICAgIGVycm8o
+KSB7IHByaW50ZiAiICBcMDMzWzE7MzFtW3hdXDAzM1swbSAlc1xuIiAiJDEiOyB9CgogICAgaWYg
+WyAhIC1kICIkUFJFRklYIiBdOyB0aGVuCiAgICAgICAgZXJybyAiRXN0ZSBzY3JpcHQgcHJlY2lz
+YSBzZXIgZXhlY3V0YWRvIG5vIFRlcm11eC4iCiAgICAgICAgZXhpdCAxCiAgICBmaQoKICAgIEhP
+U1RfQVJDSD0iJCh1bmFtZSAtbSkiCiAgICBpbmZvICJBcnF1aXRldHVyYSBkbyBkaXNwb3NpdGl2
+bzogJEhPU1RfQVJDSCIKICAgIGNhc2UgIiRIT1NUX0FSQ0giIGluCiAgICAgICAgYWFyY2g2NHxh
+cm02NCkgb2sgIkFSTTY0IGRldGVjdGFkby4iIDs7CiAgICAgICAgKikgZXJybyAiRXN0ZSBzY3Jp
+cHQgZSBkZXN0aW5hZG8gYSBkaXNwb3NpdGl2b3MgQVJNNjQuIjsgZXhpdCAxIDs7CiAgICBlc2Fj
+CgogICAgaWYgISBjb21tYW5kIC12IHByb290LWRpc3RybyA+L2Rldi9udWxsIDI+JjE7IHRoZW4K
+ICAgICAgICBhdmlzbyAiUFJvb3QtRGlzdHJvIG5hbyBlc3RhIGluc3RhbGFkby4iCiAgICAgICAg
+aW5mbyAiSW5zdGFsYW5kbyBwZWxvIFRlcm11eC4uLiIKICAgICAgICBwa2cgdXBkYXRlCiAgICAg
+ICAgcGtnIGluc3RhbGwgLXkgcHJvb3QtZGlzdHJvCiAgICBmaQogICAgb2sgIlBSb290LURpc3Ry
+byBlbmNvbnRyYWRvLiIKICAgIHByaW50ZiAiXG4iCiAgICBwcm9vdC1kaXN0cm8gdmVyc2lvbiB8
+fCB0cnVlCiAgICBwcmludGYgIlxuIgoKICAgIGluZm8gIlZlcmlmaWNhbmRvIGRlcGVuZGVuY2lh
+cyBkbyBUZXJtdXguLi4iCiAgICBwa2cgaW5zdGFsbCAteSBjdXJsIGdyZXAKICAgIG9rICJEZXBl
+bmRlbmNpYXMgcHJvbnRhcy4iCiAgICBwcmludGYgIlxuIgoKICAgIENPTlRBSU5FUl9FWElTVEU9
+MAogICAgaWYgcHJvb3QtZGlzdHJvIGxpc3QgLS1xdWlldCAyPi9kZXYvbnVsbCB8IGdyZXAgLUZ4
+cSAiJENPTlRBSU5FUiI7IHRoZW4KICAgICAgICBDT05UQUlORVJfRVhJU1RFPTEKICAgIGZpCgog
+ICAgaWYgWyAiJENPTlRBSU5FUl9FWElTVEUiIC1lcSAxIF07IHRoZW4KICAgICAgICBhdmlzbyAi
+TyBjb250YWluZXIgJyRDT05UQUlORVInIGphIGV4aXN0ZS4iCiAgICAgICAgaW5mbyAiTyBjb250
+YWluZXIgZXhpc3RlbnRlIHNlcmEgcmV1dGlsaXphZG8uIgogICAgZWxzZQogICAgICAgIGluZm8g
+Ikluc3RhbGFuZG8gS2FsaSBMaW51eCBBUk02NC4uLiIKICAgICAgICBpbmZvICJJbWFnZW06ICRJ
+TUFHRSIKICAgICAgICBwcm9vdC1kaXN0cm8gaW5zdGFsbCBcCiAgICAgICAgICAgIC0tbmFtZSAi
+JENPTlRBSU5FUiIgXAogICAgICAgICAgICAtLWFyY2hpdGVjdHVyZSAiJEFSQ0hJVEVDVFVSRSIg
+XAogICAgICAgICAgICAiJElNQUdFIgogICAgICAgIG9rICJLYWxpIExpbnV4IEFSTTY0IGluc3Rh
+bGFkby4iCiAgICBmaQogICAgcHJpbnRmICJcbiIKCiAgICBpbmZvICJFbnRyYW5kbyBubyBjb250
+YWluZXIgcGFyYSBjb25maWd1cmFyIG8gc2lzdGVtYS4uLiIKCiAgICBwcm9vdC1kaXN0cm8gbG9n
+aW4gIiRDT05UQUlORVIiIC0tIGJhc2ggPDwnS0FMSV9TQ1JJUFQnCgpzZXQgLWUKCmluZm8oKSB7
+IHByaW50ZiAiICBcMDMzWzE7MzZtLT5cMDMzWzBtICVzXG4iICIkMSI7IH0Kb2soKSAgIHsgcHJp
+bnRmICIgIFwwMzNbMTszMm1bdl1cMDMzWzBtICVzXG4iICIkMSI7IH0KYXZpc28oKXsgcHJpbnRm
+ICIgIFwwMzNbMTszM21bIV1cMDMzWzBtICVzXG4iICIkMSI7IH0KZXJybygpIHsgcHJpbnRmICIg
+IFwwMzNbMTszMW1beF1cMDMzWzBtICVzXG4iICIkMSI7IH0KCnByaW50ZiAiXG4iCnByaW50ZiAi
+ICBcMDMzWzE7MzdtKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLStc
+MDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzE7MzdtfCAgICAgICAgICAgS0FMSSBMSU5VWCBORVRI
+VU5URVIgICAgICAgICAgIHxcMDMzWzBtXG4iCnByaW50ZiAiICBcMDMzWzE7MzdtKy0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLStcMDMzWzBtXG4iCnByaW50ZiAiXG4i
+CgppbmZvICJBcnF1aXRldHVyYToiCnVuYW1lIC1tCgppZiBbIC1mIC9ldGMvb3MtcmVsZWFzZSBd
+OyB0aGVuCiAgICAuIC9ldGMvb3MtcmVsZWFzZQogICAgcHJpbnRmICIgIFwwMzNbMTszNm0tPlww
+MzNbMG0gU2lzdGVtYTogJHtQUkVUVFlfTkFNRTotS2FsaSBMaW51eH1cbiIKZmkKCmlmICEgY29t
+bWFuZCAtdiBhcHQgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgICBlcnJvICJhcHQgbmFvIGZvaSBl
+bmNvbnRyYWRvLiBDb250YWluZXIgaW52YWxpZG8uIgogICAgZXhpdCAxCmZpCm9rICJhcHQgZW5j
+b250cmFkby4iCgpwcmludGYgIlxuIgppbmZvICJDb25maWd1cmFuZG8gUG9ydHVndWVzIEJyYXNp
+bGVpcm8uLi4iCgpleHBvcnQgREVCSUFOX0ZST05URU5EPW5vbmludGVyYWN0aXZlCmFwdC1nZXQg
+dXBkYXRlIC1xcQphcHQtZ2V0IGluc3RhbGwgLXkgLXFxIGxvY2FsZXMgMj4vZGV2L251bGwgfHwg
+dHJ1ZQoKaWYgWyAtZiAvZXRjL2xvY2FsZS5nZW4gXTsgdGhlbgogICAgc2VkIC1pICdzL14jICpw
+dF9CUi5VVEYtOCBVVEYtOC9wdF9CUi5VVEYtOCBVVEYtOC8nIC9ldGMvbG9jYWxlLmdlbgogICAg
+Z3JlcCAtcSAnXnB0X0JSLlVURi04IFVURi04JyAvZXRjL2xvY2FsZS5nZW4gfHwgZWNobyAncHRf
+QlIuVVRGLTggVVRGLTgnID4+IC9ldGMvbG9jYWxlLmdlbgogICAgbG9jYWxlLWdlbiAyPi9kZXYv
+bnVsbCB8fCB0cnVlCmZpCgpjYXQgPiAvZXRjL2xvY2FsZS5jb25mIDw8J0VPRicKTEFORz1wdF9C
+Ui5VVEYtOApMQU5HVUFHRT1wdF9CUjpwdDplbl9VUzplbgpMQ19BTEw9cHRfQlIuVVRGLTgKRU9G
+CgpleHBvcnQgTEFORz0icHRfQlIuVVRGLTgiCm9rICJMb2NhbGUgcHQtQlIgY29uZmlndXJhZG8u
+IgoKcHJpbnRmICJcbiIKaW5mbyAiQXR1YWxpemFuZG8gS2FsaSBMaW51eC4uLiIKYXB0LWdldCB1
+cGRhdGUgLXFxCmFwdC1nZXQgdXBncmFkZSAteSAtcXEKb2sgIkthbGkgTGludXggYXR1YWxpemFk
+by4iCgpwcmludGYgIlxuIgppbmZvICJJbnN0YWxhbmRvIGRlcGVuZGVuY2lhcyBiYXNpY2FzLi4u
+IgphcHQtZ2V0IGluc3RhbGwgLXkgLXFxIGN1cmwgd2dldCBnaXQgMj4vZGV2L251bGwgfHwgdHJ1
+ZQpvayAiUHJvbnRvLiIKCnByaW50ZiAiXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtKy0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLStcMDMzWzBtXG4iCnByaW50ZiAiICBc
+MDMzWzE7MzJtfCAgICAgICAgICAgICAgVFVETyBQUk9OVE8gICAgICAgICAgICAgICAgIHxcMDMz
+WzBtXG4iCnByaW50ZiAiICBcMDMzWzE7MzJtKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLStcMDMzWzBtXG4iCnByaW50ZiAiXG4iCgppZiBbIC1mIC9ldGMvb3MtcmVs
+ZWFzZSBdOyB0aGVuCiAgICAuIC9ldGMvb3MtcmVsZWFzZQogICAgcHJpbnRmICIgIFNpc3RlbWEg
+ICAgOiBcMDMzWzE7MzFtJHtQUkVUVFlfTkFNRTotS2FsaSBMaW51eH1cMDMzWzBtXG4iCmZpCnBy
+aW50ZiAiICBBcnF1aXRldHVyYTogXDAzM1sxOzM2bSQodW5hbWUgLW0pXDAzM1swbVxuIgpwcmlu
+dGYgIiAgTG9jYWxlICAgICA6IFwwMzNbMTszNm0ke0xBTkc6LXB0X0JSLlVURi04fVwwMzNbMG1c
+biIKcHJpbnRmICJcbiIKcHJpbnRmICIgIFwwMzNbMTszNm1FeGVtcGxvczpcMDMzWzBtXG4iCnBy
+aW50ZiAiICBcMDMzWzE7MzZtICBhcHQgaW5zdGFsbCBubWFwXDAzM1swbVxuIgpwcmludGYgIiAg
+XDAzM1sxOzM2bSAgbXNmY29uc29sZVwwMzNbMG1cbiIKcHJpbnRmICIgIFwwMzNbMTszNm0gIGFw
+dCBzZWFyY2gga2FsaS1saW51eFwwMzNbMG1cbiIKcHJpbnRmICJcbiIKCktBTElfU0NSSVBUCgog
+ICAgb2sgIkNvbnRhaW5lciBjb25maWd1cmFkby4iCiAgICBwcmludGYgIlxuIgoKICAgIGluZm8g
+IkNyaWFuZG8gbGF1bmNoZXIgJ25oJy4uLiIKCiAgICBjYXQgPiAiJExBVU5DSEVSIiA8PCdMQVVO
+Q0hFUl9TQ1JJUFQnCiMhL2RhdGEvZGF0YS9jb20udGVybXV4L2ZpbGVzL3Vzci9iaW4vYmFzaApD
+T05UQUlORVI9ImthbGkiCnRyYXAgJ3BraWxsIC1mICJ0ZXJtdXgteDExIiAyPi9kZXYvbnVsbDsg
+ZXhpdCAwJyBJTlQgVEVSTQoKY2FzZSAiJHsxOi19IiBpbgogIC1ofC0taGVscCkKICAgIHByaW50
+ZiAiXDAzM1sxOzMxbW5oXDAzM1swbSAtLSBLYWxpIExpbnV4IE5ldEh1bnRlciAoRWxsaW90T1Mp
+XG5cbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzZtVXNvOlwwMzNbMG1cbiIKICAgIHByaW50ZiAi
+ICAgIG5oICAgICAgICAgICAgICBFbnRyYSBubyB0ZXJtaW5hbCBkbyBLYWxpIExpbnV4XG4iCiAg
+ICBwcmludGYgIiAgICBuaCAtLWd1aSB8IC1nICAgSW5pY2lhIFhGQ0UgdmlhIFRlcm11eCBYMTFc
+biIKICAgIHByaW50ZiAiICAgIG5oIC0taGVscCB8IC1oICBNb3N0cmEgZXN0YSBhanVkYVxuIgog
+ICAgcHJpbnRmICJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7MzZtRXhlbXBsb3MgZGVudHJvIGRv
+IGNvbnRhaW5lcjpcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgICBhcHQgaW5zdGFsbCBubWFwICAg
+ICAgICAgICAgICBJbnN0YWxhIG5tYXBcbiIKICAgIHByaW50ZiAiICAgIGFwdCBpbnN0YWxsIG1l
+dGFzcGxvaXQtZnJhbWV3b3JrICBJbnN0YWxhIG1ldGFzcGxvaXRcbiIKICAgIHByaW50ZiAiICAg
+IGFwdCBzZWFyY2gga2FsaS10b29scyAgICAgICAgIEJ1c2NhIGZlcnJhbWVudGFzIEthbGlcbiIK
+ICAgIHByaW50ZiAiICAgIGFwdCB1cGRhdGUgJiYgYXB0IHVwZ3JhZGUgICAgIEF0dWFsaXphIG8g
+c2lzdGVtYVxuIgogICAgcHJpbnRmICJcbiIKICAgIHByaW50ZiAiICBcMDMzWzE7OTBtSXNvbGFk
+byBkbyBUZXJtdXggLS0gc2VtIGFjZXNzbyBhbyBob21lIGRvIGhvc3RcMDMzWzBtXG4iCiAgICBl
+eGl0IDAKICAgIDs7CmVzYWMKCmlmICEgY29tbWFuZCAtdiBwcm9vdC1kaXN0cm8gPi9kZXYvbnVs
+bCAyPiYxOyB0aGVuCiAgICBlY2hvICJbIV0gUFJvb3QtRGlzdHJvIG5hbyBlc3RhIGluc3RhbGFk
+by4iCiAgICBleGl0IDEKZmkKaWYgISBwcm9vdC1kaXN0cm8gbGlzdCAtLXF1aWV0IDI+L2Rldi9u
+dWxsIHwgZ3JlcCAtRnhxICIkQ09OVEFJTkVSIjsgdGhlbgogICAgZWNobyAiWyFdIE8gY29udGFp
+bmVyICckQ09OVEFJTkVSJyBuYW8gZXhpc3RlLiIKICAgIGVjaG8gIkV4ZWN1dGUgbm92YW1lbnRl
+OiBtcyAtbmgiCiAgICBleGl0IDEKZmkKIyBNb2RvIEdVSTogaW5zdGFsYSBYRkNFIGUgcm9kYSB2
+aWEgVGVybXV4IFgxMQppZiBbICIkezE6LX0iID0gIi0tZ3VpIiBdIHx8IFsgIiR7MTotfSIgPSAi
+LWciIF07IHRoZW4KICAgIGlmICEgY29tbWFuZCAtdiB0ZXJtdXgteDExID4vZGV2L251bGwgMj4m
+MSAmJiBbICEgLWYgIi9kYXRhL2RhdGEvY29tLnRlcm11eC54MTEvZmlsZXMvdXNyL2Jpbi90ZXJt
+dXgteDExIiBdOyB0aGVuCiAgICAgICAgZWNobyAiWyFdIFRlcm11eCBYMTEgbmFvIGVuY29udHJh
+ZG8uIgogICAgICAgIGVjaG8gIiAgICBJbnN0YWxlIG8gYXBwIFRlcm11eDpYMTEgZSByb2RlOiIK
+ICAgICAgICBlY2hvICIgICAgcGtnIGluc3RhbGwgdGVybXV4LXgxMS1uaWdodGx5IgogICAgICAg
+IGV4aXQgMQogICAgZmkKICAgICMgSW5zdGFsYSBYRkNFIGRvIEthbGkgZSBjb25maWd1cmEgcGFu
+ZWwKICAgIHByb290LWRpc3RybyBsb2dpbiAtLWJpbmQgL2RhdGEvZGF0YS9jb20udGVybXV4Oi9k
+YXRhL2RhdGEvY29tLnRlcm11eCAiJENPTlRBSU5FUiIgLS0gYmFzaCAtYyBcCiAgICAgICAgImRw
+a2cgLWwga2FsaS1kZXNrdG9wLXhmY2UgMj4vZGV2L251bGwgfCBncmVwIC1xICdeXC5cP2lpJyB8
+fCAoYXB0LWdldCB1cGRhdGUgLXFxICYmIGFwdC1nZXQgaW5zdGFsbCAteSAtcXEga2FsaS1kZXNr
+dG9wLXhmY2Uga2FsaS10aGVtZXMga2FsaS1tZW51IGthbGktd2FsbHBhcGVycy1hbGwgeGZkZXNr
+dG9wNCBkYnVzLXgxMSB4MTEteHNlcnZlci11dGlscyAyPi9kZXYvbnVsbCB8fCB0cnVlKTsgXAog
+ICAgICAgICBta2RpciAtcCAvcm9vdC8uY29uZmlnL3hmY2U0L3hmY29uZi94ZmNlLXBlcmNoYW5u
+ZWwteG1sOyBcCiAgICAgICAgIGNwIC1mIC91c3Ivc2hhcmUva2FsaS10aGVtZXMvZXRjL3hkZy94
+ZmNlNC9wYW5lbC9kZWZhdWx0LnhtbCAvcm9vdC8uY29uZmlnL3hmY2U0L3hmY29uZi94ZmNlLXBl
+cmNoYW5uZWwteG1sL3hmY2U0LXBhbmVsLnhtbCAyPi9kZXYvbnVsbCB8fCB0cnVlIgogICAgIyBM
+aW1wZXphOiBtYXRhIHByb2Nlc3NvIGFudGVyaW9yIGUgcmVtb3ZlIHNvY2tldHMvbG9ja3Mgc3Rh
+bGUKICAgIF9YMTFfU09DSz0iJHtUTVBESVJ9Ly5YMTEtdW5peC9YMSIKICAgIF9YMTFfTE9DSz0i
+JHtUTVBESVJ9Ly5YMS1sb2NrIgogICAgcGtpbGwgLWYgInRlcm11eC14MTEiIDI+L2Rldi9udWxs
+IHx8IHRydWU7IHNsZWVwIDEKICAgIHJtIC1mICIkX1gxMV9TT0NLIiAiJF9YMTFfTE9DSyIgMj4v
+ZGV2L251bGwgfHwgdHJ1ZQogICAgcm1kaXIgIiR7VE1QRElSfS8uWDExLXVuaXgiIDI+L2Rldi9u
+dWxsIHx8IHRydWUKICAgIG1rZGlyIC1wICIke1RNUERJUn0vLlgxMS11bml4IgogICAgIyBJbmlj
+aWEgVGVybXV4OlgxMSBubyBkaXNwbGF5IDoxCiAgICBleHBvcnQgWERHX1JVTlRJTUVfRElSPSIk
+e1RNUERJUn0iCiAgICBwdWxzZWF1ZGlvIC0tc3RhcnQgLS1sb2FkPSJtb2R1bGUtbmF0aXZlLXBy
+b3RvY29sLXRjcCBhdXRoLWlwLWFjbD0xMjcuMC4wLjEgYXV0aC1hbm9ueW1vdXM9MSIgLS1leGl0
+LWlkbGUtdGltZT0tMSAyPi9kZXYvbnVsbCB8fCB0cnVlCiAgICB0ZXJtdXgteDExIDoxICYKICAg
+IGFtIHN0YXJ0IC0tdXNlciAwIC1uIGNvbS50ZXJtdXgueDExL2NvbS50ZXJtdXgueDExLk1haW5B
+Y3Rpdml0eSA+L2Rldi9udWxsIDI+JjEKICAgIF9XQUlUPTAKICAgIHVudGlsIFsgLVMgIiRfWDEx
+X1NPQ0siIF07IGRvCiAgICAgICAgc2xlZXAgMTsgX1dBSVQ9JCgoX1dBSVQrMSkpCiAgICAgICAg
+WyAiJF9XQUlUIiAtZ2UgMTUgXSAmJiB7IGVjaG8gIlshXSBUaW1lb3V0IOKAlCBhYnJhIG8gYXBw
+IFRlcm11eDpYMTEgZSB0ZW50ZSBub3ZhbWVudGUuIjsgZXhpdCAxOyB9CiAgICBkb25lCiAgICAj
+IEVudHJhIG5vIGNvbnRhaW5lciBjb20gLS1zaGFyZWQtdG1wIGUgLS1lbnYgcGFyYSBpbmpldGFy
+IERJU1BMQVkgZ2FyYW50aWRvCiAgICBwcm9vdC1kaXN0cm8gbG9naW4gXAogICAgICAgIC0tYmlu
+ZCAvZGF0YS9kYXRhL2NvbS50ZXJtdXg6L2RhdGEvZGF0YS9jb20udGVybXV4IFwKICAgICAgICAt
+LXNoYXJlZC10bXAgXAogICAgICAgIC0tZW52IERJU1BMQVk9OjEgXAogICAgICAgIC0tZW52IFBV
+TFNFX1NFUlZFUj0xMjcuMC4wLjEgXAogICAgICAgIC0tZW52IEdBTExJVU1fRFJJVkVSPWxsdm1w
+aXBlIFwKICAgICAgICAtLWVudiBMSUJHTF9BTFdBWVNfU09GVFdBUkU9MSBcCiAgICAgICAgLS1l
+bnYgTUVTQV9HTF9WRVJTSU9OX09WRVJSSURFPTMuMyBcCiAgICAgICAgLS1lbnYgTUVTQV9HTFNM
+X1ZFUlNJT05fT1ZFUlJJREU9MzMwIFwKICAgICAgICAtLWVudiBFR0xfTE9HX0xFVkVMPWZhdGFs
+IFwKICAgICAgICAtLWVudiBHVEtfVEhFTUU9QWR3YWl0YTpkYXJrIFwKICAgICAgICAiJENPTlRB
+SU5FUiIgLS0gL2Jpbi9iYXNoIC1jIFwKICAgICAgICAibWtkaXIgLXAgL3RtcC9ydW50aW1lLW5o
+ICYmIGNobW9kIDcwMCAvdG1wL3J1bnRpbWUtbmg7IFwKICAgICAgICAgZXhwb3J0IFhER19SVU5U
+SU1FX0RJUj0vdG1wL3J1bnRpbWUtbmg7IFwKICAgICAgICAgcm0gLWYgL3RtcC9kYnVzLW5oLnNv
+Y2s7IFwKICAgICAgICAgZGJ1cy1kYWVtb24gLS1zZXNzaW9uIC0tYWRkcmVzcz11bml4OnBhdGg9
+L3RtcC9kYnVzLW5oLnNvY2sgLS1mb3JrIDI+L2Rldi9udWxsIHx8IHRydWU7IFwKICAgICAgICAg
+ZXhwb3J0IERCVVNfU0VTU0lPTl9CVVNfQUREUkVTUz11bml4OnBhdGg9L3RtcC9kYnVzLW5oLnNv
+Y2s7IFwKICAgICAgICAgeGZzZXR0aW5nc2QgLS1uby1kYWVtb24gJiBzbGVlcCAyOyBcCiAgICAg
+ICAgIG1rZGlyIC1wIC91c3Ivc2hhcmUvaW1hZ2VzL2Rlc2t0b3AtYmFzZTsgXAogICAgICAgICBm
+aW5kIC91c3Ivc2hhcmUvYmFja2dyb3VuZHMva2FsaSAtbmFtZSBcIioucG5nXCIgMj4vZGV2L251
+bGwgfCBzb3J0IHwgeGFyZ3MgLUl7fSBjcCAtZiB7fSAvdXNyL3NoYXJlL2ltYWdlcy9kZXNrdG9w
+LWJhc2UvIDI+L2Rldi9udWxsIHx8IHRydWU7IFwKICAgICAgICAgX1dQUz0kKGZpbmQgL3Vzci9z
+aGFyZS9pbWFnZXMvZGVza3RvcC1iYXNlIC1uYW1lIFwiKi5wbmdcIiB8IHNvcnQgfCBoZWFkIC0x
+KTsgXAogICAgICAgICBbIC1uIFwiJF9XUFNcIiBdICYmIGNwIC1mIFwiJF9XUFNcIiAvdXNyL3No
+YXJlL2ltYWdlcy9kZXNrdG9wLWJhc2UvZGVmYXVsdCAyPi9kZXYvbnVsbCB8fCB0cnVlOyBcCiAg
+ICAgICAgIGNwIC9ldGMveGRnL21lbnVzL2FwcGxpY2F0aW9ucy1tZXJnZWQva2FsaS1hcHBsaWNh
+dGlvbnMubWVudSAvZXRjL3hkZy9tZW51cy94ZmNlLWFwcGxpY2F0aW9ucy5tZW51IDI+L2Rldi9u
+dWxsIHx8IHRydWU7IFwKICAgICAgICAgeGZkZXNrdG9wICYgc2xlZXAgMjsgXAogICAgICAgICB4
+ZmNlNC1wYW5lbCAmIGV4ZWMgeGZ3bTQgLS1kaXNwbGF5IDoxIgpmaQpwcm9vdC1kaXN0cm8gbG9n
+aW4gLS1iaW5kIC9kYXRhL2RhdGEvY29tLnRlcm11eDovZGF0YS9kYXRhL2NvbS50ZXJtdXggIiRD
+T05UQUlORVIiCkxBVU5DSEVSX1NDUklQVAoKICAgIGNobW9kIDc1NSAiJExBVU5DSEVSIgogICAg
+bG4gLXNmICIkTEFVTkNIRVIiICIkUFJFRklYL2Jpbi9uZXRodW50ZXIiIDI+L2Rldi9udWxsIHx8
+IHRydWUKICAgIG9rICJMYXVuY2hlciAnbmgnIGNyaWFkbyBlbSAkTEFVTkNIRVIiCiAgICBwcmlu
+dGYgIlxuIgoKICAgIHByaW50ZiAiICBcMDMzWzE7MzJtKy0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLStcMDMzWzBtXG4iCiAgICBwcmludGYgIiAgXDAzM1sxOzMybXwg
+ICAgICAgICAgSU5TVEFMQUNBTyBDT05DTFVJREEgICAgICAgICAgICB8XDAzM1swbVxuIgogICAg
+cHJpbnRmICIgIFwwMzNbMTszMm18ICBVc2U6IG5oICBvdSAgcGQgbG9naW4ga2FsaSAgICAgICAg
+ICAgICB8XDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszMm0rLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tK1wwMzNbMG1cbiIKICAgIHByaW50ZiAiXG4iCiAg
+ICA7OwoKICAjIOKUgOKUgCBBcmNoIExpbnV4IEFSTSBJbnN0YWxsZXIgKHRlcm11eC1hcmNoKSDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDi
+lIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIDilIAKICAtYmF8LS1ibGFja2FyY2gpCiAg
+ICBfQVJDSF9TQ1JJUFQ9IiR7UFJFRklYOi0vZGF0YS9kYXRhL2NvbS50ZXJtdXgvZmlsZXMvdXNy
+fS9zaGFyZS9sdWEtc2NyaXB0cy9pbnN0YWxsLWFyY2guc2giCiAgICBpZiBbIC1mICIkX0FSQ0hf
+U0NSSVBUIiBdOyB0aGVuCiAgICAgIGJhc2ggIiRfQVJDSF9TQ1JJUFQiCiAgICBlbHNlCiAgICAg
+IHByaW50ZiAiXDAzM1sxOzMxbVvinJddXDAzM1swbSBpbnN0YWxsLWFyY2guc2ggbsOjbyBlbmNv
+bnRyYWRvIGVtICRfQVJDSF9TQ1JJUFRcbiIKICAgICAgcHJpbnRmICIgICAgUmVpbnN0YWxlIG8g
+RWxsaW90T1M6IGJhc2ggbHVhc2NyaXB0LnNoXG4iCiAgICAgIGV4aXQgMQogICAgZmkKICAgIDs7
+CgogICIiKQogICAgZXhlYyAiJF9CIgogICAgOzsKCiAgKikKICAgIGNhc2UgIiQxIiBpbgogICAg
+ICAtKikKICAgICAgICBwcmludGYgIlwwMzNbMTszMW0gIFtceGUyXHg5Y1x4OTddXDAzM1swbSBP
+cFx4YzNceGE3XHhjM1x4YTNvIGRlc2NvbmhlY2lkYTogJXNcbiIgIiQxIgogICAgICAgIGV4aXQg
+MQogICAgICAgIDs7CiAgICAgICopCiAgICAgICAgX1NDUklQVD0iJDEiOyBzaGlmdAogICAgICAg
+IFsgIiR7MTotfSIgPSAiLS0iIF0gJiYgc2hpZnQKICAgICAgICBpZiBbIC1mICIkX1NDUklQVCIg
+XSAmJiBfaXZhcl9uZWVkc19wcmVwcm9jZXNzICIkX1NDUklQVCI7IHRoZW4KICAgICAgICAgICAg
+X2l2YXJfcnVuX2ZpbGUgIiRfU0NSSVBUIiAiJEAiCiAgICAgICAgZWxzZQogICAgICAgICAgICBf
+bHVhX3J1biAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcpIiAiJF9TQ1JJUFQiICIkQCIKICAgICAg
+ICBmaQogICAgICAgIDs7CiAgICBlc2FjCiAgICA7Owplc2FjCg==
+MS_B64EOF
 
     # substitui o placeholder pelo path real do binário
     if [ -z "${BIN:-}" ] || [ ! -f "$BIN" ]; then
         _warn "BIN inválido ou ausente ('${BIN:-}') — ms não configurado corretamente"
-        _warn "Corrija manualmente: sed -i 's|MS_BIN_PLACEHOLDER|/path/para/lua-net|g' \"$MS\""
+        _warn "Corrija manualmente: sed -i 's|MS_INTERP_PLACEHOLDER|/bin/bash|g; s|MS_BIN_PLACEHOLDER|/path/para/lua-net|g' \"$MS\""
     else
-        sed -i "s|MS_BIN_PLACEHOLDER|${BIN}|g" "$MS"
+        sed -i "s|MS_INTERP_PLACEHOLDER|${SH_INTERP}|g; s|MS_BIN_PLACEHOLDER|${BIN}|g" "$MS"
     fi
     chmod 755 "$MS"
 
@@ -118238,7 +121842,7 @@ static const char *LUA_STD_MODS[] = {
     "@std/db","@std/web","@std/ui","@std/ms","@std/mod",
     "@std/re","@std/util","@std/log","@std/csv","@std/json",
     "@std/tui","@std/ivar","@std/exploit","@std/pent","@std/adb",
-    "@std/agent","@std/lmod","@std/sh","@std/cc",
+    "@std/agent","@std/lmod","@std/sh","@std/cc","@std/lx",
     /* @user/ — arquivos locais */
     "@user/",
     /* stdlib Lua pura */
@@ -119550,10 +123154,91 @@ static const EeModHint EE_MOD_HINTS[] = {
     {"@std/log","log",{"log.info(","log.warn(","log.error(","log.debug(","log.fatal(","log.set_level(","log.to_file(","log.help()",NULL}},
     {"@std/csv","csv",{"csv.parse(","csv.encode(","csv.read(","csv.write(","csv.headers(","csv.rows(","csv.help()",NULL}},
     {"@std/json","json",{"json.encode(","json.decode(","json.pretty(","json.parse(","json.stringify(","json.help()",NULL}},
+    {"@std/lx","lx",{"lx.app(","lx.screen(","lx.menu(","lx.text(","lx.field(",
+        "lx.output(","lx.table(","lx.progress(","lx.button(","lx.print(",
+        "lx.spacer()","lx.sep()","lx.alert(","lx.confirm(","lx.prompt(","lx.notify(",
+        "lx.filepick(","lx.dirpick(",
+        "lx.run()","lx.quit()","lx.after(","lx.every(","lx.cancel(","lx.help()",NULL}},
     {"@std",NULL,{"net.tcp(","net.dns(","fs.read(","fs.write(","sys.sh(","ai.ask(",
         "crypto.md5(","db.open(","web.serve(","mod.xss(","tui.box(","ms.help()",NULL}},
     {NULL,NULL,{NULL}}
 };
+
+/* Tenta localizar o .lua real do módulo no disco (mesmos diretórios que
+ * require()/dyn_load() usam) e extrai as funções direto do código-fonte —
+ * "function <tabela>.<nome>(" / "function <tabela>:<nome>(" — em vez de
+ * depender de uma lista hardcoded que pode ficar desatualizada. Descobre
+ * qual é a "tabela" exportada olhando o último "return <ident>" do
+ * arquivo (padrão universal de módulo Lua: local M={}...return M). */
+static void scan_module_file(const char *modname, const char *alias_final,
+                              const char *prefix, int plen) {
+    const char *search = modname;
+    if (!strncmp(modname, "@std/", 5)) search = modname + 5;
+    else if (!strncmp(modname, "@user/", 6)) return; /* @user/ tratado à parte */
+
+    const char *home = getenv("HOME");
+    const char *pfx  = getenv("PREFIX");
+    char cand[4][512]; int nc = 0;
+    if (pfx) {
+        snprintf(cand[nc++], 512, "%s/share/lua/5.4/%s.lua", pfx, search);
+        snprintf(cand[nc++], 512, "%s/share/lua-modules/%s.lua", pfx, search);
+    }
+    if (home) {
+        snprintf(cand[nc++], 512, "%s/.lua-modules/%s.lua", home, search);
+        snprintf(cand[nc++], 512, "%s/.luarocks/share/lua/5.4/%s.lua", home, search);
+    }
+
+    for (int c = 0; c < nc; c++) {
+        FILE *f = fopen(cand[c], "r");
+        if (!f) continue;
+
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (len <= 0 || len > (1<<20)) { fclose(f); continue; }
+        char *buf = malloc((size_t)len + 1);
+        if (!buf) { fclose(f); continue; }
+        size_t rd = fread(buf, 1, (size_t)len, f);
+        buf[rd] = '\0';
+        fclose(f);
+
+        /* tabela exportada = último "return <ident>" do arquivo */
+        char tvar[64] = {0};
+        char *rp = NULL, *scanp = buf;
+        while ((scanp = strstr(scanp, "return ")) != NULL) { rp = scanp; scanp += 7; }
+        if (rp) {
+            rp += 7;
+            while (*rp==' '||*rp=='\t') rp++;
+            int ti=0;
+            while (*rp && (isalnum((unsigned char)*rp)||*rp=='_') && ti<63) tvar[ti++]=*rp++;
+            tvar[ti]='\0';
+        }
+        if (!tvar[0]) strncpy(tvar, search, sizeof(tvar)-1);
+        int tlen = (int)strlen(tvar);
+
+        /* varre "function <tvar>.<nome>(" / "function <tvar>:<nome>(" */
+        char *cur = buf;
+        char *fp;
+        while ((fp = strstr(cur, "function ")) != NULL) {
+            char *q = fp + 9;
+            while (*q==' '||*q=='\t') q++;
+            if (tlen>0 && !strncmp(q, tvar, tlen) && (q[tlen]=='.'||q[tlen]==':')) {
+                char *np = q + tlen + 1;
+                char fn[96]; int ni=0;
+                while (*np && (isalnum((unsigned char)*np)||*np=='_') && ni<95) fn[ni++]=*np++;
+                fn[ni]='\0';
+                if (ni>0 && *np=='(') {
+                    char entry[160];
+                    snprintf(entry, sizeof(entry), "%s.%s(", alias_final, fn);
+                    comp_add(entry, prefix, plen);
+                }
+            }
+            cur = fp + 9;
+        }
+        free(buf);
+        break; /* achou o arquivo — não procura nos demais diretórios */
+    }
+}
 
 /* Escaneia todas as linhas do arquivo atual por require("mod")
  * e adiciona os hints do módulo + alias se houver */
@@ -119594,9 +123279,19 @@ static void scan_file_requires(const char *prefix, int plen) {
                 if(line[ei]==';'||line[ei]=='\n') break;
             }
 
-            /* Adiciona hints do módulo */
+            /* 1. Fonte de verdade: parseia o .lua real do módulo no disco */
+            {
+                const char *search_base = modname;
+                if (!strncmp(modname, "@std/", 5)) search_base = modname + 5;
+                const char *alias_final = alias[0] ? alias : search_base;
+                scan_module_file(modname, alias_final, prefix, plen);
+            }
+
+            /* 2. Adiciona hints do módulo (fallback caso o arquivo não */
+            /*    exista em disco — ex: módulo C-nativo sem .lua fonte) */
             for(int m=0; EE_MOD_HINTS[m].mod; m++) {
-                if(strcmp(modname, EE_MOD_HINTS[m].mod)!=0) continue;
+                if(strcmp(modname, EE_MOD_HINTS[m].mod)!=0 &&
+                   (EE_MOD_HINTS[m].alias==NULL || strcmp(modname, EE_MOD_HINTS[m].alias)!=0)) continue;
                 const char *def_alias = EE_MOD_HINTS[m].alias;
                 for(int f=0; EE_MOD_HINTS[m].fns[f]; f++) {
                     const char *fn = EE_MOD_HINTS[m].fns[f];
@@ -119726,28 +123421,35 @@ static void comp_open(void) {
     comp_close();
     if (plen < 1) return;
 
-    /* 1. Cache do REPL (_G em tempo real) */
-    int cache_count_before = E.comp.count;
-    scan_ac_cache(prefix, plen);
-    int cache_loaded = (E.comp.count > cache_count_before);
+    /* Ordem por relevância: primeiro o que é mais provável de ser o que o
+     * usuário quer (símbolos do próprio arquivo, builtins conhecidos,
+     * keywords), e só por último o dump bruto do _G via cache do REPL —
+     * esse pode ter centenas de entradas internas e, entrando primeiro,
+     * empurrava coisas como "print" pra fora das 12 linhas visíveis do
+     * popup (COMPLETION_SHOW). */
 
-    /* 2. Símbolos do arquivo atual + módulos via require() */
+    /* 1. Símbolos do arquivo atual + módulos via require() */
     scan_current_file(prefix, plen);
     scan_file_requires(prefix, plen);
 
-    /* 3. COMPLETIONS[] fixo — só quando cache vazio (REPL não iniciado) */
-    if(!cache_loaded) {
-        for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
-            if (!strncmp(COMPLETIONS[i], prefix, plen))
-                E.comp.items[E.comp.count++] = strdup(COMPLETIONS[i]);
-        }
+    /* 2. COMPLETIONS[] fixo — sempre, independente do estado do cache/REPL.
+     * Builtins como print/pairs/string.* não podem depender de o REPL já
+     * ter rodado e de o cache calhar de ter algo com o mesmo prefixo;
+     * comp_add() já deduplica corretamente contra o que veio do cache. */
+    for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
+        comp_add(COMPLETIONS[i], prefix, plen);
     }
 
-    /* Keywords da sintaxe — sempre, cache não contém keywords */
+    /* 3. Keywords da sintaxe — sempre, cache não contém keywords.
+     * kw_preproc do Lua (lua_meth) é só nomes de método soltos, usados
+     * apenas para o highlight de "net.scan" etc — não faz sentido como
+     * candidato de completion sem o prefixo do módulo, então é excluído
+     * aqui (diferente de C/C++/Bash, onde kw_preproc são diretivas reais). */
     if (E.syntax) {
+        int is_lua = (E.syntax == &HLDB[2]);
         const char **lists[] = {
             E.syntax->kw_flow, E.syntax->kw_builtin,
-            E.syntax->kw_types, E.syntax->kw_preproc, NULL
+            E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
         };
         for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++) {
             for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++) {
@@ -119755,6 +123457,9 @@ static void comp_open(void) {
             }
         }
     }
+
+    /* 4. Cache do REPL (_G em tempo real) — por último, é ruidoso */
+    scan_ac_cache(prefix, plen);
 
     if (E.comp.count == 0) return;
     E.comp.selected  = 0;
@@ -119781,31 +123486,38 @@ static void comp_open_live(void) {
     comp_close();
     if (plen < 1) return;
 
-    int cache_count_before = E.comp.count;
-    scan_ac_cache(prefix, plen);
-    int cache_loaded = (E.comp.count > cache_count_before);
-
+    /* Ordem por relevância — ver comentário em comp_open() */
     scan_current_file(prefix, plen);
     scan_file_requires(prefix, plen);
 
-    if (!cache_loaded) {
-        for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
-            if (!strncmp(COMPLETIONS[i], prefix, plen))
-                E.comp.items[E.comp.count++] = strdup(COMPLETIONS[i]);
-        }
+    for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
+        comp_add(COMPLETIONS[i], prefix, plen);
     }
-    /* kw_flow/kw_builtin sempre — keywords não estão no cache do REPL */
+    /* kw_flow/kw_builtin sempre — keywords não estão no cache do REPL.
+     * kw_preproc do Lua excluído — ver comentário em comp_open(). */
     if (E.syntax) {
+        int is_lua = (E.syntax == &HLDB[2]);
         const char **lists[] = {
             E.syntax->kw_flow, E.syntax->kw_builtin,
-            E.syntax->kw_types, E.syntax->kw_preproc, NULL
+            E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
         };
         for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++)
             for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++)
                 comp_add(lists[l][j], prefix, plen);
     }
 
+    /* Cache do REPL (_G em tempo real) — por último, é ruidoso */
+    scan_ac_cache(prefix, plen);
+
     if (E.comp.count == 0) return;
+    /* Se o único match é exatamente igual ao que já foi digitado
+     * (palavra já completa), não há nada a completar — fecha o popup
+     * em vez de continuar mostrando o próprio texto digitado. */
+    if (E.comp.count == 1 && (int)strlen(E.comp.items[0]) == plen
+        && !strncmp(E.comp.items[0], prefix, plen)) {
+        comp_close();
+        return;
+    }
     E.comp.selected   = 0;
     E.comp.active     = 1;
     E.comp.trigger_cx = E.cx - plen;
@@ -120263,6 +123975,71 @@ static void format_c(void) {
  *                              end/until/else/elseif → -1 (antes) ou 0
  */
 static void format_lua(void) {
+    /* Passo 0: fecha parênteses, colchetes e chaves não finalizados */
+    {
+        int p = 0, b = 0, c2 = 0; /* (, [, { */
+        for (int y = 0; y < E.numrows; y++) {
+            char *s = E.row[y].chars;
+            int   n = E.row[y].size;
+            int in_str = 0; char sq = 0;
+            int in_long = 0; /* [[ ]] */
+            for (int i = 0; i < n; i++) {
+                char ch = s[i];
+                /* comentário de linha: para de contar */
+                if (!in_str && !in_long && ch=='-' && i+1<n && s[i+1]=='-') {
+                    /* long comment [[ ? */
+                    if (i+2<n && s[i+2]=='[' && i+3<n && s[i+3]=='[')
+                        in_long = 1;
+                    else
+                        break;
+                }
+                /* fim de long string/comment ]] */
+                if (in_long) {
+                    if (ch==']' && i+1<n && s[i+1]==']') { in_long=0; i++; }
+                    continue;
+                }
+                /* strings */
+                if (!in_str && (ch=='"'||ch=='\'')) { in_str=1; sq=ch; continue; }
+                if (in_str) {
+                    if (ch=='\\') { i++; continue; }
+                    if (ch==sq)   in_str=0;
+                    continue;
+                }
+                /* long string [[ */
+                if (ch=='[' && i+1<n && s[i+1]=='[') { in_long=1; i++; continue; }
+                /* contadores */
+                if      (ch=='(') p++;
+                else if (ch==')') p--;
+                else if (ch=='[') b++;
+                else if (ch==']') b--;
+                else if (ch=='{') c2++;
+                else if (ch=='}') c2--;
+            }
+        }
+        /* encontrar última linha não-vazia */
+        if (p > 0 || b > 0 || c2 > 0) {
+            int last = E.numrows - 1;
+            while (last > 0 && E.row[last].size == 0) last--;
+            Row *row = &E.row[last];
+            /* construir sufixo de fechamento: ordem inversa intuitiva ) antes ] antes } */
+            char suffix[256]; int si = 0;
+            /* fecha na ordem: ) ] } — mais comum em Lua: func({...}) */
+            for (int i = 0; i < p  && si < 250; i++) suffix[si++] = ')';
+            for (int i = 0; i < b  && si < 250; i++) suffix[si++] = ']';
+            for (int i = 0; i < c2 && si < 250; i++) suffix[si++] = '}';
+            suffix[si] = '\0';
+            if (si > 0) {
+                int newlen = row->size + si;
+                char *newchars = malloc(newlen + 1);
+                memcpy(newchars, row->chars, row->size);
+                memcpy(newchars + row->size, suffix, si);
+                newchars[newlen] = '\0';
+                row_replace(last, newchars, newlen);
+                free(newchars);
+            }
+        }
+    }
+
     /* Passo 1: trailing whitespace */
     for (int y = 0; y < E.numrows; y++)
         row_trim_trailing(&E.row[y]);
@@ -120427,7 +124204,7 @@ static void format_lua(void) {
 
     E.dirty++;
     E.cx = 0;
-    set_status("\x1b[32m✓\x1b[m Código Lua formatado");
+    set_status("\x1b[32m✓\x1b[m Código Lua formatado e delimitadores corrigidos");
 }
 
 /* ── Formatador Bash ────────────────────────────────── */
@@ -120706,7 +124483,7 @@ static void check_run_trailing(void) {
 }
 
 /* ── Linhas muito compridas ── */
-#define CHECK_MAX_LINE_LEN 120
+#define CHECK_MAX_LINE_LEN 200
 static void check_run_line_length(void) {
     for (int y = 0; y < E.numrows; y++) {
         if (E.row[y].size > CHECK_MAX_LINE_LEN) {
@@ -120975,6 +124752,33 @@ static void check_run_lua_pass1(void) {
                         }
                     }
                 }
+            }
+        }
+
+        /* ── parâmetros de funções anônimas: `function(v)`, `function(a,b)` ──
+           O bloco acima só cobre funções nomeadas. Aqui varremos a linha
+           inteira procurando `function(` ou `function (` e registramos
+           todos os parâmetros para evitar falso positivo em check_undefined. ── */
+        {
+            const char *fp2 = code;
+            while ((fp2 = strstr(fp2, "function")) != NULL) {
+                fp2 += 8; /* pula "function" */
+                while (*fp2 == ' ') fp2++;
+                if (*fp2 == '(') {
+                    fp2++; /* pula '(' */
+                    while (*fp2 && *fp2 != ')') {
+                        while (*fp2 == ' ' || *fp2 == ',') fp2++;
+                        if (*fp2 == ')' || *fp2 == '\0') break;
+                        char pname[40]; int pi = 0;
+                        const char *tmp = fp2;
+                        int tidx = (int)(tmp - code);
+                        if (eis_read_ident(code, &tidx, pname, sizeof(pname))) {
+                            eis_known_add(pname);
+                            fp2 = code + tidx;
+                        } else { fp2++; }
+                    }
+                }
+                /* se não tem '(' logo após: é função nomeada, já tratada acima */
             }
         }
 
@@ -121288,6 +125092,177 @@ static void check_run_c_assign_in_cond(void) {
  * DESPACHO POR LINGUAGEM + ENTRADA (Ctrl+E)
  * ════════════════════════════════════════════════════════ */
 
+/* ════════════════════════════════════════════════════════
+ * CHECK: módulos require() — verifica existência no disco e @std
+ * ════════════════════════════════════════════════════════ */
+
+/* Módulos @std builtin do ElliotOS (não precisam de arquivo no disco) */
+static const char *ELLIOT_STD_MODS[] = {
+    "@std", "@std/net", "@std/fs", "@std/sys", "@std/ai", "@std/crypto",
+    "@std/db", "@std/web", "@std/ui", "@std/ms", "@std/re", "@std/util",
+    "@std/log", "@std/csv", "@std/json", "@std/mod", "@std/tui", "@std/ivar",
+    "@std/exploit", "@std/pent", "@std/adb", "@std/agent", "@std/lmod",
+    "@std/sh", "@std/cc", "@std/try", "@std/lx", "@std/color", "@std/num",
+    "@std/path", "@std/test", "@std/queue", "@std/stack", "@std/table",
+    NULL
+};
+
+/* Módulos Lua padrão (sempre disponíveis) */
+static const char *LUA_STDLIB[] = {
+    "os","io","math","table","string","coroutine","utf8",
+    "package","debug","bit32","jit",
+    NULL
+};
+
+/* Testa se arquivo existe no disco */
+static int mod_file_exists(const char *path) {
+    struct stat st;
+    return (stat(path, &st) == 0 && S_ISREG(st.st_mode));
+}
+
+/* Procura módulo simples em todos os caminhos conhecidos.
+ * Retorna 1 se encontrado, 0 se não encontrado.
+ * Preenche found_path com o caminho onde foi achado. */
+static int mod_find_on_disk(const char *name, char *found_path, int fp_size) {
+    const char *home = getenv("HOME");
+    const char *prefix = getenv("PREFIX");
+    if (!home)   home   = "/data/data/com.termux/files/home";
+    if (!prefix) prefix = "/data/data/com.termux/files/usr";
+
+    /* Caminhos de busca em ordem de prioridade */
+    char paths[8][512];
+    int np = 0;
+
+    /* 1. ~/.lua-modules/ (padrão do usuário ElliotOS) */
+    snprintf(paths[np++], 512, "%s/.lua-modules/%s.lua", home, name);
+    /* 2. $PREFIX/share/lua/5.4/ */
+    snprintf(paths[np++], 512, "%s/share/lua/5.4/%s.lua", prefix, name);
+    /* 3. $PREFIX/share/lua/5.4/nome/init.lua */
+    snprintf(paths[np++], 512, "%s/share/lua/5.4/%s/init.lua", prefix, name);
+    /* 4. LUA_PATH env: percorre entradas separadas por ; */
+    const char *lua_path = getenv("LUA_PATH");
+    if (lua_path) {
+        char lp[2048]; snprintf(lp, sizeof(lp), "%s", lua_path);
+        char *tok = lp, *end;
+        while (tok && np < 8) {
+            end = strchr(tok, ';');
+            if (end) *end = '\0';
+            /* substitui ? pelo nome do módulo */
+            char *q = strchr(tok, '?');
+            if (q) {
+                char resolved[512];
+                int pre = (int)(q - tok);
+                snprintf(resolved, sizeof(resolved), "%.*s%s%s", pre, tok, name, q+1);
+                snprintf(paths[np++], 512, "%s", resolved);
+            }
+            tok = end ? end+1 : NULL;
+        }
+    }
+
+    for (int i = 0; i < np; i++) {
+        if (mod_file_exists(paths[i])) {
+            if (found_path) snprintf(found_path, fp_size, "%s", paths[i]);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#define MOD_SEEN_MAX 32
+
+static void check_run_lua_modules(void) {
+    char seen[MOD_SEEN_MAX][128];
+    int  seen_count = 0;
+    int  block_kind = 0;
+
+    for (int y = 0; y < E.numrows; y++) {
+        char code[512];
+        eis_strip_lua_line(&E.row[y], code, sizeof(code), &block_kind);
+
+        /* Procura require( na linha */
+        const char *p = code;
+        while ((p = strstr(p, "require(")) != NULL) {
+            p += 8; /* pula "require(" */
+            /* pula espaços */
+            while (*p == ' ') p++;
+            /* aspas */
+            char q = 0;
+            if (*p == '"' || *p == '\'') { q = *p; p++; }
+            else { continue; } /* require sem string literal — ignora */
+
+            /* extrai nome do módulo */
+            char modname[128]; int mi = 0;
+            while (*p && *p != q && mi < (int)sizeof(modname)-1)
+                modname[mi++] = *p++;
+            modname[mi] = '\0';
+            if (*p) p++; /* pula aspa de fechamento */
+            if (mi == 0) continue;
+
+            /* deduplica: só reporta cada módulo uma vez */
+            int dup = 0;
+            for (int i = 0; i < seen_count; i++)
+                if (!strcmp(seen[i], modname)) { dup=1; break; }
+            if (dup) continue;
+            if (seen_count < MOD_SEEN_MAX)
+                snprintf(seen[seen_count++], sizeof(seen[0]), "%s", modname);
+
+            /* ── 1. Módulo @std/nome ── */
+            if (modname[0] == '@') {
+                int found_std = 0;
+                for (int i = 0; ELLIOT_STD_MODS[i]; i++) {
+                    if (!strcmp(ELLIOT_STD_MODS[i], modname)) { found_std=1; break; }
+                }
+                if (!found_std) {
+                    /* tenta match sem prefixo @std/ */
+                    const char *bare = strstr(modname, "/");
+                    if (bare) bare++; else bare = modname+1;
+                    /* verifica no disco como módulo de usuário */
+                    char fpath[512];
+                    if (mod_find_on_disk(bare, fpath, sizeof(fpath))) {
+                        eissue_add(y+1, 'W',
+                            "'%s' não é @std builtin mas '%s.lua' foi achado no disco",
+                            modname, bare);
+                    } else {
+                        eissue_add(y+1, 'E',
+                            "'%s' não existe — módulos @std disponíveis: use lx.help() ou ms --doc",
+                            modname);
+                    }
+                }
+                /* @std builtin: ok, sem aviso */
+                continue;
+            }
+
+            /* ── 2. Módulo stdlib Lua ── */
+            int is_stdlib = 0;
+            for (int i = 0; LUA_STDLIB[i]; i++)
+                if (!strcmp(LUA_STDLIB[i], modname)) { is_stdlib=1; break; }
+            if (is_stdlib) continue;
+
+            /* ── 3. Módulo no disco ── */
+            char fpath[512]; fpath[0] = '\0';
+            if (mod_find_on_disk(modname, fpath, sizeof(fpath))) {
+                /* achou — verifica se está no caminho padrão (~/.lua-modules) */
+                const char *home2 = getenv("HOME");
+                if (!home2) home2 = "/data/data/com.termux/files/home";
+                char std_path[512];
+                snprintf(std_path, sizeof(std_path), "%s/.lua-modules", home2);
+                if (strstr(fpath, std_path) == NULL) {
+                    eissue_add(y+1, 'I',
+                        "'%s' achado fora do caminho padrão: %s",
+                        modname, fpath);
+                }
+                /* se está no caminho padrão: ok, sem aviso */
+                continue;
+            }
+
+            /* ── 4. Não achado em lugar nenhum ── */
+            eissue_add(y+1, 'E',
+                "módulo '%s' não encontrado — instale com: lpm install %s",
+                modname, modname);
+        }
+    }
+}
+
 static void check_run_all(void) {
     g_eissue_count = 0;
 
@@ -121305,6 +125280,7 @@ static void check_run_all(void) {
         check_run_lua_pass1();
         check_run_lua_unused();
         check_run_lua_undefined_calls();
+        check_run_lua_modules();
     } else if (is_c) {
         snprintf(g_eissue_lang, sizeof(g_eissue_lang), "%s",
                  (E.syntax == &HLDB[1]) ? "C++" : "C");
@@ -124964,13 +128940,37 @@ int main(int argc, char *argv[]) {
     init();
 
     /* ── Warm-up do cache de autocompletar ─────────────────────────────
-     * Se o arquivo aberto é .lua, dispara lua-net em background para que
-     * ele popule ~/.elliot_ac_cache com o snapshot de _G.
-     * O editor lê esse cache em comp_open() / comp_open_live().        */
+     * Se o arquivo aberto é .lua, extrai os require() do arquivo e
+     * carrega esses módulos num lua-net em background para popular
+     * ~/.elliot_ac_cache com o snapshot real de _G.
+     * Funciona para qualquer módulo: lx, @user/nome, libs de terceiros. */
     if (argc >= 2 && argv[1][0] != '-') {
         const char *_fn = argv[1];
         int _fnl = (int)strlen(_fn);
         if (_fnl > 4 && strcmp(_fn + _fnl - 4, ".lua") == 0) {
+            /* Extrai requires do arquivo */
+            char _lua_preload[4096] = "";
+            FILE *_fsrc = fopen(_fn, "r");
+            if (_fsrc) {
+                char _line[512];
+                while (fgets(_line, sizeof(_line), _fsrc)) {
+                    char _mod[256] = "";
+                    /* require("mod") ou require('mod') */
+                    if (sscanf(_line, " %*[a-zA-Z_]%*[a-zA-Z_0-9]%*[^\"']%*[\"\']%255[^\"\']%*[\"\']", _mod) == 1
+                        && strstr(_line, "require")) {
+                        /* pcall para não abortar se módulo falhar */
+                        char _stmt[384];
+                        snprintf(_stmt, sizeof(_stmt),
+                            "pcall(require, \"%s\") ", _mod);
+                        if (strlen(_lua_preload) + strlen(_stmt) < sizeof(_lua_preload) - 1)
+                            strcat(_lua_preload, _stmt);
+                    }
+                }
+                fclose(_fsrc);
+            }
+            /* Se não extraiu nada, só popula o _G padrão */
+            if (_lua_preload[0] == '\0')
+                strcpy(_lua_preload, "");
             pid_t _cpid = fork();
             if (_cpid == 0) {
                 int _devnull = open("/dev/null", O_RDWR);
@@ -124980,7 +128980,9 @@ int main(int argc, char *argv[]) {
                     dup2(_devnull, 2);
                     close(_devnull);
                 }
-                execlp("lua-net", "lua-net", "-e", "", (char *)NULL);
+                /* sinaliza ao lua-net que deve popular o cache após rodar */
+                setenv("ELLIOT_AC_WARMUP", "1", 1);
+                execlp("lua-net", "lua-net", "-e", _lua_preload, (char *)NULL);
                 _exit(0);
             }
         }
@@ -126099,7 +130101,7 @@ case "${1:-}" in
         _TPFX="${PREFIX:-/data/data/com.termux/files/usr}"
         printf "\n\033[1;35m── ElliotOS --doctor ────────────────────────────────────────────\033[0m\n\n"
         _DOCTOR_FAIL=0
-        for _bin in lua-net ms luar lpm cxx; do
+        for _bin in lua-net ms luar lpm xpm pst cxx; do
             if command -v "$_bin" >/dev/null 2>&1; then
                 _ok "Binário: $_bin → $(command -v \"$_bin\")"
             else
