@@ -30083,6 +30083,9 @@ ENGINE_EOF
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/sha.h>
 #include <sqlite3.h>
 #include <sys/statvfs.h>
 
@@ -30376,8 +30379,10 @@ static int elliot_system(const char *cmd) {
     "  ttl=64, tos=0,    -- TTL e Type of Service do IP\n" \
     "  payload=\"dados\",  -- payload apos o header TCP\n" \
     "  timeout=3})       -- timeout em segundos\n" \
-    "-- retorno normal: true ou nil,err\n" \
-    "-- com spoof_ip=0:  true, \"x.x.x.x\" (IP sorteado)\n" \
+    "-- retorno normal:               true ou nil,err\n" \
+    "-- com spoof_ip=0:              true, \"x.x.x.x\"\n" \
+    "-- com spoof_port=0:            true, nil, porta\n" \
+    "-- com ambos=0:                 true, \"x.x.x.x\", porta\n" \
     "-- Aliases mantidos para compatibilidade:\n" \
     "net.raw.syn(ip,port)    net.raw.rst(ip,port)    net.raw.ack(ip,port)\n" \
     "net.raw.fin(ip,port)    net.raw.psh(ip,port)    net.raw.synack(ip,port)\n" \
@@ -35728,8 +35733,27 @@ typedef struct {
     char host[256];
     int  port;
     char family[8];   // "ipv4","ipv6","unix"
-    char stype[8];    // "stream","dgram"
+    char stype[8];    // "stream","dgram","tls","ws","wss"
+    SSL_CTX *ssl_ctx;
+    SSL     *ssl;
 } SockObj;
+
+/* forward declarations */
+static int sock_ws_send(lua_State *L);
+static int sock_ws_recv(lua_State *L);
+
+/* helpers TLS internos */
+static ssize_t sock_tls_write(SockObj *s, const char *buf, size_t len) {
+    return (ssize_t)SSL_write(s->ssl, buf, (int)len);
+}
+static ssize_t sock_tls_read(SockObj *s, char *buf, size_t len) {
+    int n = SSL_read(s->ssl, buf, (int)len);
+    return (ssize_t)n;
+}
+static void sock_tls_free(SockObj *s) {
+    if (s->ssl)     { SSL_shutdown(s->ssl); SSL_free(s->ssl); s->ssl=NULL; }
+    if (s->ssl_ctx) { SSL_CTX_free(s->ssl_ctx); s->ssl_ctx=NULL; }
+}
 
 // ── Função interna de conexão — núcleo compartilhado ─────────────────────
 static int sock_do_connect(lua_State *L,
@@ -35868,9 +35892,11 @@ static int sock_do_connect(lua_State *L,
 
     // ── Cria userdata + metatable ─────────────────────────────────────────
     SockObj *s = (SockObj*)lua_newuserdata(L, sizeof(SockObj));
-    s->fd     = fd;
-    s->closed = 0;
-    s->port   = port;
+    s->fd      = fd;
+    s->closed  = 0;
+    s->port    = port;
+    s->ssl     = NULL;
+    s->ssl_ctx = NULL;
     strncpy(s->host,   host,        255);
     strncpy(s->family, family_str,  7);
     strncpy(s->stype,  type_str,    7);
@@ -35899,16 +35925,15 @@ static int sock_send(lua_State *L) {
     SockObj *s = (SockObj*)luaL_checkudata(L, 1, SOCK_META);
     if (s->closed) { lua_pushnil(L); lua_pushstring(L,"socket fechado"); return 2; }
     size_t len; const char *data = luaL_checklstring(L, 2, &len);
-    /* MSG_NOSIGNAL evita SIGPIPE. Para envios grandes, envia em blocos de 64KB
-     * para aproveitar o buffer do kernel sem copiar tudo de uma vez. */
     size_t total = 0;
     while (total < len) {
-        size_t chunk = len - total;
-        if (chunk > 65536) chunk = 65536;
-        ssize_t n = send(s->fd, data + total, chunk, MSG_NOSIGNAL);
+        size_t chunk = len - total; if (chunk > 65536) chunk = 65536;
+        ssize_t n = s->ssl
+            ? sock_tls_write(s, data + total, chunk)
+            : send(s->fd, data + total, chunk, MSG_NOSIGNAL);
         if (n <= 0) {
             if (total > 0) { lua_pushinteger(L,(lua_Integer)total); return 1; }
-            lua_pushnil(L); lua_pushstring(L, strerror(errno)); return 2;
+            lua_pushnil(L); lua_pushstring(L, s->ssl ? "TLS write error" : strerror(errno)); return 2;
         }
         total += (size_t)n;
     }
@@ -35925,11 +35950,13 @@ static int sock_recv(lua_State *L) {
     char stack_buf[4096];
     char *buf = (max <= 4096) ? stack_buf : (char*)malloc(max + 1);
     if (!buf) { lua_pushnil(L); lua_pushstring(L,"sem memória"); return 2; }
-    ssize_t n = recv(s->fd, buf, max, 0);
+    ssize_t n = s->ssl
+        ? sock_tls_read(s, buf, (size_t)max)
+        : recv(s->fd, buf, max, 0);
     if (n <= 0) {
         if (buf != stack_buf) free(buf);
         if (n == 0) { s->closed=1; lua_pushnil(L); lua_pushstring(L,"conexão fechada"); return 2; }
-        lua_pushnil(L); lua_pushstring(L, strerror(errno)); return 2;
+        lua_pushnil(L); lua_pushstring(L, s->ssl ? "TLS read error" : strerror(errno)); return 2;
     }
     lua_pushlstring(L, buf, (size_t)n);
     if (buf != stack_buf) free(buf);
@@ -35948,7 +35975,9 @@ static int sock_recvall(lua_State *L) {
     while (total < max) {
         int want = (int)sizeof(buf);
         if (want > max - total) want = max - total;
-        n = recv(s->fd, buf, (size_t)want, 0);
+        n = s->ssl
+            ? sock_tls_read(s, buf, (size_t)want)
+            : recv(s->fd, buf, (size_t)want, 0);
         if (n <= 0) break;
         luaL_addlstring(&b, buf, (size_t)n);
         total += (int)n;
@@ -35961,20 +35990,27 @@ static int sock_recvline(lua_State *L) {
     SockObj *s = (SockObj*)luaL_checkudata(L, 1, SOCK_META);
     if (s->closed) { lua_pushnil(L); lua_pushstring(L,"socket fechado"); return 2; }
     luaL_Buffer b; luaL_buffinit(L, &b);
-    /* Lê byte a byte com MSG_PEEK para achar \n, depois lê o bloco inteiro.
-     * Isso elimina o overhead de syscall por caractere da versão anterior. */
-    char peek[256]; ssize_t n;
-    while (1) {
-        n = recv(s->fd, peek, sizeof(peek), MSG_PEEK);
-        if (n <= 0) break;
-        /* Procura \n no peek buffer */
-        char *nl = (char*)memchr(peek, '\n', (size_t)n);
-        size_t to_read = nl ? (size_t)(nl - peek + 1) : (size_t)n;
-        char consume[256];
-        ssize_t got = recv(s->fd, consume, to_read, 0);
-        if (got <= 0) break;
-        luaL_addlstring(&b, consume, (size_t)got);
-        if (nl) break; /* linha completa */
+    ssize_t n;
+    if (s->ssl) {
+        /* TLS: MSG_PEEK não funciona com SSL — lê byte a byte */
+        char c;
+        while ((n = SSL_read(s->ssl, &c, 1)) == 1) {
+            luaL_addlstring(&b, &c, 1);
+            if (c == '\n') break;
+        }
+    } else {
+        char peek[256];
+        while (1) {
+            n = recv(s->fd, peek, sizeof(peek), MSG_PEEK);
+            if (n <= 0) break;
+            char *nl = (char*)memchr(peek, '\n', (size_t)n);
+            size_t to_read = nl ? (size_t)(nl - peek + 1) : (size_t)n;
+            char consume[256];
+            ssize_t got = recv(s->fd, consume, to_read, 0);
+            if (got <= 0) break;
+            luaL_addlstring(&b, consume, (size_t)got);
+            if (nl) break;
+        }
     }
     if (n <= 0 && luaL_bufflen(&b) == 0) {
         lua_pushnil(L); lua_pushstring(L, n==0?"conexão fechada":strerror(errno)); return 2;
@@ -36043,14 +36079,14 @@ static int sock_closed_method(lua_State *L) {
 
 static int sock_close(lua_State *L) {
     SockObj *s = (SockObj*)luaL_checkudata(L, 1, SOCK_META);
-    if (!s->closed) { close(s->fd); s->closed=1; }
+    if (!s->closed) { sock_tls_free(s); close(s->fd); s->closed=1; }
     lua_pushboolean(L, 1); return 1;
 }
 
 // __gc — fecha automaticamente ao coletar lixo
 static int sock_gc(lua_State *L) {
     SockObj *s = (SockObj*)lua_touserdata(L, 1);
-    if (s && !s->closed) { close(s->fd); s->closed=1; }
+    if (s && !s->closed) { sock_tls_free(s); close(s->fd); s->closed=1; }
     return 0;
 }
 
@@ -36377,6 +36413,8 @@ static void sock_register_meta(lua_State *L) {
     lua_pushcfunction(L, sock_accept);        lua_setfield(L, -2, "accept");
     lua_pushcfunction(L, sock_gc);            lua_setfield(L, -2, "__gc");
     lua_pushcfunction(L, sock_tostring);      lua_setfield(L, -2, "__tostring");
+    lua_pushcfunction(L, sock_ws_send);       lua_setfield(L, -2, "ws_send");
+    lua_pushcfunction(L, sock_ws_recv);       lua_setfield(L, -2, "ws_recv");
     lua_pop(L, 1); // pop metatable
 }
 
@@ -36405,6 +36443,262 @@ static int l_net_tcp6(lua_State *L) {
     int port         = (int)luaL_checkinteger(L, 2);
     int timeout      = (int)luaL_optinteger(L, 3, 5);
     return sock_do_connect(L, host, port, "ipv6", "stream", timeout, 0, 0, 1, NULL, 0, NULL, 0);
+}
+
+// ── net.tls(host, port [, timeout]) — TCP com TLS ────────────────────────
+// Retorna o mesmo SockObj que net.tcp, mas send/recv usam SSL.
+// Uso: local s = net.tls("example.com", 443)
+//      s:send("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
+//      print(s:recvall())
+static int l_net_tls(lua_State *L) {
+    const char *host = luaL_checkstring(L, 1);
+    int port         = (int)luaL_checkinteger(L, 2);
+    int timeout      = (int)luaL_optinteger(L, 3, 10);
+
+    /* Cria socket TCP normal primeiro */
+    int ret = sock_do_connect(L, host, port, "ipv4", "stream", timeout, 0, 0, 1, NULL, 0, NULL, 0);
+    if (ret != 1) return ret; /* propagou nil, err */
+
+    SockObj *s = (SockObj*)lua_touserdata(L, -1);
+
+    /* Inicializa TLS */
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    if (!ctx) {
+        lua_pop(L,1); lua_pushnil(L);
+        lua_pushstring(L,"tls: SSL_CTX_new falhou"); return 2;
+    }
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_default_verify_paths(ctx);
+
+    SSL *ssl = SSL_new(ctx);
+    if (!ssl) {
+        SSL_CTX_free(ctx); lua_pop(L,1); lua_pushnil(L);
+        lua_pushstring(L,"tls: SSL_new falhou"); return 2;
+    }
+    SSL_set_fd(ssl, s->fd);
+    SSL_set_tlsext_host_name(ssl, host); /* SNI */
+
+    if (SSL_connect(ssl) != 1) {
+        char errbuf[256]; ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
+        SSL_free(ssl); SSL_CTX_free(ctx);
+        lua_pop(L,1); lua_pushnil(L);
+        lua_pushfstring(L,"tls: handshake falhou: %s", errbuf); return 2;
+    }
+
+    s->ssl     = ssl;
+    s->ssl_ctx = ctx;
+    strncpy(s->stype, "tls", 7);
+
+    if (isatty(STDOUT_FILENO))
+        fprintf(stdout,"\033[1;32m[TLS] %s:%d → connected (%s)\033[0m\n",
+                host, port, SSL_get_cipher(ssl));
+    return 1;
+}
+
+// ── Handshake WebSocket interno ───────────────────────────────────────────
+static int ws_handshake(SockObj *s, const char *host, int port, const char *path) {
+    /* Gera chave base64 aleatória de 16 bytes */
+    unsigned char raw[16]; RAND_bytes(raw, 16);
+    /* base64 simples */
+    static const char b64[]="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    char key[25]; int ki=0;
+    for (int i=0;i<15;i+=3){
+        key[ki++]=b64[(raw[i]>>2)&0x3f];
+        key[ki++]=b64[((raw[i]&3)<<4)|(raw[i+1]>>4)];
+        key[ki++]=b64[((raw[i+1]&0xf)<<2)|(raw[i+2]>>6)];
+        key[ki++]=b64[raw[i+2]&0x3f];
+    }
+    key[ki++]=b64[(raw[15]>>2)&0x3f];
+    key[ki++]=b64[(raw[15]&3)<<4];
+    key[ki++]='='; key[ki++]='='; key[ki]='\0';
+
+    /* Envia Upgrade request */
+    char req[1024];
+    int rlen = snprintf(req, sizeof(req),
+        "GET %s HTTP/1.1\r\n"
+        "Host: %s:%d\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Key: %s\r\n"
+        "Sec-WebSocket-Version: 13\r\n\r\n",
+        path, host, port, key);
+
+    ssize_t sent = s->ssl
+        ? (ssize_t)SSL_write(s->ssl, req, rlen)
+        : send(s->fd, req, (size_t)rlen, MSG_NOSIGNAL);
+    if (sent != rlen) return -1;
+
+    /* Lê resposta até \r\n\r\n */
+    char resp[2048]; int rpos=0;
+    while (rpos < (int)sizeof(resp)-1) {
+        ssize_t n = s->ssl
+            ? SSL_read(s->ssl, resp+rpos, 1)
+            : recv(s->fd, resp+rpos, 1, 0);
+        if (n <= 0) return -1;
+        rpos++;
+        if (rpos>=4 && memcmp(resp+rpos-4,"\r\n\r\n",4)==0) break;
+    }
+    resp[rpos]='\0';
+    if (!strstr(resp,"101")) return -1; /* não foi Switching Protocols */
+    return 0;
+}
+
+/* Envia frame WebSocket (texto por padrão, opcode=1, masked=1) */
+static int sock_ws_send(lua_State *L) {
+    SockObj *s = (SockObj*)luaL_checkudata(L, 1, SOCK_META);
+    if (s->closed) { lua_pushnil(L); lua_pushstring(L,"socket fechado"); return 2; }
+    size_t len; const char *data = luaL_checklstring(L, 2, &len);
+    int opcode = (int)luaL_optinteger(L, 3, 1); /* 1=text, 2=binary */
+
+    /* Frame header: FIN=1, opcode, mask=1, payload length */
+    unsigned char hdr[14]; int hlen=0;
+    hdr[hlen++] = (unsigned char)(0x80 | (opcode & 0x0f));
+    unsigned char mask[4];
+    RAND_bytes(mask, 4);
+
+    if (len <= 125) {
+        hdr[hlen++] = (unsigned char)(0x80 | len);
+    } else if (len <= 65535) {
+        hdr[hlen++] = 0x80 | 126;
+        hdr[hlen++] = (len>>8)&0xff;
+        hdr[hlen++] = len&0xff;
+    } else {
+        hdr[hlen++] = 0x80 | 127;
+        for (int i=7;i>=0;i--) hdr[hlen++]=(unsigned char)((len>>(i*8))&0xff);
+    }
+    memcpy(hdr+hlen, mask, 4); hlen+=4;
+
+    /* Envia header */
+    ssize_t n = s->ssl
+        ? (ssize_t)SSL_write(s->ssl, hdr, hlen)
+        : send(s->fd, hdr, (size_t)hlen, MSG_NOSIGNAL);
+    if (n != hlen) { lua_pushnil(L); lua_pushstring(L,"ws: erro enviando header"); return 2; }
+
+    /* Envia payload mascarado em blocos */
+    char block[4096]; size_t sent=0;
+    while (sent < len) {
+        size_t chunk = len-sent; if (chunk>sizeof(block)) chunk=sizeof(block);
+        for (size_t i=0;i<chunk;i++) block[i]=data[sent+i]^mask[(sent+i)%4];
+        ssize_t w = s->ssl
+            ? (ssize_t)SSL_write(s->ssl, block, (int)chunk)
+            : send(s->fd, block, chunk, MSG_NOSIGNAL);
+        if (w <= 0) { lua_pushnil(L); lua_pushstring(L,"ws: erro enviando payload"); return 2; }
+        sent += (size_t)w;
+    }
+    lua_pushboolean(L,1); return 1;
+}
+
+/* helper: lê exatamente n bytes do socket/TLS */
+static int ws_readn(SockObj *s, void *buf, size_t n) {
+    size_t got=0; char *p=(char*)buf;
+    while (got<n) {
+        ssize_t r = s->ssl ? SSL_read(s->ssl, p+got, (int)(n-got))
+                           : recv(s->fd, p+got, n-got, 0);
+        if (r<=0) return -1;
+        got+=(size_t)r;
+    }
+    return 0;
+}
+
+/* Recebe um frame WebSocket — retorna payload, opcode */
+static int sock_ws_recv(lua_State *L) {
+    SockObj *s = (SockObj*)luaL_checkudata(L, 1, SOCK_META);
+    if (s->closed) { lua_pushnil(L); lua_pushstring(L,"socket fechado"); return 2; }
+
+    unsigned char hdr[2];
+    if (ws_readn(s,hdr,2)<0) { lua_pushnil(L); lua_pushstring(L,"ws: conexão fechada"); return 2; }
+
+    int fin    = (hdr[0]>>7)&1;
+    int opcode = hdr[0]&0x0f;
+    int masked = (hdr[1]>>7)&1;
+    size_t plen = hdr[1]&0x7f;
+    (void)fin;
+
+    if (plen == 126) {
+        unsigned char ext[2]; if (ws_readn(s,ext,2)<0) goto ws_err;
+        plen = ((size_t)ext[0]<<8)|ext[1];
+    } else if (plen == 127) {
+        unsigned char ext[8]; if (ws_readn(s,ext,8)<0) goto ws_err;
+        plen=0; for(int i=0;i<8;i++) plen=(plen<<8)|ext[i];
+    }
+
+    {
+        unsigned char mask[4]={0,0,0,0};
+        if (masked) { if (ws_readn(s,mask,4)<0) goto ws_err; }
+
+        char *payload = (char*)malloc(plen+1);
+        if (!payload) { lua_pushnil(L); lua_pushstring(L,"ws: sem memória"); return 2; }
+        if (ws_readn(s,payload,plen)<0) { free(payload); goto ws_err; }
+        if (masked) for (size_t i=0;i<plen;i++) payload[i]^=mask[i%4];
+        payload[plen]='\0';
+
+        lua_pushlstring(L, payload, plen);
+        lua_pushinteger(L, (lua_Integer)opcode);
+        free(payload);
+        return 2;
+    }
+
+ws_err:
+    lua_pushnil(L); lua_pushstring(L,"ws: erro lendo frame"); return 2;
+}
+
+// ── net.ws(host, port [, path [, timeout]]) — WebSocket (ws://) ──────────
+// Uso: local s = net.ws("echo.websocket.org", 80)
+//      s:ws_send("olá")
+//      local msg, op = s:ws_recv()
+static int l_net_ws(lua_State *L) {
+    const char *host = luaL_checkstring(L, 1);
+    int port         = (int)luaL_checkinteger(L, 2);
+    const char *path = luaL_optstring(L, 3, "/");
+    int timeout      = (int)luaL_optinteger(L, 4, 10);
+
+    int ret = sock_do_connect(L, host, port, "ipv4", "stream", timeout, 0, 0, 1, NULL, 0, NULL, 0);
+    if (ret != 1) return ret;
+
+    SockObj *s = (SockObj*)lua_touserdata(L, -1);
+    if (ws_handshake(s, host, port, path) != 0) {
+        close(s->fd); s->closed=1;
+        lua_pop(L,1); lua_pushnil(L);
+        lua_pushstring(L,"ws: handshake falhou"); return 2;
+    }
+    strncpy(s->stype, "ws", 7);
+    if (isatty(STDOUT_FILENO))
+        fprintf(stdout,"\033[1;36m[WS] %s:%d%s → connected\033[0m\n", host, port, path);
+    return 1;
+}
+
+// ── net.wss(host, port [, path [, timeout]]) — WebSocket sobre TLS ────────
+// Uso: local s = net.wss("echo.websocket.org", 443)
+//      s:ws_send("olá")
+//      print(s:ws_recv())
+static int l_net_wss(lua_State *L) {
+    const char *host = luaL_checkstring(L, 1);
+    int port         = (int)luaL_checkinteger(L, 2);
+    const char *path = luaL_optstring(L, 3, "/");
+    int timeout      = (int)luaL_optinteger(L, 4, 10);
+
+    /* TCP + TLS */
+    lua_pushcfunction(L, l_net_tls);
+    lua_pushstring(L, host);
+    lua_pushinteger(L, (lua_Integer)port);
+    lua_pushinteger(L, (lua_Integer)timeout);
+    if (lua_pcall(L, 3, 2, 0) != LUA_OK) {
+        lua_pushnil(L); return 2;
+    }
+    if (lua_isnil(L, -2)) return 2; /* propagou nil, err */
+    lua_pop(L, 1); /* remove o segundo valor (nil de erro) se ok */
+
+    SockObj *s = (SockObj*)lua_touserdata(L, -1);
+    if (ws_handshake(s, host, port, path) != 0) {
+        sock_tls_free(s); close(s->fd); s->closed=1;
+        lua_pop(L,1); lua_pushnil(L);
+        lua_pushstring(L,"wss: handshake falhou"); return 2;
+    }
+    strncpy(s->stype, "wss", 7);
+    if (isatty(STDOUT_FILENO))
+        fprintf(stdout,"\033[1;32m[WSS] %s:%d%s → connected (%s)\033[0m\n",
+                host, port, path, SSL_get_cipher(s->ssl));
+    return 1;
 }
 
 // ── net.listen(port [, host [, backlog]]) — servidor TCP ─────────────────
@@ -38527,6 +38821,7 @@ static int raw_tcp_send_ex(lua_State *L,
     }
 
     srand((unsigned)time(NULL)^(unsigned)getpid());
+    int was_random_port = (spoof_port == 0);
     if (!spoof_port) spoof_port=(uint16_t)(1024+rand()%64511);
     if (!seq)      seq=(uint32_t)rand();
     if (!window)   window=64240;
@@ -38598,8 +38893,10 @@ static int raw_tcp_send_ex(lua_State *L,
     free(pkt); close(fd);
     if (n<0){ lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2; }
     lua_pushboolean(L,1);
-    if (was_random) { lua_pushstring(L, chosen_ip); return 2; }
-    return 1;
+    int nret = 1;
+    if (was_random)      { lua_pushstring(L, chosen_ip);               nret++; }
+    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spoof_port); nret++; }
+    return nret;
 }
 
 /* ── Wrappers TCP ─────────────────────────────────────────────────────── */
@@ -38767,11 +39064,11 @@ static int l_net_raw_tcp(lua_State *L) {
         }
         if (lua_isnumber(L,-1)) {
             lua_Integer sp = lua_tointeger(L,-1);
-            if (sp < 1 || sp > 65535) {
+            if (sp < 0 || sp > 65535) {
                 lua_pop(L,1); lua_pushnil(L);
-                lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 1..65535)",(int)sp); return 2;
+                lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
             }
-            spoof_port=(uint16_t)sp;
+            spoof_port=(uint16_t)sp; /* 0 = aleatorio em raw_tcp_send_ex */
         }
         lua_pop(L,1);
         _OPT_U32("seq",     seq);
@@ -39111,11 +39408,11 @@ static int l_net_raw_udp(lua_State *L) {
         }
         if(lua_isnumber(L,-1)) {
             lua_Integer sp = lua_tointeger(L,-1);
-            if (sp < 1 || sp > 65535) {
+            if (sp < 0 || sp > 65535) {
                 lua_pop(L,1);
-                lua_pushnil(L); lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 1..65535)",(int)sp); return 2;
+                lua_pushnil(L); lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
             }
-            spoof_port=(uint16_t)sp;
+            spoof_port=(uint16_t)sp; /* 0 = aleatorio em raw_udp_send_ex */
         }
         lua_pop(L,1);
 
@@ -39177,6 +39474,7 @@ static int l_net_raw_udp(lua_State *L) {
     }
 
     srand((unsigned)time(NULL)^(unsigned)getpid());
+    int was_random_port = (spoof_port == 0);
     if (!spoof_port) spoof_port=(uint16_t)(1024+rand()%64511);
     size_t pkt_len=20+8+dlen;
     uint8_t *pkt=(uint8_t*)calloc(1,pkt_len);
@@ -39228,8 +39526,10 @@ static int l_net_raw_udp(lua_State *L) {
     free(pkt); close(fd);
     if (n<0){ lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2; }
     lua_pushboolean(L,1);
-    if (was_random) { lua_pushstring(L, chosen_ip); return 2; }
-    return 1;
+    int nret = 1;
+    if (was_random)      { lua_pushstring(L, chosen_ip);               nret++; }
+    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spoof_port); nret++; }
+    return nret;
 }
 
 /*
@@ -40027,6 +40327,11 @@ static int l_net_help(lua_State *L) {
     printf("  \033[1;32mnet.connect(host, port [,timeout])\033[0m → alias de net.tcp\n");
     printf("  \033[1;32mnet.tcp6(host, port [,timeout])\033[0m  → objeto socket TCP IPv6\n");
     printf("  \033[1;32mnet.udp(host, port [,timeout])\033[0m   → objeto socket UDP\n");
+    printf("  \033[1;32mnet.tls(host, port [,timeout])\033[0m   → TCP + TLS/SSL\n");
+    printf("  \033[1;32mnet.ws(host, port [,path, timeout])\033[0m → WebSocket (ws://)\n");
+    printf("  \033[1;32mnet.wss(host, port [,path, timeout])\033[0m → WebSocket sobre TLS (wss://)\n");
+    printf("    s:ws_send(msg [,opcode]) envia frame WS (1=text, 2=binary)\n");
+    printf("    s:ws_recv()              retorna payload, opcode\n");
     printf("  \033[1;32mnet.listen(port [,host [,backlog]])\033[0m → objeto servidor TCP\n\n");
 
     printf("  Métodos do objeto retornado (s):\n");
@@ -97042,6 +97347,9 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_net_tcp);      lua_setfield(L,-2,"tcp");
     lua_pushcfunction(L,l_net_udp);      lua_setfield(L,-2,"udp");
     lua_pushcfunction(L,l_net_tcp6);     lua_setfield(L,-2,"tcp6");
+    lua_pushcfunction(L,l_net_tls);      lua_setfield(L,-2,"tls");
+    lua_pushcfunction(L,l_net_ws);       lua_setfield(L,-2,"ws");
+    lua_pushcfunction(L,l_net_wss);      lua_setfield(L,-2,"wss");
     lua_pushcfunction(L,l_net_listen);   lua_setfield(L,-2,"listen");
     /* net.socketex — tabela compatível com LuaSocket 3.x */
     lsock_register_meta(L);
@@ -121304,10 +121612,18 @@ MS_B64EOF
 #!/usr/bin/env bash
 # cxx — compilador C/C++ profissional para ElliotOS
 # Uso: cxx [flags] arquivo.c [-o saida] [flags-extras]
+# Compatível: Termux, Debian/Ubuntu, Arch, Fedora, Alpine, Void, NixOS, Gentoo
 
 R=$(printf '\033[0m');  B=$(printf '\033[1;34m');  G=$(printf '\033[1;32m')
 Y=$(printf '\033[1;33m'); RE=$(printf '\033[1;31m'); GR=$(printf '\033[0;90m')
 CY=$(printf '\033[1;36m'); MA=$(printf '\033[1;35m')
+
+# ── Detecta arquitetura ───────────────────────────────────────────────────────
+_ARCH=$(uname -m 2>/dev/null || echo "unknown")
+# ── Detecta libc (glibc vs musl) ─────────────────────────────────────────────
+_LIBC="glibc"
+ldd --version 2>&1 | grep -qi musl && _LIBC="musl"
+[ -f /lib/ld-musl-*.so* ] 2>/dev/null && _LIBC="musl"
 
 _usage() {
     printf "${B}cxx${R} — compilador C/C++ profissional (ElliotOS)\n\n"
@@ -121398,13 +121714,26 @@ fi
 [ -z "$SRC" ] && { printf "${RE}Erro: nenhum arquivo fonte informado.${R}\n"; _usage; }
 [ ! -f "$SRC" ] && { printf "${RE}Erro: arquivo não encontrado: $SRC${R}\n"; exit 1; }
 
-# ── Detecta compilador ───────────────────────────────────────────────────────
+# ── Detecta compilador — prefere clang, cai em gcc ──────────────────────────
 case "$SRC" in
-    *.cpp|*.cc|*.cxx|*.C) CC="clang++" ; IS_CXX=1 ;;
-    *)                     CC="clang"  ; IS_CXX=0  ;;
+    *.cpp|*.cc|*.cxx|*.C) IS_CXX=1 ;;
+    *)                     IS_CXX=0 ;;
 esac
-command -v "$CC" >/dev/null 2>&1 || { printf "${RE}Erro: $CC não encontrado.${R}\n"; exit 1; }
+if [ "$IS_CXX" = "1" ]; then
+    if   command -v clang++ >/dev/null 2>&1; then CC="clang++"
+    elif command -v g++     >/dev/null 2>&1; then CC="g++"
+    elif command -v c++     >/dev/null 2>&1; then CC="c++"
+    else printf "${RE}Erro: nenhum compilador C++ encontrado (clang++, g++).${R}\n"; exit 1; fi
+else
+    if   command -v clang >/dev/null 2>&1; then CC="clang"
+    elif command -v gcc   >/dev/null 2>&1; then CC="gcc"
+    elif command -v cc    >/dev/null 2>&1; then CC="cc"
+    else printf "${RE}Erro: nenhum compilador C encontrado (clang, gcc).${R}\n"; exit 1; fi
+fi
 CC_VER=$($CC --version 2>/dev/null | head -1)
+# Detecta se é clang ou gcc para flags específicas
+_IS_CLANG=0
+printf '%s' "$CC_VER" | grep -qi clang && _IS_CLANG=1
 
 # ── Saída padrão ─────────────────────────────────────────────────────────────
 [ -z "$OUT" ] && OUT="${SRC%.*}"
@@ -121440,12 +121769,24 @@ case "$MODE" in
         FLAGS="-O0 -g3 $STD_FLAG $BASE_WARN -Wshadow -Wformat=2"
         FLAGS="$FLAGS -fsanitize=address,undefined"
         FLAGS="$FLAGS -fno-omit-frame-pointer -fno-optimize-sibling-calls"
+        # LeakSanitizer não existe em musl ou ARM (Termux)
+        if [ "$_LIBC" != "musl" ] && [ "$_ARCH" != "aarch64" ] && [ "$_IS_CLANG" = "1" ]; then
+            FLAGS="$FLAGS -fsanitize=leak"
+        fi
         OUT="${OUT}.asan"
         MODE_LABEL="${MA}debug+ASan${R}" ;;
     release)
-        FLAGS="-O3 $STD_FLAG -DNDEBUG -fvisibility=hidden"
+        FLAGS="-O3 $STD_FLAG -DNDEBUG"
         FLAGS="$FLAGS -ffunction-sections -fdata-sections"
-        POST_FLAGS="-Wl,--gc-sections -Wl,-s"
+        # -fvisibility=hidden: clang/gcc suportam, mas só útil em shared libs
+        $CC -fvisibility=hidden -x c /dev/null -o /dev/null 2>/dev/null && \
+            FLAGS="$FLAGS -fvisibility=hidden"
+        # --gc-sections + strip: GNU ld; não disponível em todos os linkers
+        if $CC -Wl,--gc-sections -x c /dev/null -o /dev/null 2>/dev/null; then
+            POST_FLAGS="-Wl,--gc-sections -Wl,-s"
+        else
+            POST_FLAGS=""
+        fi
         MODE_LABEL="${G}release${R}" ;;
     safe)
         FLAGS="-O1 -g $STD_FLAG $BASE_WARN"
@@ -121454,19 +121795,34 @@ case "$MODE" in
         MODE_LABEL="${Y}safe${R}" ;;
     san)
         FLAGS="-O1 -g3 $STD_FLAG $BASE_WARN"
-        FLAGS="$FLAGS -fsanitize=address,undefined,leak"
+        FLAGS="$FLAGS -fsanitize=address,undefined"
         FLAGS="$FLAGS -fno-omit-frame-pointer"
-        OUT="${OUT}.san"
-        MODE_LABEL="${RE}ASan+Leak+UBSan${R}" ;;
+        # LeakSanitizer: só glibc + x86_64/aarch64 com clang
+        if [ "$_LIBC" != "musl" ] && [ "$_IS_CLANG" = "1" ]; then
+            FLAGS="$FLAGS -fsanitize=leak"
+            MODE_LABEL="${RE}ASan+Leak+UBSan${R}"
+        else
+            MODE_LABEL="${RE}ASan+UBSan${R} ${GR}(leak indisponível neste sistema)${R}"
+        fi
+        OUT="${OUT}.san" ;;
     check)
         FLAGS="-fsyntax-only $STD_FLAG $BASE_WARN -Wshadow -Wformat=2"
         MODE_LABEL="${CY}check${R}" ;;
     asm)
-        FLAGS="-O2 -S -masm=intel $STD_FLAG -fverbose-asm"
+        # -masm=intel só existe em x86/x86_64
+        case "$_ARCH" in
+            x86_64|i686|i386)
+                FLAGS="-O2 -S -masm=intel $STD_FLAG -fverbose-asm" ;;
+            *)
+                FLAGS="-O2 -S $STD_FLAG -fverbose-asm" ;;
+        esac
         MODE_LABEL="${CY}assembly${R}" ;;
     static)
         FLAGS="-O2 $STD_FLAG $BASE_WARN -static"
-        POST_FLAGS="-Wl,-static"
+        POST_FLAGS=""
+        # Aviso: static com glibc é problemático (NSS, DNS não funcionam)
+        [ "$_LIBC" = "glibc" ] && \
+            printf "${Y}⚠  Aviso: -static + glibc pode ter problemas com DNS/NSS em runtime.${R}\n"
         MODE_LABEL="${B}static${R}" ;;
 esac
 
@@ -121482,7 +121838,9 @@ printf "${GR}%s${R}\n\n" "$CC_VER"
 # ── Compilação ───────────────────────────────────────────────────────────────
 ERR_TMP=$(mktemp 2>/dev/null || echo "${TMPDIR:-$HOME/elliot_tmp}/cxx_err_$$.txt")
 mkdir -p "${TMPDIR:-$HOME/elliot_tmp}" 2>/dev/null || true
-T0=$(date +%s%N 2>/dev/null || date +%s)
+# Mede tempo com nanosegundos se disponível, senão segundos
+_time_ns() { date +%s%N 2>/dev/null | grep -qE '^[0-9]{13,}' && date +%s%N 2>/dev/null || date +%s 2>/dev/null; }
+T0=$(_time_ns)
 
 if [ "$MODE" = "check" ]; then
     $CC $FLAGS $EXTRA "$SRC" 2>"$ERR_TMP"
@@ -121492,11 +121850,10 @@ else
 fi
 EXIT=$?
 
-T1=$(date +%s%N 2>/dev/null || date +%s)
-# Calcula elapsed (ms) — fallback seguro se date +%s%N não funcionar
-if printf '%s' "$T0" | grep -q '[0-9]\{10,\}'; then
-    ELAPSED_MS=$(( (T1 - T0) / 1000000 ))
-    TIME_STR="${ELAPSED_MS}ms"
+T1=$(_time_ns)
+_tlen=$(printf '%s' "$T0" | wc -c | tr -d ' ')
+if [ "$_tlen" -ge 13 ] 2>/dev/null; then
+    TIME_STR="$(( (T1 - T0) / 1000000 ))ms"
 else
     TIME_STR="$(( T1 - T0 ))s"
 fi
