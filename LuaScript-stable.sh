@@ -499,7 +499,7 @@ for _arg in "$@"; do
             printf "  \033[1;32m  -sq\033[0m              \033[0;90moutput verbose da compilação (sem barra de progresso)\033[0m\n"
             printf "  \033[1;32m  --stryker\033[0m        \033[0;90mStrykerOS/proot Debian — build conservador: 1 CPU, -O0, lotes de 4\033[0m\n"
             printf "  \033[1;32m  --sudo\033[0m           \033[0;90mconfirma root real (uid=0, sem PRoot/fakeroot)\033[0m\n"
-            printf "                     \033[0;90mativa net.socketex.raw() — raw sockets (ICMP, TCP raw, etc.)\033[0m\n"
+            printf "                     \033[0;90mativa net.socket.raw() — raw sockets (ICMP, TCP raw, etc.)\033[0m\n"
             printf "                     \033[0;90mrequer root verdadeiro ou CAP_NET_RAW\033[0m\n\n"
             printf "  \033[1;36mExemplos:\033[0m\n"
             printf "  \033[0;90m  bash luascript\033[0m                              \033[0;90m# Termux\033[0m\n"
@@ -29649,7 +29649,7 @@ static const char *req_mods_list[] = {
     "@std/tui","@std/ivar","@std/exploit","@std/pent","@std/adb",
     "@std/agent","@std/lmod","@std/sh","@std/cc","@std/try",
     "@std/re","@std/util","@std/log","@std/csv","@std/json",
-    "@std/lx","@std/color","@std/num",
+    "@std/lx","@std/colors","@std/num",
     "string","table","math","os","io","coroutine","utf8",
     NULL
 };
@@ -30337,8 +30337,8 @@ static int elliot_system(const char *cmd) {
     "net.ip([cidr])         — host discovery → tabela de IPs ativos\n" \
     "net.import(url)        — baixa e executa Lua remoto → true/false\n" \
     "\n" \
-    "## net.socketex — API LuaSocket (sem root)\n" \
-    "socket = net.socketex          -- tabela, não é require()\n" \
+    "## net.socket — API LuaSocket (sem root)\n" \
+    "socket = net.socket          -- tabela, não é require()\n" \
     "socket.tcp()                   — cria TCP obj\n" \
     "socket.tcp4() / socket.tcp6()  — IPv4 / IPv6\n" \
     "socket.udp()                   — cria UDP obj\n" \
@@ -30414,7 +30414,7 @@ static int elliot_system(const char *cmd) {
     "\n" \
     "-- send generico (controle total do pacote)\n" \
     "net.raw.send(ip,proto,data[,t])     -- proto: \"tcp\"|\"udp\"|\"icmp\"|\"raw\"|numero\n" \
-    "net.socketex.raw(proto) -- OOP raw: send/recv/settimeout (--sudo)\n" \
+    "net.socket.raw(proto) -- OOP raw: send/recv/settimeout (--sudo)\n" \
     "\n" \
     \
     "## CRYPTO (crypto.*)\n" \
@@ -30640,13 +30640,13 @@ static int elliot_system(const char *cmd) {
     "         net.tcp(host,port) abre socket TCP, retorna obj com :send/:recv/:close/:lines " \
     "         net.udp(host,port) socket UDP " \
     "         net.connect(host,port) alias tcp " \
-    "         net.socket() socket raw " \
+    "         net.fire() socket raw " \
     "         net.listen(port,fn) servidor TCP " \
     "         net.scan(host,p1,p2[,threads]) port scan, retorna lista de portas abertas " \
     "         net.ping(host) retorna ms ou nil " \
     "         net.dns(host) resolve DNS " \
     "         net.os(host) OS fingerprint " \
-    "         net.socketex(fam,type,host,port[,t]) socket OO completo; type='syn' → SYN probe sem root, retorna tabela {status,open,host,port,ms} " \
+    "         net.socket(fam,type,host,port[,t]) socket OO completo; type='syn' → SYN probe sem root, retorna tabela {status,open,host,port,ms} " \
     "         net.syn(host,port[,t[,family]]) SYN probe dedicado sem root; retorna tabela {status,open,host,port,ms,family}; verbose=true imprime linha colorida " \
     "         net.import(url) baixa e executa Lua remoto → true/false " \
     "\n" \
@@ -31509,7 +31509,7 @@ static int ai_http_ask(const char *model, const char *system_prompt,
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen",
-        "net.socketex.tcp()","net.socketex.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
         "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
@@ -32174,7 +32174,7 @@ static int l_ai_ask(lua_State *L) {
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","exploit","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen","net.http",
-        "net.socketex.tcp()","net.socketex.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
         "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
@@ -32313,7 +32313,7 @@ static int l_ai_search(lua_State *L) {
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","exploit","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen","net.http",
-        "net.socketex.tcp()","net.socketex.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
         NULL
     };
     const char *_sysp = CYN_SYSTEM_PROMPT_CORE;
@@ -34929,11 +34929,55 @@ static int l_fs_help(lua_State *L) {
     printf("  \033[1;33mfs.glob\033[0m(dir, pattern)   Lista arquivos que casam com padrão  ex: *.txt\n");
     printf("                          Retorna: tabela de paths completos\n\n");
     printf("  \033[1;33mfs.help\033[0m()               Esta ajuda\n\n");
+
+    printf("  \033[1;36m── Manipulação de texto (string ou arquivo) ──\033[0m\n\n");
+
+    printf("  \033[1;33mfs.grep\033[0m(src, pattern [,opts])   Linhas que contêm pattern (igual grep)\n");
+    printf("  \033[1;33mfs.rg\033[0m  (src, pattern [,opts])   Alias de fs.grep\n");
+    printf("    src     : string de conteúdo OU path de arquivo\n");
+    printf("    pattern : Lua pattern (ou literal se opts.plain=true)\n");
+    printf("    opts    : { plain=bool, invert=bool, ignorecase=bool }\n");
+    printf("    Retorna : tabela de { lnum=N, line='...' }\n\n");
+
+    printf("  \033[1;33mfs.grepstr\033[0m(src, pattern [,opts])  Igual a fs.grep mas retorna string\n\n");
+
+    printf("  \033[1;33mfs.sed\033[0m(src, pattern, repl [,opts])  Substitui pattern por repl\n");
+    printf("    opts    : { plain=bool, global=bool, lines={from,to} }\n");
+    printf("    Retorna : string completa modificada\n\n");
+
+    printf("  \033[1;33mfs.lines\033[0m(src)                Divide em tabela de linhas (1..N)\n\n");
+
+    printf("  \033[1;33mfs.slice\033[0m(src, from [,to])    Linhas from..to (igual sed -n 'X,Yp')\n");
+    printf("  \033[1;33mfs.head\033[0m (src [,n])           Primeiras n linhas (padrão 10)\n");
+    printf("  \033[1;33mfs.tail\033[0m (src [,n])           Últimas n linhas (padrão 10)\n");
+    printf("  \033[1;33mfs.line\033[0m (src, n)             Linha n (negativo = do fim). Alias: fs.ln()\n");
+    printf("  \033[1;33mfs.count\033[0m(src)                Número de linhas (wc -l)\n\n");
+
+    printf("  \033[1;33mfs.replace\033[0m(src, from, to, new_text)  Substitui bloco de linhas from..to\n");
+    printf("    Retorna : string completa com o bloco substituído\n\n");
+
+    printf("  \033[0;90m  Nota: todas as funções de texto aceitam string de conteúdo\n");
+    printf("  OU path de arquivo — autodetectado.\033[0m\n\n");
+
     printf("  \033[1;36m── Exemplos ──\033[0m\n\n");
     printf("  fs.write('/.test', 'hello')\n");
     printf("  print(fs.read('/.test'))\n");
     printf("  local t = fs.stat('/.test'); print(t.size)\n");
     printf("  local f = fs.glob('/sdcard', '*.txt')\n\n");
+
+    printf("  \033[0;90m-- grep em arquivo\033[0m\n");
+    printf("  local r = fs.grep('/etc/hosts', '127')\n");
+    printf("  for _, m in ipairs(r) do print(m.lnum, m.line) end\n\n");
+    printf("  \033[0;90m-- grep em string (ex: saída capturada)\033[0m\n");
+    printf("  local s = sys.capture(function() net.help() end)\n");
+    printf("  print(fs.grepstr(s, 'net.raw'))\n\n");
+    printf("  \033[0;90m-- sed: substituir em arquivo\033[0m\n");
+    printf("  local novo = fs.sed('/etc/hosts', 'localhost', 'myhost')\n");
+    printf("  fs.write('/etc/hosts', novo)\n\n");
+    printf("  \033[0;90m-- ver linhas 5 a 10\033[0m\n");
+    printf("  print(fs.slice('/etc/hosts', 5, 10))\n\n");
+    printf("  \033[0;90m-- linha específica\033[0m\n");
+    printf("  print(fs.line('/etc/hosts', 3))\n\n");
     return 0;
 }
 
@@ -35703,8 +35747,8 @@ static int l_net_import(lua_State *L) {
 // net.udp(host, port [, opts])        → sock  (UDP)
 // net.tcp6(host, port [, opts])       → sock  (TCP IPv6)
 // net.listen(port [, host])           → sock  (servidor TCP)
-// net.socketex(family,type,host,port) → sock  (forma completa)
-// net.socketex({...})                 → sock  (forma tabela)
+// net.socket(family,type,host,port) → sock  (forma completa)
+// net.socket({...})                 → sock  (forma tabela)
 //
 // Todos retornam um objeto sock com métodos:
 //   sock:send(data)           → bytes_enviados ou nil, err
@@ -36851,11 +36895,11 @@ static const char *net_syn_probe(const char *host, int port,
  *
  * Retorna sempre tabela: {status, host, port, ms, open}
  * Se verbose=true (ou chamada posicional sem supressão), imprime linha
- * colorida igual ao net.socket "syn" para uso interativo no REPL.
+ * colorida igual ao net.fire "syn" para uso interativo no REPL.
  *
- * Diferenças em relação a net.socket/net.socketex com type="syn":
+ * Diferenças em relação a net.fire/net.socket com type="syn":
  *   - Interface dedicada: sem precisar passar family/type como args posicionais
- *   - Sempre retorna tabela estruturada (net.socket retorna string)
+ *   - Sempre retorna tabela estruturada (net.fire retorna string)
  *   - Argumento verbose controla impressão independente do retorno
  *   - Aceita family como 4º argumento posicional (sem quebrar compatibilidade)
  */
@@ -36968,7 +37012,7 @@ static int l_net_syn(lua_State *L) {
         return 2;
     }
 
-    /* impressão interativa (mesma linha colorida do net.socket "syn") */
+    /* impressão interativa (mesma linha colorida do net.fire "syn") */
     if (verbose) {
         const char *col =
             (strcmp(syn_st, "open")   == 0) ? "\033[1;32m" :
@@ -36979,7 +37023,7 @@ static int l_net_syn(lua_State *L) {
         fflush(stdout);
     }
 
-    /* retorna tabela estruturada — igual ao net.socketex "syn" */
+    /* retorna tabela estruturada — igual ao net.socket "syn" */
     lua_newtable(L);
     lua_pushstring(L,  syn_st);                          lua_setfield(L, -2, "status");
     lua_pushstring(L,  host);                            lua_setfield(L, -2, "host");
@@ -36991,10 +37035,10 @@ static int l_net_syn(lua_State *L) {
 }
 
 /* ============================================================================
- * net.socketex — interface compatível com LuaSocket 3.x
+ * net.socket — interface compatível com LuaSocket 3.x
  *
  * Uso:
- *   socket = net.socketex      -- não é require(), é uma tabela
+ *   socket = net.socket      -- não é require(), é uma tabela
  *   t = socket.tcp()
  *   t:connect(host, port)      → 1 ou nil, err
  *   t:bind(addr, port)         → 1 ou nil, err
@@ -37052,7 +37096,7 @@ static int l_net_syn(lua_State *L) {
  *   socket._SETSIZE            = 1024
  * ========================================================================= */
 
-/* ── Flags TCP raw (usados por socketex.raw e net.raw) ───────────────────── */
+/* ── Flags TCP raw (usados por socket.raw e net.raw) ───────────────────── */
 #ifdef ELLIOT_ROOT
 #ifndef RTCP_FIN
 #define RTCP_FIN  0x01
@@ -38076,11 +38120,11 @@ static int l_net_close(lua_State *L) {
     return sock_close(L);
 }
 
-// ── net.socket — fire-and-forget: conecta, envia, recebe, fecha ──────────
-/* ── net.socket — fire-and-forget ────────────────────────────────────────────
+// ── net.fire — fire-and-forget: conecta, envia, recebe, fecha ──────────
+/* ── net.fire — fire-and-forget ────────────────────────────────────────────
    Conecta, envia payload opcional, lê resposta, fecha. Tudo numa chamada.
 
-   net.socket(family, type, host, port [, timeout [, payload]])
+   net.fire(family, type, host, port [, timeout [, payload]])
      family  : "ipv4" | "ipv6" | "unix"
      type    : "stream" | "tcp" | "dgram" | "udp"
      host    : IP ou hostname
@@ -38091,11 +38135,11 @@ static int l_net_close(lua_State *L) {
    Retorna: resposta (string) ou nil, errmsg
 
    Exemplos:
-     net.socket("ipv4","stream","1.1.1.1",80,3,"GET / HTTP/1.0\r\nHost: 1.1.1.1\r\n\r\n")
-     net.socket("ipv4","dgram","8.8.8.8",53,3)          -- só conecta/testa
-     net.socket("ipv4","stream","192.168.1.1",22)        -- banner grab SSH
+     net.fire("ipv4","stream","1.1.1.1",80,3,"GET / HTTP/1.0\r\nHost: 1.1.1.1\r\n\r\n")
+     net.fire("ipv4","dgram","8.8.8.8",53,3)          -- só conecta/testa
+     net.fire("ipv4","stream","192.168.1.1",22)        -- banner grab SSH
    ─────────────────────────────────────────────────────────────────────────── */
-static int l_net_socket(lua_State *L) {
+static int l_net_fire(lua_State *L) {
     const char *family  = luaL_checkstring(L, 1);
     const char *stype   = luaL_checkstring(L, 2);
     const char *host    = luaL_checkstring(L, 3);
@@ -38564,7 +38608,7 @@ static uint16_t raw_cksum(const void *buf, size_t len) {
     return (uint16_t)~sum;
 }
 
-/* ── Flags TCP (definidos antes do socketex; guards aqui evitam redefinição) */
+/* ── Flags TCP (definidos antes do socket; guards aqui evitam redefinição) */
 #ifndef RTCP_FIN
 #define RTCP_FIN  0x01
 #define RTCP_SYN  0x02
@@ -40321,7 +40365,7 @@ static int l_net_help(lua_State *L) {
     printf("\033[1;33m━━━ SOCKETS SIMPLES (sem root, fire-and-forget) ━━━━━━━━━━━━━━━\033[0m\n\n");
 
     printf("  Estas funções criam um socket, conectam e retornam um OBJETO que você\n");
-    printf("  usa para enviar e receber dados. São mais simples que o socketex.\n\n");
+    printf("  usa para enviar e receber dados. São mais simples que o socket.\n\n");
 
     printf("  \033[1;32mnet.tcp(host, port [,timeout])\033[0m   → objeto socket TCP IPv4\n");
     printf("  \033[1;32mnet.connect(host, port [,timeout])\033[0m → alias de net.tcp\n");
@@ -40359,10 +40403,10 @@ static int l_net_help(lua_State *L) {
     printf("    cli:send(cli:recvline())  cli:close()  srv:close()\n\n");
 
     /* ══ SOCKETEX ═══════════════════════════════════════════════════════ */
-    printf("\033[1;33m━━━ net.socketex — API ESTILO LUASOCKET ━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n\n");
+    printf("\033[1;33m━━━ net.socket — API ESTILO LUASOCKET ━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n\n");
 
-    printf("  net.socketex é uma TABELA (não uma função). Você acessa suas funções\n");
-    printf("  como campos: socket = net.socketex, depois socket.tcp(), etc.\n");
+    printf("  net.socket é uma TABELA (não uma função). Você acessa suas funções\n");
+    printf("  como campos: socket = net.socket, depois socket.tcp(), etc.\n");
     printf("  A interface é intencionalmente idêntica à biblioteca LuaSocket.\n\n");
 
     printf("  \033[1;32msocket.tcp()\033[0m  /  \033[1;32msocket.tcp4()\033[0m  /  \033[1;32msocket.tcp6()\033[0m\n");
@@ -40438,7 +40482,7 @@ static int l_net_help(lua_State *L) {
     printf("    s:setfd(fd)                   Substitui o fd do objeto.\n");
     printf("    s:dirty()                     true se há dados prontos para leitura agora.\n\n");
 
-    printf("  \033[0;36mUtilitários da tabela socketex:\033[0m\n");
+    printf("  \033[0;36mUtilitários da tabela socket:\033[0m\n");
     printf("    socket.select(recvt, sendt [,timeout])\n");
     printf("                                  Multiplexação. Aguarda sockets ficarem prontos.\n");
     printf("                                  recvt / sendt: tabelas de sockets a monitorar.\n");
@@ -40476,9 +40520,9 @@ static int l_net_help(lua_State *L) {
     printf("    socket._DATAGRAMSIZE          8192\n");
     printf("    socket._SETSIZE               1024\n\n");
 
-    printf("  \033[0;36mExemplos socketex:\033[0m\n");
+    printf("  \033[0;36mExemplos socket:\033[0m\n");
     printf("    -- HTTP manual\n");
-    printf("    local socket = net.socketex\n");
+    printf("    local socket = net.socket\n");
     printf("    local t = assert(socket.tcp())\n");
     printf("    t:settimeout(5)\n");
     printf("    assert(t:connect('example.com', 80))\n");
@@ -40486,13 +40530,13 @@ static int l_net_help(lua_State *L) {
     printf("    print(t:receive('*a'))\n");
     printf("    t:close()\n\n");
     printf("    -- Servidor TCP\n");
-    printf("    local srv = assert(net.socketex.bind('*', 9000))\n");
+    printf("    local srv = assert(net.socket.bind('*', 9000))\n");
     printf("    local cli = assert(srv:accept())\n");
     printf("    local linha = cli:receive()  -- lê uma linha\n");
     printf("    cli:send(linha .. '\\n')      -- ecoa de volta\n");
     printf("    cli:close()  srv:close()\n\n");
     printf("    -- Código limpo com try/protect\n");
-    printf("    local socket = net.socketex\n");
+    printf("    local socket = net.socket\n");
     printf("    local fn = socket.protect(function()\n");
     printf("      local t = socket.try(socket.tcp())\n");
     printf("      local try = socket.newtry(function() t:close() end)\n");
@@ -40506,19 +40550,19 @@ static int l_net_help(lua_State *L) {
     printf("    local ok, err = fn()\n");
     printf("    if ok then print(ok) else print('erro:', err) end\n\n");
     printf("    -- UDP\n");
-    printf("    local u = assert(net.socketex.udp())\n");
+    printf("    local u = assert(net.socket.udp())\n");
     printf("    u:settimeout(3)\n");
     printf("    u:sendto('hello', '192.168.1.1', 9000)\n");
     printf("    local data, ip, port = u:receivefrom()\n");
     printf("    u:close()\n\n");
     printf("    -- select: multiplexação\n");
-    printf("    local a = assert(net.socketex.connect('host1.com', 80))\n");
-    printf("    local b = assert(net.socketex.connect('host2.com', 80))\n");
-    printf("    local prontos = net.socketex.select({a, b}, {}, 2.0)\n");
+    printf("    local a = assert(net.socket.connect('host1.com', 80))\n");
+    printf("    local b = assert(net.socket.connect('host2.com', 80))\n");
+    printf("    local prontos = net.socket.select({a, b}, {}, 2.0)\n");
     printf("    for _, s in ipairs(prontos) do print(s:receive('*l')) end\n\n");
 
     /* ══ SOCKETEX RAW ═══════════════════════════════════════════════════ */
-    printf("\033[1;33m━━━ net.socketex.raw — RAW OOP (requer --sudo + root) ━━━━━━━━━\033[0m\n\n");
+    printf("\033[1;33m━━━ net.socket.raw — RAW OOP (requer --sudo + root) ━━━━━━━━━\033[0m\n\n");
 
     printf("  \033[1;32msocket.raw(proto)\033[0m\n");
     printf("    Cria um socket raw como OBJETO OOP (igual ao tcp/udp acima).\n");
@@ -40563,8 +40607,8 @@ static int l_net_help(lua_State *L) {
     printf("      r:settimeout(seg)                Define timeout.\n");
     printf("      r:close()                       Fecha o socket.\n\n");
 
-    printf("  \033[0;36mExemplos socketex.raw:\033[0m\n");
-    printf("    local socket = net.socketex\n\n");
+    printf("  \033[0;36mExemplos socket.raw:\033[0m\n");
+    printf("    local socket = net.socket\n\n");
     printf("    -- ICMP ping manual (você monta o pacote)\n");
     printf("    local r = assert(socket.raw('icmp'))\n");
     printf("    r:settimeout(3)\n");
@@ -40596,8 +40640,8 @@ static int l_net_help(lua_State *L) {
     /* ══ NET.RAW ════════════════════════════════════════════════════════ */
     printf("\033[1;33m--- net.raw - RAW DE ALTO NIVEL (requer --sudo + root) ----------\033[0m\n\n");
 
-    printf("  Diferenca em relacao ao socketex.raw:\n");
-    printf("    socketex.raw -> voce mantem um objeto (fd aberto), envia varias vezes.\n");
+    printf("  Diferenca em relacao ao socket.raw:\n");
+    printf("    socket.raw -> voce mantem um objeto (fd aberto), envia varias vezes.\n");
     printf("    net.raw.*   -> cada chamada abre fd, envia e fecha. Mais simples.\n\n");
 
     printf("  \033[0;36m--- TCP unificado ---\033[0m\n");
@@ -70793,6 +70837,82 @@ static int l_sys_net(lua_State *L) {
 }
 
 /* ── sys.storage() — espaço em disco via statvfs ── */
+/* ── sys.capture(fn | string) ────────────────────────────────────────────
+ * Redireciona fd 1 (stdout) para um pipe antes de chamar a função Lua,
+ * depois drena o pipe e restaura fd 1. Captura printf() do C e print() do Lua.
+ * Retorna a saída como string. Re-propaga erros Lua após restaurar stdout.
+ * Suporta aninhamento (cada chamada tem seu próprio pipe).
+ * ─────────────────────────────────────────────────────────────────────── */
+static int l_sys_capture_c(lua_State *L) {
+    /* aceita function ou string */
+    if (lua_type(L,1) == LUA_TSTRING) {
+        const char *src = lua_tostring(L,1);
+        if (luaL_loadstring(L, src) != LUA_OK) {
+            /* erro de compilação: mensagem já está no topo */
+            return lua_error(L);
+        }
+        lua_replace(L, 1);  /* substitui a string pela chunk compilada */
+    }
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+
+    /* 1. cria pipe */
+    int pfd[2];
+    if (pipe(pfd) != 0) {
+        lua_pushstring(L, "sys.capture: pipe() falhou");
+        return lua_error(L);
+    }
+
+    /* 2. salva fd 1 original */
+    int saved_stdout = dup(STDOUT_FILENO);
+    if (saved_stdout < 0) {
+        close(pfd[0]); close(pfd[1]);
+        lua_pushstring(L, "sys.capture: dup(stdout) falhou");
+        return lua_error(L);
+    }
+
+    /* 3. redireciona stdout para a ponta de escrita do pipe */
+    if (dup2(pfd[1], STDOUT_FILENO) < 0) {
+        close(pfd[0]); close(pfd[1]); close(saved_stdout);
+        lua_pushstring(L, "sys.capture: dup2() falhou");
+        return lua_error(L);
+    }
+    close(pfd[1]);  /* pfd[1] duplicado — fecha o original */
+
+    /* 4. chama a função Lua com pcall */
+    int rc = lua_pcall(L, 0, 0, 0);
+
+    /* 5. flush e restaura stdout ANTES de qualquer coisa */
+    fflush(stdout);
+    dup2(saved_stdout, STDOUT_FILENO);
+    close(saved_stdout);
+
+    /* 6. drena o pipe */
+    luaL_Buffer B;
+    luaL_buffinit(L, &B);
+    char buf[4096];
+    ssize_t n;
+    /* seta pipe em modo não-bloqueante para não travar se vazio */
+    int flags = fcntl(pfd[0], F_GETFL, 0);
+    fcntl(pfd[0], F_SETFL, flags | O_NONBLOCK);
+    while ((n = read(pfd[0], buf, sizeof(buf))) > 0) {
+        luaL_addlstring(&B, buf, (size_t)n);
+    }
+    close(pfd[0]);
+    luaL_pushresult(&B);
+
+    /* 7. se pcall falhou, re-propaga o erro
+     * Stack após pcall(erro): [err_msg]
+     * Stack após luaL_pushresult: [err_msg, captured_str]
+     * Descarta captured_str, mantém err_msg no topo e re-propaga. */
+    if (rc != LUA_OK) {
+        lua_pop(L, 1);       /* descarta captured_str, err_msg fica no topo */
+        return lua_error(L); /* re-propaga err_msg */
+    }
+
+    /* 8. retorna captured_str */
+    return 1;
+}
+
 static int l_sys_storage(lua_State *L) {
     /* path padrão = HOME do usuário; aceita arg opcional */
     const char *_default_path = getenv("HOME");
@@ -71111,6 +71231,35 @@ static int l_sys_help(lua_State *L) {
     printf("      sys.storage('/sdcard')          -- cartão SD\n");
     printf("      local s = sys.storage()\n");
     printf("      print(s.avail, s.pct_used)\n\n");
+
+    printf("  \033[1;36m── CAPTURA DE SAÍDA LUA ───────────────────────────────────────\033[0m\n\n");
+
+    printf("  \033[1;33msys.capture\033[0m(fn | string)\n");
+    printf("    Captura toda a saída produzida por print() e io.write()\n");
+    printf("    durante a execução de fn ou do código Lua em string.\n");
+    printf("    Nada é exibido no terminal.\n");
+    printf("    fn      : função Lua ou string de código\n");
+    printf("    Retorna : string com toda a saída capturada\n");
+    printf("    Erros   : re-propagados após restaurar print/io.write\n");
+    printf("    Nota    : valores retornados por fn são ignorados\n");
+    printf("    Nota    : suporta chamadas aninhadas\n\n");
+    printf("    ex:\n");
+    printf("      local s = sys.capture(function()\n");
+    printf("        net.help()\n");
+    printf("      end)\n");
+    printf("      print(s)\n\n");
+    printf("      -- equivalente com string\n");
+    printf("      local s = sys.capture(\"net.help()\")\n");
+    printf("      print(s)\n\n");
+    printf("      -- capturar e processar linha a linha\n");
+    printf("      local out = sys.capture(function()\n");
+    printf("        print('linha1')\n");
+    printf("        print('linha2')\n");
+    printf("      end)\n");
+    printf("      for linha in out:gmatch('[^\\n]+') do print('> '..linha) end\n\n");
+    printf("    Diferença de sh.capture():\n");
+    printf("      sh.capture(cmd) -- captura stdout de processo externo (shell)\n");
+    printf("      sys.capture(fn) -- captura saída de função Lua\n\n");
 
     return 0;
 }
@@ -83755,14 +83904,14 @@ static const char *G_completions[] = {
     /* net.* */
     "net.dns(","net.get(","net.geth(","net.post(","net.connect(",
     "net.tcp(","net.udp(","net.tcp6(","net.listen(",
-    "net.socket(","net.socketex","net.syn(","net.send(","net.recv(","net.close(",
+    "net.fire(","net.socket","net.syn(","net.send(","net.recv(","net.close(",
     "net.ip(","net.hosts(","net.scan(","net.fetch(","net.ping(","net.os(","net.import(","net.help()",
-    /* net.socketex (LuaSocket) */
-    "net.socketex.tcp()","net.socketex.tcp4()","net.socketex.tcp6()","net.socketex.udp()",
-    "net.socketex.connect(","net.socketex.bind(","net.socketex.select(",
-    "net.socketex.gettime()","net.socketex.sleep(",
-    "net.socketex.try(","net.socketex.protect(","net.socketex.newtry(","net.socketex.skip(",
-    "net.socketex.raw(",
+    /* net.socket (LuaSocket) */
+    "net.socket.tcp()","net.socket.tcp4()","net.socket.tcp6()","net.socket.udp()",
+    "net.socket.connect(","net.socket.bind(","net.socket.select(",
+    "net.socket.gettime()","net.socket.sleep(",
+    "net.socket.try(","net.socket.protect(","net.socket.newtry(","net.socket.skip(",
+    "net.socket.raw(",
     /* net.raw (root) */
     "net.raw.syn(","net.raw.rst(","net.raw.ack(","net.raw.fin(","net.raw.psh(",
     "net.raw.synack(","net.raw.xmas(","net.raw.null(",
@@ -83771,6 +83920,8 @@ static const char *G_completions[] = {
     "fs.exists(","fs.mkdir(","fs.rm(","fs.move(","fs.copy(",
     "fs.read(","fs.write(","fs.append(","fs.list()","fs.list(",
     "fs.stat(","fs.isdir(","fs.isfile(","fs.chmod(","fs.glob(","fs.help()",
+    "fs.grep(","fs.rg(","fs.grepstr(","fs.sed(","fs.lines(",
+    "fs.slice(","fs.head(","fs.tail(","fs.line(","fs.ln(","fs.count(","fs.replace(",
     /* sh.* */
     "sh.exec(","sh.capture(","sh.help()",
     /* sys.* */
@@ -84250,6 +84401,8 @@ void lua_scan(void) {
     }
     lua_pop(L,1); /* remove _G */
 
+
+
     /* Escreve cache para o editor ee ler — só funções e tabelas */
     const char *_home = getenv("HOME");
     if(_home) {
@@ -84260,8 +84413,8 @@ void lua_scan(void) {
             for(int _i=0; _i<G_lua_count; _i++) {
                 const char *_e = G_lua[_i];
                 int _el = (int)strlen(_e);
-                /* só funções (terminam com '(') e tabelas (terminam com '.') */
-                if(_el>0 && (_e[_el-1]=='(' || _e[_el-1]=='.'))
+                /* funções, nomes de módulo e tabelas (exclui só internos com '_') */
+                if(_el>0 && _e[0]!='_')
                     fprintf(_cf, "%s\n", _e);
             }
             fclose(_cf);
@@ -84278,11 +84431,11 @@ static const ElliotModHint G_mod_hints[] = {
         "net.tcp(","net.udp(","net.tcp6(","net.listen(","net.scan(","net.dns(",
         "net.get(","net.geth(","net.post(","net.fetch(","net.ping(","net.syn(",
         "net.os(","net.ip(","net.import(","net.connect(","net.help()",
-        /* socketex LuaSocket */
-        "net.socketex.tcp()","net.socketex.udp()","net.socketex.tcp6()",
-        "net.socketex.connect(","net.socketex.bind(","net.socketex.select(",
-        "net.socketex.try(","net.socketex.protect(","net.socketex.newtry(",
-        "net.socketex.raw(","net.socketex.gettime()","net.socketex.sleep(",
+        /* socket LuaSocket */
+        "net.socket.tcp()","net.socket.udp()","net.socket.tcp6()",
+        "net.socket.connect(","net.socket.bind(","net.socket.select(",
+        "net.socket.try(","net.socket.protect(","net.socket.newtry(",
+        "net.socket.raw(","net.socket.gettime()","net.socket.sleep(",
         /* net.raw (root) */
         "net.raw.syn(","net.raw.rst(","net.raw.ack(","net.raw.fin(",
         "net.raw.psh(","net.raw.synack(","net.raw.xmas(","net.raw.null(",
@@ -88018,7 +88171,7 @@ static int l_ms_test(lua_State *L) {
         const char *mf=NULL;
         if(ex) {
             const char *f[]={"get","geth","post","fetch","connect","tcp","udp","tcp6","listen",
-                             "socket","socketex","scan","ping","ip","os",
+                             "socket","socket","scan","ping","ip","os",
                              "import","dns","help",NULL};
             for(int i=0;f[i];i++){
                 lua_getfield(L,-1,f[i]);
@@ -88064,12 +88217,12 @@ static int l_ms_test(lua_State *L) {
             snprintf(det,sizeof(det),"enviou PING_UDP_MS → \"%s\"",ok?resp:"(sem resposta)");
             mst_result(&total,&failed,"net UDP loopback (C raw)",ok,t1-t0,det);
         }
-        // net.socketex TCP Lua
+        // net.socket TCP Lua
         {
             t0=mst_now_ms();
             elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
-                lua_getfield(L,-1,"socketex");
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
                 int rc=lua_pcall(L,5,2,0);
@@ -88087,15 +88240,15 @@ static int l_ms_test(lua_State *L) {
                 } else lua_settop(L,base+1);
             }
             lua_settop(L,base); t1=mst_now_ms();
-            snprintf(det,sizeof(det),"socketex→send→recv→close | \"%s\"",ok?resp:"(sem resposta)");
-            mst_result(&total,&failed,"net.socketex TCP (Lua API)",ok,t1-t0,det);
+            snprintf(det,sizeof(det),"socket→send→recv→close | \"%s\"",ok?resp:"(sem resposta)");
+            mst_result(&total,&failed,"net.socket TCP (Lua API)",ok,t1-t0,det);
         }
-        // net.socketex UDP Lua
+        // net.socket UDP Lua
         {
             t0=mst_now_ms();
             elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
-                lua_getfield(L,-1,"socketex");
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
                 lua_pushlstring(L,"",0);
@@ -88114,8 +88267,8 @@ static int l_ms_test(lua_State *L) {
                 } else lua_settop(L,base+1);
             }
             lua_settop(L,base); t1=mst_now_ms();
-            snprintf(det,sizeof(det),"socketex UDP→send→recv | \"%s\"",ok?resp:"(sem resposta)");
-            mst_result(&total,&failed,"net.socketex UDP (Lua API)",ok,t1-t0,det);
+            snprintf(det,sizeof(det),"socket UDP→send→recv | \"%s\"",ok?resp:"(sem resposta)");
+            mst_result(&total,&failed,"net.socket UDP (Lua API)",ok,t1-t0,det);
         }
         // net.tcp Lua
         {
@@ -88235,7 +88388,7 @@ static int l_ms_test(lua_State *L) {
             t0=mst_now_ms();
             elliot_std_get(L,"net"); int ok=0; char resp[64]={0};
             if(!lua_isnil(L,-1)){
-                lua_getfield(L,-1,"socketex");
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
                 int rc=lua_pcall(L,5,2,0);
@@ -88264,7 +88417,7 @@ static int l_ms_test(lua_State *L) {
             t0=mst_now_ms();
             elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
-                lua_getfield(L,-1,"socketex");
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
                 int rc=lua_pcall(L,5,2,0);
@@ -88304,7 +88457,7 @@ static int l_ms_test(lua_State *L) {
             t0=mst_now_ms();
             elliot_std_get(L,"net"); int ok=0; char det2[128]={0};
             if(!lua_isnil(L,-1)){
-                lua_getfield(L,-1,"socketex");
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,3);
                 int rc=lua_pcall(L,5,2,0);
@@ -88346,8 +88499,8 @@ static int l_ms_test(lua_State *L) {
             elliot_std_get(L,"net"); int ok=0;
             if(!lua_isnil(L,-1)){
                 /* receptor UDP no servidor local (sp já existe) */
-                /* envia via sendto + recebe via socketex normal */
-                lua_getfield(L,-1,"socketex");
+                /* envia via sendto + recebe via socket normal */
+                lua_getfield(L,-1,"socket");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
                 int rc=lua_pcall(L,5,2,0);
@@ -88681,7 +88834,7 @@ static int l_ms_test(lua_State *L) {
     // sock:local() retorna ip + porta
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char localip[32]={0}; int localport=0;
@@ -88702,7 +88855,7 @@ static int l_ms_test(lua_State *L) {
     // sock:recvfrom retorna 3 valores (data, ip, port)
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char rfdata[64]={0}; char rfip[32]={0}; int rfport=0;
@@ -88729,7 +88882,7 @@ static int l_ms_test(lua_State *L) {
     // sock:shutdown("w")+("r") ambos
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0;
@@ -88748,7 +88901,7 @@ static int l_ms_test(lua_State *L) {
     // sock:getsockopt error=0 em socket saudavel
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int errval=-1;
@@ -88768,7 +88921,7 @@ static int l_ms_test(lua_State *L) {
     // sock:info() 11 campos presentes
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int fields=0;
@@ -88793,7 +88946,7 @@ static int l_ms_test(lua_State *L) {
     // sock:closed() false→true após close
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; int c1=-1,c2=-1;
@@ -88813,7 +88966,7 @@ static int l_ms_test(lua_State *L) {
     // __tostring retorna Socket<...>
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socketex");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         int ok=0; char tostr[128]={0};
@@ -88829,10 +88982,10 @@ static int l_ms_test(lua_State *L) {
         snprintf(det,sizeof(det),"%.80s",tostr);
         mst_result(&total,&failed,"sock __tostring = Socket<...>",ok,t1-t0,det);
     }
-    // net.socket fire-and-forget TCP loopback
+    // net.fire fire-and-forget TCP loopback
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         lua_pushstring(L,"PING_FF_TCP");
@@ -88843,24 +88996,24 @@ static int l_ms_test(lua_State *L) {
         }
         lua_settop(L,base); t1=mst_now_ms();
         snprintf(det,sizeof(det),"%d bytes: %.30s",(int)strlen(resp),resp);
-        mst_result(&total,&failed,"net.socket fire-and-forget TCP",ok,t1-t0,det);
+        mst_result(&total,&failed,"net.fire fire-and-forget TCP",ok,t1-t0,det);
     }
-    // net.socket fire-and-forget UDP (loopback)
+    // net.fire fire-and-forget UDP (loopback)
     if (sp > 0) {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,sp); lua_pushinteger(L,2);
         lua_pushstring(L,"PING_FF_UDP");
         int ok=0;
         if(lua_pcall(L,6,1,0)==LUA_OK) ok=!lua_isnil(L,-1);
         lua_settop(L,base); t1=mst_now_ms();
-        mst_result(&total,&failed,"net.socket fire-and-forget UDP",ok,t1-t0,ok?"retornou string":"nil/erro");
+        mst_result(&total,&failed,"net.fire fire-and-forget UDP",ok,t1-t0,ok?"retornou string":"nil/erro");
     }
-    // net.socket UDP host externo — testa connect() com rota real
+    // net.fire UDP host externo — testa connect() com rota real
     {
         t0=mst_now_ms();
-        elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+        elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
         lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
         lua_pushstring(L,"8.8.8.8"); lua_pushinteger(L,53); lua_pushinteger(L,2);
         int ok=0; char det[128]={0};
@@ -88878,7 +89031,7 @@ static int l_ms_test(lua_State *L) {
             snprintf(det,sizeof(det),"pcall falhou");
         }
         lua_settop(L,base); t1=mst_now_ms();
-        mst_result_sev(&total, &failed, &warned, "net.socket UDP host externo (8.8.8.8:53)", ok, t1-t0, det, MST_SEV_INFO);
+        mst_result_sev(&total, &failed, &warned, "net.fire UDP host externo (8.8.8.8:53)", ok, t1-t0, det, MST_SEV_INFO);
     }
     // exploit registrado e 7 funções presentes
 #ifdef ELLIOT_GOD
@@ -89714,7 +89867,7 @@ static int frc_call_mod(lua_State *L, int base, const char *fn, const char *url)
 }
 
 
-/* Servidor eco TCP para testes de net.socket no ms.force */
+/* Servidor eco TCP para testes de net.fire no ms.force */
 typedef struct { int fd; } FrcEcoArg;
 static FrcEcoArg g_frc_eco_arg = {-1};
 static void *frc_eco_thread(void *a) {
@@ -89773,10 +89926,10 @@ static int l_ms_force(lua_State *L) {
     int port = g_force_srv.port;
     printf("  \033[1;32m✓ ForceServer porta %d — 16 endpoints vulneraveis\033[0m\n\n", port);
 
-    // ── net.socket + socketex — servidor eco dedicado ────────────────────
+    // ── net.fire + socket — servidor eco dedicado ────────────────────
     // Sobe um servidor TCP de eco simples em porta livre só pra esses testes.
     // Independente do ForceServer (single-threaded) — sem interferência.
-    printf("  \033[0;90m── net.socket + net.socketex (métodos completos) ────────────\033[0m\n");
+    printf("  \033[0;90m── net.fire + net.socket (métodos completos) ────────────\033[0m\n");
     {
         /* sobe servidor eco TCP em thread separada */
         int eco_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -89805,14 +89958,14 @@ static int l_ms_force(lua_State *L) {
 
         if (!eco_ok) {
             printf("  \033[1;33m[!] servidor eco não iniciou — pulando testes de socket\033[0m\n");
-            frc_result(&fr,"net.socket fire-and-forget TCP",0,0,"eco nao iniciou");
-            frc_result(&fr,"socketex->sendall->recv",0,0,"eco nao iniciou");
+            frc_result(&fr,"net.fire fire-and-forget TCP",0,0,"eco nao iniciou");
+            frc_result(&fr,"socket->sendall->recv",0,0,"eco nao iniciou");
             frc_result(&fr,"sock:wait+peek+recvline",0,0,"eco nao iniciou");
         } else {
             /* TEST 1: fire-and-forget */
             {
                 t0=mst_now_ms();
-                elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+                elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
                 lua_pushstring(L,"ipv4"); lua_pushstring(L,"stream");
                 lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,eco_port); lua_pushinteger(L,2);
                 lua_pushstring(L,"HELLO_FF");
@@ -89824,9 +89977,9 @@ static int l_ms_force(lua_State *L) {
                 }
                 lua_settop(L,base); t1=mst_now_ms();
                 snprintf(det,sizeof(det),"resp=[%.40s]",resp[0]?resp:"vazio");
-                frc_result(&fr,"net.socket fire-and-forget TCP",ok,t1-t0,ok?"OK":det);
+                frc_result(&fr,"net.fire fire-and-forget TCP",ok,t1-t0,ok?"OK":det);
             }
-            /* TEST 2: socketex sendall + recv */
+            /* TEST 2: socket sendall + recv */
             {
                 t0=mst_now_ms();
                 elliot_std_get(L,"net"); lua_getfield(L,-1,"tcp");
@@ -89845,7 +89998,7 @@ static int l_ms_force(lua_State *L) {
                 } else lua_settop(L,base+1);
                 lua_settop(L,base); t1=mst_now_ms();
                 snprintf(det,sizeof(det),"sendall+recv=[%.30s]",echoed[0]?echoed:"vazio");
-                frc_result(&fr,"socketex->sendall->recv",ok,t1-t0,ok?"OK":det);
+                frc_result(&fr,"socket->sendall->recv",ok,t1-t0,ok?"OK":det);
             }
             /* TEST 3: wait + peek + recvline */
             {
@@ -89880,10 +90033,10 @@ static int l_ms_force(lua_State *L) {
         }
 
         /* TEST UDP — independente do servidor eco TCP */
-        /* TEST UDP loopback: net.socket dgram para 127.0.0.1 */
+        /* TEST UDP loopback: net.fire dgram para 127.0.0.1 */
         {
             t0=mst_now_ms();
-            elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+            elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
             lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
             lua_pushstring(L,"127.0.0.1"); lua_pushinteger(L,53); lua_pushinteger(L,2);
             int ok=0; char det[128]={0};
@@ -89892,12 +90045,12 @@ static int l_ms_force(lua_State *L) {
                 else { const char *e=lua_tostring(L,-1); snprintf(det,sizeof(det),"nil: %s",e?e:"?"); }
             } else snprintf(det,sizeof(det),"pcall falhou");
             lua_settop(L,base); t1=mst_now_ms();
-            frc_result(&fr,"net.socket UDP loopback (127.0.0.1:53)",ok,t1-t0,ok?"OK":det);
+            frc_result(&fr,"net.fire UDP loopback (127.0.0.1:53)",ok,t1-t0,ok?"OK":det);
         }
         /* TEST UDP host externo: testa connect() com rota real */
         {
             t0=mst_now_ms();
-            elliot_std_get(L,"net"); lua_getfield(L,-1,"socket");
+            elliot_std_get(L,"net"); lua_getfield(L,-1,"fire");
             lua_pushstring(L,"ipv4"); lua_pushstring(L,"dgram");
             lua_pushstring(L,"8.8.8.8"); lua_pushinteger(L,53); lua_pushinteger(L,2);
             int ok=0; char det[128]={0};
@@ -89906,7 +90059,7 @@ static int l_ms_force(lua_State *L) {
                 else { const char *e=lua_tostring(L,-1); snprintf(det,sizeof(det),"nil: %s",e?e:"?"); }
             } else snprintf(det,sizeof(det),"pcall falhou");
             lua_settop(L,base); t1=mst_now_ms();
-            frc_result(&fr,"net.socket UDP host externo (8.8.8.8:53)",ok,t1-t0,ok?"OK":det);
+            frc_result(&fr,"net.fire UDP host externo (8.8.8.8:53)",ok,t1-t0,ok?"OK":det);
         }
     }
 
@@ -93869,7 +94022,7 @@ static int l_ms_help(lua_State *L) {
     printf("    \033[0;90m            mkdir, exists, glob, chmod\033[0m\n");
     printf("    \033[0;90m  sh        exec / capture / read\033[0m\n");
     printf("    \033[0;90m  sys       pid, env, spawn, sh, thread, join, list\033[0m\n");
-    printf("    \033[0;90m  net       registradas, TCP/UDP loopback, socketex, scan, dns\033[0m\n");
+    printf("    \033[0;90m  net       registradas, TCP/UDP loopback, socket, scan, dns\033[0m\n");
 #ifndef ELLIOT_NANO
     printf("    \033[0;90m  cc        compila C + verifica exit code 42\033[0m\n");
     printf("    \033[0;90m  mod       23 scanners registrados\033[0m\n");
@@ -97328,6 +97481,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_sys_channel);  lua_setfield(L,-2,"channel");
     lua_pushcfunction(L,l_sys_net);      lua_setfield(L,-2,"net");
     lua_pushcfunction(L,l_sys_storage);  lua_setfield(L,-2,"storage");
+    lua_pushcfunction(L,l_sys_capture_c);lua_setfield(L,-2,"capture");
     elliot_std_set(L,"sys");
 
     /* lg() — global standalone: exibe apenas o logo do ElliotOS */
@@ -97351,7 +97505,7 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_net_ws);       lua_setfield(L,-2,"ws");
     lua_pushcfunction(L,l_net_wss);      lua_setfield(L,-2,"wss");
     lua_pushcfunction(L,l_net_listen);   lua_setfield(L,-2,"listen");
-    /* net.socketex — tabela compatível com LuaSocket 3.x */
+    /* net.socket — tabela compatível com LuaSocket 3.x */
     lsock_register_meta(L);
     /* registra metatable para try/protect */
     luaL_newmetatable(L, LSOCK_TRY_META); lua_pop(L,1);
@@ -97378,9 +97532,9 @@ static int luaopen_net_thread(lua_State *L) {
 #ifdef ELLIOT_ROOT
     lua_pushcfunction(L, l_lsock_raw);          lua_setfield(L,-2,"raw");
 #endif
-    lua_setfield(L,-2,"socketex");
+    lua_setfield(L,-2,"socket");
     lua_pushcfunction(L,l_net_syn);      lua_setfield(L,-2,"syn");
-    lua_pushcfunction(L,l_net_socket);   lua_setfield(L,-2,"socket");
+    lua_pushcfunction(L,l_net_fire);   lua_setfield(L,-2,"fire");
     lua_pushcfunction(L,l_net_send);     lua_setfield(L,-2,"send");
     lua_pushcfunction(L,l_net_recv);     lua_setfield(L,-2,"recv");
     lua_pushcfunction(L,l_net_close);    lua_setfield(L,-2,"close");
@@ -100408,6 +100562,214 @@ static void elliot_load_prelude(lua_State *L) {
 "  function _raw_sys.now()\n"
 "    return os.date('%H:%M:%S')\n"
 "  end\n"
+"\n"
+"  -- sys.capture e implementado em C (l_sys_capture_c) e registrado\n"
+"  -- diretamente no modulo sys — nao precisa de extensao Lua aqui.\n"
+"end)\n"
+
+/* ── fs.grep / fs.rg / fs.sed / fs.lines / fs.head / fs.tail / fs.slice ─
+   Manipulação de texto sobre strings ou arquivos.
+   Mesmo padrão de extensão de sys.date — pcall sobre _raw_fs.
+   ─────────────────────────────────────────────────────────────────────── */
+"pcall(function()\n"
+"  local _std_t = _G._elliot_std\n"
+"  local _raw_fs = (_std_t and _std_t.fs) or fs\n"
+"\n"
+"  -- helpers internos ────────────────────────────────────────────────────\n"
+"\n"
+"  -- divide qualquer string em tabela de linhas (preserva linhas vazias)\n"
+"  local function _split_lines(s)\n"
+"    local t = {}\n"
+"    local i = 1\n"
+"    while i <= #s do\n"
+"      local a, b = s:find('\\n', i, true)\n"
+"      if a then\n"
+"        t[#t+1] = s:sub(i, a-1)\n"
+"        i = b + 1\n"
+"      else\n"
+"        t[#t+1] = s:sub(i)\n"
+"        break\n"
+"      end\n"
+"    end\n"
+"    return t\n"
+"  end\n"
+"\n"
+"  -- resolve: aceita string de conteúdo OU path de arquivo\n"
+"  -- heurística: se não contém '\\n' e o arquivo existe, trata como path\n"
+"  local function _resolve(src)\n"
+"    if type(src) ~= 'string' then\n"
+"      error('fs: esperava string (conteudo ou path), recebeu '..type(src), 3)\n"
+"    end\n"
+"    if not src:find('\\n', 1, true) then\n"
+"      -- pode ser path — tenta abrir\n"
+"      local f = io.open(src, 'r')\n"
+"      if f then\n"
+"        local data = f:read('*a'); f:close()\n"
+"        return data, src\n"
+"      end\n"
+"    end\n"
+"    return src, nil\n"
+"  end\n"
+"\n"
+"  -- fs.lines(src) -> tabela de strings ──────────────────────────────────\n"
+"  -- Divide src (string ou arquivo) em linhas numeradas.\n"
+"  -- Retorna tabela indexada 1..N.\n"
+"  function _raw_fs.lines(src)\n"
+"    local data = _resolve(src)\n"
+"    return _split_lines(data)\n"
+"  end\n"
+"\n"
+"  -- fs.grep(src, pattern [, opts]) -> tabela de {lnum, line} ────────────\n"
+"  -- Igual ao grep: retorna linhas completas que contêm pattern.\n"
+"  -- opts.plain  = true  → busca literal (não Lua pattern)\n"
+"  -- opts.invert = true  → linhas que NÃO batem (grep -v)\n"
+"  -- opts.ignorecase = true → case-insensitive\n"
+"  -- Alias: fs.rg()\n"
+"  function _raw_fs.grep(src, pattern, opts)\n"
+"    if type(pattern) ~= 'string' then\n"
+"      error('fs.grep: pattern deve ser string', 2)\n"
+"    end\n"
+"    opts = opts or {}\n"
+"    local data = _resolve(src)\n"
+"    local lines = _split_lines(data)\n"
+"    local plain   = opts.plain   or false\n"
+"    local invert  = opts.invert  or false\n"
+"    local icase   = opts.ignorecase or false\n"
+"    local pat     = icase and pattern:lower() or pattern\n"
+"    local result  = {}\n"
+"    for i, line in ipairs(lines) do\n"
+"      local haystack = icase and line:lower() or line\n"
+"      local found\n"
+"      if plain then\n"
+"        found = haystack:find(pat, 1, true) ~= nil\n"
+"      else\n"
+"        found = haystack:find(pat) ~= nil\n"
+"      end\n"
+"      if (found and not invert) or (not found and invert) then\n"
+"        result[#result+1] = { lnum = i, line = line }\n"
+"      end\n"
+"    end\n"
+"    return result\n"
+"  end\n"
+"  _raw_fs.rg = _raw_fs.grep  -- alias\n"
+"\n"
+"  -- fs.grepstr(src, pattern [, opts]) -> string ─────────────────────────\n"
+"  -- Igual a fs.grep mas retorna string pronta (igual saída do grep no terminal).\n"
+"  function _raw_fs.grepstr(src, pattern, opts)\n"
+"    local matches = _raw_fs.grep(src, pattern, opts)\n"
+"    local t = {}\n"
+"    for _, m in ipairs(matches) do t[#t+1] = m.line end\n"
+"    return table.concat(t, '\\n') .. (#t > 0 and '\\n' or '')\n"
+"  end\n"
+"\n"
+"  -- fs.sed(src, pattern, replacement [, opts]) -> string ────────────────\n"
+"  -- Substitui pattern por replacement em cada linha.\n"
+"  -- opts.plain   = true  → substituição literal\n"
+"  -- opts.global  = true  → substitui todas as ocorrências na linha (padrão: true)\n"
+"  -- opts.lines   = {from, to}  → aplica só nas linhas from..to\n"
+"  -- Retorna a string completa modificada.\n"
+"  function _raw_fs.sed(src, pattern, replacement, opts)\n"
+"    if type(pattern) ~= 'string' then\n"
+"      error('fs.sed: pattern deve ser string', 2)\n"
+"    end\n"
+"    replacement = replacement or ''\n"
+"    opts = opts or {}\n"
+"    local data = _resolve(src)\n"
+"    local lines = _split_lines(data)\n"
+"    local plain  = opts.plain  or false\n"
+"    local global = (opts.global ~= false)  -- padrão true\n"
+"    local from   = opts.lines and opts.lines[1] or 1\n"
+"    local to     = opts.lines and opts.lines[2] or #lines\n"
+"    local pat    = pattern\n"
+"    local rep    = replacement\n"
+"    if plain then\n"
+"      -- escapa caracteres especiais para gsub\n"
+"      pat = pattern:gsub('([%(%)%.%%%+%-%*%?%[%]%^%$])', '%%%1')\n"
+"      rep = replacement:gsub('%%', '%%%%')\n"
+"    end\n"
+"    for i = from, math.min(to, #lines) do\n"
+"      if global then\n"
+"        lines[i] = lines[i]:gsub(pat, rep)\n"
+"      else\n"
+"        lines[i] = lines[i]:gsub(pat, rep, 1)\n"
+"      end\n"
+"    end\n"
+"    return table.concat(lines, '\\n') .. '\\n'\n"
+"  end\n"
+"\n"
+"  -- fs.slice(src, from [, to]) -> string ─────────────────────────────────\n"
+"  -- Retorna as linhas from..to (inclusive). Igual ao sed -n 'X,Yp'.\n"
+"  -- from e to aceitam negativos: -1 = última linha.\n"
+"  -- Se to omitido, retorna só a linha from.\n"
+"  function _raw_fs.slice(src, from, to)\n"
+"    if type(from) ~= 'number' then\n"
+"      error('fs.slice: from deve ser number', 2)\n"
+"    end\n"
+"    local data = _resolve(src)\n"
+"    local lines = _split_lines(data)\n"
+"    local n = #lines\n"
+"    -- resolve negativos\n"
+"    if from < 0 then from = n + from + 1 end\n"
+"    if to == nil then to = from end\n"
+"    if to < 0 then to = n + to + 1 end\n"
+"    -- clamp\n"
+"    from = math.max(1, from)\n"
+"    to   = math.min(n, to)\n"
+"    if from > to then return '' end\n"
+"    local t = {}\n"
+"    for i = from, to do t[#t+1] = lines[i] end\n"
+"    return table.concat(t, '\\n') .. '\\n'\n"
+"  end\n"
+"\n"
+"  -- fs.head(src [, n]) -> string ─────────────────────────────────────────\n"
+"  -- Primeiras n linhas (padrão 10). Igual ao head.\n"
+"  function _raw_fs.head(src, n)\n"
+"    return _raw_fs.slice(src, 1, n or 10)\n"
+"  end\n"
+"\n"
+"  -- fs.tail(src [, n]) -> string ─────────────────────────────────────────\n"
+"  -- Últimas n linhas (padrão 10). Igual ao tail.\n"
+"  function _raw_fs.tail(src, n)\n"
+"    local data = _resolve(src)\n"
+"    local lines = _split_lines(data)\n"
+"    local ln = #lines\n"
+"    n = n or 10\n"
+"    return _raw_fs.slice(src, math.max(1, ln - n + 1), ln)\n"
+"  end\n"
+"\n"
+"  -- fs.line(src, n) -> string ────────────────────────────────────────────\n"
+"  -- Retorna linha n (1-based). Negativo conta do fim. Alias: fs.ln()\n"
+"  function _raw_fs.line(src, n)\n"
+"    return _raw_fs.slice(src, n, n):gsub('\\n$', '')\n"
+"  end\n"
+"  _raw_fs.ln = _raw_fs.line\n"
+"\n"
+"  -- fs.count(src) -> number ─────────────────────────────────────────────\n"
+"  -- Conta o número de linhas. Equivale a wc -l.\n"
+"  function _raw_fs.count(src)\n"
+"    local data = _resolve(src)\n"
+"    return select(2, data:gsub('\\n', '\\n')) + (data:sub(-1) ~= '\\n' and 1 or 0)\n"
+"  end\n"
+"\n"
+"  -- fs.replace(src, from, to, new_text) -> string ───────────────────────\n"
+"  -- Substitui o bloco de linhas from..to por new_text (string, pode ter \\n).\n"
+"  -- Útil para edição cirúrgica: substitui um range inteiro por conteúdo novo.\n"
+"  function _raw_fs.replace(src, from, to, new_text)\n"
+"    local data = _resolve(src)\n"
+"    local lines = _split_lines(data)\n"
+"    local n = #lines\n"
+"    if from < 0 then from = n + from + 1 end\n"
+"    if to   < 0 then to   = n + to   + 1 end\n"
+"    from = math.max(1, from)\n"
+"    to   = math.min(n, to)\n"
+"    local new_lines = _split_lines(new_text or '')\n"
+"    local result = {}\n"
+"    for i = 1, from - 1 do result[#result+1] = lines[i] end\n"
+"    for _, l in ipairs(new_lines) do result[#result+1] = l end\n"
+"    for i = to + 1, n do result[#result+1] = lines[i] end\n"
+"    return table.concat(result, '\\n') .. '\\n'\n"
+"  end\n"
+"\n"
 "end)\n"
 
 /* ── str.* — strings de proposito geral (faltava no prelude) ─────────── */
@@ -101056,7 +101418,7 @@ static void elliot_load_prelude(lua_State *L) {
 "local color = {}\n"
 "do\n"
 "  local codes = {\n"
-"    reset=0, bold=1, dim=2, italic=3, underline=4, blink=5,\n"
+"    reset=0, rst=0, bold=1, bright=1, dim=2, italic=3, underline=4, blink=5,\n"
 "    black=30, red=31, green=32, yellow=33, blue=34, magenta=35, cyan=36, white=37,\n"
 "    bright_black=90, bright_red=91, bright_green=92, bright_yellow=93,\n"
 "    bright_blue=94, bright_magenta=95, bright_cyan=96, bright_white=97,\n"
@@ -101109,7 +101471,21 @@ static void elliot_load_prelude(lua_State *L) {
 "    print('  print(color.rgb(255, 100, 0, \\'laranja\\'))')\n"
 "  end\n"
 "end\n"
-"do local _s=_G._elliot_std; if _s then _s.color=color end end\n"
+"-- colors: callable ansicolors-style (%{red,bold}text%{rst})\n"
+"local _colors_mt = {}\n"
+"_colors_mt.__call = function(_, s)\n"
+"  return (s:gsub('%%{([^}]+)}', function(tags)\n"
+"    local out = ''\n"
+"    for tag in tags:gmatch('[^,%%s]+') do\n"
+"      local fn = color[tag]\n"
+"      if fn then out = out .. fn() end\n"
+"    end\n"
+"    return out\n"
+"  end))\n"
+"end\n"
+"local colors = setmetatable({}, _colors_mt)\n"
+"for k,v in pairs(color) do colors[k]=v end\n"
+"do local _s=_G._elliot_std; if _s then _s.colors=colors end end\n"
 
 /* ══════════════════════════════════════════════════════════════════════
    test.* — assertions simples para scripts testáveis
@@ -101236,6 +101612,33 @@ static void elliot_load_prelude(lua_State *L) {
    ══════════════════════════════════════════════════════════════════════ */
 "local re = {}\n"
 "do\n"
+"  re.P = {\n"
+"    digit    = \"%d\",   digits   = \"%d+\",\n"
+"    letter   = \"%a\",   letters  = \"%a+\",\n"
+"    alnum    = \"%w\",   alnums   = \"%w+\",\n"
+"    space    = \"%s\",   spaces   = \"%s+\",\n"
+"    lower    = \"%l\",   lowers   = \"%l+\",\n"
+"    upper    = \"%u\",   uppers   = \"%u+\",\n"
+"    punct    = \"%p\",   puncts   = \"%p+\",\n"
+"    any      = \".\",    rest     = \".+\",\n"
+"    word     = \"%a[%w_]*\",\n"
+"    int      = \"%-?%d+\",\n"
+"    uint     = \"%d+\",\n"
+"    float    = \"%-?%d+%.%d+\",\n"
+"    hex      = \"%x+\",\n"
+"    ws       = \"%s*\",\n"
+"    nonspace = \"%S+\",\n"
+"    email    = \"[%w%.%-_]+@[%w%.%-]+%.[%a]+\",\n"
+"    url      = \"https?://[%w%%%-_%.%+!%*%(%)%;:@&=/%?#,]+\",\n"
+"    line     = \"[^\\\\n]+\",\n"
+"  }\n"
+"  function re.build(...)\n"
+"    local parts = {}\n"
+"    for _, name in ipairs({...}) do\n"
+"      parts[#parts+1] = re.P[name] or name\n"
+"    end\n"
+"    return table.concat(parts)\n"
+"  end\n"
 "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
 "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
 "  function re.findall(s,pat) local t={} for m in s:gmatch(pat) do t[#t+1]=m end return t end\n"
@@ -101250,9 +101653,9 @@ static void elliot_load_prelude(lua_State *L) {
 "  function re.compile(pat) local o={_p=pat}; function o:match(s) return re.match(s,self._p) end; function o:search(s) return re.search(s,self._p) end; function o:findall(s) return re.findall(s,self._p) end; function o:sub(s,r) return re.sub(s,self._p,r) end; function o:split(s) return re.split(s,self._p) end; function o:test(s) return re.test(s,self._p) end; function o:count(s) return re.count(s,self._p) end; return o end\n"
 "  function re.help()\n"
 "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
-"    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
+"    local Y=E..'[1;33m'; local D=E..'[0;90m'; local G=E..'[1;32m'\n"
 "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-"    print(C..'║  re.* -- Expressoes Regulares (padroes Lua)                  ║'..R)\n"
+"    print(C..'║  re.* -- Expressoes Regulares + Aliases de Alto Nivel        ║'..R)\n"
 "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
 "    local function f(sig, desc, ret)\n"
 "      print('  '..Y..sig..R..'  '..desc)\n"
@@ -101271,11 +101674,41 @@ static void elliot_load_prelude(lua_State *L) {
 "    f('re.test(s,pat)',         'true se o padrao ocorre em s',             'boolean')\n"
 "    f('re.count(s,pat)',        'conta ocorrencias do padrao',              'int')\n"
 "    f('re.compile(pat)',        'objeto reutilizavel: :match/:sub/:test/...', 'objeto')\n"
+"    f('re.build(...)',          'monta padrao com nomes: re.build(\"digits\",\"spaces\")', 'string')\n"
 "    f('re.help()',              'esta ajuda',                                nil)\n"
+"    print(G..'── re.P: aliases de alto nivel (sem decorar %d, %a...) ──'..R..'\\n')\n"
+"    local al={\n"
+"      {'digit / digits',   '%d / %d+',       'um digito / um ou mais digitos'},\n"
+"      {'letter / letters', '%a / %a+',       'uma letra / uma ou mais letras'},\n"
+"      {'alnum / alnums',   '%w / %w+',       'letra ou digito'},\n"
+"      {'space / spaces',   '%s / %s+',       'espaco / espacos'},\n"
+"      {'lower / lowers',   '%l / %l+',       'minuscula(s)'},\n"
+"      {'upper / uppers',   '%u / %u+',       'maiuscula(s)'},\n"
+"      {'punct / puncts',   '%p / %p+',       'pontuacao'},\n"
+"      {'word',             '%a[%w_]*',       'palavra alfanumerica'},\n"
+"      {'int',              '%-?%d+',         'inteiro (sinal opcional)'},\n"
+"      {'uint',             '%d+',            'inteiro positivo'},\n"
+"      {'float',            '%-?%d+%.%d+',    'numero decimal'},\n"
+"      {'hex',              '%x+',            'hexadecimal'},\n"
+"      {'nonspace',         '%S+',            'token sem espaco'},\n"
+"      {'line',             '[^\\\\n]+',         'linha inteira'},\n"
+"      {'email',            '[%w%.%-_]+@...', 'padrao de e-mail'},\n"
+"      {'url',              'https?://...',   'URL http/https'},\n"
+"    }\n"
+"    for _,a in ipairs(al) do print(string.format('  '..Y..'re.P.%-18s'..R..'= '..D..'%-15s'..R..' %s',a[1],a[2],a[3])) end\n"
+"    print('')\n"
 "    print(D..'  Obs: os padroes seguem a sintaxe de Lua patterns, nao regex POSIX/PCRE.'..R)\n"
 "    print(C..'── Exemplos ──'..R..'\\n')\n"
-"    print('  re.findall(\\'a1 b22 c3\\', \\'%d+\\')        --> {\\'1\\',\\'22\\',\\'3\\'}')\n"
-"    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
+"    print('  -- Classico (dificil):')\n"
+"    print('  re.findall(\"a1 b22 c3\", \"%d+\")          --> {\"1\",\"22\",\"3\"}')\n"
+"    print('')\n"
+"    print('  -- Alto nivel com re.P:')\n"
+"    print('  re.findall(\"a1 b22 c3\", re.P.digits)    --> {\"1\",\"22\",\"3\"}')\n"
+"    print('  re.findall(\"ola mundo\", re.P.letters)    --> {\"ola\",\"mundo\"}')\n"
+"    print('  re.test(\"user@mail.com\", re.P.email)     --> true')\n"
+"    print('  re.split(\"um  dois\", re.P.spaces)        --> {\"um\",\"dois\"}')\n"
+"    print('  re.sub(\"2026-09-10\", \"%-\", \"/\")          --> \"2026/09/10\"')\n"
+"    print('  re.build(\"int\",\"spaces\",\"letters\")        --> \"%-?%d+ %s+ %a+\"')\n"
 "  end\n"
 "end\n"
 "do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
@@ -101512,7 +101945,7 @@ static void elliot_load_prelude(lua_State *L) {
 "    pent=true, exploit=true, lmod=true, agent=true, adb=true,\n"
 "    util=true, json=true, re=true, cc=true, ivar=true,\n"
 "    dow=true, back=true, str=true, lx=true,\n"
-"    log=true, csv=true, num=true, color=true, test=true, try=true,\n"
+"    log=true, csv=true, num=true, colors=true, test=true, try=true,\n"
 "  }\n"
 "  -- aliases: @std/http -> net, @std/time -> sys\n"
 "  local _std_aliases = { http=\"net\", time=\"sys\" }\n"
@@ -101620,6 +102053,13 @@ static void elliot_load_prelude(lua_State *L) {
 "      local _s = user_path:match(\"([^/]+)$\"):gsub(\"%.lua$\",\"\")\n"
 "      if rawget(_G, _s) == nil then _G[_s] = result end\n"
 "      return result\n"
+"    end\n"
+"    local cmd_path = name:match(\"^@cmd/(.+)$\")\n"
+"    if cmd_path then\n"
+"      local cmdname = cmd_path:match(\"([^/]+)$\")\n"
+"      if not _G._elliot_cmd_imports then _G._elliot_cmd_imports = {} end\n"
+"      _G._elliot_cmd_imports[cmdname] = true\n"
+"      return true\n"
 "    end\n"
 "    return _orig_require(name)\n"
 "  end\n"
@@ -103421,6 +103861,36 @@ char *elliot_ivar_preprocess_block(const char *code) {
             }
             char *e=(char*)malloc(1); if(e)e[0]='\0'; return e;
         }
+        /* ── @cmd: executa comandos importados com sintaxe bash pura ───────
+         * Checa se a primeira palavra da linha está em _G._elliot_cmd_imports.
+         * Se sim, passa a linha inteira pro system() — sem parênteses, sem
+         * aspas, exatamente como bash.                                      */
+        {
+            const char *wp = p;
+            const char *we = wp;
+            while (*we && *we!=' ' && *we!='\t' && *we!='\n') we++;
+            size_t wlen = (size_t)(we - wp);
+            if (wlen > 0 && wlen < 128 && _elliot_L) {
+                char candidate[128];
+                memcpy(candidate, wp, wlen);
+                candidate[wlen] = '\0';
+                /* consulta _G._elliot_cmd_imports[candidate] */
+                lua_getglobal(_elliot_L, "_elliot_cmd_imports");
+                if (lua_istable(_elliot_L, -1)) {
+                    lua_getfield(_elliot_L, -1, candidate);
+                    int imported = lua_toboolean(_elliot_L, -1);
+                    lua_pop(_elliot_L, 2);
+                    if (imported) {
+                        system(p);
+                        char *e = (char*)malloc(1);
+                        if (e) e[0] = '\0';
+                        return e;
+                    }
+                } else {
+                    lua_pop(_elliot_L, 1);
+                }
+            }
+        }
     }
     if (!g_ivar_enabled) { char *c=(char*)malloc(strlen(code)+1); if(c)strcpy(c,code); return c; }
 
@@ -104225,39 +104695,50 @@ int luaopen_net(lua_State *L) {
         luaL_dostring(L,
             "local re = {}\n"
             "do\n"
+            "  re.P = {\n"
+            "    digit    = \"%d\",   digits   = \"%d+\",\n"
+            "    letter   = \"%a\",   letters  = \"%a+\",\n"
+            "    alnum    = \"%w\",   alnums   = \"%w+\",\n"
+            "    space    = \"%s\",   spaces   = \"%s+\",\n"
+            "    lower    = \"%l\",   lowers   = \"%l+\",\n"
+            "    upper    = \"%u\",   uppers   = \"%u+\",\n"
+            "    punct    = \"%p\",   puncts   = \"%p+\",\n"
+            "    any      = \".\",    rest     = \".+\",\n"
+            "    word     = \"%a[%w_]*\",\n"
+            "    int      = \"%-?%d+\",\n"
+            "    uint     = \"%d+\",\n"
+            "    float    = \"%-?%d+%.%d+\",\n"
+            "    hex      = \"%x+\",\n"
+            "    ws       = \"%s*\",\n"
+            "    nonspace = \"%S+\",\n"
+            "    email    = \"[%w%.%-_]+@[%w%.%-]+%.[%a]+\",\n"
+            "    url      = \"https?://[%w%%%-_%.%+!%*%(%)%;:@&=/%?#,]+\",\n"
+            "    line     = \"[^\\\\n]+\",\n"
+            "  }\n"
+            "  function re.build(...)\n"
+            "    local parts = {}\n"
+            "    for _, name in ipairs({...}) do\n"
+            "      parts[#parts+1] = re.P[name] or name\n"
+            "    end\n"
+            "    return table.concat(parts)\n"
+            "  end\n"
             "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
             "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
-            "  function re.findall(s,pat) local t={} for m in s:gmatch(pat) do t[#t+1]=m end; return t end\n"
+            "  function re.findall(s,pat) local t={} for m in s:gmatch(pat) do t[#t+1]=m end return t end\n"
             "  function re.finditer(s,pat) return s:gmatch(pat) end\n"
-            "  function re.gmatch(s,pat) return s:gmatch(pat) end\n"
-            "  function re.sub(s,pat,rep) return (s:gsub(pat,rep)) end\n"
+            "  function re.gmatch(s,pat)   return s:gmatch(pat) end\n"
+            "  function re.sub(s,pat,rep)     return (s:gsub(pat,rep))   end\n"
             "  function re.sub_n(s,pat,rep,n) return (s:gsub(pat,rep,n)) end\n"
-            "  function re.split(s,pat)\n"
-            "    local t,last={},1\n"
-            "    for i,j in function() return s:find(pat,last) end do\n"
-            "      t[#t+1]=s:sub(last,i-1); last=j+1\n"
-            "    end\n"
-            "    t[#t+1]=s:sub(last); return t\n"
-            "  end\n"
+            "  function re.split(s,pat) local t,last={},1; for i,j in function() return s:find(pat,last) end do t[#t+1]=s:sub(last,i-1); last=j+1 end; t[#t+1]=s:sub(last); return t end\n"
             "  function re.named(s,pat,names) local caps={s:match(pat)}; local t={} for i,n in ipairs(names) do t[n]=caps[i] end; return t end\n"
-            "  function re.test(s,pat) return s:find(pat)~=nil end\n"
+            "  function re.test(s,pat)  return s:find(pat)~=nil end\n"
             "  function re.count(s,pat) local n=0; for _ in s:gmatch(pat) do n=n+1 end; return n end\n"
-            "  function re.compile(pat)\n"
-            "    local o={_p=pat}\n"
-            "    function o:match(s) return re.match(s,self._p) end\n"
-            "    function o:search(s) return re.search(s,self._p) end\n"
-            "    function o:findall(s) return re.findall(s,self._p) end\n"
-            "    function o:sub(s,r) return re.sub(s,self._p,r) end\n"
-            "    function o:split(s) return re.split(s,self._p) end\n"
-            "    function o:test(s) return re.test(s,self._p) end\n"
-            "    function o:count(s) return re.count(s,self._p) end\n"
-            "    return o\n"
-            "  end\n"
+            "  function re.compile(pat) local o={_p=pat}; function o:match(s) return re.match(s,self._p) end; function o:search(s) return re.search(s,self._p) end; function o:findall(s) return re.findall(s,self._p) end; function o:sub(s,r) return re.sub(s,self._p,r) end; function o:split(s) return re.split(s,self._p) end; function o:test(s) return re.test(s,self._p) end; function o:count(s) return re.count(s,self._p) end; return o end\n"
             "  function re.help()\n"
             "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
-            "    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
+            "    local Y=E..'[1;33m'; local D=E..'[0;90m'; local G=E..'[1;32m'\n"
             "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-            "    print(C..'║  re.* -- Expressoes Regulares (padroes Lua)                  ║'..R)\n"
+            "    print(C..'║  re.* -- Expressoes Regulares + Aliases de Alto Nivel        ║'..R)\n"
             "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
             "    local function f(sig, desc, ret)\n"
             "      print('  '..Y..sig..R..'  '..desc)\n"
@@ -104276,11 +104757,41 @@ int luaopen_net(lua_State *L) {
             "    f('re.test(s,pat)',         'true se o padrao ocorre em s',             'boolean')\n"
             "    f('re.count(s,pat)',        'conta ocorrencias do padrao',              'int')\n"
             "    f('re.compile(pat)',        'objeto reutilizavel: :match/:sub/:test/...', 'objeto')\n"
+            "    f('re.build(...)',          'monta padrao com nomes: re.build(\"digits\",\"spaces\")', 'string')\n"
             "    f('re.help()',              'esta ajuda',                                nil)\n"
+            "    print(G..'── re.P: aliases de alto nivel (sem decorar %d, %a...) ──'..R..'\\n')\n"
+            "    local al={\n"
+            "      {'digit / digits',   '%d / %d+',       'um digito / um ou mais digitos'},\n"
+            "      {'letter / letters', '%a / %a+',       'uma letra / uma ou mais letras'},\n"
+            "      {'alnum / alnums',   '%w / %w+',       'letra ou digito'},\n"
+            "      {'space / spaces',   '%s / %s+',       'espaco / espacos'},\n"
+            "      {'lower / lowers',   '%l / %l+',       'minuscula(s)'},\n"
+            "      {'upper / uppers',   '%u / %u+',       'maiuscula(s)'},\n"
+            "      {'punct / puncts',   '%p / %p+',       'pontuacao'},\n"
+            "      {'word',             '%a[%w_]*',       'palavra alfanumerica'},\n"
+            "      {'int',              '%-?%d+',         'inteiro (sinal opcional)'},\n"
+            "      {'uint',             '%d+',            'inteiro positivo'},\n"
+            "      {'float',            '%-?%d+%.%d+',    'numero decimal'},\n"
+            "      {'hex',              '%x+',            'hexadecimal'},\n"
+            "      {'nonspace',         '%S+',            'token sem espaco'},\n"
+            "      {'line',             '[^\\\\n]+',         'linha inteira'},\n"
+            "      {'email',            '[%w%.%-_]+@...', 'padrao de e-mail'},\n"
+            "      {'url',              'https?://...',   'URL http/https'},\n"
+            "    }\n"
+            "    for _,a in ipairs(al) do print(string.format('  '..Y..'re.P.%-18s'..R..'= '..D..'%-15s'..R..' %s',a[1],a[2],a[3])) end\n"
+            "    print('')\n"
             "    print(D..'  Obs: os padroes seguem a sintaxe de Lua patterns, nao regex POSIX/PCRE.'..R)\n"
             "    print(C..'── Exemplos ──'..R..'\\n')\n"
-            "    print('  re.findall(\\'a1 b22 c3\\', \\'%d+\\')        --> {\\'1\\',\\'22\\',\\'3\\'}')\n"
-            "    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
+            "    print('  -- Classico (dificil):')\n"
+            "    print('  re.findall(\"a1 b22 c3\", \"%d+\")          --> {\"1\",\"22\",\"3\"}')\n"
+            "    print('')\n"
+            "    print('  -- Alto nivel com re.P:')\n"
+            "    print('  re.findall(\"a1 b22 c3\", re.P.digits)    --> {\"1\",\"22\",\"3\"}')\n"
+            "    print('  re.findall(\"ola mundo\", re.P.letters)    --> {\"ola\",\"mundo\"}')\n"
+            "    print('  re.test(\"user@mail.com\", re.P.email)     --> true')\n"
+            "    print('  re.split(\"um  dois\", re.P.spaces)        --> {\"um\",\"dois\"}')\n"
+            "    print('  re.sub(\"2026-09-10\", \"%-\", \"/\")          --> \"2026/09/10\"')\n"
+            "    print('  re.build(\"int\",\"spaces\",\"letters\")        --> \"%-?%d+ %s+ %a+\"')\n"
             "  end\n"
             "end\n"
             "do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
@@ -106502,7 +107013,7 @@ int luaopen_net(lua_State *L) {
         "local color = {}\n"
         "do\n"
         "  local codes = {\n"
-        "    reset=0, bold=1, dim=2, italic=3, underline=4, blink=5,\n"
+        "    reset=0, rst=0, bold=1, bright=1, dim=2, italic=3, underline=4, blink=5,\n"
         "    black=30, red=31, green=32, yellow=33, blue=34, magenta=35, cyan=36, white=37,\n"
         "    bright_black=90, bright_red=91, bright_green=92, bright_yellow=93,\n"
         "    bright_blue=94, bright_magenta=95, bright_cyan=96, bright_white=97,\n"
@@ -106555,7 +107066,20 @@ int luaopen_net(lua_State *L) {
         "    print('  print(color.rgb(255, 100, 0, \\'laranja\\'))')\n"
         "  end\n"
         "end\n"
-        "do local _s=_G._elliot_std; if _s then _s.color=color end end\n"
+        "local _colors_mt={}\n"
+        "_colors_mt.__call=function(_,s)\n"
+        "  return (s:gsub('%%{([^}]+)}',function(tags)\n"
+        "    local out=''\n"
+        "    for tag in tags:gmatch('[^,%%s]+') do\n"
+        "      local fn=color[tag]\n"
+        "      if fn then out=out..fn() end\n"
+        "    end\n"
+        "    return out\n"
+        "  end))\n"
+        "end\n"
+        "local colors=setmetatable({},_colors_mt)\n"
+        "for k,v in pairs(color) do colors[k]=v end\n"
+        "do local _s=_G._elliot_std; if _s then _s.colors=colors end end\n"
     );
 
     /* ── test (independente) ── */
@@ -106677,53 +107201,807 @@ int luaopen_net(lua_State *L) {
         "end\n"
     );
 
-    /* ── re_lua (independente) ── */
+    /* ── re_lua (nova sintaxe + parser proprio) ── */
     luaL_dostring(L,
+        "-- @std/re — ElliotOS v17.0\n"
+        "-- Linguagem de padrões simplificada + compatibilidade com Lua patterns\n"
+        "-- Nova sintaxe: <digit>+ OR <letter>+  /  START ... END  /  (?<nome>...)\n"
         "local re = {}\n"
         "do\n"
-        "  function re.match(s,pat) local r={s:match(pat)}; if #r==0 then return nil end; if #r==1 then return r[1] end; return table.unpack(r) end\n"
-        "  function re.search(s,pat) local i,j=s:find(pat); if not i then return nil end; return s:sub(i,j),i,j end\n"
-        "  function re.findall(s,pat) local t={} for m in s:gmatch(pat) do t[#t+1]=m end return t end\n"
-        "  function re.finditer(s,pat) return s:gmatch(pat) end\n"
-        "  function re.gmatch(s,pat)   return s:gmatch(pat) end\n"
-        "  function re.sub(s,pat,rep)     return (s:gsub(pat,rep))   end\n"
-        "  function re.sub_n(s,pat,rep,n) return (s:gsub(pat,rep,n)) end\n"
-        "  function re.split(s,pat) local t,last={},1; for i,j in function() return s:find(pat,last) end do t[#t+1]=s:sub(last,i-1); last=j+1 end; t[#t+1]=s:sub(last); return t end\n"
-        "  function re.named(s,pat,names) local caps={s:match(pat)}; local t={} for i,n in ipairs(names) do t[n]=caps[i] end; return t end\n"
-        "  function re.test(s,pat)  return s:find(pat)~=nil end\n"
-        "  function re.count(s,pat) local n=0; for _ in s:gmatch(pat) do n=n+1 end; return n end\n"
-        "  function re.compile(pat) local o={_p=pat}; function o:match(s) return re.match(s,self._p) end; function o:search(s) return re.search(s,self._p) end; function o:findall(s) return re.findall(s,self._p) end; function o:sub(s,r) return re.sub(s,self._p,r) end; function o:split(s) return re.split(s,self._p) end; function o:test(s) return re.test(s,self._p) end; function o:count(s) return re.count(s,self._p) end; return o end\n"
-        "  function re.help()\n"
-        "    local E=string.char(27); local R=E..'[0m'; local C=E..'[1;36m'\n"
-        "    local Y=E..'[1;33m'; local D=E..'[0;90m'\n"
-        "    print('\\n'..C..'╔══════════════════════════════════════════════════════════════╗'..R)\n"
-        "    print(C..'║  re.* -- Expressoes Regulares (padroes Lua)                  ║'..R)\n"
-        "    print(C..'╚══════════════════════════════════════════════════════════════╝'..R..'\\n')\n"
-        "    local function f(sig, desc, ret)\n"
-        "      print('  '..Y..sig..R..'  '..desc)\n"
-        "      if ret then print('                          '..D..'Retorna: '..ret..R) end\n"
-        "      print('')\n"
-        "    end\n"
-        "    f('re.match(s,pat)',        'captura(s) do padrao',                     'valor(es) | nil')\n"
-        "    f('re.search(s,pat)',       'primeira ocorrencia com posicao',          'match, i, j | nil')\n"
-        "    f('re.findall(s,pat)',      'todas as ocorrencias',                     'tabela')\n"
-        "    f('re.finditer(s,pat)',     'iterador sobre as ocorrencias',            'iterador')\n"
-        "    f('re.gmatch(s,pat)',       'iterador (alias de finditer)',             'iterador')\n"
-        "    f('re.sub(s,pat,rep)',      'substitui todas as ocorrencias',           'string')\n"
-        "    f('re.sub_n(s,pat,rep,n)',  'substitui as n primeiras ocorrencias',     'string')\n"
-        "    f('re.split(s,pat)',        'divide s pelo padrao',                     'tabela')\n"
-        "    f('re.named(s,pat,names)',  'captura e nomeia grupos pela lista names', 'tabela')\n"
-        "    f('re.test(s,pat)',         'true se o padrao ocorre em s',             'boolean')\n"
-        "    f('re.count(s,pat)',        'conta ocorrencias do padrao',              'int')\n"
-        "    f('re.compile(pat)',        'objeto reutilizavel: :match/:sub/:test/...', 'objeto')\n"
-        "    f('re.help()',              'esta ajuda',                                nil)\n"
-        "    print(D..'  Obs: os padroes seguem a sintaxe de Lua patterns, nao regex POSIX/PCRE.'..R)\n"
-        "    print(C..'── Exemplos ──'..R..'\\n')\n"
-        "    print('  re.findall(\\'a1 b22 c3\\', \\'%d+\\')        --> {\\'1\\',\\'22\\',\\'3\\'}')\n"
-        "    print('  re.sub(\\'2026-09-10\\', \\'%-\\', \\'/\\')     --> \\'2026/09/10\\'')\n"
+        "\n"
+        "-- ── re.P: aliases de Lua patterns (compat) ──────────────────────────────\n"
+        "re.P = {\n"
+        "  digit    = \"%d\",   digits   = \"%d+\",\n"
+        "  letter   = \"%a\",   letters  = \"%a+\",\n"
+        "  alnum    = \"%w\",   alnums   = \"%w+\",\n"
+        "  space    = \"%s\",   spaces   = \"%s+\",\n"
+        "  lower    = \"%l\",   lowers   = \"%l+\",\n"
+        "  upper    = \"%u\",   uppers   = \"%u+\",\n"
+        "  punct    = \"%p\",   puncts   = \"%p+\",\n"
+        "  any      = \".\",    rest     = \".+\",\n"
+        "  word     = \"%a[%w_]*\",\n"
+        "  int      = \"%-?%d+\",\n"
+        "  uint     = \"%d+\",\n"
+        "  float    = \"%-?%d+%.%d+\",\n"
+        "  hex      = \"%x+\",\n"
+        "  ws       = \"%s*\",\n"
+        "  nonspace = \"%S+\",\n"
+        "  email    = \"[%w%.%-_]+@[%w%.%-]+%.[%a]+\",\n"
+        "  url      = \"https?://[%w%%%-_%.%+!%*%(%)%;:@&=/%?#,]+\",\n"
+        "  line     = \"[^\\n]+\",\n"
+        "}\n"
+        "\n"
+        "-- ── Classes da nova sintaxe ──────────────────────────────────────────────\n"
+        "-- base  : unidade repetível para +/*/?/{n}\n"
+        "-- lua   : padrão Lua completo (sem quantificador)\n"
+        "-- single: true → base é char-class; false → base é expressão multi-char\n"
+        "local _CL = {\n"
+        "  digit    = {base=\"%d\",    lua=\"%d\",            single=true},\n"
+        "  letter   = {base=\"%a\",    lua=\"%a\",            single=true},\n"
+        "  lower    = {base=\"%l\",    lua=\"%l\",            single=true},\n"
+        "  upper    = {base=\"%u\",    lua=\"%u\",            single=true},\n"
+        "  alnum    = {base=\"%w\",    lua=\"%w\",            single=true},\n"
+        "  space    = {base=\"%s\",    lua=\"%s\",            single=true},\n"
+        "  punct    = {base=\"%p\",    lua=\"%p\",            single=true},\n"
+        "  any      = {base=\".\",     lua=\".\",             single=true},\n"
+        "  nonspace = {base=\"%S\",    lua=\"%S\",            single=true},\n"
+        "  uint     = {base=\"%d\",    lua=\"%d+\",           single=true},\n"
+        "  hex      = {base=\"%x\",    lua=\"%x+\",           single=true},\n"
+        "  line     = {base=\"[^\\n]\", lua=\"[^\\n]+\",        single=true},\n"
+        "  word     = {base=\"%a[%w_]*\",  lua=\"%a[%w_]*\",  single=false},\n"
+        "  int      = {base=\"%-?%d+\",   lua=\"%-?%d+\",     single=false},\n"
+        "  float    = {base=\"%-?%d+%.%d+\", lua=\"%-?%d+%.%d+\", single=false},\n"
+        "  email    = {base=\"[%w%.%-_]+@[%w%.%-]+%.[%a]+\",\n"
+        "              lua =\"[%w%.%-_]+@[%w%.%-]+%.[%a]+\",  single=false},\n"
+        "  url      = {base=\"https?://[%w%%%-_%.%+!%*%(%)%;:@&=/%?#,]+\",\n"
+        "              lua =\"https?://[%w%%%-_%.%+!%*%(%)%;:@&=/%?#,]+\", single=false},\n"
+        "}\n"
+        "\n"
+        "-- Chars especiais de Lua patterns\n"
+        "local _MAG = {[\"%\"]=1,[\".\"]=1,[\"+\"]=1,[\"*\"]=1,[\"?\"]=1,\n"
+        "              [\"[\"]=1,[\"]\"]=1,[\"^\"]=1,[\"$\"]=1,[\"(\"]=1,[\")\"]=1,[\"-\"]=1}\n"
+        "local function _esc(c) return _MAG[c] and \"%\"..c or c end\n"
+        "\n"
+        "-- Cache de padrões compilados (weak-value — não vaza memória)\n"
+        "local _cache = setmetatable({}, {__mode=\"v\"})\n"
+        "\n"
+        "-- ── Detecção de sintaxe ──────────────────────────────────────────────────\n"
+        "-- Lua patterns normais (%d+, %a+, [%w]+, ^...$, etc.) retornam false\n"
+        "-- e passam direto para as funções Lua nativas — sem flag, sem conversão.\n"
+        "-- Retorna true apenas quando há tokens inequívocos da nova sintaxe.\n"
+        "local function _is_new(pat)\n"
+        "  -- token de classe: <nome>\n"
+        "  if pat:find(\"<[a-z]\") then return true end\n"
+        "  -- OR como palavra-chave: delimitado por não-alfa (evita falsos positivos\n"
+        "  -- em palavras como \"ERROR\", \"MORNING\", etc.)\n"
+        "  if pat:find(\"[^%a]OR[^%a]\") or pat:match(\"^OR[^%a]\") or\n"
+        "     pat:match(\"[^%a]OR$\")    or pat == \"OR\" then return true end\n"
+        "  -- START / END como âncoras\n"
+        "  if pat:match(\"^START[^%a]\") or pat:match(\"[^%a]END$\") then return true end\n"
+        "  if pat == \"START\" or pat == \"END\" then return true end\n"
+        "  return false\n"
+        "  -- Exemplos que retornam FALSE (Lua nativo):\n"
+        "  --   \"%d+\"  \"%a+\"  \"^%a+$\"  \"[%w%.%-]+\"  \"%-?%d+\"  \"(%d+),(%d+)\"\n"
+        "  --   \"[^\\n]+\"  \"%x+\"  re.P.email  re.P.url  qualquer Lua pattern\n"
+        "end\n"
+        "\n"
+        "-- ── Aplicação de quantificador ───────────────────────────────────────────\n"
+        "-- base: unidade repetível em Lua; q: {min,max} ou nil\n"
+        "local function _qa(base, q)\n"
+        "  if not q then return base end\n"
+        "  local mn, mx = q.min, q.max\n"
+        "  if   mn == 0 and mx == math.huge then return base..\"*\"\n"
+        "  elseif mn == 1 and mx == math.huge then return base..\"+\"\n"
+        "  elseif mn == 0 and mx == 1  then return base..\"?\"\n"
+        "  elseif mn == mx               then return base:rep(mn)\n"
+        "  elseif mx == math.huge        then return base:rep(mn)..base..\"*\"\n"
+        "  else return base:rep(mn)..(base..\"?\"):rep(mx-mn)\n"
         "  end\n"
         "end\n"
+        "\n"
+        "-- ── Tokenizador ─────────────────────────────────────────────────────────\n"
+        "local function _tokenize(pat)\n"
+        "  local toks = {}\n"
+        "  local i, n = 1, #pat\n"
+        "  while i <= n do\n"
+        "    local c = pat:sub(i,i)\n"
+        "    if c==\" \" or c==\"\\t\" then\n"
+        "      i = i+1\n"
+        "    elseif c==\"<\" then\n"
+        "      local j = pat:find(\">\", i+1)\n"
+        "      if not j then\n"
+        "        error((\"re: '<' sem '>' na posição %d: %s\"):format(i, pat), 3)\n"
+        "      end\n"
+        "      local nm = pat:sub(i+1,j-1)\n"
+        "      local cl = _CL[nm]\n"
+        "      if not cl then\n"
+        "        error((\"re: classe desconhecida <%s> na posição %d: %s\"):format(nm, i, pat), 3)\n"
+        "      end\n"
+        "      toks[#toks+1]={T=\"CL\",cl=cl}; i=j+1\n"
+        "    elseif c==\"(\" then\n"
+        "      if pat:sub(i,i+1)==\"(?\" and pat:sub(i+2,i+2)==\"<\" then\n"
+        "        local j = pat:find(\">\",i+3)\n"
+        "        if not j then\n"
+        "          error((\"re: '(?<' sem '>' na posição %d\"):format(i), 3)\n"
+        "        end\n"
+        "        local nm = pat:sub(i+3,j-1)\n"
+        "        if not nm:match(\"^%a[%w_]*$\") then\n"
+        "          error((\"re: nome de grupo inválido '%s' na posição %d\"):format(nm,i), 3)\n"
+        "        end\n"
+        "        toks[#toks+1]={T=\"GO\",named=nm}; i=j+1\n"
+        "      else\n"
+        "        toks[#toks+1]={T=\"GO\"}; i=i+1\n"
+        "      end\n"
+        "    elseif c==\")\" then\n"
+        "      toks[#toks+1]={T=\"GC\"}; i=i+1\n"
+        "    elseif c==\"+\" then toks[#toks+1]={T=\"Q\",min=1,max=math.huge}; i=i+1\n"
+        "    elseif c==\"*\" then toks[#toks+1]={T=\"Q\",min=0,max=math.huge}; i=i+1\n"
+        "    elseif c==\"?\" then toks[#toks+1]={T=\"Q\",min=0,max=1};         i=i+1\n"
+        "    elseif c==\"{\" then\n"
+        "      local j = pat:find(\"}\",i+1)\n"
+        "      if not j then\n"
+        "        error((\"re: '{' sem '}' na posição %d: %s\"):format(i, pat), 3)\n"
+        "      end\n"
+        "      local s = pat:sub(i+1,j-1)\n"
+        "      local a,b = s:match(\"^(%d+),(%d+)$\")\n"
+        "      if a then\n"
+        "        a,b = tonumber(a),tonumber(b)\n"
+        "        if a > b then\n"
+        "          error((\"re: {n,m} requer n<=m na posição %d\"):format(i), 3)\n"
+        "        end\n"
+        "        toks[#toks+1]={T=\"Q\",min=a,max=b}\n"
+        "      else\n"
+        "        local x = tonumber(s:match(\"^%d+$\"))\n"
+        "        if not x or x<1 then\n"
+        "          error((\"re: quantificador inválido {%s} na posição %d\"):format(s,i), 3)\n"
+        "        end\n"
+        "        toks[#toks+1]={T=\"Q\",min=x,max=x}\n"
+        "      end\n"
+        "      i=j+1\n"
+        "    elseif c==\"\\\\\" then\n"
+        "      if i>=n then error(\"re: barra invertida no final do padrão\", 3) end\n"
+        "      toks[#toks+1]={T=\"LI\",v=_esc(pat:sub(i+1,i+1))}; i=i+2\n"
+        "    else\n"
+        "      local kw = pat:match(\"^(%u%u+)\", i)\n"
+        "      if     kw==\"OR\"    then toks[#toks+1]={T=\"OR\"};        i=i+2\n"
+        "      elseif kw==\"START\" then toks[#toks+1]={T=\"AN\",v=\"^\"};  i=i+5\n"
+        "      elseif kw==\"END\"   then toks[#toks+1]={T=\"AN\",v=\"$\"};  i=i+3\n"
+        "      else\n"
+        "        toks[#toks+1]={T=\"LI\",v=_esc(c)}; i=i+1\n"
+        "      end\n"
+        "    end\n"
+        "  end\n"
+        "  toks[#toks+1]={T=\"EOF\"}\n"
+        "  return toks\n"
+        "end\n"
+        "\n"
+        "-- ── Compilador: tokens → lista de strings Lua patterns ──────────────────\n"
+        "-- Usa produto cartesiano para OR dentro de grupos.\n"
+        "-- named_map: {nome→índice_de_captura} (compartilhado entre alternativas)\n"
+        "-- cap: {n=contador} (resetado por alternativa — padrões OR são independentes)\n"
+        "\n"
+        "local _calt  -- forward decl\n"
+        "\n"
+        "local function _cseq(toks, named_map, cap)\n"
+        "  local alts = {\"\"}\n"
+        "  local i = 1\n"
+        "  while toks[i].T ~= \"EOF\" do\n"
+        "    local tok = toks[i]\n"
+        "    local q   = (toks[i+1] and toks[i+1].T==\"Q\") and toks[i+1] or nil\n"
+        "    local adv = q and 2 or 1\n"
+        "\n"
+        "    if tok.T==\"AN\" then\n"
+        "      if q then error(\"re: quantificador após âncora é inválido\", 4) end\n"
+        "      for j=1,#alts do alts[j]=alts[j]..tok.v end\n"
+        "      i=i+1\n"
+        "\n"
+        "    elseif tok.T==\"CL\" then\n"
+        "      local cl = tok.cl\n"
+        "      local piece\n"
+        "      if not q then\n"
+        "        piece = cl.lua\n"
+        "      elseif cl.single then\n"
+        "        piece = _qa(cl.base, q)\n"
+        "      else\n"
+        "        -- multi-char: {n} repete; +/*/? usa o padrão completo\n"
+        "        if q.min==q.max then\n"
+        "          piece = cl.lua:rep(q.min)\n"
+        "        else\n"
+        "          piece = _qa(cl.lua, q)\n"
+        "        end\n"
+        "      end\n"
+        "      for j=1,#alts do alts[j]=alts[j]..piece end\n"
+        "      i=i+adv\n"
+        "\n"
+        "    elseif tok.T==\"LI\" then\n"
+        "      local piece = _qa(tok.v, q)\n"
+        "      for j=1,#alts do alts[j]=alts[j]..piece end\n"
+        "      i=i+adv\n"
+        "\n"
+        "    elseif tok.T==\"GO\" then\n"
+        "      -- acha GC correspondente\n"
+        "      local depth, ei = 1, i+1\n"
+        "      while toks[ei].T~=\"EOF\" and depth>0 do\n"
+        "        if toks[ei].T==\"GO\" then depth=depth+1\n"
+        "        elseif toks[ei].T==\"GC\" then depth=depth-1 end\n"
+        "        ei=ei+1\n"
+        "      end\n"
+        "      if depth~=0 then error(\"re: grupo '(' sem ')'\", 4) end\n"
+        "\n"
+        "      cap.n = cap.n+1\n"
+        "      if tok.named then named_map[tok.named]=cap.n end\n"
+        "\n"
+        "      local inner={}\n"
+        "      for k=i+1,ei-2 do inner[#inner+1]=toks[k] end\n"
+        "      inner[#inner+1]={T=\"EOF\"}\n"
+        "      local ialts = _calt(inner, named_map, cap)\n"
+        "\n"
+        "      local gq = (toks[ei] and toks[ei].T==\"Q\") and toks[ei] or nil\n"
+        "      if gq then ei=ei+1 end\n"
+        "\n"
+        "      local new={}\n"
+        "      for _,cur in ipairs(alts) do\n"
+        "        for _,ia in ipairs(ialts) do\n"
+        "          new[#new+1] = cur.._qa(\"(\"..ia..\")\", gq)\n"
+        "        end\n"
+        "      end\n"
+        "      alts=new\n"
+        "      i=ei\n"
+        "\n"
+        "    else\n"
+        "      i=i+1\n"
+        "    end\n"
+        "  end\n"
+        "  return alts\n"
+        "end\n"
+        "\n"
+        "-- Divide tokens em alternativas (OR top-level) e compila cada segmento\n"
+        "_calt = function(toks, named_map, cap)\n"
+        "  named_map = named_map or {}\n"
+        "  cap       = cap       or {n=0}\n"
+        "\n"
+        "  local segs, cur, depth = {}, {}, 0\n"
+        "  local i = 1\n"
+        "  while toks[i].T~=\"EOF\" do\n"
+        "    local tok = toks[i]\n"
+        "    if tok.T==\"OR\" and depth==0 then\n"
+        "      cur[#cur+1]={T=\"EOF\"}; segs[#segs+1]=cur; cur={}\n"
+        "    elseif tok.T==\"GO\" then depth=depth+1; cur[#cur+1]=tok\n"
+        "    elseif tok.T==\"GC\" then\n"
+        "      depth=depth-1\n"
+        "      if depth<0 then error(\"re: ')' inesperado no padrão\", 4) end\n"
+        "      cur[#cur+1]=tok\n"
+        "    else cur[#cur+1]=tok\n"
+        "    end\n"
+        "    i=i+1\n"
+        "  end\n"
+        "  cur[#cur+1]={T=\"EOF\"}; segs[#segs+1]=cur\n"
+        "  if depth~=0 then error(\"re: grupo '(' não fechado\", 4) end\n"
+        "\n"
+        "  local result={}\n"
+        "  for _,seg in ipairs(segs) do\n"
+        "    -- cada alternativa OR é um padrão Lua independente → cap próprio\n"
+        "    local lcap = {n=cap.n}\n"
+        "    for _,a in ipairs(_cseq(seg, named_map, lcap)) do result[#result+1]=a end\n"
+        "    cap.n = math.max(cap.n, lcap.n)\n"
+        "  end\n"
+        "  return result\n"
+        "end\n"
+        "\n"
+        "-- Ponto de entrada: pat → {patterns=[...], named_groups={}, is_new}\n"
+        "local function _compile(pat, legacy)\n"
+        "  if legacy then return {patterns={pat},named_groups={},is_new=false} end\n"
+        "  if not _is_new(pat) then return {patterns={pat},named_groups={},is_new=false} end\n"
+        "  local cached = _cache[pat]; if cached then return cached end\n"
+        "\n"
+        "  local ok, toks = pcall(_tokenize, pat)\n"
+        "  if not ok then error(toks, 2) end\n"
+        "\n"
+        "  local named, cap = {}, {n=0}\n"
+        "  local ok2, pats = pcall(_calt, toks, named, cap)\n"
+        "  if not ok2 then error(pats, 2) end\n"
+        "\n"
+        "  local r = {patterns=pats, named_groups=named, is_new=true}\n"
+        "  _cache[pat] = r\n"
+        "  return r\n"
+        "end\n"
+        "\n"
+        "-- ── API pública ──────────────────────────────────────────────────────────\n"
+        "\n"
+        "function re.match(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  for _,p in ipairs(c.patterns) do\n"
+        "    local r = {s:match(p)}\n"
+        "    if #r>0 then return #r==1 and r[1] or table.unpack(r) end\n"
+        "  end\n"
+        "  return nil\n"
+        "end\n"
+        "\n"
+        "function re.search(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  local bi, bj\n"
+        "  for _,p in ipairs(c.patterns) do\n"
+        "    local i,j = s:find(p)\n"
+        "    if i and (not bi or i<bi) then bi,bj=i,j end\n"
+        "  end\n"
+        "  if not bi then return nil end\n"
+        "  return s:sub(bi,bj), bi, bj\n"
+        "end\n"
+        "\n"
+        "function re.findall(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  if #c.patterns==1 then\n"
+        "    local t={}; for m in s:gmatch(c.patterns[1]) do t[#t+1]=m end; return t\n"
+        "  end\n"
+        "  -- OR: percorre achando a correspondência mais à esquerda em cada posição\n"
+        "  local t, pos = {}, 1\n"
+        "  while pos<=#s do\n"
+        "    local bi,bj,bm\n"
+        "    for _,p in ipairs(c.patterns) do\n"
+        "      local i,j = s:find(p, pos)\n"
+        "      if i and (not bi or i<bi or (i==bi and j>bj)) then\n"
+        "        bi,bj,bm=i,j,s:sub(i,j)\n"
+        "      end\n"
+        "    end\n"
+        "    if not bi then break end\n"
+        "    t[#t+1]=bm\n"
+        "    pos = bj>=bi and bj+1 or bi+1   -- guarda contra match vazio\n"
+        "  end\n"
+        "  return t\n"
+        "end\n"
+        "\n"
+        "function re.finditer(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  if #c.patterns==1 then return s:gmatch(c.patterns[1]) end\n"
+        "  local pos = 1\n"
+        "  return function()\n"
+        "    if pos>#s then return nil end\n"
+        "    local bi,bj,bm\n"
+        "    for _,p in ipairs(c.patterns) do\n"
+        "      local i,j = s:find(p, pos)\n"
+        "      if i and (not bi or i<bi) then bi,bj,bm=i,j,s:sub(i,j) end\n"
+        "    end\n"
+        "    if not bi then return nil end\n"
+        "    pos = bj>=bi and bj+1 or bi+1\n"
+        "    return bm\n"
+        "  end\n"
+        "end\n"
+        "\n"
+        "function re.gmatch(s, pat, legacy)\n"
+        "  return re.finditer(s, pat, legacy)\n"
+        "end\n"
+        "\n"
+        "function re.sub(s, pat, rep, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  if #c.patterns==1 then return (s:gsub(c.patterns[1], rep)) end\n"
+        "  local r=s\n"
+        "  for _,p in ipairs(c.patterns) do r=(r:gsub(p, rep)) end\n"
+        "  return r\n"
+        "end\n"
+        "\n"
+        "function re.sub_n(s, pat, rep, n, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  if #c.patterns==1 then return (s:gsub(c.patterns[1], rep, n)) end\n"
+        "  local r, total = s, 0\n"
+        "  for _,p in ipairs(c.patterns) do\n"
+        "    if total>=n then break end\n"
+        "    local nr, cnt = r:gsub(p, rep, n-total)\n"
+        "    r, total = nr, total+cnt\n"
+        "  end\n"
+        "  return r\n"
+        "end\n"
+        "\n"
+        "function re.split(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  local p = c.patterns[1]\n"
+        "  local t, last = {}, 1\n"
+        "  local si, sj = s:find(p, last)\n"
+        "  while si do\n"
+        "    t[#t+1] = s:sub(last, si-1)\n"
+        "    last = sj>=si and sj+1 or si+1   -- guarda contra match vazio\n"
+        "    si, sj = s:find(p, last)\n"
+        "  end\n"
+        "  t[#t+1] = s:sub(last)\n"
+        "  return t\n"
+        "end\n"
+        "\n"
+        "function re.named(s, pat, names, legacy)\n"
+        "  -- compat: re.named(s,pat,names_table) ← assinatura original\n"
+        "  -- novo:   re.named(s,pat)             ← usa grupos nomeados do padrão\n"
+        "  if type(names)==\"boolean\" then legacy=names; names=nil end\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  local caps = {s:match(c.patterns[1])}\n"
+        "  local t = {}\n"
+        "  if names then\n"
+        "    for i,nm in ipairs(names) do t[nm]=caps[i] end\n"
+        "  else\n"
+        "    for nm,idx in pairs(c.named_groups) do t[nm]=caps[idx] end\n"
+        "  end\n"
+        "  return t\n"
+        "end\n"
+        "\n"
+        "function re.test(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  for _,p in ipairs(c.patterns) do if s:find(p) then return true end end\n"
+        "  return false\n"
+        "end\n"
+        "\n"
+        "function re.count(s, pat, legacy)\n"
+        "  local c = _compile(pat, legacy)\n"
+        "  local n = 0\n"
+        "  for _,p in ipairs(c.patterns) do\n"
+        "    for _ in s:gmatch(p) do n=n+1 end\n"
+        "  end\n"
+        "  return n\n"
+        "end\n"
+        "\n"
+        "function re.compile(pat, legacy)\n"
+        "  local c = _compile(pat, legacy)         -- valida em tempo de compilação\n"
+        "  local o = {_c=c, _p=pat, _l=legacy}\n"
+        "  function o:match(s)       return re.match(s,   self._p, self._l) end\n"
+        "  function o:search(s)      return re.search(s,  self._p, self._l) end\n"
+        "  function o:findall(s)     return re.findall(s, self._p, self._l) end\n"
+        "  function o:finditer(s)    return re.finditer(s,self._p, self._l) end\n"
+        "  function o:sub(s,r)       return re.sub(s,     self._p, r, self._l) end\n"
+        "  function o:sub_n(s,r,n)   return re.sub_n(s,   self._p, r, n, self._l) end\n"
+        "  function o:split(s)       return re.split(s,   self._p, self._l) end\n"
+        "  function o:test(s)        return re.test(s,    self._p, self._l) end\n"
+        "  function o:count(s)       return re.count(s,   self._p, self._l) end\n"
+        "  function o:named(s, ns)   return re.named(s,   self._p, ns, self._l) end\n"
+        "  function o:gmatch(s)      return re.gmatch(s,  self._p, self._l) end\n"
+        "  return o\n"
+        "end\n"
+        "\n"
+        "function re.build(...)\n"
+        "  local parts={}\n"
+        "  for _,name in ipairs({...}) do parts[#parts+1]=re.P[name] or name end\n"
+        "  return table.concat(parts)\n"
+        "end\n"
+        "\n"
+        "-- ── re.help() ────────────────────────────────────────────────────────────\n"
+        "function re.help()\n"
+        "  local E=string.char(27)\n"
+        "  local R=E..\"[0m\"; local C=E..\"[1;36m\"; local Y=E..\"[1;33m\"\n"
+        "  local G=E..\"[1;32m\"; local D=E..\"[0;90m\"\n"
+        "\n"
+        "  print(\"\\n\"..C..\"╔══════════════════════════════════════════════════════════════╗\"..R)\n"
+        "  print(C..\"║  re.* — Linguagem de Padrões Simplificada (ElliotOS v17.0)   ║\"..R)\n"
+        "  print(C..\"╚══════════════════════════════════════════════════════════════╝\"..R)\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Classes ──\"..R..\"\\n\")\n"
+        "  local cls={\n"
+        "    {\"<digit>\",\"dígito\"},{\"<letter>\",\"letra\"},{\"<lower>\",\"minúscula\"},\n"
+        "    {\"<upper>\",\"maiúscula\"},{\"<alnum>\",\"alfanumérico\"},{\"<word>\",\"palavra (%a[%w_]*)\"},\n"
+        "    {\"<space>\",\"espaço em branco\"},{\"<punct>\",\"pontuação\"},\n"
+        "    {\"<any>\",\"qualquer caractere\"},{\"<nonspace>\",\"não-espaço\"},\n"
+        "    {\"<uint>\",\"inteiro positivo\"},{\"<int>\",\"inteiro com sinal\"},\n"
+        "    {\"<float>\",\"número decimal\"},{\"<hex>\",\"hexadecimal\"},\n"
+        "    {\"<line>\",\"linha inteira\"},{\"<email>\",\"e-mail\"},{\"<url>\",\"URL http/https\"},\n"
+        "  }\n"
+        "  for _,v in ipairs(cls) do\n"
+        "    print((\"  \"..Y..\"%-14s\"..R..\"  %s\"):format(v[1], v[2]))\n"
+        "  end\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Quantificadores ──\"..R..\"\\n\")\n"
+        "  for _,v in ipairs({\n"
+        "    {\"+\",\"uma ou mais\"},{\"*\",\"zero ou mais\"},{\"?\",\"opcional\"},\n"
+        "    {\"{n}\",\"exatamente n\"},{{\"{n,m}\"},\"entre n e m\"},\n"
+        "  }) do print((\"  \"..Y..\"%-8s\"..R..\"  %s\"):format(v[1],v[2])) end\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Estrutura ──\"..R..\"\\n\")\n"
+        "  print(\"  \"..Y..\"START ... END\"..R..\"     âncoras de início e fim\")\n"
+        "  print(\"  \"..Y..\"A OR B\"..R..\"           alternativa (A ou B)\")\n"
+        "  print(\"  \"..Y..\"(...)\"..R..\"            grupo de captura\")\n"
+        "  print(\"  \"..Y..\"(?<nome>...)\"..R..\"     grupo nomeado\")\n"
+        "  print(\"  \"..Y..\"\\\\c\"..R..\"              escape de caractere especial (\\\\. \\\\( \\\\) \\\\+ etc.)\")\n"
+        "  print(\"  \"..D..\"  espaços entre tokens são ignorados\"..R)\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Funções ──\"..R..\"\\n\")\n"
+        "  local fns={\n"
+        "    {\"re.match(s,pat[,leg])\",\"captura(s) do padrão\",\"valor(es) | nil\"},\n"
+        "    {\"re.search(s,pat[,leg])\",\"primeira ocorrência com posição\",\"match, i, j | nil\"},\n"
+        "    {\"re.findall(s,pat[,leg])\",\"todas as ocorrências\",\"tabela\"},\n"
+        "    {\"re.finditer(s,pat[,leg])\",\"iterador sobre ocorrências\",\"iterador\"},\n"
+        "    {\"re.gmatch(s,pat[,leg])\",\"alias de finditer\",\"iterador\"},\n"
+        "    {\"re.sub(s,pat,rep[,leg])\",\"substitui todas as ocorrências\",\"string\"},\n"
+        "    {\"re.sub_n(s,pat,rep,n[,l])\",\"substitui as n primeiras\",\"string\"},\n"
+        "    {\"re.split(s,pat[,leg])\",\"divide s pelo padrão\",\"tabela\"},\n"
+        "    {\"re.named(s,pat[,ns][,l])\",\"captura grupos nomeados\",\"tabela\"},\n"
+        "    {\"re.test(s,pat[,leg])\",\"true se padrão ocorre\",\"boolean\"},\n"
+        "    {\"re.count(s,pat[,leg])\",\"conta ocorrências\",\"int\"},\n"
+        "    {\"re.compile(pat[,leg])\",\"objeto compilado reutilizável\",\"obj\"},\n"
+        "    {\"re.build(...)\",\"concatena aliases re.P\",\"string\"},\n"
+        "    {\"re.help()\",\"esta ajuda\",nil},\n"
+        "    {\"re.test_suite()\",\"executa suite de testes\",\"tabela\"},\n"
+        "  }\n"
+        "  for _,v in ipairs(fns) do\n"
+        "    print(\"  \"..Y..v[1]..R)\n"
+        "    if v[3] then\n"
+        "      print(\"    \"..v[2]..\" \"..D..\"→ \"..v[3]..R)\n"
+        "    else\n"
+        "      print(\"    \"..v[2])\n"
+        "    end\n"
+        "  end\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Lua patterns nativos (modo automático) ──\"..R..\"\\n\")\n"
+        "  print(\"  Padrões Lua comuns funcionam \"..Y..\"diretamente, sem nenhuma flag\"..R..\":\")\n"
+        "  print(\"  \"..D..\"  re.findall(s, \\\"%d+\\\")          -- dígitos\")..R\n"
+        "  print(\"  \"..D..\"  re.findall(s, \\\"%a+\\\")          -- letras\"..R)\n"
+        "  print(\"  \"..D..\"  re.test(s, \\\"^%a+$\\\")           -- ainda funciona\"..R)\n"
+        "  print(\"  \"..D..\"  re.findall(s, \\\"[%w%.%-]+\\\")    -- classe customizada\"..R)\n"
+        "  print(\"  \"..D..\"  re.sub(s, \\\"%-\\\", \\\"/\\\")          -- substituição\"..R)\n"
+        "  print(\"  \"..D..\"  re.findall(s, re.P.email)     -- alias re.P\"..R)\n"
+        "  print(\"  O módulo detecta automaticamente: se não há <classe>, START,\"..R)\n"
+        "  print(\"  \"..D..\"END ou OR, o padrão vai direto para as funções Lua.\"..R)\n"
+        "  print(\"\\n  Flag \"..Y..\"true\"..R..\" só é necessária para forçar Lua quando o\")\n"
+        "  print(\"  padrão contém literalmente as palavras START, END ou OR:\")\n"
+        "  print(\"  \"..D..\"  re.test(s, \\\"START\\\", true)     -- match literal 'START'\"..R)\n"
+        "  print(\"  \"..D..\"  re.test(s, \\\"OR\\\", true)        -- match literal 'OR'\"..R)\n"
+        "\n"
+        "  print(\"\\n\"..G..\"── Exemplos ──\"..R..\"\\n\")\n"
+        "  local exs={\n"
+        "    {\"-- IPv4\",\n"
+        "     \"re.findall(sh.read(\\\"ifconfig\\\"),\"},\n"
+        "    {\"\",\n"
+        "     \"  \\\"<digit>+.<digit>+.<digit>+.<digit>+\\\")\"},\n"
+        "    {\"-- Data com grupos nomeados\",\n"
+        "     \"local d = re.named(\\\"2026-09-10\\\",\"},\n"
+        "    {\"\",\n"
+        "     \"  \\\"(?<year><digit>{4})-(?<month><digit>{2})-(?<day><digit>{2})\\\")\"},\n"
+        "    {\"\",\n"
+        "     \"print(d.year, d.month, d.day)  --> 2026  09  10\"},\n"
+        "    {\"-- Alternativas\",\n"
+        "     \"re.findall(\\\"abc 123\\\", \\\"<digit>+ OR <letter>+\\\")  --> {\\\"abc\\\",\\\"123\\\"}\"},\n"
+        "    {\"-- Quantificador range\",\n"
+        "     \"re.findall(\\\"aaa bb c\\\", \\\"<letter>{2,3}\\\")  --> {\\\"aaa\\\",\\\"bb\\\"}\"},\n"
+        "    {\"-- Escape de special char\",\n"
+        "     \"re.test(\\\"2+2\\\", \\\"<digit>\\\\\\\\+<digit>\\\")  --> true\"},\n"
+        "    {\"-- Objeto compilado\",\n"
+        "     \"local p = re.compile(\\\"<digit>+\\\")\"},\n"
+        "    {\"\",\n"
+        "     \"p:findall(\\\"a1b2c3\\\")  --> {\\\"1\\\",\\\"2\\\",\\\"3\\\"}\"},\n"
+        "    {\"-- Lua patterns funcionam direto (sem flag)\",\n"
+        "     \"re.findall(\\\"a1b2c3\\\", \\\"%d+\\\")       --> {\\\"1\\\",\\\"2\\\",\\\"3\\\"}\"},\n"
+        "    {\"\",\n"
+        "     \"re.findall(\\\"ola mundo\\\", \\\"%a+\\\")    --> {\\\"ola\\\",\\\"mundo\\\"}\"},\n"
+        "    {\"\",\n"
+        "     \"re.test(\\\"hello\\\", \\\"^%a+$\\\")         --> true\"},\n"
+        "    {\"\",\n"
+        "     \"re.sub(\\\"2026-09-10\\\", \\\"%-\\\", \\\"/\\\")   --> \\\"2026/09/10\\\"\"},\n"
+        "    {\"\",\n"
+        "     \"re.split(\\\"a,b,c\\\", \\\",\\\")            --> {\\\"a\\\",\\\"b\\\",\\\"c\\\"}\"},\n"
+        "    {\"\",\n"
+        "     \"re.match(\\\"x=42\\\", \\\"(%a+)=(%d+)\\\")   --> \\\"x\\\", \\\"42\\\"\"},\n"
+        "    {\"-- re.P aliases também funcionam direto\",\n"
+        "     \"re.findall(\\\"a1b2\\\", re.P.digits)   --> {\\\"1\\\",\\\"2\\\"}\"},\n"
+        "    {\"\",\n"
+        "     \"re.test(\\\"user@mail.com\\\", re.P.email)  --> true\"},\n"
+        "    {\"-- true só para palavras reservadas como literal\",\n"
+        "     \"re.test(s, \\\"START\\\", true)          -- match literal 'START'\"},\n"
+        "  }\n"
+        "  for _,v in ipairs(exs) do\n"
+        "    if v[1]~=\"\" then print(\"  \"..D..v[1]..R) end\n"
+        "    if v[2]~=\"\" then print(\"  \"..Y..v[2]..R) end\n"
+        "  end\n"
+        "  print()\n"
+        "end\n"
+        "\n"
+        "-- ── re.test_suite() ──────────────────────────────────────────────────────\n"
+        "function re.test_suite()\n"
+        "  local E=string.char(27)\n"
+        "  local R=E..\"[0m\"; local G=E..\"[1;32m\"\n"
+        "  local RR=E..\"[1;31m\"; local Y=E..\"[1;33m\"; local D=E..\"[0;90m\"\n"
+        "\n"
+        "  local pass, fail, results = 0, 0, {}\n"
+        "  local function ck(name, cond, got, exp)\n"
+        "    if cond then\n"
+        "      pass=pass+1; results[#results+1]={ok=true,name=name}\n"
+        "    else\n"
+        "      fail=fail+1\n"
+        "      results[#results+1]={ok=false,name=name,\n"
+        "        info=(\"got=%s  exp=%s\"):format(tostring(got),tostring(exp))}\n"
+        "    end\n"
+        "  end\n"
+        "  local function teq(a,b)\n"
+        "    if type(a)~=\"table\" or type(b)~=\"table\" then return a==b end\n"
+        "    if #a~=#b then return false end\n"
+        "    for i=1,#a do if a[i]~=b[i] then return false end end\n"
+        "    return true\n"
+        "  end\n"
+        "  local function noerr(pat)\n"
+        "    local ok = pcall(re.test, \"x\", pat); return ok\n"
+        "  end\n"
+        "  local function haserr(pat)\n"
+        "    local ok = pcall(re.test, \"x\", pat); return not ok\n"
+        "  end\n"
+        "\n"
+        "  -- 1. Classes básicas\n"
+        "  ck(\"digit\",      re.match(\"abc123\",\"<digit>\")==\"1\",   re.match(\"abc123\",\"<digit>\"),   \"1\")\n"
+        "  ck(\"letter\",     re.match(\"123abc\",\"<letter>\")==\"a\",  re.match(\"123abc\",\"<letter>\"),  \"a\")\n"
+        "  ck(\"lower\",      re.match(\"ABcde\",\"<lower>\")==\"c\",    re.match(\"ABcde\",\"<lower>\"),    \"c\")\n"
+        "  ck(\"upper\",      re.match(\"abCDE\",\"<upper>\")==\"C\",    re.match(\"abCDE\",\"<upper>\"),    \"C\")\n"
+        "  ck(\"alnum\",      re.test(\"a1\",\"<alnum>\"),              true, true)\n"
+        "  ck(\"space\",      re.test(\"a b\",\"<space>\"),             true, true)\n"
+        "  ck(\"punct\",      re.test(\"a,b\",\"<punct>\"),             true, true)\n"
+        "  ck(\"any\",        re.match(\"x\",\"<any>\")==\"x\",          re.match(\"x\",\"<any>\"),          \"x\")\n"
+        "  ck(\"nonspace\",   re.match(\"  abc\",\"<nonspace>\")==\"abc\",re.match(\"  abc\",\"<nonspace>\"),\"abc\")\n"
+        "  ck(\"word\",       re.match(\"1 hi_2\",\"<word>\")==\"hi_2\", re.match(\"1 hi_2\",\"<word>\"),    \"hi_2\")\n"
+        "  ck(\"uint\",       re.match(\"x42y\",\"<uint>\")==\"42\",     re.match(\"x42y\",\"<uint>\"),      \"42\")\n"
+        "  ck(\"hex\",        re.match(\"zffz\",\"<hex>\")==\"ff\",      re.match(\"zffz\",\"<hex>\"),       \"ff\")\n"
+        "  ck(\"line\",       re.match(\"ab\\ncd\",\"<line>\")==\"ab\",   re.match(\"ab\\ncd\",\"<line>\"),    \"ab\")\n"
+        "  ck(\"email\",      re.test(\"a@b.com\",\"<email>\"),         true, true)\n"
+        "  ck(\"url\",        re.test(\"https://x.com\",\"<url>\"),     true, true)\n"
+        "\n"
+        "  -- 2. Quantificadores\n"
+        "  ck(\"+ um+\",      re.match(\"123x\",\"<digit>+\")==\"123\",  re.match(\"123x\",\"<digit>+\"),    \"123\")\n"
+        "  ck(\"* zero+\",    re.match(\"abc\",\"<digit>*\")==\"\",      re.match(\"abc\",\"<digit>*\"),     \"\")\n"
+        "  ck(\"? presente\", re.test(\"1\",\"<digit>?\"),              true, true)\n"
+        "  ck(\"? ausente\",  re.test(\"x\",\"<digit>?\"),              true, true)\n"
+        "  ck(\"{3} exato\",  re.match(\"12345\",\"<digit>{3}\")==\"123\",re.match(\"12345\",\"<digit>{3}\"),\"123\")\n"
+        "  ck(\"{2,4}\",      re.match(\"12345\",\"<digit>{2,4}\")==\"1234\",\n"
+        "                   re.match(\"12345\",\"<digit>{2,4}\"), \"1234\")\n"
+        "  ck(\"{2,2}\",      re.match(\"12345\",\"<digit>{2,2}\")==\"12\",\n"
+        "                   re.match(\"12345\",\"<digit>{2,2}\"), \"12\")\n"
+        "\n"
+        "  -- 3. Âncoras\n"
+        "  ck(\"START ok\",   re.test(\"hello\",\"START <letter>+\"),   true, true)\n"
+        "  ck(\"START fail\", not re.test(\"1hello\",\"START <letter>+\"), true, true)\n"
+        "  ck(\"END ok\",     re.test(\"hello\",\"<letter>+ END\"),     true, true)\n"
+        "  ck(\"END fail\",   not re.test(\"hello1\",\"<letter>+ END\"),true, true)\n"
+        "  ck(\"S+E ok\",     re.test(\"hi\",\"START <letter>+ END\"),  true, true)\n"
+        "  ck(\"S+E fail\",   not re.test(\"1hi2\",\"START <letter>+ END\"), true, true)\n"
+        "\n"
+        "  -- 4. Grupos de captura\n"
+        "  local yr,mo = re.match(\"2026-09\",\"(<digit>{4})-(<digit>{2})\")\n"
+        "  ck(\"grupo cap1\", yr==\"2026\", yr, \"2026\")\n"
+        "  ck(\"grupo cap2\", mo==\"09\",   mo, \"09\")\n"
+        "\n"
+        "  -- 5. Grupos nomeados\n"
+        "  local d = re.named(\"2026-09-10\",\n"
+        "    \"(?<year><digit>{4})-(?<month><digit>{2})-(?<day><digit>{2})\")\n"
+        "  ck(\"named year\",  d.year==\"2026\",  d.year,  \"2026\")\n"
+        "  ck(\"named month\", d.month==\"09\",   d.month, \"09\")\n"
+        "  ck(\"named day\",   d.day==\"10\",     d.day,   \"10\")\n"
+        "\n"
+        "  -- 6. OR (alternativas)\n"
+        "  local orr = re.findall(\"abc 123 xyz\",\"<digit>+ OR <letter>+\")\n"
+        "  ck(\"OR count\",   #orr==3,         #orr,    3)\n"
+        "  ck(\"OR [1]\",     orr[1]==\"abc\",   orr[1],  \"abc\")\n"
+        "  ck(\"OR [2]\",     orr[2]==\"123\",   orr[2],  \"123\")\n"
+        "  ck(\"OR [3]\",     orr[3]==\"xyz\",   orr[3],  \"xyz\")\n"
+        "  ck(\"OR test t\",  re.test(\"hello\",\"<digit>+ OR <letter>+\"), true, true)\n"
+        "  ck(\"OR test f\",  not re.test(\"!@#\",\"<digit>+ OR <letter>+\"), true, true)\n"
+        "\n"
+        "  -- 7. IPv4 — caso de uso principal\n"
+        "  local txt = \"inet 192.168.1.1 netmask 255.255.255.0\"\n"
+        "  local ips = re.findall(txt, \"<digit>+.<digit>+.<digit>+.<digit>+\")\n"
+        "  ck(\"IPv4 count\", #ips==2,               #ips,   2)\n"
+        "  ck(\"IPv4 [1]\",   ips[1]==\"192.168.1.1\", ips[1], \"192.168.1.1\")\n"
+        "  ck(\"IPv4 [2]\",   ips[2]==\"255.255.255.0\",ips[2],\"255.255.255.0\")\n"
+        "\n"
+        "  -- 8. Escape\n"
+        "  ck(\"esc ponto\",  re.test(\"2+2\",\"<digit>\\\\+<digit>\"), true, true)\n"
+        "  ck(\"esc parens\", re.test(\"(abc)\",\"\\\\(<letter>+\\\\)\"),  true, true)\n"
+        "  ck(\"literal\",    re.test(\"hello world\",\"hello world\"),true, true)\n"
+        "\n"
+        "  -- 9. Padrões inválidos (devem lançar erro)\n"
+        "  ck(\"err <foo>\",   haserr(\"<foobar>\"),  true, true)\n"
+        "  ck(\"err < sem >\", haserr(\"<digit\"),    true, true)\n"
+        "  ck(\"err { sem }\", haserr(\"<digit>{3\"), true, true)\n"
+        "  ck(\"err ( sem )\", haserr(\"(<digit>+\"), true, true)\n"
+        "  ck(\"err AN+Q\",    haserr(\"START+\"),    true, true)\n"
+        "  ck(\"err n>m\",     haserr(\"<digit>{5,2}\"), true, true)\n"
+        "  ck(\"err ok\",      noerr(\"<digit>+\"),   true, true)\n"
+        "\n"
+        "  -- 10. Strings vazias\n"
+        "  ck(\"vazio findall\",  teq(re.findall(\"\",\"<digit>+\"),{}),  true, true)\n"
+        "  ck(\"vazio test\",     not re.test(\"\",\"<digit>+\"),          true, true)\n"
+        "  ck(\"vazio split\",    teq(re.split(\"\",\",\"),{\"\"}),          true, true)\n"
+        "  ck(\"vazio match\",    re.match(\"\",\"<digit>+\")==nil,        true, true)\n"
+        "\n"
+        "  -- 11. Todas as funções públicas\n"
+        "  local s = \"foo 42 bar 99\"\n"
+        "  ck(\"match\",       re.match(s,\"<digit>+\")==\"42\",        re.match(s,\"<digit>+\"), \"42\")\n"
+        "  local sm,si,sj = re.search(s,\"<digit>+\")\n"
+        "  ck(\"search val\",  sm==\"42\", sm, \"42\")\n"
+        "  ck(\"search pos\",  si==5,    si, 5)\n"
+        "  ck(\"findall\",     teq(re.findall(s,\"<digit>+\"),{\"42\",\"99\"}), true, true)\n"
+        "  local ir={}; for m in re.finditer(s,\"<digit>+\") do ir[#ir+1]=m end\n"
+        "  ck(\"finditer\",    teq(ir,{\"42\",\"99\"}), true, true)\n"
+        "  local gr={}; for m in re.gmatch(s,\"<digit>+\") do gr[#gr+1]=m end\n"
+        "  ck(\"gmatch\",      teq(gr,{\"42\",\"99\"}), true, true)\n"
+        "  ck(\"sub\",         re.sub(s,\"<digit>+\",\"N\")==\"foo N bar N\",\n"
+        "                    re.sub(s,\"<digit>+\",\"N\"), \"foo N bar N\")\n"
+        "  ck(\"sub_n\",       re.sub_n(s,\"<digit>+\",\"N\",1)==\"foo N bar 99\",\n"
+        "                    re.sub_n(s,\"<digit>+\",\"N\",1), \"foo N bar 99\")\n"
+        "  ck(\"split\",       teq(re.split(\"a,b,c\",\",\"),{\"a\",\"b\",\"c\"}), true, true)\n"
+        "  ck(\"test t\",      re.test(s,\"<digit>+\"),          true, true)\n"
+        "  ck(\"test f\",      not re.test(\"abc\",\"<digit>+\"),  true, true)\n"
+        "  ck(\"count\",       re.count(s,\"<digit>+\")==2,      re.count(s,\"<digit>+\"), 2)\n"
+        "\n"
+        "  -- 12. re.compile\n"
+        "  local cp = re.compile(\"<digit>+\")\n"
+        "  ck(\"cp:match\",    cp:match(\"f42\")==\"42\",           cp:match(\"f42\"), \"42\")\n"
+        "  ck(\"cp:findall\",  teq(cp:findall(\"1a2b3\"),{\"1\",\"2\",\"3\"}), true, true)\n"
+        "  ck(\"cp:test t\",   cp:test(\"a1\"),                   true, true)\n"
+        "  ck(\"cp:test f\",   not cp:test(\"abc\"),              true, true)\n"
+        "  ck(\"cp:count\",    cp:count(\"1 2 3\")==3,            cp:count(\"1 2 3\"), 3)\n"
+        "  ck(\"cp:sub\",      cp:sub(\"a1b2\",\"N\")==\"aNbN\",      cp:sub(\"a1b2\",\"N\"), \"aNbN\")\n"
+        "  ck(\"cp:split\",    teq(cp:split(\"a1b\"),{\"a\",\"b\"}),  true, true)\n"
+        "  -- cache: mesma estrutura compilada\n"
+        "  local c1=re.compile(\"<digit>+\"); local c2=re.compile(\"<digit>+\")\n"
+        "  ck(\"cache\",       c1._c==c2._c, true, true)\n"
+        "\n"
+        "  -- 13. Lua patterns sem flag (modo automático — principal garantia)\n"
+        "  ck(\"lua %d+ sem flag\",  teq(re.findall(\"a1b2c3\",\"%d+\"),{\"1\",\"2\",\"3\"}), true, true)\n"
+        "  ck(\"lua %a+ sem flag\",  teq(re.findall(\"ola mundo\",\"%a+\"),{\"ola\",\"mundo\"}), true, true)\n"
+        "  ck(\"lua ^%a+$ sem flag\",re.test(\"hello\",\"^%a+$\"), true, true)\n"
+        "  ck(\"lua sub sem flag\",  re.sub(\"2026-09-10\",\"%-\",\"/\")==\"2026/09/10\",\n"
+        "                          re.sub(\"2026-09-10\",\"%-\",\"/\"), \"2026/09/10\")\n"
+        "  ck(\"lua split sem flag\",teq(re.split(\"a,b,c\",\",\"),{\"a\",\"b\",\"c\"}), true, true)\n"
+        "  ck(\"lua match caps\",    ({re.match(\"x=42\",\"(%a+)=(%d+)\")})[1]==\"x\", true, true)\n"
+        "  ck(\"lua findall [%w]+\", teq(re.findall(\"a1 b2\",\"[%w]+\"),{\"a1\",\"b2\"}), true, true)\n"
+        "  ck(\"lua %-?%d+\",        re.match(\"-42\",\"%-?%d+\")==\"-42\",\n"
+        "                          re.match(\"-42\",\"%-?%d+\"), \"-42\")\n"
+        "  ck(\"lua [^\\n]+\",        re.match(\"ab\\ncd\",\"[^\\n]+\")==\"ab\",\n"
+        "                          re.match(\"ab\\ncd\",\"[^\\n]+\"), \"ab\")\n"
+        "  ck(\"lua %.escaped\",     re.test(\"3.14\",\"^%d+%.%d+$\"), true, true)\n"
+        "  ck(\"lua %x+\",           re.match(\"xffx\",\"%x+\")==\"ff\",\n"
+        "                          re.match(\"xffx\",\"%x+\"), \"ff\")\n"
+        "  -- com flag true (compat explícita)\n"
+        "  ck(\"leg true match\",    re.match(\"abc123\",\"%d+\",true)==\"123\",\n"
+        "                          re.match(\"abc123\",\"%d+\",true), \"123\")\n"
+        "  ck(\"leg true sub\",      re.sub(\"foo bar\",\"%a+\",\"X\",true)==\"X X\",\n"
+        "                          re.sub(\"foo bar\",\"%a+\",\"X\",true), \"X X\")\n"
+        "  -- re.P aliases (sem flag)\n"
+        "  ck(\"re.P digit\",        re.test(\"5\",re.P.digit),       true, true)\n"
+        "  ck(\"re.P word\",         re.test(\"hi\",re.P.word),        true, true)\n"
+        "  ck(\"re.P email\",        re.test(\"a@b.com\",re.P.email),  true, true)\n"
+        "  ck(\"re.P url\",          re.test(\"https://x.io\",re.P.url),true, true)\n"
+        "  ck(\"re.build\",          re.build(\"digits\",\"ws\",\"letters\")==\"%d+%s*%a+\", true, true)\n"
+        "\n"
+        "  -- 14. re.named compat (lista explícita)\n"
+        "  local dn = re.named(\"2026-09\",\"(%d+)-(%d+)\",{\"year\",\"month\"})\n"
+        "  ck(\"named compat year\",  dn.year==\"2026\",  dn.year,  \"2026\")\n"
+        "  ck(\"named compat month\", dn.month==\"09\",   dn.month, \"09\")\n"
+        "\n"
+        "  -- 15. Grupos OR dentro de grupo\n"
+        "  local go = re.findall(\"cats dogs\",\"(cat OR dog)+\")\n"
+        "  ck(\"OR em grupo\", #go>=2, #go, \">=2\")\n"
+        "\n"
+        "  -- 16. Qualquer Lua pattern passa transparente (sem conversão, sem erro)\n"
+        "  ck(\"pass %d+\",       noerr(\"%d+\"),           true, true)\n"
+        "  ck(\"pass ^%a+$\",     noerr(\"^%a+$\"),         true, true)\n"
+        "  ck(\"pass [%w%.%-]+\", noerr(\"[%w%.%-]+\"),      true, true)\n"
+        "  ck(\"pass %-?%d+\",    noerr(\"%-?%d+\"),         true, true)\n"
+        "  ck(\"pass re.P.email\",noerr(re.P.email),       true, true)\n"
+        "  ck(\"pass re.P.url\",  noerr(re.P.url),         true, true)\n"
+        "  ck(\"pass caps\",      noerr(\"(%d+),(%d+)\"),    true, true)\n"
+        "  ck(\"pass %x+\",       noerr(\"%x+\"),            true, true)\n"
+        "  ck(\"pass [^\\n]+\",    noerr(\"[^\\n]+\"),          true, true)\n"
+        "  -- resultado correto nos padrões Lua passados direto\n"
+        "  ck(\"pass result %d+\",teq(re.findall(\"a1b2\",\"%d+\"),{\"1\",\"2\"}), true, true)\n"
+        "  ck(\"pass result %a+\",teq(re.findall(\"1a2b\",\"%a+\"),{\"a\",\"b\"}), true, true)\n"
+        "\n"
+        "  -- Relatório\n"
+        "  print(\"\\n\"..Y..\"── re.test_suite ──\"..R..\"\\n\")\n"
+        "  for _,r in ipairs(results) do\n"
+        "    if r.ok then\n"
+        "      print(\"  \"..G..\"[✔]\"..R..\" \"..r.name)\n"
+        "    else\n"
+        "      print(\"  \"..RR..\"[✗]\"..R..\" \"..r.name..(r.info and (\"  \"..D..r.info..R) or \"\"))\n"
+        "    end\n"
+        "  end\n"
+        "  print((\"\\n  Total: %d  \"..G..\"Passou: %d\"..R..\"  \"..\n"
+        "        (fail>0 and RR or G)..\"Falhou: %d\"..R..\"\\n\"):format(pass+fail, pass, fail))\n"
+        "\n"
+        "  return {pass=pass, fail=fail, results=results}\n"
+        "end\n"
+        "\n"
+        "end  -- do\n"
+        "\n"
         "do local _s=_G._elliot_std; if _s then _s.re=re end end\n"
+        "return re\n"
     );
 
     /* ── try (independente) ── */
@@ -108140,7 +109418,7 @@ end
 for _, f in ipairs({"xss","sqli","lfi","rce","headers","spider","chain","params","nosql","backup","crlf"}) do
     if type(mod[f]) ~= "function" then missing[#missing+1] = "mod."..f end
 end
-for _, f in ipairs({"get","geth","post","connect","scan","dns","ping","socket"}) do
+for _, f in ipairs({"get","geth","post","connect","scan","dns","ping","fire"}) do
     if type(net[f]) ~= "function" then missing[#missing+1] = "net."..f end
 end
 if #missing == 0 then print("OK")
@@ -108186,7 +109464,7 @@ PREFIX="${PREFIX:-/usr/local}"
 INSTALL_DIR="$HOME/.luarocks"
 LIB_DIR="$INSTALL_DIR/lib/lua/5.4"
 LUA_DIR="$INSTALL_DIR/share/lua/5.4"
-TMP_DIR="${TMPDIR:-$PREFIX/tmp}/lpm_$$"
+TMP_DIR="${TMPDIR:-/tmp}/lpm_$$"
 
 R="\033[0m"; G="\033[1;32m"; Y="\033[1;33m"; B="\033[1;36m"; E="\033[1;31m"
 _ok()      { printf "${G}  ✓ %s${R}\n" "$1"; }
@@ -108194,6 +109472,133 @@ _info()    { printf "${B}  → %s${R}\n" "$1"; }
 _warn()    { printf "${Y}  ! %s${R}\n" "$1"; }
 _err()     { printf "${E}  ✗ %s${R}\n" "$1"; rm -rf "$TMP_DIR" 2>/dev/null; [ "$_LPM_ALL_MODE" = "1" ] && return 1 || exit 1; }
 _LPM_ALL_MODE=0
+
+# ── Detecta gerenciador de pacotes do sistema ─────────────────────────────
+_LPM_OS="unknown"
+_LPM_PKG=""
+# Só usa sudo se não for root e sudo existir
+if [ "$(id -u)" = "0" ] || ! command -v sudo >/dev/null 2>&1; then
+    _LPM_SUDO=""
+else
+    _LPM_SUDO="sudo"
+fi
+if [ -d "/data/data/com.termux" ] || [ -n "$TERMUX_VERSION" ]; then
+    _LPM_OS="termux"; _LPM_PKG="pkg"
+elif command -v apt-get >/dev/null 2>&1; then
+    _LPM_OS="debian"; _LPM_PKG="apt-get"; _LPM_SUDO="sudo"
+elif command -v pacman >/dev/null 2>&1; then
+    _LPM_OS="arch";   _LPM_PKG="pacman"; _LPM_SUDO="sudo"
+elif command -v dnf >/dev/null 2>&1; then
+    _LPM_OS="fedora"; _LPM_PKG="dnf";    _LPM_SUDO="sudo"
+elif command -v apk >/dev/null 2>&1; then
+    _LPM_OS="alpine"; _LPM_PKG="apk";    _LPM_SUDO=""
+elif command -v zypper >/dev/null 2>&1; then
+    _LPM_OS="opensuse"; _LPM_PKG="zypper"; _LPM_SUDO="sudo"
+elif command -v xbps-install >/dev/null 2>&1; then
+    _LPM_OS="void";   _LPM_PKG="xbps-install"; _LPM_SUDO="sudo"
+elif command -v emerge >/dev/null 2>&1; then
+    _LPM_OS="gentoo"; _LPM_PKG="emerge"; _LPM_SUDO="sudo"
+fi
+
+# Instala pacote do sistema de forma portável
+_sys_install() {
+    local pkg_termux="$1" pkg_debian="$2" pkg_arch="$3" pkg_fedora="$4"
+    local pkg_alpine="${5:-$pkg_debian}" pkg_other="${6:-}"
+    case "$_LPM_OS" in
+        termux)  $_LPM_PKG install -y "$pkg_termux"  2>/dev/null ;;
+        debian)  $_LPM_SUDO $_LPM_PKG install -y "$pkg_debian"  2>/dev/null ;;
+        arch)    $_LPM_SUDO $_LPM_PKG -S --noconfirm "$pkg_arch" 2>/dev/null ;;
+        fedora)  $_LPM_SUDO $_LPM_PKG install -y "$pkg_fedora"  2>/dev/null ;;
+        alpine)  $_LPM_SUDO apk add --no-cache "$pkg_alpine"    2>/dev/null ;;
+        opensuse)$_LPM_SUDO zypper install -y "$pkg_debian"     2>/dev/null ;;
+        void)    $_LPM_SUDO xbps-install -Sy "$pkg_arch"        2>/dev/null ;;
+        *)       [ -n "$pkg_other" ] && _warn "Instale manualmente: $pkg_other" ;;
+    esac
+}
+
+# ── Helpers portáveis usados por todos os instaladores ────────────────────────
+_lpm_detect_os() {
+    [ -d "/data/data/com.termux" ] || [ -n "$TERMUX_VERSION" ] && { echo "termux"; return; }
+    if [ -f /etc/os-release ]; then
+        _lid=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+        case "$_lid" in
+            ubuntu|debian|linuxmint|pop|kali|parrot|trixie|raspbian) echo "debian";   return ;;
+            arch|manjaro|endeavouros|garuda)                          echo "arch";     return ;;
+            fedora|rhel|centos|rocky|alma)                            echo "fedora";   return ;;
+            alpine)                                                   echo "alpine";   return ;;
+            opensuse*|sles)                                           echo "opensuse"; return ;;
+            void)                                                     echo "void";     return ;;
+            gentoo)                                                   echo "gentoo";   return ;;
+        esac
+        _llike=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+        case "$_llike" in
+            *debian*|*ubuntu*) echo "debian";   return ;;
+            *arch*)            echo "arch";     return ;;
+            *fedora*|*rhel*)   echo "fedora";   return ;;
+            *suse*)            echo "opensuse"; return ;;
+        esac
+    fi
+    command -v apt-get      >/dev/null 2>&1 && { echo "debian";   return; }
+    command -v pacman       >/dev/null 2>&1 && { echo "arch";     return; }
+    command -v dnf          >/dev/null 2>&1 && { echo "fedora";   return; }
+    command -v apk          >/dev/null 2>&1 && { echo "alpine";   return; }
+    command -v zypper       >/dev/null 2>&1 && { echo "opensuse"; return; }
+    command -v xbps-install >/dev/null 2>&1 && { echo "void";     return; }
+    command -v emerge       >/dev/null 2>&1 && { echo "gentoo";   return; }
+    echo "unknown"
+}
+_lpm_sudo() { [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1 && echo "sudo" || echo ""; }
+
+_ensure_git() {
+    command -v git >/dev/null 2>&1 && return 0
+    _info "Instalando git..."
+    local _o; _o=$(_lpm_detect_os); local _s; _s=$(_lpm_sudo)
+    case "$_o" in
+        termux)   pkg install -y git 2>/dev/null ;;
+        debian)   $_s apt-get install -y git 2>/dev/null ;;
+        arch)     $_s pacman -S --noconfirm git 2>/dev/null ;;
+        fedora)   $_s dnf install -y git 2>/dev/null ;;
+        alpine)   apk add --no-cache git 2>/dev/null ;;
+        opensuse) $_s zypper install -y git 2>/dev/null ;;
+        void)     $_s xbps-install -Sy git 2>/dev/null ;;
+        gentoo)   $_s emerge dev-vcs/git 2>/dev/null ;;
+    esac
+    command -v git >/dev/null 2>&1
+}
+
+_ensure_luarocks() {
+    command -v luarocks >/dev/null 2>&1 || command -v luarocks-5.4 >/dev/null 2>&1 && return 0
+    _info "Instalando luarocks + deps de compilação..."
+    local _o; _o=$(_lpm_detect_os); local _s; _s=$(_lpm_sudo)
+    case "$_o" in
+        termux)   pkg install -y luarocks 2>/dev/null ;;
+        debian)   $_s apt-get install -y luarocks lua5.4 liblua5.4-dev build-essential 2>/dev/null ;;
+        arch)     $_s pacman -S --noconfirm luarocks lua base-devel 2>/dev/null ;;
+        fedora)   $_s dnf install -y luarocks lua-devel gcc make 2>/dev/null ;;
+        alpine)   apk add --no-cache luarocks5.4 lua5.4-dev build-base 2>/dev/null ;;
+        opensuse) $_s zypper install -y luarocks lua54-devel gcc make 2>/dev/null ;;
+        void)     $_s xbps-install -Sy luarocks lua54-devel base-devel 2>/dev/null ;;
+        gentoo)   $_s emerge dev-lua/luarocks 2>/dev/null ;;
+    esac
+    command -v luarocks >/dev/null 2>&1 || command -v luarocks-5.4 >/dev/null 2>&1
+}
+
+_luarocks_run() {
+    local pkg="$1"
+    if command -v luarocks >/dev/null 2>&1; then
+        luarocks --lua-version 5.4 install "$pkg" 2>/dev/null \
+            || luarocks install "$pkg" 2>/dev/null && return 0
+    fi
+    command -v luarocks-5.4 >/dev/null 2>&1 \
+        && luarocks-5.4 install "$pkg" 2>/dev/null && return 0
+    return 1
+}
+
+_lua_check() {
+    lua5.4 -e "require('$1')" 2>/dev/null \
+        || lua -e "require('$1')" 2>/dev/null
+}
+
 _banner() {
     printf "${Y}"
     printf "  ╔══════════════════════════════════════════╗\n"
@@ -108220,13 +109625,24 @@ _ensure_headers() {
 
 _compile() {
     local out="$1"; shift
+    # Detecta compilador C disponível
+    local _CC=""
+    if   command -v clang >/dev/null 2>&1; then _CC="clang"
+    elif command -v gcc   >/dev/null 2>&1; then _CC="gcc"
+    elif command -v cc    >/dev/null 2>&1; then _CC="cc"
+    else _err "Nenhum compilador C encontrado (clang, gcc)"; return 1; fi
+
+    # rpath só funciona com GNU ld / lld — testa antes de usar
+    local _rpath=""
+    $_CC -shared -Wl,-rpath,"$PREFIX/lib" -x c /dev/null -o /dev/null 2>/dev/null \
+        && _rpath="-Wl,-rpath,${PREFIX}/lib"
+
     if [ -f "$PREFIX/lib/liblua-net.so" ]; then
-        clang -O2 -shared -fPIC \
+        $_CC -O2 -shared -fPIC \
             -I"$LUA_INC" -I"$PREFIX/include" -L"$PREFIX/lib" \
-            "$@" -o "$out" -lm -llua-net \
-            -Wl,-rpath,"$PREFIX/lib" && return 0
+            "$@" -o "$out" -lm -llua-net $_rpath && return 0
     fi
-    clang -O2 -shared -fPIC \
+    $_CC -O2 -shared -fPIC \
         -I"$LUA_INC" -I"$PREFIX/include" -L"$PREFIX/lib" \
         "$@" -o "$out" -lm
 }
@@ -108280,10 +109696,12 @@ _install_ansicolors() {
 _install_from_lux() {
     local pkg="$1"
     _info "Buscando $pkg no repositório Lux..."
+    # Garante git disponível
+    _ensure_git || { _warn "git não disponível — não é possível usar Lux"; return 1; }
     # Lux usa GitHub como backend — busca o pacote no index oficial
     # Index: https://github.com/lux-org/lux-pkgs (formato: nome=usuario/repo@tag)
     local _LUX_INDEX_URL="https://raw.githubusercontent.com/lux-org/lux-pkgs/main/packages.txt"
-    local _LUX_INDEX="${TMPDIR:-$PREFIX/tmp}/lux_index.txt"
+    local _LUX_INDEX="${TMPDIR:-/tmp}/lux_index.txt"
 
     # Baixa index se não existir ou tiver mais de 1h
     if [ ! -f "$_LUX_INDEX" ] || \
@@ -108339,15 +109757,27 @@ _install_from_lux() {
     # Instala: copia .lua, compila .c se houver
     local cfiles; cfiles=$(find . -name "*.c" ! -path "*/test*" ! -path "*/doc*" 2>/dev/null | tr '\n' ' ')
     if [ -z "$cfiles" ]; then
-        find . -name "*.lua" ! -name "*.rockspec" ! -path "*/test*" | while read f; do
-            cp "$f" "$LUA_DIR/$(basename "$f")"
-            _ok "$(basename "$f") instalado (Lux)"
+        find . -name "*.lua" ! -name "*.rockspec" ! -path "*/test*" | while read _f; do
+            cp "$_f" "$LUA_DIR/$(basename "$_f")"
+            _ok "$(basename "$_f") instalado (Lux)"
         done
     else
+        # Tem código C — garante build tools
+        _info "Pacote tem código C — instalando build deps..."
+        local _lo; _lo=$(_lpm_detect_os); local _ls; _ls=$(_lpm_sudo)
+        case "$_lo" in
+            termux)   pkg install -y clang make 2>/dev/null ;;
+            debian)   $_ls apt-get install -y build-essential liblua5.4-dev 2>/dev/null ;;
+            arch)     $_ls pacman -S --noconfirm base-devel lua 2>/dev/null ;;
+            fedora)   $_ls dnf install -y gcc make lua-devel 2>/dev/null ;;
+            alpine)   apk add --no-cache build-base lua5.4-dev 2>/dev/null ;;
+            opensuse) $_ls zypper install -y gcc make lua54-devel 2>/dev/null ;;
+            void)     $_ls xbps-install -Sy base-devel lua54-devel 2>/dev/null ;;
+        esac
         _compile "$LIB_DIR/${pkg}.so" $cfiles || { _err "Falha ao compilar $pkg"; return 1; }
         _ok "${pkg}.so instalado (Lux)"
-        find . -name "*.lua" ! -name "*.rockspec" ! -path "*/test*" | while read f; do
-            cp "$f" "$LUA_DIR/$(basename "$f")"
+        find . -name "*.lua" ! -name "*.rockspec" ! -path "*/test*" | while read _f; do
+            cp "$_f" "$LUA_DIR/$(basename "$_f")"
         done
     fi
     return 0
@@ -108366,6 +109796,10 @@ _install_generic() {
     fi
 
     # ── LuaRocks (padrão / auto) ───────────────────────────────────────────
+    # Garante luarocks instalado antes de tentar
+    if ! _ensure_luarocks; then
+        _warn "luarocks não disponível — pulando etapa LuaRocks"
+    fi
     cd "$TMP_DIR"
     _info "Buscando $pkg no luarocks.org..."
     local manifest; manifest=$(curl -s --max-time 15 "https://luarocks.org/manifest-5.4")
@@ -108452,12 +109886,17 @@ _install_generic() {
 
     # ── Fallback automático para Lux se LuaRocks não achar ────────────────
     if [ "$from" = "auto" ]; then
-        _warn "'$pkg' não encontrado no LuaRocks — tentando Lux..."
+        _warn "'$pkg' não encontrado no LuaRocks — tentando Lux (GitHub)..."
         cd "$HOME"
         _install_from_lux "$pkg" && return
+        # Último recurso: luarocks system-wide (pode ter acesso diferente)
+        if _ensure_luarocks; then
+            _warn "Tentando luarocks global..."
+            _luarocks_run "$pkg" && { _ok "$pkg instalado via luarocks"; return; }
+        fi
     fi
 
-    _err "Pacote '$pkg' não encontrado no LuaRocks nem no Lux"
+    _err "Pacote '$pkg' não encontrado no LuaRocks, Lux ou luarocks global"
 }
 
 _install() {
@@ -108468,49 +109907,262 @@ _install() {
     # Pacotes C que existem no Termux como binários — não compiláveis pelo lpm
     case "$pkg" in
         lgi|lua-lgi)
-            _info "lgi é um binding C (GObject/GTK) — instalando via pkg..."
-            pkg install -y lua-lgi 2>/dev/null || _err "Falha: tente pkg install lua-lgi"
-            # Localiza o .so instalado e garante que está no LUA_CPATH
-            # Procura o .so do lgi (ex: .../lib/lua/5.4/lgi/corelgilua54.so)
-            _lgi_so=$(find "${PREFIX:-/usr/local}" \
-                -path "*/lua*" -name "corelgilua*.so" 2>/dev/null | head -1)
+            _info "lgi (GObject/GTK binding) — instalando..."
+
+            # ── Detecta OS na hora (garante que funciona mesmo em subshell) ──
+            _LI_OS="unknown"
+            if [ -d "/data/data/com.termux" ] || [ -n "$TERMUX_VERSION" ]; then
+                _LI_OS="termux"
+            elif [ -f /etc/os-release ]; then
+                _lid=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+                case "$_lid" in
+                    ubuntu|debian|linuxmint|pop|kali|parrot|trixie) _LI_OS="debian" ;;
+                    arch|manjaro|endeavouros|garuda)                  _LI_OS="arch"   ;;
+                    fedora|rhel|centos|rocky|alma)                    _LI_OS="fedora" ;;
+                    alpine)                                           _LI_OS="alpine" ;;
+                    opensuse*|sles)                                   _LI_OS="opensuse" ;;
+                    void)                                             _LI_OS="void"   ;;
+                    gentoo)                                           _LI_OS="gentoo" ;;
+                esac
+                # fallback por ID_LIKE
+                if [ "$_LI_OS" = "unknown" ]; then
+                    _llike=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
+                    case "$_llike" in
+                        *debian*|*ubuntu*) _LI_OS="debian"  ;;
+                        *arch*)            _LI_OS="arch"    ;;
+                        *fedora*|*rhel*)   _LI_OS="fedora"  ;;
+                        *suse*)            _LI_OS="opensuse";;
+                    esac
+                fi
+            fi
+            # fallback por comando disponível
+            if [ "$_LI_OS" = "unknown" ]; then
+                if   command -v apt-get      >/dev/null 2>&1; then _LI_OS="debian"
+                elif command -v pacman       >/dev/null 2>&1; then _LI_OS="arch"
+                elif command -v dnf          >/dev/null 2>&1; then _LI_OS="fedora"
+                elif command -v apk          >/dev/null 2>&1; then _LI_OS="alpine"
+                elif command -v zypper       >/dev/null 2>&1; then _LI_OS="opensuse"
+                elif command -v xbps-install >/dev/null 2>&1; then _LI_OS="void"
+                elif command -v emerge       >/dev/null 2>&1; then _LI_OS="gentoo"
+                fi
+            fi
+            _info "OS detectado: $_LI_OS"
+
+            # sudo só se não for root
+            _LI_SUDO=""
+            [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1 && _LI_SUDO="sudo"
+
+            _lgi_ok=0
+
+            # ── ETAPA 1: pacote binário do repo ──────────────────────────────
+            _info "Etapa 1: tentando pacote binário do repositório..."
+            case "$_LI_OS" in
+                termux)   pkg install -y lua-lgi 2>/dev/null                          && _lgi_ok=1 ;;
+                debian)   $_LI_SUDO apt-get install -y lua-lgi 2>/dev/null            && _lgi_ok=1 ;;
+                arch)     $_LI_SUDO pacman -S --noconfirm lua-lgi 2>/dev/null         && _lgi_ok=1
+                          [ "$_lgi_ok" = "0" ] && command -v yay >/dev/null 2>&1 &&                               yay -S --noconfirm lua-lgi 2>/dev/null                  && _lgi_ok=1 ;;
+                fedora)   $_LI_SUDO dnf install -y lua-lgi 2>/dev/null                && _lgi_ok=1 ;;
+                alpine)   apk add --no-cache lua5.4-lgi 2>/dev/null                   && _lgi_ok=1 ;;
+                opensuse) $_LI_SUDO zypper install -y lua54-lgi 2>/dev/null           && _lgi_ok=1 ;;
+                void)     $_LI_SUDO xbps-install -Sy lua54-lgi 2>/dev/null            && _lgi_ok=1 ;;
+                gentoo)   $_LI_SUDO emerge dev-lua/lgi 2>/dev/null                    && _lgi_ok=1 ;;
+            esac
+
+            # ── ETAPA 2: luarocks (compila automaticamente) ──────────────────
+            if [ "$_lgi_ok" = "0" ]; then
+                _info "Etapa 2: instalando deps C e compilando via luarocks..."
+                case "$_LI_OS" in
+                    debian)
+                        $_LI_SUDO apt-get install -y                             build-essential pkg-config luarocks                             lua5.4 liblua5.4-dev                             libgirepository1.0-dev libglib2.0-dev                             gir1.2-glib-2.0 2>/dev/null ;;
+                    arch)
+                        $_LI_SUDO pacman -S --noconfirm                             base-devel luarocks lua gobject-introspection glib2 2>/dev/null ;;
+                    fedora)
+                        $_LI_SUDO dnf install -y                             luarocks lua-devel                             gobject-introspection-devel glib2-devel 2>/dev/null ;;
+                    alpine)
+                        apk add --no-cache                             build-base luarocks5.4 lua5.4-dev                             gobject-introspection-dev glib-dev 2>/dev/null ;;
+                    opensuse)
+                        $_LI_SUDO zypper install -y                             luarocks lua54-devel                             gobject-introspection-devel glib2-devel 2>/dev/null ;;
+                    void)
+                        $_LI_SUDO xbps-install -Sy                             luarocks lua54-devel                             gobject-introspection-devel glib-devel 2>/dev/null ;;
+                    *)
+                        # Genérico: tenta instalar luarocks + deps pelo que tiver
+                        command -v apt-get >/dev/null 2>&1 &&                             apt-get install -y build-essential luarocks liblua5.4-dev libgirepository1.0-dev libglib2.0-dev pkg-config 2>/dev/null || true
+                        command -v dnf >/dev/null 2>&1 &&                             dnf install -y luarocks lua-devel gobject-introspection-devel glib2-devel 2>/dev/null || true
+                        command -v pacman >/dev/null 2>&1 &&                             pacman -S --noconfirm luarocks lua gobject-introspection glib2 2>/dev/null || true ;;
+                esac
+                if command -v luarocks >/dev/null 2>&1; then
+                    luarocks --lua-version 5.4 install lgi 2>/dev/null                         || luarocks install lgi 2>/dev/null
+                    lua5.4 -e "require('''lgi''')" 2>/dev/null                         || lua -e "require('''lgi''')" 2>/dev/null && _lgi_ok=1 || true
+                elif command -v luarocks-5.4 >/dev/null 2>&1; then
+                    luarocks-5.4 install lgi 2>/dev/null && _lgi_ok=1
+                fi
+            fi
+
+            # ── ETAPA 3: compila do source (GitHub) ──────────────────────────
+            if [ "$_lgi_ok" = "0" ]; then
+                _info "Etapa 3: compilando do source (github.com/lgi-devs/lgi)..."
+                _LGI_SRC="$TMP_DIR/lgi-src"
+                mkdir -p "$_LGI_SRC"
+                # Instala deps de compilação mínimas
+                case "$_LI_OS" in
+                    debian)
+                        $_LI_SUDO apt-get install -y                             build-essential pkg-config git                             lua5.4 liblua5.4-dev                             libgirepository1.0-dev libglib2.0-dev                             libffi-dev 2>/dev/null ;;
+                    arch)
+                        $_LI_SUDO pacman -S --noconfirm                             base-devel git lua gobject-introspection glib2 libffi 2>/dev/null ;;
+                    fedora)
+                        $_LI_SUDO dnf install -y                             gcc make git lua-devel                             gobject-introspection-devel glib2-devel libffi-devel 2>/dev/null ;;
+                    alpine)
+                        apk add --no-cache                             build-base git lua5.4-dev                             gobject-introspection-dev glib-dev libffi-dev 2>/dev/null ;;
+                    *)
+                        command -v apt-get >/dev/null 2>&1 &&                             apt-get install -y build-essential git liblua5.4-dev libgirepository1.0-dev libglib2.0-dev libffi-dev pkg-config 2>/dev/null || true ;;
+                esac
+                # Determina lua include e lib
+                _LUA_INC=$(pkg-config --cflags lua5.4 2>/dev/null                     || pkg-config --cflags lua 2>/dev/null                     || printf -- '-I/usr/include/lua5.4')
+                _LUA_LIB=$(pkg-config --libs lua5.4 2>/dev/null                     || pkg-config --libs lua 2>/dev/null                     || printf -- '-llua5.4')
+                _GI_CFLAGS=$(pkg-config --cflags gobject-introspection-1.0 2>/dev/null || true)
+                _GI_LIBS=$(pkg-config --libs gobject-introspection-1.0 2>/dev/null || true)
+                if [ -n "$_GI_CFLAGS" ] || [ -n "$_GI_LIBS" ]; then
+                    if command -v git >/dev/null 2>&1; then
+                        # Instala path 5.4 explicitamente
+                        _LGI_INST="$HOME/.luarocks"
+                        _LGI_LVER="5.4"
+                        _LGI_LBIN="lua5.4"
+                        command -v lua5.4 >/dev/null 2>&1 || _LGI_LBIN="lua"
+                        git clone --depth=1 https://github.com/lgi-devs/lgi "$_LGI_SRC" 2>/dev/null                         && make -C "$_LGI_SRC"                             LUA="$_LGI_LBIN"                             LUAVERSION="$_LGI_LVER"                             LUA_CFLAGS="$_LUA_INC"                             LUA_LDFLAGS="$_LUA_LIB"                             INSTALL_LMOD="$_LGI_INST/share/lua/$_LGI_LVER"                             INSTALL_CMOD="$_LGI_INST/lib/lua/$_LGI_LVER"                             PREFIX="$_LGI_INST" 2>/dev/null                         && make -C "$_LGI_SRC" install                             LUA="$_LGI_LBIN"                             LUAVERSION="$_LGI_LVER"                             INSTALL_LMOD="$_LGI_INST/share/lua/$_LGI_LVER"                             INSTALL_CMOD="$_LGI_INST/lib/lua/$_LGI_LVER"                             PREFIX="$_LGI_INST" 2>/dev/null                         && _lgi_ok=1
+                    fi
+                else
+                    _warn "gobject-introspection não encontrado — não é possível compilar lgi"
+                fi
+                rm -rf "$_LGI_SRC"
+            fi
+
+            # ── Resultado ─────────────────────────────────────────────────────
+            if [ "$_lgi_ok" = "0" ]; then
+                _err "Todas as tentativas falharam. Instale manualmente:
+  apt install libgirepository1.0-dev libglib2.0-dev liblua5.4-dev build-essential
+  luarocks install lgi"
+                return
+            fi
+
+            # Configura LUA_CPATH e LUA_PATH — filtra 5.4, exclui 5.1/5.2/5.3
+            _lgi_so=$(find /usr /lib "$HOME/.luarocks" /data/data/com.termux \
+                -path "*/lua/5.4/*" -name "corelgilua*.so" 2>/dev/null | head -1)
+            [ -z "$_lgi_so" ] && _lgi_so=$(find /usr /lib "$HOME/.luarocks" /data/data/com.termux \
+                -path "*/lua*" -name "corelgilua*.so" 2>/dev/null \
+                | grep -v "lua/5\.[123]" | head -1)
             if [ -n "$_lgi_so" ]; then
-                _lgi_dir="$(dirname "$_lgi_so")"          # .../lib/lua/5.4/lgi
-                _lgi_cpath_root="$(dirname "$_lgi_dir")"  # .../lib/lua/5.4
+                _lgi_cpath_root="$(dirname "$(dirname "$_lgi_so")")"
+                _lgi_lpath_root="$HOME/.luarocks/share/lua/5.4"
+                # CPATH (.so)
                 sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
-                printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;%s/?/?.so;\${LUA_CPATH:-}"\n' \
+                printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;%s/?/?.so;${LUA_CPATH:-}"\n' \
                     "$_lgi_cpath_root" "$_lgi_cpath_root" >> "$HOME/.bashrc"
                 export LUA_CPATH="$_lgi_cpath_root/?.so:$_lgi_cpath_root/?/?.so:${LUA_CPATH:-}"
-                _ok "lgi instalado — .so em: $_lgi_dir"
+                # PATH (.lua) — necessário para lgi.lua e lgi/*.lua
+                sed -i '/lgi_lpath/d' "$HOME/.bashrc" 2>/dev/null
+                printf '\n# lgi_lpath\nexport LUA_PATH="%s/?.lua;%s/?/init.lua;${LUA_PATH:-};"\n' \
+                    "$_lgi_lpath_root" "$_lgi_lpath_root" >> "$HOME/.bashrc"
+                export LUA_PATH="$_lgi_lpath_root/?.lua;$_lgi_lpath_root/?/init.lua;${LUA_PATH:-};"
+                _ok ".so em: $_lgi_so"
+                _info "Execute: source ~/.bashrc   (ou reinicie o shell)"
             else
-                _warn "lgi instalado mas .so nao localizado — pode nao funcionar com Lua 5.4"
+                _ok "lgi compilado — execute: source ~/.bashrc"
             fi
             return ;;
         luaposix|posix)
-            _info "luaposix é um binding C — instalando via pkg..."
-            pkg install -y lua-posix 2>/dev/null \
-                && _ok "luaposix instalado via pkg (lua-posix)" \
-                || _err "Falha ao instalar lua-posix — tente: pkg install lua-posix"
+            _info "luaposix (binding POSIX) — instalando..."
+            local _po=0 _po_os; _po_os=$(_lpm_detect_os); local _po_s; _po_s=$(_lpm_sudo)
+
+            # Etapa 1: pacote binário
+            _info "Etapa 1: pacote binário do repositório..."
+            case "$_po_os" in
+                termux)   pkg install -y lua-posix 2>/dev/null              && _po=1 ;;
+                debian)   $_po_s apt-get install -y lua-posix 2>/dev/null   && _po=1 ;;
+                arch)     $_po_s pacman -S --noconfirm lua-posix 2>/dev/null && _po=1 ;;
+                fedora)   $_po_s dnf install -y lua-posix 2>/dev/null       && _po=1 ;;
+                alpine)   apk add --no-cache lua5.4-posix 2>/dev/null       && _po=1 ;;
+                opensuse) $_po_s zypper install -y lua54-posix 2>/dev/null  && _po=1 ;;
+                void)     $_po_s xbps-install -Sy lua54-posix 2>/dev/null   && _po=1 ;;
+                gentoo)   $_po_s emerge dev-lua/luaposix 2>/dev/null        && _po=1 ;;
+            esac
+
+            # Etapa 2: luarocks
+            if [ "$_po" = "0" ]; then
+                _info "Etapa 2: compilando via luarocks..."
+                case "$_po_os" in
+                    debian)   $_po_s apt-get install -y build-essential lua5.4 liblua5.4-dev luarocks 2>/dev/null ;;
+                    arch)     $_po_s pacman -S --noconfirm base-devel lua luarocks 2>/dev/null ;;
+                    fedora)   $_po_s dnf install -y gcc make lua-devel luarocks 2>/dev/null ;;
+                    alpine)   apk add --no-cache build-base lua5.4-dev luarocks5.4 2>/dev/null ;;
+                    opensuse) $_po_s zypper install -y gcc make lua54-devel luarocks 2>/dev/null ;;
+                    void)     $_po_s xbps-install -Sy base-devel lua54-devel luarocks 2>/dev/null ;;
+                esac
+                _ensure_luarocks && _luarocks_run "luaposix" && _lua_check "posix" && _po=1
+            fi
+
+            # Etapa 3: source (GitHub)
+            if [ "$_po" = "0" ]; then
+                _info "Etapa 3: compilando do source..."
+                _ensure_git && _ensure_luarocks || { _err "Falha ao instalar luaposix"; return; }
+                local _ptmp="$TMP_DIR/luaposix-src"
+                git clone --depth=1 https://github.com/luaposix/luaposix "$_ptmp" 2>/dev/null                 && cd "$_ptmp"                 && _luarocks_run "luaposix"                 && _lua_check "posix" && _po=1
+                rm -rf "$_ptmp"; cd "$HOME"
+            fi
+
+            [ "$_po" = "0" ] && _err "Falha ao instalar luaposix" && return
+            _ok "luaposix instalado"
             return ;;
         lcurl|curl)
-            _info "lcurl é um binding C — instalando via pkg..."
-            pkg install -y lua-curl 2>/dev/null \
-                && _ok "lcurl instalado via pkg (lua-curl)" \
-                || _err "Falha ao instalar lua-curl — tente: pkg install lua-curl"
+            _info "lcurl (libcurl binding) — instalando..."
+            local _cu=0 _cu_os; _cu_os=$(_lpm_detect_os); local _cu_s; _cu_s=$(_lpm_sudo)
+
+            # Etapa 1: pacote binário
+            _info "Etapa 1: pacote binário do repositório..."
+            case "$_cu_os" in
+                termux)   pkg install -y lua-curl 2>/dev/null               && _cu=1 ;;
+                debian)   $_cu_s apt-get install -y lua-curl 2>/dev/null    && _cu=1 ;;
+                arch)     $_cu_s pacman -S --noconfirm lua-curl 2>/dev/null && _cu=1 ;;
+                fedora)   $_cu_s dnf install -y lua-curl 2>/dev/null        && _cu=1 ;;
+                alpine)   apk add --no-cache lua5.4-curl 2>/dev/null        && _cu=1 ;;
+                opensuse) $_cu_s zypper install -y lua54-curl 2>/dev/null   && _cu=1 ;;
+                void)     $_cu_s xbps-install -Sy lua54-curl 2>/dev/null    && _cu=1 ;;
+                gentoo)   $_cu_s emerge dev-lua/lcurl 2>/dev/null           && _cu=1 ;;
+            esac
+
+            # Etapa 2: luarocks (precisa de libcurl-dev)
+            if [ "$_cu" = "0" ]; then
+                _info "Etapa 2: instalando libcurl-dev e compilando via luarocks..."
+                case "$_cu_os" in
+                    debian)   $_cu_s apt-get install -y build-essential libcurl4-openssl-dev lua5.4 liblua5.4-dev luarocks 2>/dev/null ;;
+                    arch)     $_cu_s pacman -S --noconfirm base-devel curl lua luarocks 2>/dev/null ;;
+                    fedora)   $_cu_s dnf install -y gcc make libcurl-devel lua-devel luarocks 2>/dev/null ;;
+                    alpine)   apk add --no-cache build-base curl-dev lua5.4-dev luarocks5.4 2>/dev/null ;;
+                    opensuse) $_cu_s zypper install -y gcc make libcurl-devel lua54-devel luarocks 2>/dev/null ;;
+                    void)     $_cu_s xbps-install -Sy base-devel libcurl-devel lua54-devel luarocks 2>/dev/null ;;
+                esac
+                _ensure_luarocks && _luarocks_run "lcurl" && _lua_check "cURL" && _cu=1
+            fi
+
+            # Etapa 3: source (GitHub)
+            if [ "$_cu" = "0" ]; then
+                _info "Etapa 3: compilando do source..."
+                _ensure_git && _ensure_luarocks || { _err "Falha ao instalar lcurl"; return; }
+                local _ctmp="$TMP_DIR/lcurl-src"
+                git clone --depth=1 https://github.com/Lua-cURL/Lua-cURL "$_ctmp" 2>/dev/null                 && _luarocks_run "lcurl"                 && _lua_check "cURL" && _cu=1
+                rm -rf "$_ctmp"; cd "$HOME"
+            fi
+
+            [ "$_cu" = "0" ] && _err "Falha ao instalar lcurl" && return
+            _ok "lcurl instalado"
             return ;;
         lx)
-            _info "lx — instalando dependência lgi (GTK/LGI)..."
-            pkg install -y lua-lgi 2>/dev/null || _warn "Falha ao instalar lua-lgi via pkg"
-            # Configura LUA_CPATH para o .so do lgi
-            _lgi_so=$(find "${PREFIX:-/usr/local}" \
-                -path "*/lua*" -name "corelgilua*.so" 2>/dev/null | head -1)
-            if [ -n "$_lgi_so" ]; then
-                _lgi_dir="$(dirname "$_lgi_so")"
-                _lgi_cpath_root="$(dirname "$_lgi_dir")"
-                sed -i '/lgi_cpath/d' "$HOME/.bashrc" 2>/dev/null
-                printf '\n# lgi_cpath\nexport LUA_CPATH="%s/?.so;%s/?/?.so;\${LUA_CPATH:-}"\n' \
-                    "$_lgi_cpath_root" "$_lgi_cpath_root" >> "$HOME/.bashrc"
-                export LUA_CPATH="$_lgi_cpath_root/?.so:$_lgi_cpath_root/?/?.so:${LUA_CPATH:-}"
+            _info "lx — instalando dependência lgi (3 etapas com fallback)..."
+            # Reutiliza o instalador completo do lgi (que já tem 3 etapas)
+            _install "lgi" "$from"
+            # Verifica se lgi carregou
+            if ! _lua_check "lgi" 2>/dev/null; then
+                _err "lx requer lgi — instale lgi primeiro: lpm install lgi"
+                return
             fi
             # Instala lx.lua no LUA_DIR
             mkdir -p "$LUA_DIR"
@@ -110348,7 +112000,7 @@ LPMEOF
 #!/usr/bin/env bash
 # xpm — ElliotOS eXtended Pentest Manager
 # Gerenciador universal de ferramentas de pentest e segurança
-# Versão: 1.0.0 | Plataforma: Termux (Android) + Linux
+# Versão: 1.0.0 | Plataforma: Termux, Debian/Ubuntu, Arch, Fedora, Alpine, Void, openSUSE, Gentoo
 
 PREFIX="${PREFIX:-/usr/local}"
 XPM_HOME="${XPM_HOME:-$HOME/.xpm}"
@@ -110390,20 +112042,30 @@ _os_type() {
         _ID=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
         _ID_LIKE=$(grep '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]')
         case "$_ID" in
-            ubuntu)                     echo "ubuntu";  return ;;
-            debian)                     echo "debian";  return ;;
-            arch|manjaro|endeavouros)   echo "arch";    return ;;
-            fedora|rhel|centos|rocky|alma) echo "fedora"; return ;;
+            ubuntu)                        echo "debian";   return ;;
+            debian)                        echo "debian";   return ;;
+            arch|manjaro|endeavouros|garuda) echo "arch";   return ;;
+            fedora|rhel|centos|rocky|alma) echo "fedora";   return ;;
+            alpine)                        echo "alpine";   return ;;
+            void)                          echo "void";     return ;;
+            opensuse*|sles)                echo "opensuse"; return ;;
+            gentoo)                        echo "gentoo";   return ;;
+            nixos)                         echo "nixos";    return ;;
         esac
         case "$_ID_LIKE" in
-            *ubuntu*|*debian*) echo "debian"; return ;;
-            *arch*)            echo "arch";   return ;;
-            *fedora*|*rhel*)   echo "fedora"; return ;;
+            *ubuntu*|*debian*) echo "debian";   return ;;
+            *arch*)            echo "arch";     return ;;
+            *fedora*|*rhel*)   echo "fedora";   return ;;
+            *suse*)            echo "opensuse"; return ;;
         esac
     fi
-    if   command -v apt-get >/dev/null 2>&1; then echo "debian"
-    elif command -v pacman  >/dev/null 2>&1; then echo "arch"
-    elif command -v dnf     >/dev/null 2>&1; then echo "fedora"
+    if   command -v apt-get      >/dev/null 2>&1; then echo "debian"
+    elif command -v pacman       >/dev/null 2>&1; then echo "arch"
+    elif command -v dnf          >/dev/null 2>&1; then echo "fedora"
+    elif command -v apk          >/dev/null 2>&1; then echo "alpine"
+    elif command -v zypper       >/dev/null 2>&1; then echo "opensuse"
+    elif command -v xbps-install >/dev/null 2>&1; then echo "void"
+    elif command -v emerge       >/dev/null 2>&1; then echo "gentoo"
     else echo "unknown"; fi
 }
 
@@ -110602,10 +112264,22 @@ _ensure_java() {
     _info "Java não encontrado — instalando..."
     local os; os=$(_os_type)
     case "$os" in
-        termux)        pkg install -y openjdk-21 2>/dev/null || pkg install -y openjdk-17 2>/dev/null || true ;;
-        debian|ubuntu) apt-get install -y default-jdk-headless 2>/dev/null || apt-get install -y default-jre-headless 2>/dev/null || true ;;
-        arch)          pacman -S --noconfirm jdk-openjdk 2>/dev/null || pacman -S --noconfirm jre-openjdk-headless 2>/dev/null || true ;;
-        fedora)        dnf install -y java-21-openjdk-devel 2>/dev/null || dnf install -y java-21-openjdk-headless 2>/dev/null || true ;;
+        termux)   pkg install -y openjdk-21 2>/dev/null || pkg install -y openjdk-17 2>/dev/null || true ;;
+        debian)   $_XPM_SUDO apt-get install -y default-jdk-headless 2>/dev/null || \
+                  $_XPM_SUDO apt-get install -y default-jre-headless 2>/dev/null || true ;;
+        arch)     $_XPM_SUDO pacman -S --noconfirm jdk-openjdk 2>/dev/null || \
+                  $_XPM_SUDO pacman -S --noconfirm jre-openjdk-headless 2>/dev/null || true ;;
+        fedora)   $_XPM_SUDO dnf install -y java-21-openjdk-devel 2>/dev/null || \
+                  $_XPM_SUDO dnf install -y java-21-openjdk-headless 2>/dev/null || true ;;
+        alpine)   apk add --no-cache openjdk21-jdk 2>/dev/null || \
+                  apk add --no-cache openjdk17-jdk 2>/dev/null || true ;;
+        opensuse) $_XPM_SUDO zypper install -y java-21-openjdk 2>/dev/null || \
+                  $_XPM_SUDO zypper install -y java-17-openjdk 2>/dev/null || true ;;
+        void)     $_XPM_SUDO xbps-install -Sy openjdk21 2>/dev/null || \
+                  $_XPM_SUDO xbps-install -Sy openjdk17 2>/dev/null || true ;;
+        gentoo)   $_XPM_SUDO emerge dev-java/openjdk:21 2>/dev/null || \
+                  $_XPM_SUDO emerge dev-java/openjdk-jre-bin:21 2>/dev/null || true ;;
+        *)        _warn "Instale Java manualmente (java-21-openjdk ou equivalente)" ;;
     esac
     command -v java >/dev/null 2>&1 && _ok "java: $(java -version 2>&1 | head -1)"
 }
@@ -110614,16 +112288,26 @@ _ensure_java() {
 
 # ── Instalador de pacotes cross-OS ───────────────────────────────────────────
 # _sys_pkg_install <pkg>  — mesmo nome em todos os OSes (ex: git, clang, make)
+_XPM_SUDO=""
+[ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1 && _XPM_SUDO="sudo"
 _sys_pkg_install() {
     local pkg="$1"
     if _is_termux; then
         pkg install -y "$pkg" 2>/dev/null || true
-    elif command -v apt-get >/dev/null 2>&1; then
-        apt-get install -y "$pkg" 2>/dev/null || true
-    elif command -v pacman >/dev/null 2>&1; then
-        pacman -S --noconfirm "$pkg" 2>/dev/null || true
-    elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y "$pkg" 2>/dev/null || true
+    elif command -v apt-get   >/dev/null 2>&1; then
+        $_XPM_SUDO apt-get install -y "$pkg" 2>/dev/null || true
+    elif command -v pacman    >/dev/null 2>&1; then
+        $_XPM_SUDO pacman -S --noconfirm "$pkg" 2>/dev/null || true
+    elif command -v dnf       >/dev/null 2>&1; then
+        $_XPM_SUDO dnf install -y "$pkg" 2>/dev/null || true
+    elif command -v apk       >/dev/null 2>&1; then
+        apk add --no-cache "$pkg" 2>/dev/null || true
+    elif command -v zypper    >/dev/null 2>&1; then
+        $_XPM_SUDO zypper install -y "$pkg" 2>/dev/null || true
+    elif command -v xbps-install >/dev/null 2>&1; then
+        $_XPM_SUDO xbps-install -Sy "$pkg" 2>/dev/null || true
+    elif command -v emerge    >/dev/null 2>&1; then
+        $_XPM_SUDO emerge "$pkg" 2>/dev/null || true
     fi
 }
 
@@ -115090,8 +116774,8 @@ local LUA_KEYWORDS = {
     ["md5"]=1,["sha256"]=1,["sha512"]=1,["hmac"]=1,["b64e"]=1,["b64d"]=1,
     ["xss"]=1,["sqli"]=1,["lfi"]=1,["rce"]=1,["ssrf"]=1,["ssti"]=1,
     ["spider"]=1,["waf"]=1,["chain"]=1,["recon"]=1,["jwt"]=1,
-    ["geth"]=1,["import"]=1,["tcp"]=1,["udp"]=1,["socket"]=1,
-    ["socketex"]=1,["send"]=1,["recv"]=1,["stat"]=1,["isdir"]=1,
+    ["geth"]=1,["import"]=1,["tcp"]=1,["udp"]=1,["fire"]=1,
+    ["socket"]=1,["send"]=1,["recv"]=1,["stat"]=1,["isdir"]=1,
     ["isfile"]=1,["chmod"]=1,["glob"]=1,["append"]=1,["mkdir"]=1,
     ["rm"]=1,["move"]=1,["copy"]=1,["list"]=1,["capture"]=1,
     ["sha1"]=1,["b64enc"]=1,["b64dec"]=1,["hexenc"]=1,["hexdec"]=1,
@@ -116603,7 +118287,7 @@ OzsKICAtLXNjYW4pCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcp
 O2xvY2FsIHQ9bmV0LnNjYW4oJyQxJywkMiwkezM6LSQyfSkgZm9yIF8scCBpbiBwYWlycyh0KSBk
 byBwcmludChwKSBlbmQiCiAgICA7OwogIC0tc29ja2V0KQogICAgIyBtcyAtLXNvY2tldCBpcHY0
 IHN0cmVhbSBob3N0IHBvcnQgW3BheWxvYWRdCiAgICBzaGlmdAogICAgZXhlYyAiJF9CIiAtZSAi
-cmVxdWlyZSgnQHN0ZCcpO3ByaW50KG5ldC5zb2NrZXQoJyQxJywnJDInLCckMycsJDQsNSwnJHs1
+cmVxdWlyZSgnQHN0ZCcpO3ByaW50KG5ldC5maXJlKCckMScsJyQyJywnJDMnLCQ0LDUsJyR7NQ==
 Oi19JykpIgogICAgOzsKICAtLWlwKQogICAgZXhlYyAiJF9CIiAtZSAicmVxdWlyZSgnQHN0ZCcp
 Owpsb2NhbCBFU0M9c3RyaW5nLmNoYXIoMjcpCmxvY2FsIGlwID0gbmV0LmdldGgoJ2h0dHBzOi8v
 YXBpLmlwaWZ5Lm9yZycpCmlmIGlwIGFuZCAjaXAgPiAwIHRoZW4KICBwcmludChFU0MuLidbMTsz
@@ -118169,10 +119853,10 @@ IgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG5ldC5zeW4oJzEuMS4xLjEnLCA4MClcMDMzWzBt
 XG4iCiAgICBwcmludGYgIiAgXDAzM1swOzkwbSAgbmV0LnN5bih7aG9zdD0nYWx2by5jb20nLCBw
 b3J0PTQ0MywgdmVyYm9zZT1mYWxzZX0pXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5
 MG0gIGxvY2FsIHIgPSBuZXQuc3luKCdhbHZvLmNvbScsIDIyKTsgaWYgci5vcGVuIHRoZW4gLi4u
-IGVuZFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQuc29ja2V0XDAzM1sw
+IGVuZFwwMzNbMG1cblxuIgogICAgcHJpbnRmICIgIFwwMzNbMTszM21uZXQuZmlyZVwwMzNbMA==
 bShmYW1pbHksIHR5cGUsIGhvc3QsIHBvcnQgWywgdG8gWywgcGF5bG9hZF1dKVxuIgogICAgcHJp
 bnRmICIgIFwwMzNbMDs5MG0gIEZpcmUtYW5kLWZvcmdldDogY29uZWN0YSwgZW52aWEsIHJlY2Vi
-ZSwgZmVjaGEuXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG5ldC5zb2NrZXQo
+ZSwgZmVjaGEuXDAzM1swbVxuIgogICAgcHJpbnRmICIgIFwwMzNbMDs5MG0gIG5ldC5maXJlKA==
 J2lwdjQnLCdzdHJlYW0nLCdhbHZvLmNvbScsODApXDAzM1swbVxuXG4iCiAgICBwcmludGYgIiAg
 XDAzM1sxOzMzbW5ldC51ZHBcMDMzWzBtKGhvc3QsIHBvcnQpICAtPiAgc29ja2V0IFVEUFxuXG4i
 CiAgICBwcmludGYgIlwwMzNbMTszNm3ilIDilIAgRE5TIC8gUElORyAvIFNDQU4g4pSA4pSA4pSA
@@ -124763,7 +126447,7 @@ local function syn_flood(ip,port,pkt_per_thread,n_threads)
     local code=string.format([[
 local sent=0
 for _=1,%d do
-    local ok=pcall(net.socket,"ipv4","syn",%q,%d,0)
+    local ok=pcall(net.fire,"ipv4","syn",%q,%d,0)
     if ok then sent=sent+1 end
 end
 return sent
@@ -126163,7 +127847,9 @@ _install_editor() {
     "Ctrl+←→ palavra  Ctrl+↑↓ scroll  Ctrl+BS apagar palavra  Home smart-home"
 #define COMPLETION_MAX   512
 #define COMPLETION_SHOW  12
+#ifndef CTRL
 #define CTRL(k)          ((k) & 0x1f)
+#endif
 #define GUTTER           5   /* largura do número de linha: 4 dígitos + 1 espaço */
 
 /* ════════════════════════════════════════════════════════
@@ -126220,8 +127906,7 @@ typedef struct {
 } Syntax;
 
 /* ── C / C++ ─────────────────────────────────────────── */
-static const char *c_ext[]   = { ".c",".h", NULL };
-static const char *cpp_ext[] = { ".cpp",".cc",".cxx",".hpp",".hxx",".inl", NULL };
+static const char *c_ext[]   = { ".c",".h",".cpp",".cc",".cxx",".hpp",".hxx",".inl", NULL };
 static const char *c_flow[] = {
     "if","else","while","for","do","switch","case","break","continue",
     "return","goto","default","sizeof","typeof","alignof","offsetof",
@@ -126339,7 +128024,7 @@ static const char *lua_ns[]  = {
 static const char *lua_meth[]= {
     /* net */
     "get","post","geth","fetch","connect","tcp","tcp6","udp","listen",
-    "socketex","socket","send","recv","recvall","recvline","recvfrom",
+    "socket","socket","send","recv","recvall","recvline","recvfrom",
     "close","scan","dns","ping","hosts","ip","os","import",
     "bind","accept","peer","info","wait","lines","sendall","sendto",
     "peek","shutdown","settimeout","setsockopt","getsockopt",
@@ -126527,9 +128212,7 @@ static const char *html_pp[] = {
 };
 
 static Syntax HLDB[] = {
-    { "C",           c_ext,   c_flow,  c_bi,   c_types, c_pp,
-      "//","/*","*/", HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
-    { "C++",         cpp_ext, c_flow,  c_bi,   c_types, c_pp,
+    { "C/C++",       c_ext,   c_flow,  c_bi,   c_types, c_pp,
       "//","/*","*/", HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
     { "Lua/ElliotOS",lua_ext, lua_flow,lua_bi, lua_ns,  lua_meth,
       "--","--[[","]]",HL_FLAG_NUMBERS|HL_FLAG_STRINGS },
@@ -126664,6 +128347,7 @@ static const char *LUA_STD_MODS[] = {
     "@std/re","@std/util","@std/log","@std/csv","@std/json",
     "@std/tui","@std/ivar","@std/exploit","@std/pent","@std/adb",
     "@std/agent","@std/lmod","@std/sh","@std/cc","@std/lx",
+    "@std/try","@std/num","@std/colors",
     /* @user/ — arquivos locais */
     "@user/",
     /* stdlib Lua pura */
@@ -126682,6 +128366,7 @@ typedef struct {
     char *chars, *render;
     unsigned char *hl;
     int hl_open_comment;
+    int hl_open_long_str;
     int is_dirty;  /* 1 se linha foi modificada desde o último save */
 } Row;
 
@@ -126690,7 +128375,7 @@ typedef struct { char *data; int len; int cx, cy; } UndoEntry;
 typedef struct {
     char *items[COMPLETION_MAX];
     int count, selected, active;
-    int trigger_cx;
+    int trigger_cx, trigger_cy;
 } Comp;
 
 typedef struct {
@@ -126784,11 +128469,18 @@ static int detect_require_ctx(char *prefix, int bufsz) {
     if (rpos < 0) return 0;
     int i = rpos + 1;
     while (i < cx && (line[i]==' '||line[i]=='\t')) i++;
-    if (i >= cx) return 0;
+    /* cursor logo após '(' sem aspas ainda: retorna 2 para sinalizar
+     * que comp_open_require deve inserir "" automaticamente */
+    if (i >= cx) { prefix[0] = '\0'; return 2; }
     char q = line[i];
-    if (q != '"' && q != '\'') return 0;
+    if (q != '"' && q != '\'') { prefix[0] = '\0'; return 2; }
     i++;
     if (i > cx) return 0;
+    /* verifica que o cursor está DENTRO das aspas (antes do fechamento) */
+    if (i < row->size && row->chars[i-1] == q) {
+        const char *close = memchr(line + i, q, row->size - i);
+        if (close && (int)(close - line) < cx) return 0; /* cursor após fechamento */
+    }
     int plen = cx - i;
     if (plen < 0) plen = 0;
     if (plen >= bufsz) plen = bufsz - 1;
@@ -126812,6 +128504,44 @@ static void comp_add(const char *item, const char *prefix, int plen) {
         if(!is_fn && k_is_fn && klen==ilen+1 && !strncmp(item,E.comp.items[k],ilen)) return;
     }
     E.comp.items[E.comp.count++] = strdup(item);
+}
+
+/* ── comp_add_req: comp_add com fuzzy match para require() ──────────────
+ * Além do prefix match normal, também aceita quando o prefix bate com a
+ * parte após a última '/' do item.
+ * Exemplos: "net" → "@std/net"  |  "re" → "@std/re"  |  "json" → "@std/json"
+ * ─────────────────────────────────────────────────────────────────────── */
+static void comp_add_req(const char *item, const char *prefix, int plen) {
+    if (E.comp.count >= COMPLETION_MAX) return;
+    if (plen > 0) {
+        int match = (strncmp(item, prefix, plen) == 0);
+        if (!match) {
+            /* tenta após a última '/': "net" bate com "@std/net" */
+            const char *slash = strrchr(item, '/');
+            if (slash && strncmp(slash+1, prefix, plen) == 0) match = 1;
+        }
+        if (!match) return;
+    }
+    /* dedup idêntico ao comp_add */
+    int ilen = (int)strlen(item);
+    for (int k = 0; k < E.comp.count; k++) {
+        if (!strcmp(E.comp.items[k], item)) return;
+    }
+    E.comp.items[E.comp.count++] = strdup(item);
+}
+
+/* Comparador para qsort das completions de require:
+ * @std/* primeiro (alfabético entre si), @user/* depois, resto por nome */
+static int req_comp_cmp(const void *a, const void *b) {
+    const char *sa = *(const char **)a;
+    const char *sb = *(const char **)b;
+    int as = (strncmp(sa,"@std/",5)==0 || strcmp(sa,"@std")==0);
+    int bs = (strncmp(sb,"@std/",5)==0 || strcmp(sb,"@std")==0);
+    int au = (strncmp(sa,"@user",5)==0);
+    int bu = (strncmp(sb,"@user",5)==0);
+    if (as && !bs) return -1;  if (!as && bs) return  1;
+    if (au && !bu) return -1;  if (!au && bu) return  1;
+    return strcmp(sa, sb);
 }
 
 /* Varre /usr/local/include e subdirs */
@@ -126903,11 +128633,11 @@ static int comp_open_include(void) {
     comp_close();
     int plen = (int)strlen(prefix);
     /* usa lista de headers conforme linguagem ativa */
-    const char **hlist = (E.syntax == &HLDB[1]) ? CPP_HEADERS : C_HEADERS;
+    const char **hlist = (E.syntax == &HLDB[0]) ? CPP_HEADERS : C_HEADERS;
     for (int i = 0; hlist[i]; i++)
         comp_add(hlist[i], prefix, plen);
     /* scan do filesystem: para C só .h, para C++ também sem extensão */
-    if (E.syntax == &HLDB[1]) {
+    if (E.syntax == &HLDB[0]) {
         /* C++: scan normal de .h + headers sem extensão do STL */
         scan_c_headers(prefix, plen);
     } else {
@@ -126925,6 +128655,7 @@ static int comp_open_include(void) {
     while (i < row->size && (line[i]==' '||line[i]=='\t')) i++;
     i++; /* salta '<' ou '"' */
     E.comp.trigger_cx = i;
+    E.comp.trigger_cy = E.cy;
     return 1;
 }
 
@@ -126987,10 +128718,24 @@ static void scan_user_files(const char *suffix, const char *fprefix, int fplen) 
     closedir(d);
 }
 
+/* Forward declaration */
+static void insert_char(int c);
+
 /* Abre completion para require("...") / require('...') */
 static int comp_open_require(void) {
     char prefix[128];
-    if (!detect_require_ctx(prefix, sizeof(prefix))) return 0;
+    int r = detect_require_ctx(prefix, sizeof(prefix));
+    if (!r) return 0;
+
+    /* Modo sem aspas (r==2): cursor logo após require( sem "
+     * Insere "" automaticamente e posiciona cursor entre elas */
+    if (r == 2) {
+        insert_char('"');
+        insert_char('"');
+        E.cx--;  /* recua para entre as aspas */
+        if (!detect_require_ctx(prefix, sizeof(prefix))) return 0;
+    }
+
     comp_close();
     int plen = (int)strlen(prefix);
 
@@ -127026,15 +128771,56 @@ static int comp_open_require(void) {
         while(i2<cx&&(line[i2]==' '||line[i2]=='	'))i2++;
         i2++;
         E.comp.trigger_cx=i2;
+        E.comp.trigger_cy=E.cy;
         return 1;
     }
 
+    /* ── módulos @std e stdlib (fuzzy match via comp_add_req) ── */
     for (int i = 0; LUA_STD_MODS[i]; i++)
-        comp_add(LUA_STD_MODS[i], prefix, plen);
+        comp_add_req(LUA_STD_MODS[i], prefix, plen);
+
+    /* ── módulos instalados em disco ── */
     scan_lua_modules(prefix, plen);
+
+    /* ── diretório do arquivo em edição: módulos irmãos via @user/ ──
+     * Se o arquivo aberto está dentro de $HOME, escaneia sua pasta
+     * para sugerir arquivos Lua vizinhos como require("@user/..."). */
+    if (E.filename) {
+        const char *home = getenv("HOME");
+        if (home && strncmp(E.filename, home, strlen(home)) == 0) {
+            char *last = strrchr(E.filename, '/');
+            if (last && last != E.filename) {
+                int dlen = (int)(last - E.filename);
+                char file_dir[512]; file_dir[0] = '\0';
+                if (dlen < (int)sizeof(file_dir)-1) {
+                    memcpy(file_dir, E.filename, dlen);
+                    file_dir[dlen] = '\0';
+                }
+                /* caminho relativo ao HOME */
+                const char *rel = file_dir + strlen(home);
+                if (*rel == '/') rel++;
+                /* só escaneia se prefix está vazio ou é @user/ */
+                if (plen == 0 || strncmp(prefix,"@user",5)==0) {
+                    char fpfx[256] = {0};
+                    if (plen > 6 && strncmp(prefix,"@user/",6)==0) {
+                        const char *sfx2 = prefix + 6;
+                        const char *ls2  = strrchr(sfx2, '/');
+                        strncpy(fpfx, ls2 ? ls2+1 : sfx2, sizeof(fpfx)-1);
+                    }
+                    scan_user_files(rel, fpfx, (int)strlen(fpfx));
+                }
+            }
+        }
+    }
+
+    /* ── ordena: @std/* primeiro (alfa), @user/* depois, disco por nome ── */
+    if (E.comp.count > 1)
+        qsort(E.comp.items, E.comp.count, sizeof(char *), req_comp_cmp);
+
     if (E.comp.count == 0) return 0;
     E.comp.selected = 0;
     E.comp.active   = 1;
+
     /* trigger_cx = posição logo após as aspas de abertura */
     Row *row = &E.row[E.cy];
     char *line = row->chars;
@@ -127049,8 +128835,9 @@ static int comp_open_require(void) {
     }
     int i2 = rpos + 1;
     while (i2 < cx && (line[i2]==' '||line[i2]=='\t')) i2++;
-    i2++; /* salta aspas */
+    i2++; /* salta aspas de abertura */
     E.comp.trigger_cx = i2;
+    E.comp.trigger_cy = E.cy;
     return 1;
 }
 
@@ -127084,14 +128871,53 @@ static int get_winsz(int *rows, int *cols) {
     *cols = ws.ws_col; *rows = ws.ws_row; return 0;
 }
 
+/* ── Estado de resize com debounce ── */
+static volatile sig_atomic_t g_resize_pending = 0;
+static int  g_last_rows = 0, g_last_cols = 0;
+static long g_resize_ts = 0;
+static int  g_needs_redraw = 1;
+
+/* Obtém tempo em ms para debounce de resize */
+static long now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+}
+
 static void handle_resize(int sig) {
     (void)sig;
-    if (get_winsz(&E.rows, &E.cols) != -1) {
-        E.rows -= 2;  /* reserva status bar + msg */
-        /* Garante que o cursor não fique fora da área visível */
-        if (E.cy >= E.rows) E.cy = E.rows > 0 ? E.rows - 1 : 0;
-        if (E.cx >= E.cols) E.cx = E.cols > 0 ? E.cols - 1 : 0;
-    }
+    /* Apenas sinaliza — nunca modifica E dentro de um signal handler.
+     * O loop principal aplica o resize com debounce. */
+    g_resize_pending = 1;
+    g_resize_ts = now_ms();
+    g_needs_redraw = 1;
+}
+
+/* Aplica o resize pendente se estabilizou (debounce de 80ms).
+ * Retorna 1 se o tamanho mudou e a tela deve ser limpa. */
+static int apply_resize_if_stable(void) {
+    if (!g_resize_pending) return 0;
+    if (now_ms() - g_resize_ts < 80) return 0; /* ainda mudando — aguarda */
+
+    g_resize_pending = 0;
+    int new_rows, new_cols;
+    if (get_winsz(&new_rows, &new_cols) == -1) return 0;
+
+    new_rows -= 2; /* status bar + msg */
+    if (new_rows < 1) new_rows = 1;
+
+    if (new_rows == g_last_rows && new_cols == g_last_cols) return 0; /* sem mudança real */
+
+    E.rows = new_rows;
+    E.cols = new_cols;
+    g_last_rows = new_rows;
+    g_last_cols = new_cols;
+
+    /* Ajusta cursor para não ficar fora da área visível */
+    if (E.cy >= E.rows) E.cy = E.rows > 0 ? E.rows - 1 : 0;
+    if (E.cx >= E.cols) E.cx = E.cols > 0 ? E.cols - 1 : 0;
+
+    return 1; /* tamanho mudou: precisa limpar a tela */
 }
 
 /* forward declarations necessárias para o handler de mouse em read_key */
@@ -127186,11 +129012,13 @@ static int read_key(void) {
                             }
                         } else if (btn == 64) { /* scroll up */
                             for (int i=0;i<3;i++) move_cursor(ARROW_UP);
+                            g_needs_redraw = 1;
                         } else if (btn == 65) { /* scroll down */
                             for (int i=0;i<3;i++) move_cursor(ARROW_DOWN);
+                            g_needs_redraw = 1;
                         }
                     }
-                    return 0; /* redesenha sem tecla */
+                    return 0; /* não é tecla — redraw já agendado acima */
                 }
             }
         }
@@ -127225,10 +129053,12 @@ static void draw_fexp_panel(Abuf *ab);
 static void draw_check_panel(Abuf *ab);
 static void draw_goto_panel(Abuf *ab);
 static void draw_sym_panel(Abuf *ab);
+static void draw_lang_panel(Abuf *ab);
 static int has_word(const char *s, const char *tok);
 static void insert_newline(void);
 static void open_file(const char *fname);
 static int  line_ends_with_opener(Row *row);
+static void electric_deindent(void);
 
 static void ab_append(Abuf *ab, const char *s, int len) {
     char *p = realloc(ab->b, ab->len + len);
@@ -127262,15 +129092,15 @@ static void update_syntax(Row *row) {
     int msl  = mcs ? (int)strlen(mcs) : 0;
     int mel  = mce ? (int)strlen(mce) : 0;
 
-    int is_c    = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
-    int is_lua  = (E.syntax == &HLDB[2]);
-    int is_bash = (E.syntax == &HLDB[3]);
-    int is_html = (E.syntax == &HLDB[4]);
+    int is_c    = (E.syntax == &HLDB[0]);
+    int is_lua  = (E.syntax == &HLDB[0]);
+    int is_bash = (E.syntax == &HLDB[2]);
+    int is_html = (E.syntax == &HLDB[3]);
 
     int prev_sep    = 1;
     int in_string   = 0;
     int in_comment  = row->hl_open_comment;
-    int in_long_str = 0;
+    int in_long_str = row->hl_open_long_str;
     int i = 0;
 
     /* ── HTML: highlight especial de tags, atributos e entidades ── */
@@ -127682,6 +129512,10 @@ finish:;
     row->hl_open_comment = in_comment;
     if (changed && (row - E.row) + 1 < E.numrows)
         update_syntax(row + 1);
+    int changed_ls = (row->hl_open_long_str != in_long_str);
+    row->hl_open_long_str = in_long_str;
+    if (changed_ls && (row - E.row) + 1 < E.numrows)
+        update_syntax(row + 1);
 }
 
 static int hl_to_color(int hl) {
@@ -127714,9 +129548,9 @@ static void select_syntax(void) {
     if (E.numrows > 0 && E.row[0].size > 1
         && E.row[0].chars[0] == '#' && E.row[0].chars[1] == '!') {
         if (strstr(E.row[0].chars, "bash") || strstr(E.row[0].chars, "/sh"))
-            { E.syntax = &HLDB[3]; goto rescan; }
-        if (strstr(E.row[0].chars, "lua") || strstr(E.row[0].chars, "/ms"))
             { E.syntax = &HLDB[2]; goto rescan; }
+        if (strstr(E.row[0].chars, "lua") || strstr(E.row[0].chars, "/ms"))
+            { E.syntax = &HLDB[1]; goto rescan; }
     }
 
     for (int i = 0; i < HLDB_SIZE; i++)
@@ -127745,7 +129579,7 @@ static void select_syntax(void) {
                 }
             }
         }
-        if (score >= 2) { E.syntax = &HLDB[2]; goto rescan; }
+        if (score >= 2) { E.syntax = &HLDB[1]; goto rescan; }
     }
 
     /* Detecção heurística HTML: procura DOCTYPE ou <html nos primeiros 5 linhas */
@@ -127754,7 +129588,7 @@ static void select_syntax(void) {
         for (int y = 0; y < limit; y++) {
             char *s = E.row[y].chars;
             if (strstr(s, "<!DOCTYPE") || strstr(s, "<html") || strstr(s, "<HTML")) {
-                E.syntax = &HLDB[4]; goto rescan;
+                E.syntax = &HLDB[3]; goto rescan;
             }
         }
     }
@@ -127811,7 +129645,7 @@ static void insert_row(int at, const char *s, int len) {
     memcpy(E.row[at].chars, s, len);
     E.row[at].chars[len] = '\0';
     E.row[at].rsize = 0; E.row[at].render = NULL;
-    E.row[at].hl = NULL; E.row[at].hl_open_comment = 0;
+    E.row[at].hl = NULL; E.row[at].hl_open_comment = 0; E.row[at].hl_open_long_str = 0;
     update_row(&E.row[at]);
     E.numrows++; E.dirty++;
 }
@@ -127952,8 +129786,8 @@ static int get_prefix(char *buf, int bufsz) {
 typedef struct { const char *mod; const char *alias; const char *fns[48]; } EeModHint;
 static const EeModHint EE_MOD_HINTS[] = {
     {"@std/net","net",{"net.tcp(","net.udp(","net.scan(","net.dns(","net.http(","net.https(",
-        "net.get(","net.geth(","net.post(","net.connect(","net.socketex(","net.listen(",
-        "net.socket(","net.syn(","net.ping(","net.tcp6(","net.help()",NULL}},
+        "net.get(","net.geth(","net.post(","net.connect(","net.socket(","net.listen(",
+        "net.fire(","net.syn(","net.ping(","net.tcp6(","net.help()",NULL}},
     {"@std/fs","fs",{"fs.read(","fs.write(","fs.append(","fs.ls(","fs.exists(","fs.mkdir(",
         "fs.rm(","fs.cp(","fs.mv(","fs.stat(","fs.glob(","fs.help()",NULL}},
     {"@std/sys","sys",{"sys.sh(","sys.exec(","sys.env(","sys.kill(","sys.pid()","sys.sleep(",
@@ -127963,7 +129797,7 @@ static const EeModHint EE_MOD_HINTS[] = {
         "crypto.base64_enc(","crypto.base64_dec(","crypto.rand(","crypto.help()",NULL}},
     {"@std/db","db",{"db.open(","db.exec(","db.query(","db.close(","db.help()",NULL}},
     {"@std/web","web",{"web.serve(","web.stop()","web.route(","web.static(","web.help()",NULL}},
-    {"@std/ui","ui",{"ui.alert(","ui.input(","ui.menu(","ui.confirm(","ui.help()",NULL}},
+    {"@std/ui","ui",{"ui.color(","ui.box(","ui.clear(","ui.sleep(","ui.fig(","ui.input(","ui.help()",NULL}},
     {"@std/ms","ms",{"ms.help()",NULL}},
     {"@std/mod","mod",{"mod.xss(","mod.sqli(","mod.nosql(","mod.lfi(","mod.rce(",
         "mod.ssrf(","mod.ssti(","mod.redir(","mod.cors(","mod.csrf(","mod.jwt(",
@@ -127991,6 +129825,7 @@ static const EeModHint EE_MOD_HINTS[] = {
         "lx.alert(","lx.confirm(","lx.prompt(","lx.notify(","lx.filepick(","lx.dirpick(",
         "lx.print(","lx.tray(","lx.run()","lx.quit()","lx.after(","lx.every(","lx.cancel(",
         "lx.help()",NULL}},
+    {"@std/colors","colors",{NULL}},
     {"@std",NULL,{"net.tcp(","net.dns(","fs.read(","fs.write(","sys.sh(","ai.ask(",
         "crypto.md5(","db.open(","web.serve(","mod.xss(","tui.box(","ms.help()",NULL}},
     {NULL,NULL,{NULL}}
@@ -128144,7 +129979,57 @@ static void scan_file_requires(const char *prefix, int plen) {
     }
 }
 
-/* Lê ~/.elliot_ac_cache (escrito pelo REPL a cada Tab) */
+/* Verifica se o arquivo atual tem require() para o módulo base (ex: "net").
+ * Aceita tanto o nome do módulo (strip @std/) quanto o alias à esquerda do =:
+ *   local net  = require("@std/net")  → base "net"  ✓ (pelo nome)
+ *   local http = require("lua-http")  → base "http" ✓ (pelo alias) */
+static int file_has_module_required(const char *base) {
+    for(int y=0; y<E.numrows; y++) {
+        char *line = E.row[y].chars;
+        char *p = line;
+        while((p = strstr(p, "require(")) != NULL) {
+            char *rq = p;
+            p += 8;
+            while(*p==' '||*p=='\t') p++;
+            char q=0;
+            if(*p=='"'||*p=='\''){q=*p;p++;}
+            char modname[128]={0}; int mi=0;
+            while(*p && (q?*p!=q:(*p!=')'&&*p!=' ')) && mi<127)
+                modname[mi++]=*p++;
+            modname[mi]='\0';
+            if(!mi){ p++; continue; }
+            /* 1. Compara pelo nome do módulo (strip @std/) */
+            const char *cmp = modname;
+            if(!strncmp(cmp,"@std/",5)) cmp+=5;
+            if(!strcmp(cmp,base)) return 1;
+            /* 2. Compara pelo alias: local <alias> = require("qualquer-coisa") */
+            int rq_off = (int)(rq - line);
+            for(int ei=rq_off-1; ei>=0; ei--) {
+                if(line[ei]=='=') {
+                    int ae=ei-1;
+                    while(ae>=0&&(line[ae]==' '||line[ae]=='\t'))ae--;
+                    int as2=ae;
+                    while(as2>0&&(isalnum((unsigned char)line[as2-1])||line[as2-1]=='_'))as2--;
+                    int al=ae-as2+1;
+                    if(al>0 && al<64) {
+                        char alias[64]={0};
+                        memcpy(alias,line+as2,al);
+                        if(!strcmp(alias,base)) return 1;
+                    }
+                    break;
+                }
+                if(line[ei]==';'||line[ei]=='\n') break;
+            }
+            p++;
+        }
+    }
+    return 0;
+}
+
+/* Lê ~/.elliot_ac_cache (escrito pelo REPL a cada Tab).
+ * Dois passes:
+ *  1. Coleta quais nomes são módulos (têm ao menos uma entrada "base.algo")
+ *  2. Filtra: "base.algo" e o próprio "base" só entram se required no arquivo */
 static void scan_ac_cache(const char *prefix, int plen) {
     const char *home = getenv("HOME");
     if(!home) return;
@@ -128152,13 +130037,50 @@ static void scan_ac_cache(const char *prefix, int plen) {
     snprintf(path, sizeof(path), "%s/.elliot_ac_cache", home);
     FILE *f = fopen(path, "r");
     if(!f) return;
+
+    /* Passe 1: descobre nomes de módulo */
+#define MOD_SET_MAX 64
+    char mod_set[MOD_SET_MAX][64];
+    int  mod_set_n = 0;
     char line[256];
     while(fgets(line, sizeof(line), f)) {
         int l = (int)strlen(line);
         while(l>0 && (line[l-1]=='\n'||line[l-1]=='\r')) line[--l]='\0';
-        /* descarta entradas vazias ou que não começam com letra/_/@ */
+        if(l==0) continue;
+        const char *dot = strchr(line, '.');
+        if(dot && dot > line) {
+            int blen = (int)(dot - line);
+            if(blen > 0 && blen < 64 && mod_set_n < MOD_SET_MAX) {
+                char base[64]={0}; memcpy(base, line, blen);
+                int found=0;
+                for(int i=0;i<mod_set_n;i++) if(!strcmp(mod_set[i],base)){found=1;break;}
+                if(!found) memcpy(mod_set[mod_set_n++], base, blen+1);
+            }
+        }
+    }
+    rewind(f);
+
+    /* Passe 2: filtra e adiciona */
+    while(fgets(line, sizeof(line), f)) {
+        int l = (int)strlen(line);
+        while(l>0 && (line[l-1]=='\n'||line[l-1]=='\r')) line[--l]='\0';
         if(l==0) continue;
         if(!isalpha((unsigned char)line[0]) && line[0]!='_' && line[0]!='@') continue;
+        const char *dot = strchr(line, '.');
+        if(dot && dot > line) {
+            /* "net.tcp(" → base = "net" */
+            char base[64]={0};
+            int blen = (int)(dot - line);
+            if(blen < (int)sizeof(base)) {
+                memcpy(base, line, blen);
+                if(!file_has_module_required(base)) continue;
+            }
+        } else {
+            /* "net" sem ponto: só filtra se for nome de módulo */
+            int is_mod=0;
+            for(int i=0;i<mod_set_n;i++) if(!strcmp(mod_set[i],line)){is_mod=1;break;}
+            if(is_mod && !file_has_module_required(line)) continue;
+        }
         comp_add(line, prefix, plen);
     }
     fclose(f);
@@ -128241,10 +130163,10 @@ static void scan_current_file(const char *prefix, int plen) {
 static void comp_apply(void);  /* forward decl */
 static void comp_open(void) {
     /* ── Contextos especiais têm prioridade ── */
-    if (E.syntax && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {   /* C / C++ */
+    if (E.syntax && (E.syntax == &HLDB[0])) {   /* C / C++ */
         if (comp_open_include()) return;
     }
-    if (E.syntax && E.syntax == &HLDB[2]) {   /* Lua */
+    if (E.syntax && E.syntax == &HLDB[0]) {   /* Lua */
         if (comp_open_require()) return;
     }
 
@@ -128260,34 +130182,34 @@ static void comp_open(void) {
      * empurrava coisas como "print" pra fora das 12 linhas visíveis do
      * popup (COMPLETION_SHOW). */
 
-    /* 1. Símbolos do arquivo atual + módulos via require() */
-    scan_current_file(prefix, plen);
-    scan_file_requires(prefix, plen);
-
-    /* 2. COMPLETIONS[] fixo — sempre, independente do estado do cache/REPL.
-     * Builtins como print/pairs/string.* não podem depender de o REPL já
-     * ter rodado e de o cache calhar de ter algo com o mesmo prefixo;
-     * comp_add() já deduplica corretamente contra o que veio do cache. */
-    for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
-        comp_add(COMPLETIONS[i], prefix, plen);
-    }
-
-    /* 3. Keywords da sintaxe — sempre, cache não contém keywords.
-     * kw_preproc do Lua (lua_meth) é só nomes de método soltos, usados
-     * apenas para o highlight de "net.scan" etc — não faz sentido como
-     * candidato de completion sem o prefixo do módulo, então é excluído
-     * aqui (diferente de C/C++/Bash, onde kw_preproc são diretivas reais). */
+    /* 1. Keywords da sintaxe — primeiro: têm prioridade máxima.
+     * "do" deve aparecer antes de "dofile", "end" antes de qualquer
+     * símbolo com mesmo prefixo, etc.
+     * kw_preproc do Lua (lua_meth) é só nomes de método soltos — excluído.
+     * kw_types do Lua (lua_ns) = nomes de módulo: só entra se required. */
     if (E.syntax) {
-        int is_lua = (E.syntax == &HLDB[2]);
+        int is_lua = (E.syntax == &HLDB[0]);
         const char **lists[] = {
             E.syntax->kw_flow, E.syntax->kw_builtin,
             E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
         };
         for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++) {
+            int is_ns = is_lua && (lists[l] == E.syntax->kw_types);
             for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++) {
+                if (is_ns && !file_has_module_required(lists[l][j])) continue;
                 comp_add(lists[l][j], prefix, plen);
             }
         }
+    }
+
+    /* 2. Símbolos do arquivo atual + módulos via require() */
+    scan_current_file(prefix, plen);
+    scan_file_requires(prefix, plen);
+
+    /* 3. COMPLETIONS[] fixo — builtins/API ElliotOS.
+     * comp_add() já deduplica contra o que veio antes. */
+    for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
+        comp_add(COMPLETIONS[i], prefix, plen);
     }
 
     /* 4. Cache do REPL (_G em tempo real) — por último, é ruidoso */
@@ -128297,6 +130219,7 @@ static void comp_open(void) {
     E.comp.selected  = 0;
     E.comp.active    = 1;
     E.comp.trigger_cx = E.cx - plen;
+    E.comp.trigger_cy = E.cy;
     /* Match único: aplica direto sem mostrar popup */
     if (E.comp.count == 1) {
         comp_apply();
@@ -128306,10 +130229,10 @@ static void comp_open(void) {
 
 /* Como comp_open(), mas nunca auto-aplica — só exibe popup (live typing) */
 static void comp_open_live(void) {
-    if (E.syntax && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {
+    if (E.syntax && (E.syntax == &HLDB[0])) {
         if (comp_open_include()) return;
     }
-    if (E.syntax && E.syntax == &HLDB[2]) {
+    if (E.syntax && E.syntax == &HLDB[0]) {
         if (comp_open_require()) return;
     }
 
@@ -128318,24 +130241,28 @@ static void comp_open_live(void) {
     comp_close();
     if (plen < 1) return;
 
-    /* Ordem por relevância — ver comentário em comp_open() */
+    /* Keywords primeiro — ver comentário em comp_open().
+     * kw_types do Lua (lua_ns) = nomes de módulo: só entra se required. */
+    if (E.syntax) {
+        int is_lua = (E.syntax == &HLDB[0]);
+        const char **lists[] = {
+            E.syntax->kw_flow, E.syntax->kw_builtin,
+            E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
+        };
+        for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++) {
+            int is_ns = is_lua && (lists[l] == E.syntax->kw_types);
+            for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++) {
+                if (is_ns && !file_has_module_required(lists[l][j])) continue;
+                comp_add(lists[l][j], prefix, plen);
+            }
+        }
+    }
+
     scan_current_file(prefix, plen);
     scan_file_requires(prefix, plen);
 
     for (int i = 0; COMPLETIONS[i] && E.comp.count < COMPLETION_MAX; i++) {
         comp_add(COMPLETIONS[i], prefix, plen);
-    }
-    /* kw_flow/kw_builtin sempre — keywords não estão no cache do REPL.
-     * kw_preproc do Lua excluído — ver comentário em comp_open(). */
-    if (E.syntax) {
-        int is_lua = (E.syntax == &HLDB[2]);
-        const char **lists[] = {
-            E.syntax->kw_flow, E.syntax->kw_builtin,
-            E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
-        };
-        for (int l = 0; lists[l] && E.comp.count < COMPLETION_MAX; l++)
-            for (int j = 0; lists[l][j] && E.comp.count < COMPLETION_MAX; j++)
-                comp_add(lists[l][j], prefix, plen);
     }
 
     /* Cache do REPL (_G em tempo real) — por último, é ruidoso */
@@ -128353,11 +130280,14 @@ static void comp_open_live(void) {
     E.comp.selected   = 0;
     E.comp.active     = 1;
     E.comp.trigger_cx = E.cx - plen;
+    E.comp.trigger_cy = E.cy;
     /* Nunca auto-aplica: sempre mostra popup */
 }
 
 static void comp_apply(void) {
     if (!E.comp.active || E.comp.count == 0) return;
+    /* Se o cursor mudou de linha desde que o popup foi aberto, fecha sem aplicar */
+    if (E.cy != E.comp.trigger_cy) { comp_close(); return; }
     const char *item = E.comp.items[E.comp.selected];
     int ilen = (int)strlen(item);
 
@@ -128368,6 +130298,19 @@ static void comp_apply(void) {
     /* Apaga o prefixo digitado desde trigger_cx */
     for (int i = 0; i < plen; i++) row_del_char(&E.row[E.cy], E.comp.trigger_cx);
     E.cx = E.comp.trigger_cx;
+
+    /* Se item não termina em '(' mas existe versão com '(' em COMPLETIONS, usa ela */
+    char item_with_paren[260];
+    if (ilen > 0 && item[ilen-1] != '(' && ilen < (int)sizeof(item_with_paren)-2) {
+        snprintf(item_with_paren, sizeof(item_with_paren), "%s(", item);
+        for (int _ci = 0; COMPLETIONS[_ci]; _ci++) {
+            if (strcmp(COMPLETIONS[_ci], item_with_paren) == 0) {
+                item = item_with_paren;
+                ilen = (int)strlen(item);
+                break;
+            }
+        }
+    }
 
     /* Insere o item completo */
     if(ilen>0 && item[ilen-1]=='(' && strcmp(item,"require(")==0) {
@@ -128733,7 +130676,7 @@ static int line_ends_with_opener(Row *row) {
     /* pula trailing spaces */
     while (end > 0 && (s[end]==' '||s[end]=='\t')) end--;
     char last = s[end];
-    if (last == '{' || last == '(' || last == '[') return 1;
+    if (last == '{') return 1;
     /* Lua/Bash keywords: then, do, else, repeat */
     const char *kws[] = {"then","do","else","repeat","begin",NULL};
     for (int i = 0; kws[i]; i++) {
@@ -128755,6 +130698,38 @@ static void deindent_line(void) {
     for (int i = 0; i < sp; i++) row_del_char(row, 0);
     E.cx -= sp; if (E.cx < 0) E.cx = 0;
     E.dirty++;
+}
+
+/* ── Electric de-indent ─────────────────────────────────────────────────
+ * Quando o usuário termina de digitar else / elseif / end / until numa
+ * linha que já estava indentada, recua automaticamente um nível.
+ * Só age quando o cursor está no final da linha (evita falsos positivos
+ * ao editar o meio de uma linha) e quando o conteúdo da linha é
+ * exatamente a keyword — sem nada antes nem depois.
+ * ─────────────────────────────────────────────────────────────────────── */
+static void electric_deindent(void) {
+    if (E.cy >= E.numrows) return;
+    Row *row = &E.row[E.cy];
+    if (row->size == 0) return;
+    /* só age com cursor no final da linha */
+    if (E.cx != row->size) return;
+    /* pula espaços/tabs iniciais */
+    int lead = 0;
+    while (lead < row->size &&
+           (row->chars[lead] == ' ' || row->chars[lead] == '\t'))
+        lead++;
+    if (lead == 0) return;   /* sem indentação: nada a fazer */
+    char *tok  = row->chars + lead;
+    int   tlen = row->size  - lead;
+    /* keywords que pedem recuo em Lua */
+    const char *dk[] = { "else", "elseif", "end", "until", NULL };
+    for (int i = 0; dk[i]; i++) {
+        int kl = (int)strlen(dk[i]);
+        if (tlen == kl && strncmp(tok, dk[i], kl) == 0) {
+            deindent_line();   /* remove um nível (TAB_SIZE espaços) */
+            return;
+        }
+    }
 }
 
 /* ════════════════════════════════════════════════════════
@@ -129306,9 +131281,9 @@ static void format_code(void) {
         return;
     }
     undo_push();
-    if      (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) format_c();
-    else if (E.syntax == &HLDB[2]) format_lua();
-    else if (E.syntax == &HLDB[3]) format_bash();
+    if      (E.syntax == &HLDB[0]) format_c();
+    else if (E.syntax == &HLDB[1]) format_lua();
+    else if (E.syntax == &HLDB[2]) format_bash();
     else set_status("Formatador não disponível para esta linguagem");
 }
 
@@ -129531,6 +131506,7 @@ static int eis_is_ident_char(char c)  { return isalnum((unsigned char)c) || c=='
  * persiste entre chamadas (estado do bloco --[[ ]] entre
  * linhas). Linhas maiores que outsz-1 são truncadas (seguro,
  * só limita o alcance da heurística, nunca estoura buffer). */
+/* block_kind: 0=normal, 1=dentro de --[[ comentário longo, 2=dentro de [[ string longa */
 static void eis_strip_lua_line(Row *row, char *out, int outsz, int *block_kind) {
     int n = row->size; if (n >= outsz) n = outsz - 1;
     int oi = 0;
@@ -129540,6 +131516,7 @@ static void eis_strip_lua_line(Row *row, char *out, int outsz, int *block_kind) 
         char c = row->chars[x];
         char c2 = (x + 1 < n) ? row->chars[x+1] : 0;
 
+        /* dentro de bloco longo (comentário --[[ ou string [[): suprime tudo */
         if (*block_kind) {
             if (c == ']' && c2 == ']') { *block_kind = 0; x++; }
             continue;
@@ -129550,10 +131527,27 @@ static void eis_strip_lua_line(Row *row, char *out, int outsz, int *block_kind) 
             continue;
         }
         if (c == '-' && c2 == '-') {
+            /* --[[ : comentário longo multilinha */
             if (x + 3 < n && row->chars[x+2]=='[' && row->chars[x+3]=='[') {
                 *block_kind = 1; x += 3; continue;
             }
             break; /* -- até o fim da linha */
+        }
+        /* [[ : string longa multilinha (não precedida por --) */
+        if (c == '[' && c2 == '[') {
+            /* verifica se fecha na mesma linha */
+            int closing = -1;
+            for (int k = x+2; k+1 < n; k++) {
+                if (row->chars[k]==']' && row->chars[k+1]==']') { closing = k; break; }
+            }
+            if (closing >= 0) {
+                /* string longa inline: pula o conteúdo */
+                x = closing + 1;
+                continue;
+            } else {
+                /* abre bloco que fecha em outra linha */
+                *block_kind = 2; x += 1; continue;
+            }
         }
         if (c == '"' || c == '\'') { in_str = 1; str_q = c; continue; }
 
@@ -129914,14 +131908,13 @@ static void check_run_lua_unused(void) {
         }
         if (!used) {
             if (eis_decls[i].kind == 'L') {
+                /* variável local: certeza que não é usada neste arquivo */
                 eissue_add(eis_decls[i].line, 'W',
-                    "variável local '%s' é declarada mas nunca usada", name);
+                    "variável local '%s' declarada mas nunca lida — remova ou use '_ = %s' para silenciar", name, name);
             } else if (!has_ivar) {
-                /* Só avisa sobre globais não-lidas se o arquivo NÃO usa
-                 * sintaxe Ivar — caso contrário o acesso é via !N/!!N
-                 * e não aparece como o nome da variável no código. */
+                /* global de topo: pode ser lida por outro script via require() */
                 eissue_add(eis_decls[i].line, 'I',
-                    "'%s' é atribuída mas não parece ser lida neste arquivo (global — confira se outro script usa)", name);
+                    "'%s' (global) atribuída aqui mas não lida neste arquivo — ok se outro script acessa via require()", name);
             }
         }
     }
@@ -129944,6 +131937,20 @@ static void check_run_lua_undefined_calls(void) {
     int flagged_count = 0;
     int block_kind = 0;
 
+    /* Pre-scan: registra qualquer IDENT que aparece como LHS de atribuição
+     * (IDENT = ...) — são variáveis/callbacks locais, não chamadas estranhas */
+    int bk2 = 0;
+    for (int y2 = 0; y2 < E.numrows; y2++) {
+        char tmp[320];
+        eis_strip_lua_line(&E.row[y2], tmp, sizeof(tmp), &bk2);
+        int tp = 0; char lname[40];
+        if (eis_read_ident(tmp, &tp, lname, sizeof(lname)) && !eis_is_lua_keyword(lname)) {
+            while (tmp[tp]==' ') tp++;
+            if (tmp[tp]!='[' && tmp[tp]!='.' && tmp[tp]=='=' && tmp[tp+1]!='=')
+                eis_known_add(lname);
+        }
+    }
+
     for (int y = 0; y < E.numrows; y++) {
         char code[320];
         eis_strip_lua_line(&E.row[y], code, sizeof(code), &block_kind);
@@ -129962,19 +131969,20 @@ static void check_run_lua_undefined_calls(void) {
             char root[40];
             eis_read_ident(code, &p, root, sizeof(root));
 
-            /* se vier logo antes um '.' ou ':', isto não é a raiz da
-               cadeia (é um campo/método no meio) — não é candidato */
+            /* se vier logo antes um '.' ou ':', não é a raiz da cadeia */
             if (start > 0 && (code[start-1]=='.' || code[start-1]==':')) continue;
 
+            /* detecta cadeia: módulo.campo( ou módulo:método( */
             int q = p;
+            int has_chain = 0;
             while (code[q]=='.' || code[q]==':') {
-                q++;
+                has_chain = 1; q++;
                 char sub[40];
                 if (!eis_read_ident(code, &q, sub, sizeof(sub))) break;
             }
             while (code[q]==' ') q++;
 
-            if (code[q] != '(') continue; /* não é uma chamada, só um identificador solto */
+            if (code[q] != '(') continue; /* não é uma chamada */
             if (eis_is_lua_keyword(root)) continue;
             if (eis_known_contains(root)) continue;
 
@@ -129982,13 +131990,18 @@ static void check_run_lua_undefined_calls(void) {
             for (int i = 0; i < flagged_count; i++)
                 if (!strcmp(flagged[i], root)) { already = 1; break; }
             if (already) continue;
-            if (flagged_count < EIS_FLAGGED_MAX) {
+            if (flagged_count < EIS_FLAGGED_MAX)
                 snprintf(flagged[flagged_count++], sizeof(flagged[0]), "%s", root);
-            }
 
-            eissue_add(y+1, 'I',
-                "'%s' não é um módulo conhecido nem foi declarado neste arquivo — nome de função digitado errado?",
-                root);
+            if (has_chain) {
+                eissue_add(y+1, 'I',
+                    "'%s' usado como módulo (%s.func()) mas não declarado nem é @std — falta require('%s')?",
+                    root, root, root);
+            } else {
+                eissue_add(y+1, 'I',
+                    "função '%s()' não declarada neste arquivo nem é builtin — erro de digitação ou falta require()?",
+                    root);
+            }
         }
     }
 }
@@ -130083,6 +132096,534 @@ static void check_run_c_assign_in_cond(void) {
 /* ════════════════════════════════════════════════════════
  * DESPACHO POR LINGUAGEM + ENTRADA (Ctrl+E)
  * ════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS ESPECÍFICAS DE C/C++ — EXPANDIDAS
+ * ════════════════════════════════════════════════════════ */
+
+/* Helper: strip de comentários C/C++ numa linha (output em out).
+ * block_comment persiste entre chamadas. */
+static void c_strip_line(Row *row, char *out, int outsz, int *block_comment) {
+    int oi = 0, n = row->size < outsz-1 ? row->size : outsz-1;
+    int in_str = 0; char str_q = 0;
+    for (int x = 0; x < n; x++) {
+        char c = row->chars[x], c2 = x+1<n ? row->chars[x+1] : 0;
+        if (*block_comment) {
+            if (c=='*' && c2=='/') { *block_comment=0; x++; } continue;
+        }
+        if (in_str) {
+            if (c=='\\' && x+1<n) { x++; out[oi++]='?'; continue; }
+            if (c==str_q) in_str=0;
+            out[oi++]=' '; continue;
+        }
+        if (c=='/' && c2=='*') { *block_comment=1; x++; continue; }
+        if (c=='/' && c2=='/') break;
+        if (c=='"' || c=='\'') { in_str=1; str_q=c; out[oi++]=' '; continue; }
+        out[oi++]=c;
+    }
+    out[oi]='\0';
+}
+
+/* ── printf/fprintf com % mas sem args ── */
+static void check_run_c_printf(void) {
+    int bc = 0;
+    for (int y = 0; y < E.numrows; y++) {
+        Row *row = &E.row[y];
+        char code[512]; c_strip_line(row, code, sizeof(code), &bc);
+        /* procura printf( ou fprintf( na linha */
+        const char *fns[] = {"printf(","fprintf(","sprintf(","snprintf(","dprintf(",NULL};
+        for (int fi = 0; fns[fi]; fi++) {
+            const char *p = strstr(code, fns[fi]);
+            if (!p) continue;
+            p += strlen(fns[fi]);
+            /* para fprintf/snprintf pula o primeiro argumento */
+            if (fi==1||fi==3||fi==4) {
+                int depth=1;
+                while (*p && depth>0) { if(*p=='(')depth++; else if(*p==')')depth--; else if(*p==','&&depth==1){p++;break;} p++; }
+                while (*p==' ') p++;
+            }
+            /* agora p aponta para o início da string de formato */
+            if (*p != '"' && *p != '\'') continue; /* formato não literal: ignora */
+            char q = *p; p++;
+            /* varre a string buscando % que não seja %% */
+            int has_fmt = 0;
+            int arg_count = 0;
+            while (*p && *p != q) {
+                if (*p=='%' && *(p+1)!='%' && *(p+1)!='\0') has_fmt++;
+                p++;
+            }
+            if (!*p) continue; /* string não fechada */
+            p++; /* pula aspa de fechamento */
+            /* conta vírgulas no mesmo nível (= argumentos após o formato) */
+            int depth2 = 1;
+            /* conta vírgulas que ainda existem depois do formato */
+            while (*p && *p != ')') {
+                if (*p=='(') depth2++;
+                else if (*p==')') { depth2--; break; }
+                else if (*p==',' && depth2==1) arg_count++;
+                p++;
+            }
+            if (has_fmt > 0 && arg_count == 0)
+                eissue_add(y+1, 'W',
+                    "%s com %%%c na string mas sem argumentos — comportamento indefinido",
+                    fns[fi], 'd');
+        }
+    }
+}
+
+/* ── malloc/calloc/realloc sem free visível no arquivo ── */
+static void check_run_c_malloc_free(void) {
+    int malloc_count=0, free_count=0, malloc_line=0;
+    for (int y = 0; y < E.numrows; y++) {
+        const char *s = E.row[y].chars;
+        if (strstr(s,"malloc(") || strstr(s,"calloc(") || strstr(s,"realloc(")) {
+            malloc_count++;
+            if (malloc_line==0) malloc_line=y+1;
+        }
+        if (strstr(s,"free(")) free_count++;
+    }
+    if (malloc_count > 0 && free_count == 0)
+        eissue_add(malloc_line, 'W',
+            "%d alocação(ões) com malloc/calloc mas nenhum free() encontrado no arquivo",
+            malloc_count);
+}
+
+/* ── #include com caminho absoluto ── */
+static void check_run_c_include_abs(void) {
+    for (int y = 0; y < E.numrows; y++) {
+        const char *s = E.row[y].chars;
+        const char *p = strstr(s, "#include");
+        if (!p) continue;
+        p += 8; while (*p==' ') p++;
+        if (*p != '"') continue; /* <system> está ok */
+        p++;
+        if (*p=='/')
+            eissue_add(y+1, 'W',
+                "#include com caminho absoluto — use caminho relativo ou -I na compilação");
+    }
+}
+
+/* ── C++ específico ── */
+static void check_run_cpp_style(void) {
+    int bc=0;
+    for (int y = 0; y < E.numrows; y++) {
+        char code[512]; c_strip_line(&E.row[y], code, sizeof(code), &bc);
+        /* using namespace std */
+        if (strstr(code,"using namespace std"))
+            eissue_add(y+1, 'W',
+                "'using namespace std' polui o namespace global — prefira 'std::' explícito");
+        /* NULL em C++ (deve ser nullptr) */
+        const char *p = code;
+        while ((p = strstr(p,"NULL")) != NULL) {
+            int pre = (p==code || !eis_is_ident_char(p[-1]));
+            int pos = !eis_is_ident_char(p[4]);
+            if (pre && pos)
+                eissue_add(y+1, 'I',
+                    "use 'nullptr' em vez de NULL em C++ (mais seguro para sobrecarga)");
+            p += 4;
+        }
+        /* cast estilo C em C++: (Type)expr */
+        p = code;
+        while (*p) {
+            if (*p=='(') {
+                const char *q = p+1;
+                while (*q==' ') q++;
+                /* pega possível tipo */
+                if (eis_is_ident_start(*q) || *q=='*') {
+                    char tname[32]; int ti=0;
+                    while ((*q=='*'||*q==' '||eis_is_ident_char(*q)) && ti<31) tname[ti++]=*q++;
+                    tname[ti]='\0';
+                    while (*q==' ') q++;
+                    if (*q==')' && eis_is_ident_start(q[1])) {
+                        /* ignora casts de tipos básicos que são comuns */
+                        static const char *basic[]={"int","char","float","double","long","void","size_t","uint8_t","uint16_t","uint32_t","uint64_t",NULL};
+                        int is_basic=0;
+                        for (int i=0;basic[i];i++) if(strstr(tname,basic[i])){is_basic=1;break;}
+                        if (!is_basic && ti>2)
+                            eissue_add(y+1, 'I',
+                                "cast estilo C (%s) — prefira static_cast<>/reinterpret_cast<> em C++", tname);
+                    }
+                }
+            }
+            p++;
+        }
+    }
+}
+
+/* ── return sem valor em função não-void ── */
+static void check_run_c_bare_return(void) {
+    /* Heurística simples: se o arquivo tem alguma declaração de função não-void
+     * (linha com TIPO nome(...) { ), verifica se tem "return ;" (return sem valor) */
+    int bc=0, brace_depth=0;
+    int in_nonvoid = 0; /* estamos dentro de uma função que tem tipo de retorno */
+    for (int y = 0; y < E.numrows; y++) {
+        char code[512]; c_strip_line(&E.row[y], code, sizeof(code), &bc);
+        /* conta chaves */
+        for (int x=0; code[x]; x++) {
+            if (code[x]=='{') {
+                brace_depth++;
+                /* heurística: se a linha anterior tem TIPO nome( e não é void */
+                if (brace_depth==1 && y>0) {
+                    const char *prev = E.row[y>0?y-1:y].chars;
+                    if (!strstr(prev,"void ") && (strstr(prev,"int ")||strstr(prev,"char *")||
+                        strstr(prev,"static ")||strstr(prev,"size_t ")||strstr(prev,"bool ")))
+                        in_nonvoid = 1;
+                    else in_nonvoid = 0;
+                }
+            }
+            else if (code[x]=='}') { brace_depth--; if(brace_depth<=0){brace_depth=0;in_nonvoid=0;} }
+        }
+        if (in_nonvoid) {
+            const char *p = strstr(code,"return");
+            if (p) {
+                int pre=(p==code||!eis_is_ident_char(p[-1]));
+                int pos_idx=(int)(p-code)+6;
+                while(code[pos_idx]==' ') pos_idx++;
+                if (pre && (code[pos_idx]==';' || code[pos_idx]=='\0'))
+                    eissue_add(y+1,'W',"return sem valor em função com tipo de retorno não-void");
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS ESPECÍFICAS DE BASH
+ * ════════════════════════════════════════════════════════ */
+
+/* Remove comentários bash simples (# até fim da linha), exceto dentro de strings */
+static void bash_strip_line(Row *row, char *out, int outsz) {
+    int oi=0, n=row->size<outsz-1?row->size:outsz-1;
+    int in_str=0; char str_q=0;
+    for (int x=0; x<n; x++) {
+        char c=row->chars[x];
+        if (in_str) {
+            if (str_q=='"' && c=='$') { out[oi++]=c; continue; }
+            if (c=='\\' && x+1<n) { out[oi++]=c; out[oi++]=row->chars[++x]; continue; }
+            if (c==str_q) in_str=0;
+            out[oi++]=c; continue;
+        }
+        if (c=='"' || c=='\'') { in_str=1; str_q=c; out[oi++]=c; continue; }
+        if (c=='#') break; /* comentário */
+        out[oi++]=c;
+    }
+    out[oi]='\0';
+}
+
+/* ── Shebang correto na primeira linha ── */
+static void check_run_bash_shebang(void) {
+    if (E.numrows == 0) return;
+    const char *first = E.row[0].chars;
+    if (strncmp(first,"#!/",3)==0) {
+        /* tem shebang — verifica se é um intérprete razoável */
+        if (!strstr(first,"bash") && !strstr(first,"sh") && !strstr(first,"env"))
+            eissue_add(1,'W',"shebang não aponta para bash/sh — confira o intérprete");
+    } else if (first[0]=='#' && first[1]=='!') {
+        eissue_add(1,'W',"shebang malformado — deve começar com #!/");
+    } else {
+        eissue_add(1,'I',"sem shebang — adicione '#!/bin/bash' ou '#!/usr/bin/env bash' na linha 1");
+    }
+}
+
+/* ── Variável sem aspas dentro de [ ] (não [[ ]]) ── */
+static void check_run_bash_unquoted_var(void) {
+    for (int y=0; y<E.numrows; y++) {
+        char code[512]; bash_strip_line(&E.row[y], code, sizeof(code));
+        /* procura padrão: [ $VAR ou [ $VAR ] ou test $VAR */
+        const char *p = code;
+        /* busca por '[ ' (colchete simples) */
+        while ((p=strchr(p,'[')) != NULL) {
+            /* certifica que não é [[ ]] */
+            if (p[1]=='[') { p+=2; continue; }
+            p++;
+            /* dentro dos colchetes simples, procura $var sem aspas */
+            int depth=1;
+            while (*p && depth>0) {
+                if (*p=='[') depth++;
+                else if (*p==']') { depth--; break; }
+                else if (*p=='$' && p[1]!='(' && p[1]!='{' && p[-1]!='"') {
+                    eissue_add(y+1,'W',
+                        "variável $%c... sem aspas em [ ] — use \"$VAR\" para evitar word splitting",
+                        isalpha((unsigned char)p[1])?(char)p[1]:'?');
+                    break;
+                }
+                p++;
+            }
+        }
+    }
+}
+
+/* ── cd sem tratamento de erro ── */
+static void check_run_bash_cd_nocheck(void) {
+    for (int y=0; y<E.numrows; y++) {
+        char code[512]; bash_strip_line(&E.row[y], code, sizeof(code));
+        const char *p = strstr(code,"cd ");
+        if (!p) continue;
+        /* verifica se há && ou || ou ; set -e depois de cd na mesma linha */
+        const char *after = p+3;
+        while (*after && *after!=';' && !(*after=='&'&&after[1]=='&') && !(*after=='|'&&after[1]=='|')) after++;
+        if (*after==';' || *after=='\0') {
+            /* cd sem && nem || na linha — verifica se a linha seguinte tem algo */
+            eissue_add(y+1,'I',
+                "'cd' sem verificação de erro — considere: cd dir || exit 1");
+        }
+    }
+}
+
+/* ── echo -e (não portável) ── */
+static void check_run_bash_echo_e(void) {
+    for (int y=0; y<E.numrows; y++) {
+        char code[512]; bash_strip_line(&E.row[y], code, sizeof(code));
+        const char *p = strstr(code,"echo -e");
+        if (!p) continue;
+        int pre=(p==code||!eis_is_ident_char(p[-1]));
+        if (pre)
+            eissue_add(y+1,'I',"'echo -e' não é portável em sh — prefira printf para escape sequences");
+    }
+}
+
+/* ── Uso de $? depois de múltiplos comandos ── */
+static void check_run_bash_dollar_question(void) {
+    int last_cmd_line = -1;
+    for (int y=0; y<E.numrows; y++) {
+        char code[512]; bash_strip_line(&E.row[y], code, sizeof(code));
+        /* simplificação: se a linha tem $? e não é imediatamente após um único comando */
+        if (strstr(code,"$?")) {
+            if (last_cmd_line >= 0 && y - last_cmd_line > 1)
+                eissue_add(y+1,'I',
+                    "$? pode não refletir o comando esperado — captura logo após o comando");
+        }
+        /* linha com comando (heurística: tem palavras e não começa com #/if/while/for) */
+        {
+            char trimmed[512]; snprintf(trimmed,sizeof(trimmed),"%s",code);
+            eis_trim(trimmed);
+            if (trimmed[0] && trimmed[0]!='#' &&
+                strncmp(trimmed,"if ",3)&&strncmp(trimmed,"while ",6)&&
+                strncmp(trimmed,"for ",4)&&strncmp(trimmed,"fi",2)&&
+                strncmp(trimmed,"do",2)&&strncmp(trimmed,"done",4)&&
+                !strstr(trimmed,"$?"))
+                last_cmd_line=y;
+        }
+    }
+}
+
+/* ── Variável não inicializada usada (heurística: $VAR antes de VAR=) ── */
+static void check_run_bash_undef_var(void) {
+    /* Coleta todas as atribuições VAR= do arquivo */
+    #define BVAR_MAX 80
+    static char bvars[BVAR_MAX][40];
+    int bvar_count=0;
+
+    for (int y=0; y<E.numrows; y++) {
+        char code[512]; bash_strip_line(&E.row[y], code, sizeof(code));
+        /* atribuição: VAR= no início (sem $) */
+        int p=0; char name[40];
+        if (eis_read_ident(code,&p,name,sizeof(name)) && code[p]=='=') {
+            int dup=0;
+            for(int i=0;i<bvar_count;i++) if(!strcmp(bvars[i],name)){dup=1;break;}
+            if (!dup && bvar_count<BVAR_MAX)
+                snprintf(bvars[bvar_count++],sizeof(bvars[0]),"%s",name);
+        }
+    }
+    /* Verifica uso de $VAR que nunca tem atribuição */
+    static char flagged_bv[BVAR_MAX][40]; int flagged_bv_count=0;
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        const char *p=s;
+        while ((p=strchr(p,'$')) != NULL) {
+            p++;
+            if (*p=='{') p++;
+            if (!eis_is_ident_start(*p)) continue;
+            char name[40]; int ni=0;
+            while (eis_is_ident_char(*p) && ni<39) name[ni++]=*p++;
+            name[ni]='\0';
+            if (!ni) continue;
+            /* ignora variáveis especiais do bash */
+            static const char *special[]={"0","1","2","3","4","5","6","7","8","9",
+                "?","#","@","*","!","$","-","_","HOME","PATH","USER","PWD",
+                "BASH","BASH_VERSION","IFS","RANDOM","LINENO","FUNCNAME",
+                "PREFIX","OS_TYPE","HAS_REAL_ROOT",NULL};
+            int is_sp=0;
+            for(int i=0;special[i];i++) if(!strcmp(special[i],name)){is_sp=1;break;}
+            if(is_sp) continue;
+            /* verifica se tem atribuição em algum lugar */
+            int has_assign=0;
+            for(int i=0;i<bvar_count;i++) if(!strcmp(bvars[i],name)){has_assign=1;break;}
+            if (!has_assign) {
+                /* verifica se já foi reportada */
+                int dup=0;
+                for(int i=0;i<flagged_bv_count;i++) if(!strcmp(flagged_bv[i],name)){dup=1;break;}
+                if (!dup) {
+                    if(flagged_bv_count<BVAR_MAX)
+                        snprintf(flagged_bv[flagged_bv_count++],sizeof(flagged_bv[0]),"%s",name);
+                    eissue_add(y+1,'I',
+                        "$%s usada mas sem atribuição visível — parâmetro externo ou variável de ambiente?",
+                        name);
+                }
+            }
+        }
+    }
+}
+
+/* ════════════════════════════════════════════════════════
+ * CHECAGENS ESPECÍFICAS DE HTML
+ * ════════════════════════════════════════════════════════ */
+
+/* ── Tags que precisam ser fechadas (lista de block/inline comuns) ── */
+static void check_run_html_unclosed_tags(void) {
+    static const char *paired[] = {
+        "div","span","p","a","ul","ol","li","table","tr","td","th",
+        "thead","tbody","tfoot","form","button","select","option",
+        "textarea","section","article","header","footer","nav","main",
+        "h1","h2","h3","h4","h5","h6","script","style","head","body","html",
+        NULL
+    };
+    #define HTML_TAG_STACK 64
+    typedef struct { char tag[24]; int line; } HTagItem;
+    static HTagItem stack[HTML_TAG_STACK];
+    int sp=0;
+
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        const char *p=s;
+        while ((p=strchr(p,'<')) != NULL) {
+            p++;
+            int closing = (*p=='/');
+            if (closing) p++;
+            if (!isalpha((unsigned char)*p)) continue;
+            /* extrai nome da tag */
+            char tname[24]; int ti=0;
+            while ((isalpha((unsigned char)*p)||isdigit((unsigned char)*p)) && ti<23)
+                tname[ti++]=(char)tolower((unsigned char)*p++);
+            tname[ti]='\0';
+            /* verifica se é paired */
+            int is_paired=0;
+            for(int i=0;paired[i];i++) if(!strcmp(paired[i],tname)){is_paired=1;break;}
+            if (!is_paired) continue;
+            /* auto-fechamento: <tag ... /> */
+            while(*p && *p!='>') {
+                if (*p=='/' && p[1]=='>') { closing=2; break; }
+                p++;
+            }
+            if (closing==2) continue; /* auto-fechada */
+            if (!closing) {
+                if (sp<HTML_TAG_STACK) { snprintf(stack[sp].tag,24,"%s",tname); stack[sp].line=y+1; sp++; }
+            } else {
+                /* fecha — procura no stack */
+                int found=-1;
+                for(int i=sp-1;i>=0;i--) if(!strcmp(stack[i].tag,tname)){found=i;break;}
+                if (found<0) {
+                    eissue_add(y+1,'E',"</%s> sem <opening> correspondente",tname);
+                } else {
+                    /* remove e verifica se havia algo entre */
+                    if (found<sp-1) {
+                        eissue_add(y+1,'W',"</%s> fecha tag aberta na linha %d, mas <%s> (linha %d) ainda está aberta",
+                            tname,stack[found].line,stack[sp-1].tag,stack[sp-1].line);
+                    }
+                    /* pop até found */
+                    sp=found;
+                }
+            }
+        }
+    }
+    for(int i=0;i<sp;i++)
+        eissue_add(stack[i].line,'E',"<%s> aberta na linha %d nunca foi fechada",stack[i].tag,stack[i].line);
+}
+
+/* ── <img> sem alt ── */
+static void check_run_html_img_alt(void) {
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        const char *p=strstr(s,"<img");
+        if (!p) continue;
+        /* verifica se tem alt= na mesma tag */
+        const char *end=strchr(p,'>');
+        if (!end) end=s+E.row[y].size;
+        int has_alt=0;
+        for(const char *q=p;q<end;q++) {
+            if (strncmp(q,"alt=",4)==0||strncmp(q,"alt =",5)==0) { has_alt=1; break; }
+        }
+        if (!has_alt)
+            eissue_add(y+1,'W',"<img> sem atributo alt — obrigatório para acessibilidade");
+    }
+}
+
+/* ── Atributos sem aspas ── */
+static void check_run_html_unquoted_attr(void) {
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        const char *p=s;
+        while ((p=strchr(p,'<')) != NULL) {
+            p++;
+            if (!isalpha((unsigned char)*p)) continue;
+            /* dentro da tag: procura ATTR=VALOR_SEM_ASPAS */
+            while (*p && *p!='>') {
+                if (*p=='=') {
+                    char prev[32]=""; int pi=0;
+                    const char *q=p-1;
+                    while(q>=s && (isalnum((unsigned char)*q)||*q=='-'||*q=='_')) {prev[pi++]=(char)*q--;} prev[pi]='\0';
+                    const char *after=p+1;
+                    if (*after && *after!='"' && *after!='\'' && *after!='>' && !isspace((unsigned char)*after)) {
+                        eissue_add(y+1,'W',"atributo HTML sem aspas ('=' seguido de valor sem \"...\") — pode quebrar parsers");
+                        break;
+                    }
+                }
+                /* pula strings para não confundir */
+                if (*p=='"' || *p=='\'') {
+                    char q=*p; p++;
+                    while(*p && *p!=q) p++;
+                }
+                if (*p) p++;
+            }
+        }
+    }
+}
+
+/* ── charset faltando no <head> ── */
+static void check_run_html_charset(void) {
+    int has_charset=0, has_head=0;
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        if (strstr(s,"<head")) has_head=1;
+        if (strstr(s,"charset")) { has_charset=1; break; }
+    }
+    if (has_head && !has_charset)
+        eissue_add(1,'W',"<head> sem declaração de charset — adicione <meta charset=\"UTF-8\">");
+}
+
+/* ── Tags obsoletas/depreciadas ── */
+static void check_run_html_deprecated(void) {
+    static const char *depr[] = {"<center","<font","<marquee","<blink","<frame","<frameset","<strike",NULL};
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        for(int i=0;depr[i];i++) {
+            if (strcasestr(s,depr[i]))
+                eissue_add(y+1,'W',"tag HTML obsoleta '%s' — substituída por CSS moderno",depr[i]+1);
+        }
+    }
+}
+
+/* ── <script> sem fechar ── */
+static void check_run_html_script_close(void) {
+    int open_script=-1;
+    for (int y=0; y<E.numrows; y++) {
+        const char *s=E.row[y].chars;
+        if (strcasestr(s,"<script") && !strcasestr(s,"</script")) {
+            if (open_script<0) open_script=y+1;
+        }
+        if (strcasestr(s,"</script")) open_script=-1;
+    }
+    if (open_script>0)
+        eissue_add(open_script,'E',"<script> aberta na linha %d sem </script> correspondente",open_script);
+}
+
+/* ── doctype faltando ── */
+static void check_run_html_doctype(void) {
+    if (E.numrows==0) return;
+    const char *first=E.row[0].chars;
+    if (strncasecmp(first,"<!DOCTYPE",9)!=0)
+        eissue_add(1,'I',"sem <!DOCTYPE html> na primeira linha");
+}
+
+
 
 /* ════════════════════════════════════════════════════════
  * CHECK: módulos require() — verifica existência no disco e @std
@@ -130094,7 +132635,7 @@ static const char *ELLIOT_STD_MODS[] = {
     "@std/db", "@std/web", "@std/ui", "@std/ms", "@std/re", "@std/util",
     "@std/log", "@std/csv", "@std/json", "@std/mod", "@std/tui", "@std/ivar",
     "@std/exploit", "@std/pent", "@std/adb", "@std/agent", "@std/lmod",
-    "@std/sh", "@std/cc", "@std/try", "@std/lx", "@std/color", "@std/num",
+    "@std/sh", "@std/cc", "@std/try", "@std/lx", "@std/colors", "@std/num",
     "@std/path", "@std/test", "@std/queue", "@std/stack", "@std/table",
     NULL
 };
@@ -130264,8 +132805,13 @@ static void check_run_all(void) {
     check_run_mixed_indent();
     check_run_markers();
 
-    int is_c   = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
-    int is_lua = (E.syntax == &HLDB[2]);
+    int is_c    = (E.syntax == &HLDB[0]);
+    int is_cpp  = (E.syntax == &HLDB[0] && E.filename &&
+                 (strstr(E.filename,".cpp")||strstr(E.filename,".cc")||
+                  strstr(E.filename,".cxx")||strstr(E.filename,".hpp")));
+    int is_lua  = (E.syntax == &HLDB[0]);
+    int is_bash = (E.syntax == &HLDB[2]);
+    int is_html = (E.syntax == &HLDB[3]);
 
     if (is_lua) {
         snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Lua/ElliotOS");
@@ -130274,11 +132820,30 @@ static void check_run_all(void) {
         check_run_lua_undefined_calls();
         check_run_lua_modules();
     } else if (is_c) {
-        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "%s",
-                 (E.syntax == &HLDB[1]) ? "C++" : "C");
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "%s", is_cpp ? "C++" : "C");
         check_run_c_assign_in_cond();
-    } else if (E.syntax == &HLDB[3]) {
+        check_run_c_printf();
+        check_run_c_malloc_free();
+        check_run_c_include_abs();
+        check_run_c_bare_return();
+        if (is_cpp) check_run_cpp_style();
+    } else if (is_bash) {
         snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Bash");
+        check_run_bash_shebang();
+        check_run_bash_unquoted_var();
+        check_run_bash_cd_nocheck();
+        check_run_bash_echo_e();
+        check_run_bash_dollar_question();
+        check_run_bash_undef_var();
+    } else if (is_html) {
+        snprintf(g_eissue_lang, sizeof(g_eissue_lang), "HTML");
+        check_run_html_doctype();
+        check_run_html_charset();
+        check_run_html_unclosed_tags();
+        check_run_html_img_alt();
+        check_run_html_unquoted_attr();
+        check_run_html_script_close();
+        check_run_html_deprecated();
     } else {
         snprintf(g_eissue_lang, sizeof(g_eissue_lang), "Genérico");
     }
@@ -130324,6 +132889,21 @@ static void check_code(void) {
  * painel de snippets (Ctrl+I): título, lista com badge colorido
  * por severidade, separador, preview da linha de código
  * apontada, e rodapé com dicas de navegação. */
+/* Apaga uma região retangular do terminal antes de desenhar um pop-up.
+ * Evita "fantasmas" de frames anteriores quando o painel muda de tamanho.
+ * row/col são 1-indexed (coordenadas de terminal). */
+static void ab_clear_region(Abuf *ab, int row, int col, int width, int height) {
+    char blank[256];
+    int w = width < (int)sizeof(blank)-1 ? width : (int)sizeof(blank)-1;
+    memset(blank, ' ', w); blank[w] = '\0';
+    for (int r = 0; r < height; r++) {
+        char pos[32];
+        snprintf(pos, sizeof(pos), "\x1b[%d;%dH\x1b[m", row + r, col);
+        ab_append(ab, pos, strlen(pos));
+        ab_append(ab, blank, w);
+    }
+}
+
 static void draw_check_panel(Abuf *ab) {
     if (!g_eissue_active || g_eissue_count == 0) return;
 
@@ -130336,6 +132916,7 @@ static void draw_check_panel(Abuf *ab) {
     if (panel_col < 1) panel_col = 1;
     int panel_row = (E.rows - total_h) / 2;
     if (panel_row < 1) panel_row = 1;
+
 
     const char *C_TITLE_BG  = "\x1b[48;5;53m";   /* roxo escuro */
     const char *C_TITLE_FG  = "\x1b[38;5;215m";  /* dourado */
@@ -130367,6 +132948,16 @@ static void draw_check_panel(Abuf *ab) {
         for(int s=tl;s<panel_w;s++) ab_append(ab," ",1);
         ab_append(ab,C_RST,strlen(C_RST));
     }
+
+    /* apaga linhas extras do frame anterior se o painel encolheu */
+    static int eissue_last_total_h = 0;
+    if (eissue_last_total_h > total_h) {
+        for (int er = panel_row + total_h; er < panel_row + eissue_last_total_h; er++) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH\x1b[K",er,panel_col);
+            ab_append(ab,pos,strlen(pos));
+        }
+    }
+    eissue_last_total_h = total_h;
 
     if (g_eissue_sel < g_eissue_scroll) g_eissue_scroll = g_eissue_sel;
     if (g_eissue_sel >= g_eissue_scroll + list_h) g_eissue_scroll = g_eissue_sel - list_h + 1;
@@ -131211,10 +133802,10 @@ static int snip_vis_count = 0;
 static void snip_build_list(void) {
     snip_vis_count = 0;
     int lang = -1;
-    if (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) lang = 0;
-    else if (E.syntax == &HLDB[2]) lang = 1;
-    else if (E.syntax == &HLDB[3]) lang = 2;
-    else if (E.syntax == &HLDB[4]) lang = 4;
+    if (E.syntax == &HLDB[0]) lang = 0;      /* C/C++ */
+    else if (E.syntax == &HLDB[1]) lang = 1; /* Lua   */
+    else if (E.syntax == &HLDB[2]) lang = 2; /* Bash  */
+    else if (E.syntax == &HLDB[3]) lang = 3; /* HTML  */
 
     for (int i = 0; i < SNIP_TOTAL && snip_vis_count < SNIP_COUNT; i++) {
         if (g_snips[i].lang == 3 || g_snips[i].lang == lang)
@@ -131433,6 +134024,7 @@ static void draw_fexp_panel(Abuf *ab) {
     int panel_row = (E.rows - panel_h - 3) / 2;
     if (panel_row < 2) panel_row = 2;
 
+
     /* título com path atual */
     {
         char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
@@ -131582,8 +134174,8 @@ static void snip_badge(int si, char *badge, int bsz, char *origin, int osz) {
     int lang         = g_snips[si].lang;
 
     /* origem da linguagem base */
-    const char *lang_str = (lang==0)?"C":(lang==1)?"Lua":(lang==2)?"Bash":
-                           (lang==4)?"HTML":"*";
+    const char *lang_str = (lang==0)?"C/C++":(lang==1)?"Lua":(lang==2)?"Bash":
+                           (lang==3)?"HTML":"*";
 
     /* prefixos ElliotOS explícitos: "ElliotOS: ..." ou "ElliotOS: mod..." */
     if (strncmp(name,"ElliotOS:",9)==0) {
@@ -131668,6 +134260,18 @@ static void draw_snip_panel(Abuf *ab) {
     if (panel_col < 1) panel_col = 1;
     int panel_row = (E.rows - total_h) / 2;
     if (panel_row < 1) panel_row = 1;
+
+    ab_clear_region(ab, panel_row, panel_col, panel_w, total_h);
+
+    /* apaga linhas extras se painel encolheu */
+    static int snip_last_total_h = 0;
+    if (snip_last_total_h > total_h) {
+        for (int sr = panel_row + total_h; sr < panel_row + snip_last_total_h; sr++) {
+            char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH\x1b[K",sr,panel_col);
+            ab_append(ab,pos,strlen(pos));
+        }
+    }
+    snip_last_total_h = total_h;
 
     /* cores base */
     const char *C_TITLE_BG  = "\x1b[48;5;17m";   /* azul escuro */
@@ -131912,9 +134516,9 @@ static char      g_goto_word[64];
 /* Procura definições do símbolo no arquivo */
 static void goto_find(const char *word) {
     g_goto_count = 0;
-    int is_lua  = (E.syntax == &HLDB[2]);
-    int is_c    = (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]);
-    int is_bash = (E.syntax == &HLDB[3]);
+    int is_lua  = (E.syntax == &HLDB[0]);
+    int is_c    = (E.syntax == &HLDB[0]);
+    int is_bash = (E.syntax == &HLDB[2]);
 
     for (int y = 0; y < E.numrows && g_goto_count < GOTO_MAX; y++) {
         char *s = E.row[y].chars;
@@ -132017,6 +134621,7 @@ static void draw_goto_panel(Abuf *ab) {
     if (panel_col < 1) panel_col = 1;
     int panel_row = 2;
 
+
     /* título */
     {
         char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
@@ -132071,55 +134676,54 @@ static void draw_goto_panel(Abuf *ab) {
     }
 }
 
+/* ── Estado do seletor de linguagem (Ctrl+L) ── */
+static int g_lang_active = 0;
+static int g_lang_sel    = 0;
+
 static void choose_language(void) {
-    /* Nomes e índices no HLDB */
-    const char *names[] = { "C", "C++", "Lua/ElliotOS", "Bash", "HTML", NULL };
-    int n = 5;
-    int sel = 0;
+    /* descobre seleção atual e abre o painel */
+    g_lang_sel = 0;
+    for (int i = 0; i < 4; i++)
+        if (E.syntax == &HLDB[i]) { g_lang_sel = i; break; }
+    g_lang_active = 1;
+}
 
-    /* descobre seleção atual */
-    for (int i = 0; i < n; i++)
-        if (E.syntax == &HLDB[i]) { sel = i; break; }
+/* Desenha o painel do seletor de linguagem (chamado em refresh_screen) */
+static void draw_lang_panel(Abuf *ab) {
+    if (!g_lang_active) return;
 
-    /* loop de menu inline na status bar */
-    while (1) {
-        /* Monta string de menu */
-        char menu[512];
-        int mi = 0;
-        mi += snprintf(menu+mi, sizeof(menu)-mi, "Linguagem: ");
-        for (int i = 0; i < n; i++) {
-            if (i == sel)
-                mi += snprintf(menu+mi, sizeof(menu)-mi,
-                               "\x1b[48;5;99m\x1b[38;5;255m\x1b[1m %s \x1b[m", names[i]);
-            else
-                mi += snprintf(menu+mi, sizeof(menu)-mi,
-                               "\x1b[38;5;141m %s \x1b[m", names[i]);
-            if (i < n-1)
-                mi += snprintf(menu+mi, sizeof(menu)-mi, "│");
-        }
-        mi += snprintf(menu+mi, sizeof(menu)-mi,
-                       "  \x1b[38;5;141m← → mover  Enter confirmar  Esc cancelar\x1b[m");
+    static const char *names[] = { "C/C++", "Lua/ElliotOS", "Bash", "HTML" };
+    const int n = 4;
 
-        snprintf(E.statusmsg, sizeof(E.statusmsg), "%s", menu);
-        E.statusmsg_time = time(NULL) + 9999; /* mantém visível */
-        refresh_screen();
+    /* calcula largura total do menu */
+    int total_w = 12; /* "Linguagem: " */
+    for (int i = 0; i < n; i++) total_w += (int)strlen(names[i]) + 3; /* " X " + "│" */
+    total_w += 2; /* sem último separador */
+    int panel_col = (E.cols - total_w) / 2;
+    if (panel_col < 1) panel_col = 1;
+    int panel_row = E.rows + 1; /* linha de status msg */
 
-        int c = read_key();
-        if (c == ARROW_LEFT  || c == CTRL('h')) { sel = (sel - 1 + n) % n; }
-        else if (c == ARROW_RIGHT || c == '\t') { sel = (sel + 1) % n;     }
-        else if (c == '\r') {
-            E.syntax = &HLDB[sel];
-            for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
-            snprintf(E.statusmsg, sizeof(E.statusmsg),
-                     "\x1b[32m✓\x1b[m Linguagem: %s", names[sel]);
-            E.statusmsg_time = time(NULL);
-            return;
-        }
-        else if (c == '\x1b') {
-            set_status("Seleção cancelada");
-            return;
-        }
+
+    char pos[32]; snprintf(pos, sizeof(pos), "\x1b[%d;%dH", panel_row, 1);
+    ab_append(ab, pos, strlen(pos));
+    ab_append(ab, "\x1b[K", 3); /* apaga linha toda */
+
+    /* posiciona e desenha */
+    snprintf(pos, sizeof(pos), "\x1b[%d;%dH", panel_row, panel_col);
+    ab_append(ab, pos, strlen(pos));
+
+    ab_append(ab, "\x1b[38;5;245mLinguagem: \x1b[m", 26);
+    for (int i = 0; i < n; i++) {
+        if (i == g_lang_sel)
+            ab_append(ab, "\x1b[48;5;99m\x1b[38;5;255m\x1b[1m", 25);
+        else
+            ab_append(ab, "\x1b[48;5;237m\x1b[38;5;141m", 21);
+        ab_append(ab, " ", 1);
+        ab_append(ab, names[i], strlen(names[i]));
+        ab_append(ab, " \x1b[m", 4);
+        if (i < n-1) ab_append(ab, "\x1b[38;5;240m│\x1b[m", 16);
     }
+    ab_append(ab, "  \x1b[38;5;241m← → mover  Enter confirmar  Esc cancelar\x1b[m", 57);
 }
 
 
@@ -132548,7 +135152,7 @@ static void move_cursor(int k) {
             else if (row && E.cx == row->size && E.cy < E.numrows-1) { E.cy++; E.cx = 0; }
             break;
         case ARROW_UP:   if (E.cy > 0) E.cy--;         break;
-        case ARROW_DOWN: if (E.cy < E.numrows) E.cy++;  break;
+        case ARROW_DOWN: if (E.cy < E.numrows - 1) E.cy++;  break;
     }
     row = (E.cy < E.numrows) ? &E.row[E.cy] : NULL;
     int rlen = row ? row->size : 0;
@@ -132627,9 +135231,10 @@ static void draw_rows(Abuf *ab) {
                 int is_bracket_match = (bmatch_cy == fr && bmatch_cx == abs_col);
                 int is_cursor_bracket = (fr == E.cy && abs_col == E.cx && bmatch_cy >= 0);
                 if ((is_bracket_match || is_cursor_bracket) && !E.sel_active) {
-                    ab_append(ab, "\x1b[48;5;58m\x1b[38;5;226m\x1b[1m", 24); /* amarelo bold em fundo oliva */
+                    ab_append(ab, "\x1b[48;5;58m\x1b[38;5;226m\x1b[1m", 25); /* amarelo bold em fundo oliva */
                     ab_append(ab, &ch[j], 1);
                     ab_append(ab, "\x1b[0m", 4);
+                    cur_color = -1;
                     continue;
                 }
 
@@ -132803,10 +135408,10 @@ static int sym_extract_name(const char *s, int skip,
 
 static void sym_collect(void) {
     g_sym_count = 0;
-    int is_c    = (E.syntax==&HLDB[0]||E.syntax==&HLDB[1]);
-    int is_lua  = (E.syntax==&HLDB[2]);
-    int is_bash = (E.syntax==&HLDB[3]);
-    int is_html = (E.syntax==&HLDB[4]);
+    int is_c    = (E.syntax==&HLDB[0]);
+    int is_lua  = (E.syntax==&HLDB[0]);
+    int is_bash = (E.syntax==&HLDB[2]);
+    int is_html = (E.syntax==&HLDB[3]);
 
     for (int y = 0; y < E.numrows && g_sym_count < SYM_MAX; y++) {
         char *s = E.row[y].chars;
@@ -132946,6 +135551,7 @@ static void draw_sym_panel(Abuf *ab) {
     if (panel_col < 1) panel_col = 1;
     int panel_row = 1;
 
+
     /* título */
     {
         char pos[32]; snprintf(pos,sizeof(pos),"\x1b[%d;%dH",panel_row,panel_col);
@@ -133060,6 +135666,7 @@ static void draw_completion(Abuf *ab) {
     if (start + show > E.comp.count) start = E.comp.count - show;
     if (start < 0) start = 0;
 
+
     for (int i = 0; i < show; i++) {
         int idx = start + i;
         int row = popup_row + i;
@@ -133103,6 +135710,7 @@ void refresh_screen(void) {
     draw_fexp_panel(&ab);
     draw_goto_panel(&ab);
     draw_sym_panel(&ab);
+    draw_lang_panel(&ab);
     /* posiciona cursor */
     char buf[32];
     snprintf(buf, sizeof(buf), "\x1b[%d;%dH",
@@ -133123,17 +135731,37 @@ static void set_status(const char *fmt, ...) {
     vsnprintf(E.statusmsg, sizeof(E.statusmsg), fmt, ap);
     va_end(ap);
     E.statusmsg_time = time(NULL);
+    g_needs_redraw = 1;
 }
 
 static void process_key(void) {
     static int quit_times = 1;
     int c = read_key();
-    if (c == 0) return; /* timeout de 100ms — só redesenha, sem input */
+    if (c == 0) return; /* timeout sem input — não redesenha */
+    g_needs_redraw = 1; /* qualquer tecla real → redesenha */
 
     /* ── painel de checagem ativo (Ctrl+E): intercepta navegação ──
        mesmo padrão do painel de goto (Ctrl+J): navegação com setas,
        Enter confirma e fecha, Esc ou qualquer outra tecla fecha.
        Nenhuma leitura de teclado própria — usa o read_key() acima. ── */
+    if (g_lang_active) {
+        if (c == ARROW_LEFT || c == CTRL('h')) {
+            g_lang_sel = (g_lang_sel - 1 + 4) % 4;
+        } else if (c == ARROW_RIGHT || c == '\t') {
+            g_lang_sel = (g_lang_sel + 1) % 4;
+        } else if (c == '\r') {
+            g_lang_active = 0;
+            E.syntax = &HLDB[g_lang_sel];
+            for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
+            static const char *lnames[] = { "C/C++", "Lua/ElliotOS", "Bash", "HTML" };
+            set_status("\x1b[32m✓\x1b[m Linguagem: %s", lnames[g_lang_sel]);
+        } else if (c == '\x1b' || c == CTRL('l')) {
+            g_lang_active = 0;
+            set_status("Seleção cancelada");
+        }
+        return;
+    }
+
     if (g_eissue_active) {
         switch (c) {
             case ARROW_DOWN:
@@ -133349,8 +135977,32 @@ static void process_key(void) {
                 if (E.comp.selected < 0) E.comp.selected = E.comp.count-1;
                 return;
             case '\r':
-            case '\t':
-                undo_push(); comp_apply(); return;
+            case '\t': {
+                /* Captura o item antes de comp_apply() fechar o popup */
+                char comp_item[256] = {0};
+                if (E.comp.active && E.comp.count > 0) {
+                    const char *ci = E.comp.items[E.comp.selected];
+                    int cil = (int)strlen(ci);
+                    if (cil >= (int)sizeof(comp_item)) cil = (int)sizeof(comp_item)-1;
+                    memcpy(comp_item, ci, cil);
+                    comp_item[cil] = '\0';
+                }
+                undo_push(); comp_apply();
+                /* Se é keyword de bloco Lua, insere nova linha após completar */
+                if (comp_item[0]) {
+                    static const char *nl_kws[] = {
+                        "end","else","then","do","repeat","elseif","until",
+                        "tryend","tryelse","tryelseif", NULL
+                    };
+                    for (int _ki = 0; nl_kws[_ki]; _ki++) {
+                        if (strcmp(comp_item, nl_kws[_ki]) == 0) {
+                            insert_newline();
+                            break;
+                        }
+                    }
+                }
+                return;
+            }
             case '\x1b':
                 comp_close(); return;
             default:
@@ -133364,7 +136016,7 @@ static void process_key(void) {
         /* ── Enter ── */
         case '\r': {
             /* HTML: se linha atual é apenas "!" → expande para template HTML5 */
-            if (E.syntax == &HLDB[4] && E.cy < E.numrows) {
+            if (E.syntax == &HLDB[3] && E.cy < E.numrows) {
                 Row *cur = &E.row[E.cy];
                 /* trim espaços */
                 int ts = 0, te = cur->size - 1;
@@ -133426,14 +136078,17 @@ static void process_key(void) {
                     break;
                 }
             }
-            /* C: linha "!" → template main() */
+            /* C/C++: linha "!" → template main() (C ou C++ pela extensão) */
             if ((E.syntax == &HLDB[0]) && E.cy < E.numrows) {
                 Row *cur = &E.row[E.cy];
                 int ts = 0, te = cur->size - 1;
                 while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
                 while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
                 if (te - ts == 0 && cur->chars[ts] == '!') {
-                    const char *tpl[] = {
+                    int use_cpp = (E.filename &&
+                        (strstr(E.filename,".cpp")||strstr(E.filename,".cc")||
+                         strstr(E.filename,".cxx")||strstr(E.filename,".hpp")));
+                    const char *tpl_c[] = {
                         "#include <stdio.h>",
                         "#include <stdlib.h>",
                         "#include <string.h>",
@@ -133444,24 +136099,7 @@ static void process_key(void) {
                         "}",
                         NULL
                     };
-                    int orig_cy = E.cy; del_row(orig_cy);
-                    int ti = 0;
-                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
-                    E.cy = orig_cy + 5; E.cx = 12; E.rowoff = orig_cy;
-                    for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
-                    E.dirty = 1;
-                    set_status("\x1b[32m✓\x1b[m Template C inserido — Ctrl+S para salvar");
-                    break;
-                }
-            }
-            /* C++: linha "!" → template main() C++ */
-            if ((E.syntax == &HLDB[1]) && E.cy < E.numrows) {
-                Row *cur = &E.row[E.cy];
-                int ts = 0, te = cur->size - 1;
-                while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
-                while (te >= ts && (cur->chars[te]==' '||cur->chars[te]=='\t')) te--;
-                if (te - ts == 0 && cur->chars[ts] == '!') {
-                    const char *tpl[] = {
+                    const char *tpl_cpp[] = {
                         "#include <iostream>",
                         "#include <string>",
                         "#include <vector>",
@@ -133472,18 +136110,20 @@ static void process_key(void) {
                         "}",
                         NULL
                     };
+                    const char **tpl = use_cpp ? tpl_cpp : tpl_c;
                     int orig_cy = E.cy; del_row(orig_cy);
-                    int ti = 0;
-                    for (; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
-                    E.cy = orig_cy + 5; E.cx = 16; E.rowoff = orig_cy;
+                    for (int ti = 0; tpl[ti]; ti++) insert_row(orig_cy+ti, tpl[ti], (int)strlen(tpl[ti]));
+                    E.cy = orig_cy + (use_cpp ? 5 : 5);
+                    E.cx = use_cpp ? 16 : 12; E.rowoff = orig_cy;
                     for (int r = 0; r < E.numrows; r++) update_syntax(&E.row[r]);
                     E.dirty = 1;
-                    set_status("\x1b[32m✓\x1b[m Template C++ inserido — Ctrl+S para salvar");
+                    set_status("\x1b[32m✓\x1b[m Template %s inserido — Ctrl+S para salvar",
+                               use_cpp ? "C++" : "C");
                     break;
                 }
             }
             /* Lua/ElliotOS: linha "!" → template script Lua */
-            if ((E.syntax == &HLDB[2]) && E.cy < E.numrows) {
+            if ((E.syntax == &HLDB[0]) && E.cy < E.numrows) {
                 Row *cur = &E.row[E.cy];
                 int ts = 0, te = cur->size - 1;
                 while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
@@ -133510,7 +136150,7 @@ static void process_key(void) {
                 }
             }
             /* Bash: linha "!" → template script shell */
-            if ((E.syntax == &HLDB[3]) && E.cy < E.numrows) {
+            if ((E.syntax == &HLDB[2]) && E.cy < E.numrows) {
                 Row *cur = &E.row[E.cy];
                 int ts = 0, te = cur->size - 1;
                 while (ts <= te && (cur->chars[ts]==' '||cur->chars[ts]=='\t')) ts++;
@@ -133705,8 +136345,8 @@ static void process_key(void) {
         /* ── Tab: completion ou indent ── */
         case '\t': {
             /* contextos especiais: #include e require() */
-            if ((E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) && comp_open_include()) return;
-            if (E.syntax == &HLDB[2] && comp_open_require()) return;
+            if ((E.syntax == &HLDB[0]) && comp_open_include()) return;
+            if (E.syntax == &HLDB[0] && comp_open_require()) return;
             char prefix[128];
             int plen = get_prefix(prefix, sizeof(prefix));
             if (plen >= 2) {
@@ -133807,7 +136447,7 @@ static void process_key(void) {
             if (iscntrl(c)) break;
 
             /* ── Contexto #include em C/C++: '<' abre completion E faz auto-pair ── */
-            if (c == '<' && (E.syntax == &HLDB[0] || E.syntax == &HLDB[1])) {
+            if (c == '<' && (E.syntax == &HLDB[0])) {
                 if (E.cy < E.numrows) {
                     Row *row = &E.row[E.cy];
                     char *line = row->chars;
@@ -133824,7 +136464,7 @@ static void process_key(void) {
             }
 
             /* ── Contexto require() em Lua: '"' ou '\'' abre completion ── */
-            if ((c == '"' || c == '\'') && E.syntax == &HLDB[2]) {
+            if ((c == '"' || c == '\'') && E.syntax == &HLDB[0]) {
                 if (E.cy < E.numrows) {
                     undo_push();
                     try_auto_pair(c);          /* insere o par e posiciona cursor */
@@ -133847,6 +136487,7 @@ static void process_key(void) {
 
             undo_push();
             insert_char(c);
+            electric_deindent(); /* recua else/elseif/end/until automaticamente */
 
             /* completion ao vivo — popup aparece enquanto digita */
             if (isalnum(c) || c == '_' || c == '.') {
@@ -133856,7 +136497,7 @@ static void process_key(void) {
             }
 
             /* completion após '.' removido — só via Tab */
-            if (E.syntax == &HLDB[0] || E.syntax == &HLDB[1]) {
+            if (E.syntax == &HLDB[0]) {
                 char pfx[128]; int ua;
                 if (detect_include_ctx(pfx, sizeof(pfx), &ua)) {
                     comp_open_include();
@@ -134028,9 +136669,23 @@ int main(int argc, char *argv[]) {
             "Ctrl+S para salvar  Ctrl+Q para sair  Ctrl+P explorador");
     }
 
+    /* Inicializa tamanho conhecido */
+    { int r, cl; if (get_winsz(&r, &cl) != -1) { g_last_rows = r-2; g_last_cols = cl; } }
+
     while (1) {
-        refresh_screen();
-        process_key();
+        /* Verifica resize estabilizado (debounce 80ms) */
+        int size_changed = apply_resize_if_stable();
+        if (size_changed) {
+            /* Tamanho mudou: limpa tela inteira UMA vez para evitar artefatos */
+            write(STDOUT_FILENO, "\x1b[2J", 4);
+            g_needs_redraw = 1;
+        }
+
+        if (g_needs_redraw) {
+            g_needs_redraw = 0;
+            refresh_screen();
+        }
+        process_key(); /* bloqueia até 100ms esperando input */
     }
     return 0;
 }
