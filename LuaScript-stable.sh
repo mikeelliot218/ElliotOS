@@ -28428,6 +28428,9 @@ PLEOF
 #include <errno.h>
 #include <ctype.h>
 
+/* Forward declaration — definida em libnet.c */
+int ac_scan_methods(const char *varname, const char *mprefix, char **matches, int max_matches);
+
 typedef struct elliot_repl_state elliot_repl_state;
 
 /* Códigos de tecla especiais retornados por elliot_repl_read_key().
@@ -29641,7 +29644,6 @@ extern void  user_files_scan(const char *prefix);
 extern void  parse_require_hints(const char *line);
 extern char *G_hints[];
 extern int   G_hints_count;
-extern int   ac_scan_methods(const char *varname, const char *mprefix, char **matches, int max_matches);
 
 static const char *req_mods_list[] = {
     "@std",
@@ -29716,22 +29718,16 @@ static int ac_collect(const char *text, const char *full_line, size_t cursor_pos
         return n;
     }
 
-    /* ── prefixo de método OO (texto contém ":") ── */
-    {
-        const char *colon_pos = strchr(text, ':');
-        if (colon_pos && colon_pos > text) {
-            char varname[128] = {0};
-            size_t vlen = (size_t)(colon_pos - text);
-            if (vlen < sizeof(varname)) {
-                memcpy(varname, text, vlen);
-                varname[vlen] = '\0';
-                const char *mprefix = colon_pos + 1;
-                n = ac_scan_methods(varname, mprefix, matches, max_matches);
-            }
-            return n;
+    { const char *cp=strchr(text,':');
+      if(cp&&cp>text){char vn[128]={0};size_t vl=(size_t)(cp-text);
+        if(vl<sizeof(vn)){memcpy(vn,text,vl);n=ac_scan_methods(vn,cp+1,matches,max_matches);
+          /* Salva métodos no cache para o editor ee */
+          if(n>0){const char*_h=getenv("HOME");
+            if(_h){char _cp[512];snprintf(_cp,sizeof(_cp),"%s/.elliot_ac_cache",_h);
+              FILE*_cf=fopen(_cp,"a");
+              if(_cf){for(int _i=0;_i<n;_i++)fprintf(_cf,"%s\n",matches[_i]);fclose(_cf);}}}
         }
-    }
-
+        return n;}}
     /* ── prefixo de módulo (texto contém ".") ── */
     char prefix[128] = {0};
     const char *dot = strrchr(text, '.');
@@ -29768,6 +29764,23 @@ static int ac_collect(const char *text, const char *full_line, size_t cursor_pos
     /* 4. libs em disco (só sem prefixo de módulo) */
     if (!prefix[0]) {
         for (int i = 0; i < G_dyn_count && n < max_matches; i++) AC_ADD(G_dyn[i]);
+    }
+
+    /* Salva entradas com separador '.' ou ':' no cache para o editor ee */
+    if (prefix[0] && n > 0) {
+        const char *_h = getenv("HOME");
+        if (_h) {
+            char _cp[512]; snprintf(_cp, sizeof(_cp), "%s/.elliot_ac_cache", _h);
+            FILE *_cf = fopen(_cp, "a");
+            if (_cf) {
+                for (int _i = 0; _i < n; _i++) {
+                    const char *_e = matches[_i];
+                    if (strchr(_e, '.') || strchr(_e, ':'))
+                        fprintf(_cf, "%s\n", _e);
+                }
+                fclose(_cf);
+            }
+        }
     }
 
 #undef AC_ADD
@@ -37965,20 +37978,12 @@ static void lsock_register_meta(lua_State *L) {
     lua_pushcfunction(L,ls_index);    lua_setfield(L,-2,"__index");
     lua_pushcfunction(L,ls_gc);       lua_setfield(L,-2,"__gc");
     lua_pushcfunction(L,ls_tostring); lua_setfield(L,-2,"__tostring");
-    {
-        static const char *ac[] = {
-            "close","settimeout","gettimeout","setoption","getoption",
-            "getpeername","getsockname","getfd","setfd","dirty",
-            "connect","bind","listen","accept","shutdown",
-            "send","receive","sendto","receivefrom",
-            "setpeername","setsockname", NULL
-        };
-        lua_newtable(L);
-        for (int _i = 0; ac[_i]; _i++) {
-            lua_pushboolean(L, 1); lua_setfield(L, -2, ac[_i]);
-        }
-        lua_setfield(L, -2, "_elliot_ac");
-    }
+    { static const char *ac[]={"close","settimeout","gettimeout","setoption","getoption",
+        "getpeername","getsockname","getfd","setfd","dirty","connect","bind","listen",
+        "accept","shutdown","send","receive","sendto","receivefrom","setpeername","setsockname",NULL};
+      lua_newtable(L);
+      for(int _i=0;ac[_i];_i++){lua_pushboolean(L,1);lua_setfield(L,-2,ac[_i]);}
+      lua_setfield(L,-2,"_elliot_ac"); }
     lua_pop(L,1);
 }
 
@@ -84448,9 +84453,11 @@ static void dyn_scan(const char *dirpath) {
         strncpy(name, ent->d_name, sizeof(name)-1);
         name[sizeof(name)-1]='\0';
         char *dot=strrchr(name,'.');
-        if(!dot) continue;  /* sem extensão = diretório ou ignorável */
-        if(!strcmp(dot,".lua")||!strcmp(dot,".so")) *dot='\0';
-        else continue;
+        if(!dot) continue;
+        if(dot){
+            if(!strcmp(dot,".lua")||!strcmp(dot,".so")) *dot='\0';
+            else continue;
+        }
         int dup=0;
         for(int i=0;i<G_dyn_count;i++)
             if(!strcmp(G_dyn[i],name)){dup=1;break;}
@@ -84618,8 +84625,33 @@ static void lua_compl_add(const char *s) {
 }
 
 /* Referência ao lua_State global (preenchida em pmain após luaopen_net) */
-/* weak: liblua-net.so usa NULL; o binário lua sobrescreve com a definição real */
 __attribute__((weak)) lua_State *_elliot_L = NULL;
+
+/* Inicializa _elliot_L para uso pelo editor ee em background thread.
+ * luaopen_net registra todos os módulos @std/ — igual ao ms.
+ * Idempotente e não-bloqueante: retorna 0 enquanto carrega, 1 quando pronto. */
+static void *_elliot_ac_init_thread(void *arg) {
+    (void)arg;
+    lua_State *L = luaL_newstate();
+    if (!L) return NULL;
+    luaL_openlibs(L);
+    luaopen_net(L);
+    _elliot_L = L; /* atomic store — L está pronto para uso */
+    return NULL;
+}
+static int _elliot_ac_L_started = 0;
+int elliot_ac_init_L(void) {
+    if (_elliot_L) return 1;
+    if (!_elliot_ac_L_started) {
+        _elliot_ac_L_started = 1;
+        pthread_t tid; pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_create(&tid, &attr, _elliot_ac_init_thread, NULL);
+        pthread_attr_destroy(&attr);
+    }
+    return 0; /* ainda carregando */
+}
 
 /*
  * lua_scan_table — varre os campos de uma tabela Lua que está no topo da
@@ -84737,105 +84769,50 @@ void lua_scan(void) {
     }
 }
 
-static int ac_has_method(char **matches, int n,
-                          const char *varname, const char *mname) {
-    size_t vlen = strlen(varname), mlen = strlen(mname);
-    for (int i = 0; i < n; i++) {
-        const char *e = matches[i];
-        if (strncmp(e, varname, vlen)==0 && e[vlen]==':' &&
-            strncmp(e+vlen+1, mname, mlen)==0 && e[vlen+1+mlen]=='(')
-            return 1;
-    }
-    return 0;
-}
-
-static int ac_scan_tbl(lua_State *L, const char *varname,
-                        const char *mprefix, size_t mplen,
-                        char **matches, int n, int max) {
+static int ac_has_method(char**m,int n,const char*v,const char*k){
+    size_t vl=strlen(v),ml=strlen(k);
+    for(int i=0;i<n;i++){const char*e=m[i];
+        if(strncmp(e,v,vl)==0&&e[vl]==':'&&strncmp(e+vl+1,k,ml)==0&&e[vl+1+ml]=='(')return 1;}
+    return 0;}
+static int ac_scan_tbl(lua_State*L,const char*v,const char*mp,size_t mpl,char**m,int n,int max){
     lua_pushnil(L);
-    while (lua_next(L, -2) && n < max) {
-        if (lua_type(L, -2) == LUA_TSTRING) {
-            const char *k = lua_tostring(L, -2);
-            if (k && k[0]!='_' &&
-                strncmp(k, mprefix ? mprefix : "", mplen)==0 &&
-                !ac_has_method(matches, n, varname, k)) {
-                char entry[256];
-                snprintf(entry, sizeof(entry), "%s:%s(", varname, k);
-                matches[n++] = strdup(entry);
-            }
-        }
-        lua_pop(L, 1);
-    }
-    return n;
+    while(lua_next(L,-2)&&n<max){
+        if(lua_type(L,-2)==LUA_TSTRING){const char*k=lua_tostring(L,-2);
+            if(k&&k[0]!='_'&&strncmp(k,mp?mp:"",mpl)==0&&!ac_has_method(m,n,v,k)){
+                char e[256];snprintf(e,256,"%s:%s(",v,k);m[n++]=strdup(e);}}
+        lua_pop(L,1);}
+    return n;}
+int ac_scan_methods(const char*varname,const char*mprefix,char**matches,int max_matches){
+#define ACM 8
+    int n=0;lua_State*L=_elliot_L;
+    if(!L||!varname||!varname[0])return 0;
+    size_t mpl=mprefix?strlen(mprefix):0;
+    int t0=lua_gettop(L);
+    {char p[256];strncpy(p,varname,255);p[255]='\0';
+     char*tok=strtok(p,".");if(!tok)goto done;lua_getglobal(L,tok);
+     while((tok=strtok(NULL,"."))!=NULL){int t=lua_type(L,-1);
+         if(t!=LUA_TTABLE&&t!=LUA_TUSERDATA)goto done;
+         lua_getfield(L,-1,tok);lua_remove(L,-2);}}
+    if(lua_isnil(L,-1))goto done;
+    {const void*seen[ACM];int sn=0;
+     for(int d=0;d<ACM&&n<max_matches;d++){
+         if(!lua_getmetatable(L,-1)){if(lua_istable(L,-1))n=ac_scan_tbl(L,varname,mprefix,mpl,matches,n,max_matches);break;}
+         const void*mt=lua_topointer(L,-1);int cy=0;
+         for(int i=0;i<sn;i++)if(seen[i]==mt){cy=1;break;}
+         if(cy){lua_pop(L,1);break;}if(sn<ACM)seen[sn++]=mt;
+         lua_getfield(L,-1,"_elliot_ac");
+         if(lua_istable(L,-1)){n=ac_scan_tbl(L,varname,mprefix,mpl,matches,n,max_matches);lua_pop(L,2);break;}
+         lua_pop(L,1);
+         lua_getfield(L,-1,"__index");lua_remove(L,-2);
+         if(lua_type(L,-1)!=LUA_TTABLE){lua_pop(L,2);break;}
+         const void*idx=lua_topointer(L,-1);int ic=0;
+         for(int i=0;i<sn;i++)if(seen[i]==idx){ic=1;break;}
+         n=ac_scan_tbl(L,varname,mprefix,mpl,matches,n,max_matches);
+         if(ic){lua_pop(L,1);break;}if(sn<ACM)seen[sn++]=idx;
+         lua_remove(L,-2);}}
+done: lua_settop(L,t0);return n;
+#undef ACM
 }
-
-int ac_scan_methods(const char *varname, const char *mprefix,
-                    char **matches, int max_matches) {
-#define AC_CHAIN_MAX 8
-    int n = 0;
-    lua_State *L = _elliot_L;
-    if (!L || !varname || !varname[0]) return 0;
-    size_t mplen = mprefix ? strlen(mprefix) : 0;
-    int top0 = lua_gettop(L);
-
-    /* 1. Resolve dotted path a.b.c */
-    {
-        char path[256];
-        strncpy(path, varname, sizeof(path)-1); path[sizeof(path)-1]='\0';
-        char *tok = strtok(path, ".");
-        if (!tok) goto ac_done;
-        lua_getglobal(L, tok);
-        while ((tok = strtok(NULL, ".")) != NULL) {
-            int t = lua_type(L, -1);
-            if (t != LUA_TTABLE && t != LUA_TUSERDATA) goto ac_done;
-            lua_getfield(L, -1, tok);
-            lua_remove(L, -2);
-        }
-    }
-    if (lua_isnil(L, -1)) goto ac_done;
-
-    /* 2. Traversal __index com herança, dedup e cycle detection */
-    {
-        const void *seen[AC_CHAIN_MAX]; int seen_n = 0;
-        for (int depth = 0; depth < AC_CHAIN_MAX && n < max_matches; depth++) {
-            if (!lua_getmetatable(L, -1)) {
-                if (lua_istable(L, -1))
-                    n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
-                break;
-            }
-            const void *mt_ptr = lua_topointer(L, -1);
-            int cycled = 0;
-            for (int i = 0; i < seen_n; i++) if (seen[i]==mt_ptr){cycled=1;break;}
-            if (cycled) { lua_pop(L, 1); break; }
-            if (seen_n < AC_CHAIN_MAX) seen[seen_n++] = mt_ptr;
-
-            lua_getfield(L, -1, "_elliot_ac");
-            if (lua_istable(L, -1)) {
-                n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
-                lua_pop(L, 2); break;
-            }
-            lua_pop(L, 1);
-
-            lua_getfield(L, -1, "__index");
-            lua_remove(L, -2);
-            if (lua_type(L, -1) != LUA_TTABLE) { lua_pop(L, 2); break; }
-
-            const void *idx_ptr = lua_topointer(L, -1);
-            int idx_cycled = 0;
-            for (int i = 0; i < seen_n; i++) if (seen[i]==idx_ptr){idx_cycled=1;break;}
-            n = ac_scan_tbl(L, varname, mprefix, mplen, matches, n, max_matches);
-            if (idx_cycled) { lua_pop(L, 1); break; }
-            if (seen_n < AC_CHAIN_MAX) seen[seen_n++] = idx_ptr;
-            lua_remove(L, -2);
-        }
-    }
-
-ac_done:
-    lua_settop(L, top0);
-    return n;
-#undef AC_CHAIN_MAX
-}
-
 /* ── Módulos @std conhecidos e suas funções (fallback sem L) ─────── */
 /* Usado quando o módulo ainda não foi carregado mas o usuário digitou
  * require("@std/net") — lista as funções típicas para orientar. */
@@ -109633,13 +109610,13 @@ TRANSLATE_EOF
         printf "\033[1;36m── [2/4] make Lua core ───────────────────────────────────────\033[0m\n"
         make -j"$_ncpu" posix CC="${_CC}" \
             MYCFLAGS="${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -Wno-unknown-escape-sequence ${PROFILE_DEFINES} ${_INC}" \
-            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB} -rdynamic" \
+            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB}" \
             2>&1 | tee "$HOME/.elliot_make.log"
         _make_exit=${PIPESTATUS[0]}
     else
         make -j"$_ncpu" posix CC="${_CC}" \
             MYCFLAGS="${_MAKE_FLAGS} -fPIC -DLUA_USE_POSIX -DLUA_USE_DLOPEN -DLUA_USE_READLINE -Wno-unknown-escape-sequence ${PROFILE_DEFINES} ${_INC}" \
-            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB} -rdynamic" \
+            MYLIBS="-lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv ${_LIB}" \
             > "$HOME/.elliot_make.log" 2>&1 &
         _make_pid=$!
         # Total de objetos esperados (aprox 35), barra começa em 45%
@@ -109732,7 +109709,7 @@ TRANSLATE_EOF
         done
         printf "  \033[0;90mLD liblua-net.so\033[0m\n"
         ${_CC} ${_MAKE_FLAGS} -shared \
-            $_so_objs libnet.o \
+            $_so_objs libnet.o elliot_repl_engine.o \
             -o liblua-net.so \
             ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv \
             2>&1 | tee -a "$_so_log"
@@ -109758,7 +109735,7 @@ TRANSLATE_EOF
             done
             for _pid in $_so_cpids; do wait "$_pid" || exit 1; done
             ${_CC} ${_MAKE_FLAGS} -shared \
-                $_so_objs libnet.o \
+                $_so_objs libnet.o elliot_repl_engine.o \
                 -o liblua-net.so \
                 ${_LIB} -lm -ldl -lpthread -lreadline -lcurl -lssl -lcrypto -lsqlite3 -lresolv \
                 2>/dev/null && \
@@ -110031,7 +110008,8 @@ _compile() {
     if [ -f "$PREFIX/lib/liblua-net.so" ]; then
         $_CC -O2 -shared -fPIC \
             -I"$LUA_INC" -I"$PREFIX/include" -L"$PREFIX/lib" \
-            "$@" -o "$out" -lm -llua-net $_rpath && return 0
+            "$@" -o "$out" -lm -llua-net \
+            $_rpath && return 0
     fi
     $_CC -O2 -shared -fPIC \
         -I"$LUA_INC" -I"$PREFIX/include" -L"$PREFIX/lib" \
@@ -128245,6 +128223,13 @@ _install_editor() {
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <pthread.h>
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+extern lua_State *_elliot_L;
+extern int ac_scan_methods(const char *varname, const char *mprefix, char **matches, int max_matches);
+extern int elliot_ac_init_L(void);
 
 /* ════════════════════════════════════════════════════════
  * CONSTANTES
@@ -129270,6 +129255,8 @@ static void raw_off(void) {
     /* sai do buffer alternativo e restaura o terminal */
     write(STDOUT_FILENO, "\x1b[?1049l", 8);
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios);
+    /* limpa cache de autocomplete do ee ao sair */
+    { const char *_h=getenv("HOME"); if(_h){ char _p[512]; snprintf(_p,sizeof(_p),"%s/.elliot_ee_ac_cache",_h); remove(_p); } }
 }
 static void raw_on(void) {
     if (tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
@@ -129294,6 +129281,7 @@ static volatile sig_atomic_t g_resize_pending = 0;
 static int  g_last_rows = 0, g_last_cols = 0;
 static long g_resize_ts = 0;
 static int  g_needs_redraw = 1;
+static volatile int g_cache_updated = 0; /* setado pela thread de preload */
 
 /* Obtém tempo em ms para debounce de resize */
 static long now_ms(void) {
@@ -129308,6 +129296,12 @@ static void handle_resize(int sig) {
      * O loop principal aplica o resize com debounce. */
     g_resize_pending = 1;
     g_resize_ts = now_ms();
+    g_needs_redraw = 1;
+}
+
+static void handle_cache_ready(int sig) {
+    (void)sig;
+    g_cache_updated = 1;
     g_needs_redraw = 1;
 }
 
@@ -129342,6 +129336,8 @@ static int apply_resize_if_stable(void) {
 static int  rx_to_cx(Row *row, int rx);
 static void move_cursor(int k);
 static void save_file(void);
+static void ee_preload_cache_for_file(void);
+static void *ee_preload_cache_thread(void *arg);
 
 static int read_key(void) {
     int n; char c;
@@ -130307,7 +130303,7 @@ static void scan_module_file(const char *modname, const char *alias_final,
         while ((fp = strstr(cur, "function ")) != NULL) {
             char *q = fp + 9;
             while (*q==' '||*q=='\t') q++;
-            if (tlen>0 && !strncmp(q, tvar, tlen) && (q[tlen]=='.'||q[tlen]==':')) {
+            if (tlen>0 && !strncmp(q, tvar, tlen) && q[tlen]=='.') {
                 char *np = q + tlen + 1;
                 char fn[96]; int ni=0;
                 while (*np && (isalnum((unsigned char)*np)||*np=='_') && ni<95) fn[ni++]=*np++;
@@ -130444,6 +130440,23 @@ static int file_has_module_required(const char *base) {
     return 0;
 }
 
+/* Lê ~/.elliot_ee_ac_cache (escrito pelo ee ao introspectar módulos). */
+static void scan_ee_cache(const char *prefix, int plen) {
+    const char *home = getenv("HOME");
+    if(!home) return;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/.elliot_ee_ac_cache", home);
+    FILE *f = fopen(path, "r");
+    if(!f) return;
+    char line[256];
+    while(fgets(line, sizeof(line), f)) {
+        int l = (int)strlen(line);
+        while(l>0 && (line[l-1]=='\n'||line[l-1]=='\r')) line[--l]='\0';
+        if(l>0) comp_add(line, prefix, plen);
+    }
+    fclose(f);
+}
+
 /* Lê ~/.elliot_ac_cache (escrito pelo REPL a cada Tab).
  * Dois passes:
  *  1. Coleta quais nomes são módulos (têm ao menos uma entrada "base.algo")
@@ -130486,12 +130499,16 @@ static void scan_ac_cache(const char *prefix, int plen) {
         if(!isalpha((unsigned char)line[0]) && line[0]!='_' && line[0]!='@') continue;
         const char *dot = strchr(line, '.');
         if(dot && dot > line) {
-            /* "net.tcp(" → base = "net" */
-            char base[64]={0};
-            int blen = (int)(dot - line);
-            if(blen < (int)sizeof(base)) {
-                memcpy(base, line, blen);
-                if(!file_has_module_required(base)) continue;
+            /* "net.tcp(" → base = "net"
+             * Se o prefix já contém '.' ou ':', o usuário já digitou o separador
+             * — confia no ee_find_ctor que já validou a variável; não filtra. */
+            if(!strchr(prefix, '.') && !strchr(prefix, ':')) {
+                char base[64]={0};
+                int blen = (int)(dot - line);
+                if(blen < (int)sizeof(base)) {
+                    memcpy(base, line, blen);
+                    if(!file_has_module_required(base)) continue;
+                }
             }
         } else {
             /* "net" sem ponto: só filtra se for nome de módulo */
@@ -130502,6 +130519,331 @@ static void scan_ac_cache(const char *prefix, int plen) {
         comp_add(line, prefix, plen);
     }
     fclose(f);
+}
+
+/* ── Autocomplete dinâmico de métodos OO ───────────────────────────
+ * Sem tabelas fixas: lê o arquivo, reconstrói o objeto via ms -e,
+ * e inspeciona o metatable em tempo real — igual ao REPL. */
+
+/* Procura: [local] var = require("mod") ou require('mod') */
+static int ee_find_require(const char *var, char *mod, int msz) {
+    int vl=(int)strlen(var);
+    for(int y=0;y<E.numrows;y++){
+        char *s=E.row[y].chars; int sz=E.row[y].size;
+        char *cm=strstr(s,"--"); int lim=cm?(int)(cm-s):sz;
+        int i=0;
+        while(i<lim&&(s[i]==' '||s[i]=='\t'))i++;
+        if(i+5<lim&&strncmp(s+i,"local",5)==0&&(s[i+5]==' '||s[i+5]=='\t'))i+=5;
+        while(i<lim&&(s[i]==' '||s[i]=='\t'))i++;
+        if(strncmp(s+i,var,vl)!=0)continue;
+        int j=i+vl;
+        if(j<lim&&(isalnum((unsigned char)s[j])||s[j]=='_'))continue;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        if(j>=lim||s[j]!='=')continue; j++;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        if(j+7>=lim||strncmp(s+j,"require",7)!=0)continue; j+=7;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        if(j>=lim||s[j]!='(')continue; j++;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        if(j>=lim||(s[j]!='"'&&s[j]!='\''))continue;
+        char q=s[j]; j++; int st=j;
+        while(j<lim&&s[j]!=q)j++;
+        int ml=j-st;
+        if(ml>0&&ml<msz){memcpy(mod,s+st,ml);mod[ml]='\0';return 1;}
+    }
+    return 0;
+}
+
+/* Procura: [local] var = ctor(...)
+ * Se ctor é "x.func", resolve x via require → "modname.func" */
+static int ee_find_ctor(const char *var, char *ctor, int csz) {
+    int vl=(int)strlen(var);
+    for(int y=0;y<E.numrows;y++){
+        char *s=E.row[y].chars; int sz=E.row[y].size;
+        char *cm=strstr(s,"--"); int lim=cm?(int)(cm-s):sz;
+        int i=0;
+        while(i<lim&&(s[i]==' '||s[i]=='\t'))i++;
+        if(i+5<lim&&strncmp(s+i,"local",5)==0&&(s[i+5]==' '||s[i+5]=='\t'))i+=5;
+        while(i<lim&&(s[i]==' '||s[i]=='\t'))i++;
+        if(i+vl>lim||strncmp(s+i,var,vl)!=0)continue;
+        int j=i+vl;
+        if(j<lim&&(isalnum((unsigned char)s[j])||s[j]=='_'))continue;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        if(j>=lim||s[j]!='=')continue; j++;
+        while(j<lim&&(s[j]==' '||s[j]=='\t'))j++;
+        /* Caso especial: var = require("modname") */
+        if(j+7<=lim&&strncmp(s+j,"require",7)==0){
+            int k=j+7;
+            while(k<lim&&(s[k]==' '||s[k]=='\t'))k++;
+            if(k<lim&&s[k]=='('){k++;
+                while(k<lim&&(s[k]==' '||s[k]=='\t'))k++;
+                if(k<lim&&(s[k]=='"'||s[k]=='\'')){
+                    char q=s[k]; k++; int ms=k;
+                    while(k<lim&&s[k]!=q)k++;
+                    int ml=k-ms;
+                    if(ml>0&&ml+9<csz){
+                        /* Sinaliza módulo direto com prefixo "require:" */
+                        snprintf(ctor,csz,"require:%.*s",ml,s+ms);
+                        return 1;
+                    }
+                }
+            }
+        }
+        int st=j;
+        while(j<lim&&(isalnum((unsigned char)s[j])||s[j]=='_'||s[j]=='.'))j++;
+        int cl=j-st; if(cl<=0||cl>=csz)continue;
+        char raw[128]={0}; memcpy(raw,s+st,cl);
+        const char *dot=strchr(raw,'.');
+        if(dot&&dot>raw){
+            char pfx[64]={0}; int pl=(int)(dot-raw);
+            if(pl<64){memcpy(pfx,raw,pl);
+                char mod[128]={0};
+                if(ee_find_require(pfx,mod,sizeof(mod))){
+                    snprintf(ctor,csz,"%s%s",mod,dot);return 1;}}}
+        memcpy(ctor,raw,cl+1);return 1;
+    }
+    /* Fallback: procura require("@std/var") ou require("var") sem atribuição
+     * Ex: require("@std/net") → var="net" → ctor="require:@std/net" */
+    for(int y=0;y<E.numrows;y++){
+        char *s=E.row[y].chars; int sz=E.row[y].size;
+        char *req=strstr(s,"require(");
+        if(!req) continue;
+        char *q1=strchr(req,'"'); if(!q1) q1=strchr(req,'\'');
+        if(!q1) continue; char qc=*q1; q1++;
+        char *q2=strchr(q1,qc); if(!q2) continue;
+        int ml=(int)(q2-q1); if(ml<=0||ml>=128) continue;
+        char modname[128]={0}; memcpy(modname,q1,ml);
+        /* Extrai parte final: "@std/net" → "net" */
+        const char *base=modname;
+        const char *sl=strrchr(modname,'/');
+        if(sl) base=sl+1;
+        if(strcmp(base,var)==0){
+            snprintf(ctor,csz,"require:%s",modname);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Roda ms com script Lua via arquivo temp — evita problemas de escaping.
+ * Suporta:
+ *   "require:modname"  → inspeciona tabela do módulo (var = require(...))
+ *   "modname.func"     → instancia obj=mod.func() e inspeciona metatable
+ *   "ctor"             → instancia obj=ctor() e inspeciona metatable */
+static void ee_introspect_methods(const char *varname,
+                                   const char *mprefix, int mplen) {
+    char ctor[128]={0};
+    if(!ee_find_ctor(varname,ctor,sizeof(ctor)))return;
+
+    const char *home=getenv("HOME");
+    if(!home)return;
+    char tmppath[512];
+    snprintf(tmppath,sizeof(tmppath),"%s/.elliot_ee_ac.lua",home);
+    FILE *tf=fopen(tmppath,"w");
+    if(!tf)return;
+
+    /* Caso 1: var = require("mod") — inspeciona tabela do módulo diretamente */
+    if(strncmp(ctor,"require:",8)==0){
+        const char *modname=ctor+8;
+        fprintf(tf,
+            "local ok,_m=pcall(require,'%s')\n"
+            "if not ok or type(_m)~='table' then return end\n"
+            "for k,v in pairs(_m) do\n"
+            "  if type(k)=='string' and k:sub(1,1)~='_' and\n"
+            "     (type(v)=='function' or type(v)=='table') then\n"
+            "    if type(v)=='function' then\n"
+            "      io.write('%s.'..k..'(\\n')\n"
+            "    end\n"
+            "  end\n"
+            "end\n",
+            modname, varname);
+    } else {
+        const char *dot=strchr(ctor,'.');
+        if(dot){
+            char mod[64]={0},func[64]={0};
+            int pl=(int)(dot-ctor);
+            if(pl<=0||pl>=64){fclose(tf);remove(tmppath);return;}
+            memcpy(mod,ctor,pl); strncpy(func,dot+1,63);
+            /* Caso 2: var = mod.func() — tenta sem arg, depois args comuns */
+            fprintf(tf,
+                "local ok,_m=pcall(require,'%s')\n"
+                "if not ok then return end\n"
+                "local ok2,_o=pcall(function() return _m['%s']() end)\n"
+                "if not ok2 or _o==nil then\n"
+                "  for _,a in ipairs({'tcp','udp','tcp6','unix','http','client'}) do\n"
+                "    ok2,_o=pcall(function() return _m['%s'](a) end)\n"
+                "    if ok2 and _o~=nil then break end\n"
+                "  end\n"
+                "end\n"
+                "if not ok2 or _o==nil then return end\n"
+                "local mt=getmetatable(_o)\n"
+                "local idx=mt and(\n"
+                "  type(mt.__index)=='table' and mt.__index or\n"
+                "  rawget(mt,'_elliot_ac') or\n"
+                "  (type(mt)=='table' and mt or nil))\n"
+                "  or (type(_o)=='table' and _o or nil)\n"
+                "if idx then for k in pairs(idx) do\n"
+                "  if type(k)=='string' and k:sub(1,1)~='_' then\n"
+                "    io.write('%s:'..k..'(\\n')\n"
+                "  end\n"
+                "end end\n",
+                mod, func, func, varname);
+        } else {
+            /* Caso 3: var = ctor() */
+            fprintf(tf,
+                "local ok,_o=pcall(function() return %s() end)\n"
+                "if not ok or _o==nil then return end\n"
+                "local mt=getmetatable(_o)\n"
+                "local idx=mt and(\n"
+                "  type(mt.__index)=='table' and mt.__index or\n"
+                "  rawget(mt,'_elliot_ac') or\n"
+                "  (type(mt)=='table' and mt or nil))\n"
+                "  or (type(_o)=='table' and _o or nil)\n"
+                "if idx then for k in pairs(idx) do\n"
+                "  if type(k)=='string' and k:sub(1,1)~='_' then\n"
+                "    io.write('%s:'..k..'(\\n')\n"
+                "  end\n"
+                "end end\n",
+                ctor, varname);
+        }
+    }
+    fclose(tf);
+
+    char cmd[600];
+    snprintf(cmd,sizeof(cmd),"luar '%s' 2>/dev/null",tmppath);
+    FILE *fp=popen(cmd,"r");
+    if(!fp){remove(tmppath);return;}
+
+    /* Abre cache para append — resultados ficam disponíveis para live completion */
+    const char *home2=getenv("HOME");
+    char cachepath[512]={0};
+    if(home2) snprintf(cachepath,sizeof(cachepath),"%s/.elliot_ee_ac_cache",home2);
+    FILE *cf=cachepath[0]?fopen(cachepath,"a"):NULL;
+
+    char line[256];
+    while(fgets(line,sizeof(line),fp)&&E.comp.count<COMPLETION_MAX){
+        int l=(int)strlen(line);
+        while(l>0&&(line[l-1]=='\n'||line[l-1]=='\r'))line[--l]='\0';
+        if(!l)continue;
+        /* Aceita separador ':' ou '.' */
+        const char *sep2=strchr(line,':');
+        if(!sep2) sep2=strchr(line,'.');
+        if(!sep2)continue;
+        if(mplen>0&&strncmp(sep2+1,mprefix,mplen)!=0)continue;
+        int dup=0;
+        for(int d=0;d<E.comp.count;d++)
+            if(!strcmp(E.comp.items[d],line)){dup=1;break;}
+        if(!dup){E.comp.items[E.comp.count]=strdup(line);
+                 if(E.comp.items[E.comp.count])E.comp.count++;
+                 if(cf)fprintf(cf,"%s\n",line);}
+    }
+    pclose(fp);
+    if(cf)fclose(cf);
+    remove(tmppath);
+}
+
+/* Ponto de entrada: detecta "varname:" no prefixo */
+static int comp_open_method(const char *prefix, int plen) {
+    /* Aceita tanto ':' quanto '.' como separador */
+    const char *sep=NULL;
+    for(int _i=plen-1;_i>=0;_i--){
+        if(prefix[_i]==':'||prefix[_i]=='.'){sep=prefix+_i;break;}
+    }
+    if(!sep||sep==prefix)return 0;
+    int vlen=(int)(sep-prefix);
+    char varname[128]={0};
+    if(vlen>=(int)sizeof(varname))return 0;
+    memcpy(varname,prefix,vlen);
+    const char *mprefix=sep+1;
+    int mplen=plen-vlen-1; if(mplen<0)mplen=0;
+
+    /* Só prossegue se varname está definido no arquivo atual */
+    {
+        char ctor_check[128]={0};
+        if(!ee_find_ctor(varname,ctor_check,sizeof(ctor_check)))return 0;
+    }
+
+    int before=E.comp.count;
+
+    /* Usa ac_scan_methods via lua_State — igual ao REPL, instantâneo */
+    elliot_ac_init_L();
+    {
+        char *matches[256]; int n=0;
+        /* Resolve varname para o objeto real:
+         * se ctor é "require:mod", carrega o módulo no L primeiro */
+        char ctor[128]={0};
+        if(ee_find_ctor(varname,ctor,sizeof(ctor)) && strncmp(ctor,"require:",8)==0){
+            /* Garante que o módulo está carregado no L */
+            if(_elliot_L){
+                lua_getglobal(_elliot_L, varname);
+                if(lua_isnil(_elliot_L,-1)){
+                    lua_pop(_elliot_L,1);
+                    lua_getglobal(_elliot_L,"require");
+                    lua_pushstring(_elliot_L,ctor+8);
+                    if(lua_pcall(_elliot_L,1,1,0)==LUA_OK)
+                        lua_setglobal(_elliot_L,varname);
+                    else
+                        lua_pop(_elliot_L,1);
+                } else {
+                    lua_pop(_elliot_L,1);
+                }
+            }
+        } else if(ee_find_ctor(varname,ctor,sizeof(ctor))){
+            /* ctor é "mod.func" — garante que o objeto existe no L */
+            if(_elliot_L){
+                lua_getglobal(_elliot_L,varname);
+                if(lua_isnil(_elliot_L,-1)){
+                    lua_pop(_elliot_L,1);
+                    /* tenta criar: local _o = require(mod).func() */
+                    const char *dot=strchr(ctor,'.');
+                    if(dot){
+                        char mod[64]={0}; memcpy(mod,ctor,(int)(dot-ctor));
+                        lua_getglobal(_elliot_L,"require");
+                        lua_pushstring(_elliot_L,mod);
+                        if(lua_pcall(_elliot_L,1,1,0)==LUA_OK){
+                            lua_getfield(_elliot_L,-1,dot+1);
+                            lua_remove(_elliot_L,-2);
+                            /* tenta chamar sem arg */
+                            lua_pushvalue(_elliot_L,-1);
+                            if(lua_pcall(_elliot_L,0,1,0)!=LUA_OK){
+                                lua_pop(_elliot_L,1);
+                                /* tenta com "tcp" */
+                                lua_pushstring(_elliot_L,"tcp");
+                                if(lua_pcall(_elliot_L,1,1,0)!=LUA_OK)
+                                    lua_pop(_elliot_L,1);
+                                else
+                                    lua_setglobal(_elliot_L,varname);
+                            } else {
+                                lua_setglobal(_elliot_L,varname);
+                            }
+                            lua_pop(_elliot_L,1); /* remove func */
+                        } else {
+                            lua_pop(_elliot_L,1);
+                        }
+                    }
+                } else {
+                    lua_pop(_elliot_L,1);
+                }
+            }
+        }
+        n = ac_scan_methods(varname, mprefix, matches, 256);
+        for(int i=0;i<n;i++){
+            comp_add(matches[i], prefix, plen);
+            free(matches[i]);
+        }
+    }
+
+    /* Fallback: cache + luar se ac_scan_methods não achou nada */
+    if(E.comp.count==before){
+        scan_ee_cache(prefix, plen);
+        scan_ac_cache(prefix, plen);
+    }
+    if(E.comp.count==before)
+        scan_file_requires(prefix, plen);
+    if(E.comp.count==before)
+        ee_introspect_methods(varname, mprefix, mplen);
+
+    return E.comp.count > before ? 1 : 0;
 }
 
 /* Escaneia o arquivo atual por declarações Lua:
@@ -130580,18 +130922,18 @@ static void scan_current_file(const char *prefix, int plen) {
 
 static void comp_apply(void);  /* forward decl */
 static void comp_open(void) {
-    /* ── Contextos especiais têm prioridade ── */
-    if (E.syntax && (E.syntax == &HLDB[0])) {   /* C / C++ */
-        if (comp_open_include()) return;
+    if (E.syntax && (E.syntax == &HLDB[0])) { if (comp_open_include()) return; }
+    if (E.syntax && E.syntax == &HLDB[1])   { if (comp_open_require()) return; }
+    char prefix[128]; int plen = get_prefix(prefix, sizeof(prefix));
+    comp_close(); if (plen < 1) return;
+    if (strchr(prefix, ':') || strchr(prefix, '.')) {
+        comp_open_method(prefix, plen);
+        if (!E.comp.count) return;
+        E.comp.selected=0; E.comp.active=1;
+        E.comp.trigger_cx=E.cx-plen; E.comp.trigger_cy=E.cy;
+        if (E.comp.count==1) { comp_apply(); return; }
+        return;
     }
-    if (E.syntax && E.syntax == &HLDB[1]) {   /* Lua */
-        if (comp_open_require()) return;
-    }
-
-    char prefix[128];
-    int plen = get_prefix(prefix, sizeof(prefix));
-    comp_close();
-    if (plen < 1) return;
 
     /* Ordem por relevância: primeiro o que é mais provável de ser o que o
      * usuário quer (símbolos do próprio arquivo, builtins conhecidos,
@@ -130647,17 +130989,111 @@ static void comp_open(void) {
 
 /* Como comp_open(), mas nunca auto-aplica — só exibe popup (live typing) */
 static void comp_open_live(void) {
-    if (E.syntax && (E.syntax == &HLDB[0])) {
-        if (comp_open_include()) return;
+    if (E.syntax && (E.syntax == &HLDB[0])) { if (comp_open_include()) return; }
+    if (E.syntax && E.syntax == &HLDB[1])   { if (comp_open_require()) return; }
+    char prefix[128]; int plen = get_prefix(prefix, sizeof(prefix));
+    comp_close(); if (plen < 1) return;
+    if (strchr(prefix, ':') || strchr(prefix, '.')) {
+        /* Verifica se varname existe no arquivo */
+        {
+            const char *sep2=NULL;
+            for(int _i=plen-1;_i>=0;_i--){
+                if(prefix[_i]==':'||prefix[_i]=='.'){sep2=prefix+_i;break;}
+            }
+            if(sep2&&sep2>prefix){
+                char _vn[128]={0}; int _vl=(int)(sep2-prefix);
+                if(_vl<128){ memcpy(_vn,prefix,_vl);
+                    char _ct[128]={0};
+                    if(!ee_find_ctor(_vn,_ct,sizeof(_ct))) return;
+                }
+            }
+        }
+        /* Usa comp_open_method que chama ac_scan_methods via lua_State */
+        comp_open_method(prefix, plen);
+        if (E.comp.count > 0) {
+            if (E.comp.count==1 && (int)strlen(E.comp.items[0])==plen
+                && !strncmp(E.comp.items[0],prefix,plen)) { comp_close(); return; }
+            E.comp.selected=0; E.comp.active=1;
+            E.comp.trigger_cx=E.cx-plen; E.comp.trigger_cy=E.cy;
+            return;
+        }
+        /* Fallback: lança introspecção em background para esta variável */
+        {
+            const char *sep3=NULL;
+            for(int _i=plen-1;_i>=0;_i--){
+                if(prefix[_i]==':'||prefix[_i]=='.'){sep3=prefix+_i;break;}
+            }
+            if(sep3&&sep3>prefix){
+                char _vn2[128]={0}; int _vl2=(int)(sep3-prefix);
+                if(_vl2<128){
+                    memcpy(_vn2,prefix,_vl2);
+                    char _ct2[128]={0};
+                    if(ee_find_ctor(_vn2,_ct2,sizeof(_ct2))){
+                        /* Monta script de introspecção para esta var */
+                        const char *_home=getenv("HOME");
+                        if(_home){
+                            char _tmp[512];
+                            snprintf(_tmp,sizeof(_tmp),"%s/.elliot_ee_ac.lua",_home);
+                            FILE *_tf=fopen(_tmp,"w");
+                            if(_tf){
+                                if(strncmp(_ct2,"require:",8)==0){
+                                    fprintf(_tf,
+                                        "local ok,_m=pcall(require,'%s')\n"
+                                        "if not ok or type(_m)~='table' then return end\n"
+                                        "for k,v in pairs(_m) do\n"
+                                        "  if type(k)=='string' and k:sub(1,1)~='_' and type(v)=='function' then\n"
+                                        "    io.write('%s.'..k..'(\\n')\n"
+                                        "  end\n"
+                                        "end\n",
+                                        _ct2+8, _vn2);
+                                } else {
+                                    const char *_dot=strchr(_ct2,'.');
+                                    if(_dot){
+                                        char _mod[64]={0},_fn[64]={0};
+                                        int _pl=(int)(_dot-_ct2);
+                                        if(_pl>0&&_pl<64){
+                                            memcpy(_mod,_ct2,_pl);
+                                            strncpy(_fn,_dot+1,63);
+                                            fprintf(_tf,
+                                                "local ok,_m=pcall(require,'%s')\n"
+                                                "if not ok then return end\n"
+                                                "local ok2,_o=pcall(function() return _m['%s']() end)\n"
+                                                "if not ok2 or _o==nil then\n"
+                                                "  for _,a in ipairs({'tcp','udp','tcp6','unix','http'}) do\n"
+                                                "    ok2,_o=pcall(function() return _m['%s'](a) end)\n"
+                                                "    if ok2 and _o~=nil then break end\n"
+                                                "  end\n"
+                                                "end\n"
+                                                "if not ok2 or _o==nil then return end\n"
+                                                "local mt=getmetatable(_o)\n"
+                                                "local idx=mt and(type(mt.__index)=='table' and mt.__index or mt) or nil\n"
+                                                "if idx then for k in pairs(idx) do\n"
+                                                "  if type(k)=='string' and k:sub(1,1)~='_' then\n"
+                                                "    io.write('%s:'..k..'(\\n')\n"
+                                                "  end\n"
+                                                "end end\n",
+                                                _mod,_fn,_fn,_vn2);
+                                        }
+                                    }
+                                }
+                                fclose(_tf);
+                                char *_cmd=malloc(600);
+                                if(_cmd){
+                                    snprintf(_cmd,600,"luar '%s' 2>/dev/null; rm -f '%s'",_tmp,_tmp);
+                                    pthread_t _tid; pthread_attr_t _attr;
+                                    pthread_attr_init(&_attr);
+                                    pthread_attr_setdetachstate(&_attr,PTHREAD_CREATE_DETACHED);
+                                    pthread_create(&_tid,&_attr,ee_preload_cache_thread,_cmd);
+                                    pthread_attr_destroy(&_attr);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return;
     }
-    if (E.syntax && E.syntax == &HLDB[1]) {   /* Lua */
-        if (comp_open_require()) return;
-    }
-
-    char prefix[128];
-    int plen = get_prefix(prefix, sizeof(prefix));
-    comp_close();
-    if (plen < 1) return;
 
     /* Keywords primeiro — ver comentário em comp_open().
      * kw_types do Lua (lua_ns) = nomes de módulo: só entra se required. */
@@ -130836,6 +131272,14 @@ static void insert_char(int c) {
 }
 
 static void insert_newline(void) {
+    /* Se a linha tem require(...) ou padrão var=mod.func(), dispara preload */
+    if (E.cy < E.numrows) {
+        char *_s = E.row[E.cy].chars;
+        char *_dot = strchr(_s, '.');
+        int _trigger = (strstr(_s, "require(") || strstr(_s, "require ("))
+                    || (_dot && strchr(_s,'=') && strstr(_dot,"()"));
+        if (_trigger) ee_preload_cache_for_file();
+    }
     if (E.cx == 0) {
         insert_row(E.cy, "", 0);
         E.cy++;
@@ -135251,10 +135695,170 @@ static void buf_switch(int idx) {
 static void buf_next(void) { buf_switch((E.buf_idx+1) % E.buf_count); }
 static void buf_prev(void) { buf_switch((E.buf_idx+E.buf_count-1) % E.buf_count); }
 
+/* Roda em background: escaneia requires do arquivo e popula cache */
+static void *ee_preload_cache_thread(void *arg) {
+    char *script = (char *)arg;
+    FILE *fp = popen(script, "r");
+    free(script);
+    if (!fp) return NULL;
+    const char *home = getenv("HOME");
+    char cachepath[512] = {0};
+    if (home) snprintf(cachepath, sizeof(cachepath), "%s/.elliot_ee_ac_cache", home);
+    FILE *cf = cachepath[0] ? fopen(cachepath, "a") : NULL;
+    char line[256];
+    int wrote = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        int l = (int)strlen(line);
+        while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = '\0';
+        if (l > 0 && cf) { fprintf(cf, "%s\n", line); wrote = 1; }
+    }
+    pclose(fp);
+    if (cf) { fclose(cf); }
+    /* Sinaliza editor para re-disparar live completion */
+    if (wrote) kill(getpid(), SIGUSR1);
+    return NULL;
+}
+
+static void ee_preload_cache_for_file(void) {
+    /* Só para arquivos Lua */
+    if (!E.syntax || E.syntax != &HLDB[1]) return;
+    /* Monta script Lua que inspeciona todos os requires do arquivo */
+    char luacode[4096] = {0};
+    int llen = 0;
+    llen += snprintf(luacode + llen, sizeof(luacode) - llen,
+        "local mods={}\n");
+    for (int y = 0; y < E.numrows && llen < (int)sizeof(luacode) - 256; y++) {
+        char *s = E.row[y].chars; int sz = E.row[y].size;
+        /* Procura: varname = require("modname") */
+        char *req = strstr(s, "require(");
+        if (!req) req = strstr(s, "require (");
+        if (!req) continue;
+        /* Extrai varname (antes do '=') */
+        char varname[64] = {0};
+        char *eq = strchr(s, '=');
+        if (!eq || eq >= req) continue;
+        char *vs = s; while (*vs == ' ' || *vs == '\t') vs++;
+        if (strncmp(vs, "local", 5) == 0) { vs += 5; while (*vs == ' ' || *vs == '\t') vs++; }
+        int vl = 0;
+        while (vs[vl] && (isalnum((unsigned char)vs[vl]) || vs[vl] == '_')) vl++;
+        if (vl <= 0 || vl >= 64) continue;
+        memcpy(varname, vs, vl);
+        /* Extrai modname (dentro das aspas) */
+        char *q1 = strchr(req, '"'); if (!q1) q1 = strchr(req, '\'');
+        if (!q1) continue; q1++;
+        char *q2 = strchr(q1, q1[-1]); if (!q2) continue;
+        int ml = (int)(q2 - q1); if (ml <= 0 || ml >= 64) continue;
+        char modname[64] = {0}; memcpy(modname, q1, ml);
+        /* Também busca objetos criados por varmod.func() no arquivo */
+        char objvars[8][64] = {0}; char objfns[8][64] = {0}; int nobj = 0;
+        for (int z = 0; z < E.numrows && nobj < 8; z++) {{
+            char *zs = E.row[z].chars;
+            /* Padrão: objvar = varname.func() */
+            char *zeq = strchr(zs, '=');
+            if (!zeq) continue;
+            char *zdot = strchr(zs, '.');
+            if (!zdot || zdot >= zeq) continue;
+            /* verifica que antes do ponto está varname */
+            char *zvs = zs; while (*zvs==' '||*zvs=='\t') zvs++;
+            if (strncmp(zvs,"local",5)==0){{zvs+=5;while(*zvs==' '||*zvs=='\t')zvs++;}}
+            /* pula se começa com varname. mas extrai obj varname */
+            char *zdot2 = strchr(zvs, '.');
+            if (!zdot2 || zdot2 >= zeq) continue;
+            int zpfxlen = (int)(zdot2 - zvs);
+            if (zpfxlen != vl || strncmp(zvs, varname, vl) != 0) continue;
+            /* extrai nome da função após o ponto */
+            char *zfn = zdot2 + 1; int zfl = 0;
+            while (zfn[zfl] && (isalnum((unsigned char)zfn[zfl])||zfn[zfl]=='_')) zfl++;
+            if (zfl <= 0 || zfl >= 64) continue;
+            /* extrai nome da variável do objeto (antes do =) */
+            /* precisa ir para antes do varname. para achar o nome do objeto */
+            /* o padrão é: objvar = varname.func() → objvar está antes do '=' */
+            /* mas zvs já aponta pro começo da linha, e varname. está ali */
+            /* então objvar não está aqui, está na linha do tipo: obj = varname.func() */
+            /* zvs aponta para o início do identifier antes do '.' */
+            /* Isso significa: zvs..zdot2 = "varname" e o objeto é... */
+            /* Precisamos do identifier ANTES de zvs na linha */
+            /* Na verdade zvs JÁ aponta para o primeiro identifier da linha */
+            /* Se a linha é "tcp = s.tcp()" então zvs="tcp", zdot2 aponta ao '.', */
+            /* mas zpfxlen seria len("tcp") não len("s") */
+            /* Então preciso reinterpretar: zvs é o objvar, e o padrão é objvar = modvar.func() */
+            /* Resetar: pula whitespace e local, aí lê objvar até espaço/= */
+            char *lp = zs; while(*lp==' '||*lp=='\t') lp++;
+            if(strncmp(lp,"local",5)==0){{lp+=5;while(*lp==' '||*lp=='\t')lp++;}}
+            int ovl=0; while(lp[ovl]&&(isalnum((unsigned char)lp[ovl])||lp[ovl]=='_'))ovl++;
+            if(ovl<=0||ovl>=64) continue;
+            char objv[64]={0}; memcpy(objv,lp,ovl);
+            /* Agora verifica que após objvar vem "= varname.func()" */
+            char *after=lp+ovl; while(*after==' '||*after=='\t') after++;
+            if(*after!='=') continue; after++;
+            while(*after==' '||*after=='\t') after++;
+            /* verifica varname. */
+            if(strncmp(after,varname,vl)!=0||after[vl]!='.') continue;
+            char *fn=after+vl+1; int fnl=0;
+            while(fn[fnl]&&(isalnum((unsigned char)fn[fnl])||fn[fnl]=='_'))fnl++;
+            if(fnl<=0||fnl>=64) continue;
+            memcpy(objvars[nobj],objv,ovl);
+            memcpy(objfns[nobj],fn,fnl);
+            nobj++;
+        }}
+        llen += snprintf(luacode + llen, sizeof(luacode) - llen,
+            "do local ok,m=pcall(require,'%s')\n"
+            "if ok and type(m)=='table' then\n"
+            "  for k,v in pairs(m) do\n"
+            "    if type(k)=='string' and k:sub(1,1)~='_' and type(v)=='function' then\n"
+            "      io.write('%s.'..k..'(\\n')\n"
+            "    end\n"
+            "  end\n"
+            "end end\n",
+            modname, varname);
+        /* Para cada objeto encontrado no arquivo, popula métodos */
+        for (int oi = 0; oi < nobj; oi++) {
+            llen += snprintf(luacode + llen, sizeof(luacode) - llen,
+                "do local ok,m=pcall(require,'%s')\n"
+                "if ok and type(m['%s'])=='function' then\n"
+                "  local ok2,o=pcall(m['%s'])\n"
+                "  if ok2 and o~=nil then\n"
+                "    local mt=getmetatable(o)\n"
+                "    local idx=mt and(type(mt.__index)=='table' and mt.__index or mt) or nil\n"
+                "    if idx then for k in pairs(idx) do\n"
+                "      if type(k)=='string' and k:sub(1,1)~='_' then\n"
+                "        io.write('%s:'..k..'(\\n')\n"
+                "      end\n"
+                "    end end\n"
+                "  end\n"
+                "end end\n",
+                modname, objfns[oi], objfns[oi], objvars[oi]);
+        }
+    }
+    if (llen <= (int)strlen("local mods={}\n")) return; /* nada encontrado */
+    /* Escreve script em arquivo temp */
+    const char *home = getenv("HOME");
+    if (!home) return;
+    /* Recria o cache do ee (não o do REPL) para não acumular entradas antigas */
+    char _eecache[512]={0};
+    snprintf(_eecache,sizeof(_eecache),"%s/.elliot_ee_ac_cache",home);
+    remove(_eecache);
+    char tmppath[512];
+    snprintf(tmppath, sizeof(tmppath), "%s/.elliot_ee_preload.lua", home);
+    FILE *tf = fopen(tmppath, "w");
+    if (!tf) return;
+    fputs(luacode, tf); fclose(tf);
+    /* Monta comando e lança thread */
+    char *cmd = malloc(600);
+    if (!cmd) { remove(tmppath); return; }
+    snprintf(cmd, 600, "luar '%s' 2>/dev/null; rm -f '%s'", tmppath, tmppath);
+    pthread_t tid;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&tid, &attr, ee_preload_cache_thread, cmd);
+    pthread_attr_destroy(&attr);
+}
+
 static void open_file(const char *fname) {
     free(E.filename); E.filename = strdup(fname);
     FILE *fp = fopen(fname, "r");
-    if (!fp) { if (errno == ENOENT) { select_syntax(); return; } die("fopen"); }
+    if (!fp) { if (errno == ENOENT) { select_syntax(); ee_preload_cache_for_file(); return; } die("fopen"); }
     char *line = NULL; size_t cap = 0; ssize_t len;
     while ((len = getline(&line, &cap, fp)) != -1) {
         while (len > 0 && (line[len-1] == '\r' || line[len-1] == '\n')) len--;
@@ -135265,6 +135869,7 @@ static void open_file(const char *fname) {
     select_syntax();
     restore_cursor_pos();
     buf_register(fname);
+    ee_preload_cache_for_file();
 }
 
 static void save_file(void) {
@@ -135283,6 +135888,7 @@ static void save_file(void) {
     snprintf(E.statusmsg, sizeof(E.statusmsg),
         "\x1b[32m✓\x1b[m %d bytes salvos em \"%s\"", len, E.filename);
     E.statusmsg_time = time(NULL);
+    ee_preload_cache_for_file();
 }
 
 /* ════════════════════════════════════════════════════════
@@ -136926,7 +137532,7 @@ static void process_key(void) {
             electric_deindent(); /* recua else/elseif/end/until automaticamente */
 
             /* completion ao vivo — popup aparece enquanto digita */
-            if (isalnum(c) || c == '_' || c == '.') {
+            if (isalnum(c) || c == '_' || c == '.' || c == ':') {
                 comp_open_live();
             } else {
                 comp_close();
@@ -137041,6 +137647,8 @@ int main(int argc, char *argv[]) {
 
     raw_on();
     signal(SIGWINCH, handle_resize);
+    signal(SIGUSR1, handle_cache_ready);
+    elliot_ac_init_L(); /* inicia carregamento do lua_State em background */
     init();
 
     /* ── Warm-up do cache de autocompletar ─────────────────────────────
@@ -137121,6 +137729,19 @@ int main(int argc, char *argv[]) {
             g_needs_redraw = 0;
             refresh_screen();
         }
+        /* Cache de autocomplete atualizado pela thread de preload */
+        if (g_cache_updated) {
+            g_cache_updated = 0;
+            /* Re-dispara live completion se cursor está após '.' ou ':' */
+            if (E.cy < E.numrows && E.cx > 0) {
+                char *row = E.row[E.cy].chars;
+                char prev = (E.cx > 0) ? row[E.cx-1] : 0;
+                if (prev == '.' || prev == ':') {
+                    comp_open_live();
+                    g_needs_redraw = 1;
+                }
+            }
+        }
         process_key(); /* bloqueia até 100ms esperando input */
     }
     return 0;
@@ -137129,14 +137750,14 @@ int main(int argc, char *argv[]) {
 EDITOR_C_EOF
     if [ "$INSTALL_SQ" = "1" ]; then
         printf "\n\033[1;36m── Compilando editor.c ──────────────────────────────────────\033[0m\n"
-        clang -O2 -o "$_EE_BIN" "$_EE_SRC" 2>&1 || \
-            cc -O2 -o "$_EE_BIN" "$_EE_SRC" 2>&1 || {
+        clang -O2 -o "$_EE_BIN" "$_EE_SRC" -I"$LUA_INC" -I"${_TPFX}/include" -L"${_TPFX}/lib" -lpthread -llua-net 2>&1 || \
+            cc -O2 -o "$_EE_BIN" "$_EE_SRC" -I"$LUA_INC" -I"${_TPFX}/include" -L"${_TPFX}/lib" -lpthread -llua-net 2>&1 || {
             _warn "Falha ao compilar editor.c"
             return 1
         }
     else
-        clang -O2 -o "$_EE_BIN" "$_EE_SRC" 2>/dev/null || \
-            cc -O2 -o "$_EE_BIN" "$_EE_SRC" || {
+        clang -O2 -o "$_EE_BIN" "$_EE_SRC" -I"$LUA_INC" -I"${_TPFX}/include" -L"${_TPFX}/lib" -lpthread -llua-net 2>/dev/null || \
+            cc -O2 -o "$_EE_BIN" "$_EE_SRC" -I"$LUA_INC" -I"${_TPFX}/include" -L"${_TPFX}/lib" -lpthread -llua-net || {
             _warn "Falha ao compilar editor.c"
             return 1
         }
