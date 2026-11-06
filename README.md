@@ -33,6 +33,7 @@
 - [ms — Referência de flags](#ms--referência-de-flags)
 - [REPL ms — Recursos avançados](#repl-ms--recursos-avançados)
 - [Comandos especiais do REPL](#comandos-especiais-do-repl)
+- [Namespaces de módulo](#namespaces-de-módulo)
 - [Módulos da API](#módulos-da-api)
   - [net.\*](#net--rede)
   - [mod.\*](#mod--pentest-scanners)
@@ -189,10 +190,15 @@ bash luascript.sh --doctor
 | `-e` / `--editor` | Instala o editor MoonStyle (ee) |
 | `--gui` | Instala XFCE4 via Termux:X11 |
 | `--update` | Recompila binário e atualiza scripts (sem reinstalar deps) |
+| `--update-ee` / `--ee` | Recompila apenas o editor `ee` (sem reinstalar o resto) |
 | `--doctor` | Diagnóstico da instalação atual |
 | `-u` / `--uninstall` | Desinstala o ElliotOS (deps mantidas) |
-| `-ua` / `--uninstall-all` | Desinstala tudo, inclusive dependências |
+| `-ua` | Desinstala tudo, inclusive dependências |
+| `-b` | Compila o binário sem instalar (build only) |
+| `-s` / `--skip-password` | Pula confirmação de senha durante a instalação |
 | `-sq` | Output verbose da compilação (sem barra de progresso) |
+| `--stryker` | Build para StrykerOS/proot Debian — conservador (1 CPU, -O0, lotes de 4) |
+| `--sudo` | Confirma root real (uid=0, sem PRoot/fakeroot). Ativa `net.socket.raw()` — raw sockets (ICMP, TCP raw). Requer root verdadeiro ou CAP_NET_RAW |
 | `-h` / `--help` | Exibe ajuda completa |
 
 > A instalação compila tudo do zero e leva cerca de **15 a 20 minutos** dependendo do dispositivo. Nenhuma etapa exige root.
@@ -224,30 +230,58 @@ ms -a
 
 A CYN é a inteligência artificial integrada diretamente no ElliotOS. Ela conhece todos os módulos, flags, funções e a arquitetura do sistema. Responde sempre em português, é técnica, objetiva e focada em segurança.
 
-O backend usa `tgpt`. Providers disponíveis:
+O backend usa `tgpt` (padrão — gratuito, sem API key). Se `tgpt` não estiver disponível, usa `libcurl` como fallback.
 
-| Provider | Gratuito | Modelo padrão |
-|----------|----------|---------------|
-| `sky` | ✓ (recomendado) | gpt-4.1-mini |
+### Providers tgpt (sem key)
+
+| Provider | Gratuito | Observação |
+|----------|----------|------------|
+| `opencode` | ✓ (padrão) | recomendado |
 | `pollinations` | ✓ | — |
-| `isou` | ✓ | — |
-| `ollama` | ✓ (local) | — |
-| `koboldai` | ✓ | — |
-| `groq` | requer key | llama-3.3-70b-versatile |
-| `openai` | requer key | — |
-| `gemini` | requer key | — |
-| `deepseek` | requer key | — |
+| `ollama` | ✓ (local) | llama3, mistral, codellama... |
+| `koboldai` | ✓ (local) | ficção/RP |
 
-Configuração via REPL:
-```lua
-ai.provider('sky')                             -- sem chave (recomendado)
-ai.provider('groq','llama-3.3-70b-versatile')  -- requer ai.key()
-ai.key('sua-chave-aqui')
-ai.model('gemma27')
-ai.clear()   -- limpa histórico
+### Providers libcurl (fallback)
+
+| Provider | Key | Modelos |
+|----------|-----|---------|
+| `openrouter` | não | vários modelos gratuitos |
+| `groq` | sim (gratuita) | llama-3.3-70b, mixtral |
+| `gemini` | sim (gratuita) | gemini-2.5-flash, 2.5-pro |
+| `openai` | sim (pago) | gpt-4o, gpt-4o-mini |
+| `deepseek` | sim (pago) | deepseek-chat, deepseek-reasoner |
+
+### Configuração via variáveis de ambiente (tgpt)
+
+```bash
+export AI_PROVIDER=groq             # provider tgpt
+export AI_API_KEY=sua-chave         # key para providers pagos
+export AI_ROTATE_PROVIDERS=opencode,groq,pollinations  # fallback automático
 ```
 
-Para uma chave gratuita do Gemini: [aistudio.google.com](https://aistudio.google.com)
+### Configuração via REPL
+
+```lua
+-- provider e modelo
+ai.provider('groq', 'llama-3.3-70b-versatile')
+ai.key('sua-chave-aqui')
+
+-- trocar modelo do fallback libcurl
+ai.provider('gemini', 'gemini-2.5-flash')
+
+-- provider customizado
+ai.provider({base_url='https://...', model='nome', api_key='...'})
+
+-- modelos do slot "code" (ms --code)
+ai.add('openai/gpt-oss-120b', 'code')   -- define modelo para geração de código
+ai.remove('code')                        -- remove slot
+ai.models_code()                         -- lista modelos recomendados para código
+
+-- histórico
+ai.clear()   -- limpa histórico de conversa
+```
+
+> Para uma chave gratuita do Gemini: [aistudio.google.com](https://aistudio.google.com)
 
 ---
 
@@ -275,7 +309,9 @@ ms -a 'pergunta'              # pergunta direta
 ms -A 'pergunta'              # resposta raw sem formatação
 ms -a -f arq 'pergunta'       # passa arquivo como contexto para a CYN
 ms --search 'query'           # pesquisa na web via DuckDuckGo e resume
-ms --code [-o arq] 'tarefa'   # gera código/script (-o salva no arquivo)
+ms --code 'tarefa'            # gera código/script sem restrições
+ms --code -o arq 'tarefa'     # gera e salva diretamente no arquivo
+ms --code -f arq 'tarefa'     # passa arquivo como contexto para geração
 ```
 
 **Rede**
@@ -417,7 +453,7 @@ As palavras são coloridas **instantaneamente** enquanto você digita, sem delay
 | Strings (`"..."`, `'...'`) | Verde |
 | Números | Amarelo |
 | Comentários (`--`) | Cinza |
-| Módulos (`void.`, `net.`, `mod.`) | Azul claro |
+| Módulos (`net.`, `mod.`, `ai.`...) | Azul claro |
 | Operadores (`+`, `-`, `==`, `..`) | Amarelo |
 | Chamadas de função (`nome(`) | Roxo |
 
@@ -437,9 +473,9 @@ Se o próximo caractere já é o par de fechamento, o cursor apenas avança (sem
 
 ### Tab completion inteligente
 
-- **Módulos:** digitar `void` + Tab insere automaticamente o `.` e exibe os métodos disponíveis (`void.tcp(`, `void.udp(`, `void.syn(`)
-- **Métodos:** `void.` + Tab lista os métodos do módulo
-- **`require("@user/`** + Tab lista arquivos do `$HOME/` com **case-insensitive** — funciona mesmo se o diretório começa com letra maiúscula (ex: `Downloads/`)
+- **Módulos:** digitar `net` + Tab insere automaticamente o `.` e exibe os métodos disponíveis
+- **Métodos:** `net.` + Tab lista os métodos do módulo
+- **`require("@user/`** + Tab lista arquivos do `$HOME/.lua-modules/` com **case-insensitive**
 - **`require("@std/`** + Tab lista módulos do sistema
 - **Globals Lua:** variáveis e funções definidas na sessão atual
 - **Keywords:** palavras-chave da linguagem
@@ -477,35 +513,91 @@ Os comandos abaixo **não são funções Lua** — não precisam de `()`. São i
 
 ---
 
-## Módulos da API
+## Namespaces de módulo
 
-Os módulos do ElliotOS são acessados via `require("@std")` — não são globais automaticamente em scripts `.lua` rodados com `lua-net` diretamente. No REPL (`ms`) e nos scripts executados com `ms -f`, o `require("@std")` já é chamado automaticamente.
+O ElliotOS usa três prefixos de namespace para o `require()`. Não existe `sys.namespace()` nem mecanismo especial — são apenas convenções do loader.
 
-### Como carregar os módulos
+| Namespace | O que é | Sintaxe |
+|-----------|---------|---------|
+| `@std` | Módulos builtin do ElliotOS | `require('@std')` ou `require('@std/net')` |
+| `@user` | Módulos Lua do próprio usuário | `require('@user/nome')` |
+| `@cmd` | Registra comandos para uso sem parênteses no REPL | `require('@cmd/prog')` |
+
+### `@std` — módulos builtin
 
 ```lua
--- Carrega todos os módulos de uma vez (recomendado)
-require("@std")
--- Após isso: net, fs, sys, ai, crypto, db, mod, etc. ficam disponíveis como globais
-
--- Carrega um módulo específico (retorna o módulo)
-local net = require("@std/net")
-local fs  = require("@std/fs")
-local mod = require("@std/mod")
-
--- Carrega módulo do usuário (arquivo em $HOME/)
-local meu = require("@user/Downloads/main")
--- → carrega $HOME/Downloads/main.lua
-
--- Módulos disponíveis via @std
--- net, fs, sys, sh, ai, crypto, db, mod, ms, ui, tui, web,
--- pent, exploit, lmod, agent, adb, util, json, re, cc, ivar,
--- dow, log, csv, try, str
+#!/usr/bin/env ms
+require('@std')   -- injeta TODOS os módulos em _G
 ```
 
-> **No REPL `ms`:** `require("@std")` é chamado automaticamente — todos os módulos ficam disponíveis como globais sem nenhuma chamada adicional.  
-> **Em scripts `ms -f script.lua`:** idem — o prelude já executa `require("@std")` antes do seu script.  
-> **Em scripts `lua-net script.lua` direto:** adicione `require("@std")` no topo do arquivo.
+Módulos disponíveis após `require('@std')`:
+`net` `fs` `sys` `sh` `ai` `crypto` `db` `mod` `ms` `ui` `tui` `web` `pent` `exploit` `lmod` `agent` `adb` `util` `json` `re` `cc` `ivar` `dow` `back` `str` `lx` `log` `csv` `num` `colors` `test` `try`
+
+Também é possível carregar módulos individuais:
+
+```lua
+require('@std/net')       -- carrega só net em _G
+require('@std/fs')        -- carrega só fs em _G
+-- Aliases: @std/http → net | @std/time → sys
+-- Subaninhado: require('@std/net/tcp') → retorna net.tcp
+```
+
+> **No REPL `ms`:** `require('@std')` é executado automaticamente — todos os módulos ficam disponíveis como globais.  
+> **Em `ms -f script.lua`:** idem — o prelude já executa `require('@std')`.  
+> **Em `lua-net script.lua` direto:** adicione `require('@std')` no topo do arquivo.
+
+### `@user` — módulos do usuário
+
+```lua
+require('@user/meu_modulo')      -- busca ~/.lua-modules/meu_modulo.lua
+require('@user/libs/helper')     -- suporta subdiretórios
+```
+
+- **Sintaxe:** sempre barra `/` — nunca ponto. `require('@user.mod')` está **errado**.
+- **Ordem de busca:** `~/.lua-modules/` → `~/.luarocks/` → `~/`
+- Auto-injeta o nome curto em `_G`
+- Passa pelo preprocessador ivar/trif
+
+**Exemplo** — arquivo `~/.lua-modules/utils.lua`:
+
+```lua
+local M = {}
+function M.hello(name)
+    return 'Olá, ' .. (name or 'Usuário') .. '!'
+end
+return M
+```
+
+```lua
+require('@user/utils')
+print(utils.hello('CYN'))   -- utils já está em _G
+```
+
+### `@cmd` — comandos no REPL
+
+```lua
+require('@cmd/ffmpeg')   -- registra ffmpeg para uso sem parênteses no REPL
+require('@cmd/ping')     -- registra ping diretamente
+```
+
+- **Só funciona no REPL interativo** — não funciona em scripts `.lua`.
+- Permite chamar o comando diretamente sem parênteses no REPL.
+
+### Namespace Lua puro
+
+Para criar agrupamentos próprios em `_G`:
+
+```lua
+_G['meu_ns'] = _G['meu_ns'] or {}
+local t = _G['meu_ns']
+t.funcao = function(...) end
+```
+
+> **Não existe:** `sys.namespace()`, `ns.run()`, `ns.env`, `ns.kill()`
+
+---
+
+## Módulos da API
 
 ---
 
@@ -584,37 +676,29 @@ s:closed()      -- true/false
 
 **Exemplos:**
 ```lua
--- GET simples
 local body = net.get('http://site.com/')
 
--- POST com headers customizados
 local r, c = net.post('http://site.com/api', '{"id":1}',
                        'application/json',
                        {Authorization='Bearer TOKEN'})
 
--- DNS lookup
 local ips = net.dns('exemplo.com')
 for _, ip in ipairs(ips) do print(ip) end
 
--- SYN probe direto
 print(net.socket("ipv4","syn","1.1.1.1",80))
 -- → [SYN] 1.1.1.1:80 → open (+12ms)
 
--- SYN probe via net.syn → tabela estruturada
 local r = net.syn("alvo.com", 443)
 if r and r.open then print("aberta:", r.ms, "ms") end
 
--- Port scan completo
 local portas = net.scan('192.168.1.1', 1, 65535)
 for _, p in ipairs(portas) do print('aberta:', p) end
 
--- HTTP manual via socket OO
 local s = net.socketex("ipv4","stream","example.com",80)
 s:sendall("GET / HTTP/1.0\r\nHost: example.com\r\n\r\n")
 print(s:recvall())
 s:close()
 
--- Servidor TCP
 local srv = net.listen(8080)
 local cli = srv:accept()
 for line in cli:lines() do print(line) end
@@ -692,6 +776,7 @@ sys.thread(fn)          -- lança thread Lua isolada → tid
 sys.join(tid [,ms])     -- aguarda thread terminar → valor retornado
 sys.spawn(cmd)          -- executa comando em processo filho → PID
 sys.sh(cmd)             -- executa via /bin/sh em thread separada
+sys.capture(fn)         -- executa fn capturando stdout → string
 sys.list()              -- lista tasks ativas (threads + processos)
 sys.kill(id)            -- encerra task pelo ID
 sys.env(var)            -- lê variável de ambiente
@@ -709,6 +794,8 @@ sys.storage()           -- info de armazenamento: total, usado, livre
 sys.logo()              -- exibe logo ASCII do ElliotOS
 sys.help()
 ```
+
+> `sys.sh(cmd)` = fork sem captura de output. Para capturar: `sys.capture(fn)` ou `sh.read(cmd)`.
 
 **Exemplo — threads + canal:**
 ```lua
@@ -791,21 +878,64 @@ db.close()
 ### `ai.*` — Interface com a CYN
 
 ```lua
-ai.ask(msg)                     -- pergunta para a CYN (com histórico)
-ai.code(tarefa)                 -- gera código técnico otimizado
-ai.search(query)                -- pesquisa na web e resume
-ai.model(nome)                  -- troca modelo (flash, pro, gemma27...)
-ai.models_code()                -- lista modelos disponíveis para código
-ai.key(chave)                   -- define API key para o provider atual
-ai.provider(nome [,modelo])     -- troca provider (sky, groq, gemini, openai...)
-ai.list([modo])                 -- lista providers e modelos disponíveis
-ai.add(nome, url, modelo)       -- adiciona provider customizado
-ai.remove(nome)                 -- remove provider
-ai.raw_mode(bool)               -- ativa/desativa output raw (sem markdown)
-ai.history()                    -- exibe histórico da conversa atual
-ai.forget()                     -- remove última troca do histórico
-ai.clear()                      -- limpa todo o histórico de conversa
+ai.ask(msg)                        -- pergunta para a CYN (mantém histórico)
+ai.code(tarefa [,arquivo])         -- gera código técnico otimizado; arquivo opcional salva direto
+ai.search(query)                   -- pesquisa na web e resume
+ai.history()                       -- exibe histórico da conversa atual
+ai.forget()                        -- remove última troca do histórico
+ai.clear()                         -- limpa todo o histórico de conversa
+
+-- Modelo e provider
+ai.provider([nome [,modelo]])      -- mostra ou troca provider do fallback libcurl
+ai.model([nome])                   -- mostra modelo ativo ou lista modelos do provider
+ai.models_code()                   -- lista modelos recomendados para ms --code
+ai.key(chave)                      -- define API key para o provider libcurl atual
+
+-- Slots de modelo (persistidos em ~/.elliotai/models.json)
+ai.add(url_modelo, slot)           -- cadastra modelo em um slot nomeado
+                                   -- ex: ai.add('openai/gpt-oss-120b', 'code')
+ai.remove(slot)                    -- remove slot
+ai.list()                          -- lista slots cadastrados
+ai.main(slot_ou_modelo)            -- define modelo padrão do fallback libcurl
+
+-- Misc
+ai.raw_mode(bool)                  -- ativa/desativa output raw (sem markdown)
 ai.help()
+```
+
+**Slots especiais:**
+
+| Slot | Usado por | Padrão inicial |
+|------|-----------|----------------|
+| `"code"` | `ms --code` e `ai.code()` | `gpt-4o-mini` |
+| `"default"` | `ai.ask()` via libcurl | `gpt-4o-mini` |
+| `"pro"` | alias para modelos pesados | `gpt-4o` |
+
+> Os slots são persistidos em `~/.elliotai/models.json` e recarregados automaticamente a cada sessão.
+
+**Exemplos:**
+```lua
+-- Pergunta com histórico
+ai.ask('explica buffer overflow')
+
+-- Gerar código (usa slot "code")
+local code = ai.code('port scanner TCP em Lua usando net.tcp')
+print(code)
+
+-- Definir modelo para ms --code
+ai.add('openai/gpt-oss-120b', 'code')
+
+-- Trocar provider do fallback libcurl
+ai.provider('groq', 'llama-3.3-70b-versatile')
+ai.key('gsk_...')
+ai.ask('explica SQL injection')
+
+-- Ollama local (sem internet)
+ai.provider('ollama', 'llama3')
+ai.ask('explica SQL injection')
+
+ai.forget()   -- remove última troca
+ai.clear()    -- limpa tudo
 ```
 
 ---
@@ -890,7 +1020,7 @@ lmod.path()                -- mostra o diretório de módulos
 lmod.help()
 ```
 
-Módulos criados com `lmod` são carregados via `require('nome')` nos scripts.
+Módulos criados com `lmod` são carregados via `require('@user/nome')`.
 
 | Tipo | Descrição |
 |------|-----------|
@@ -910,7 +1040,6 @@ cc.help()
 ```
 
 ```lua
--- Exemplo cc.run:
 cc.run([[
   #include <stdio.h>
   int main() { printf("ola do C!\n"); return 0; }
@@ -1500,14 +1629,16 @@ ElliotOS/
 |---------|----------|
 | `$HOME/.lua-net-build` | Diretório de compilação |
 | `$HOME/.lua-cache` | Cache de downloads (fontes do Lua) |
-| `$HOME/.lua-modules` | Módulos do usuário (lmod) |
-| `$HOME/.elliotai` | Configuração e cache da CYN |
+| `$HOME/.lua-modules` | Módulos do usuário (`@user/`) |
+| `$HOME/.elliotai` | Configuração CYN, histórico e modelos persistidos |
 | `$HOME/.elliot` | Dados do usuário, scripts baixados via lpm |
 | `$HOME/.xpm/pins` | Versões pinadas pelo `xpm pin` |
 | `$HOME/.xpm/installed` | Metadados das ferramentas instaladas |
 | `$HOME/.elliot_logs` | Log de vulnerabilidades encontradas |
 | `$HOME/.elliot_ivar.cfg` | Estado persistente do ivar |
 | `$HOME/.elliot_history` | Histórico persistente do REPL (2000 entradas) |
+| `$HOME/.elliotai/models.json` | Slots de modelo cadastrados via `ai.add()` |
+| `$HOME/.elliot_ai.cfg` | Provider/modelo do fallback libcurl |
 | `$PREFIX/share/lua-scripts` | Scripts de exemplo do ElliotOS |
 | `$PREFIX/share/c-scripts` | Scripts C prontos |
 | `$PREFIX/share/lua-modules` | Módulos Lua do sistema |
